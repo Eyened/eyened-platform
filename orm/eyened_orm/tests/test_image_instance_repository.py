@@ -9,6 +9,7 @@ from eyened_orm import (
     Series,
     Study,
 )
+from eyened_orm.authz.scoping import projects_of
 from eyened_orm.project import ExternalEnum
 from eyened_orm.repositories.image_instance_repository import ImageInstanceRepository
 from eyened_orm.utils.factories import admin_scope
@@ -69,6 +70,30 @@ def test_get_full_graph_by_public_id_resolves_graph_and_digit_fallback(session):
     assert by_pk is not None and by_pk.ImageInstanceID == image_id
 
     assert repo.get_full_graph_by_public_id("no-such-id", **kw) is None
+
+
+def test_project_ids_for_images_agrees_with_the_shared_resolver(session):
+    """The batch gate and ``projects_of`` resolve an image the same way.
+
+    Both derive from ``_PARENT_OF``; re-forking either into its own hand-written
+    join chain is exactly the drift this disagreement would catch. The
+    single-project assertion keeps that comparison from passing vacuously on two
+    empty answers.
+    """
+    first_id = _make_image(session, "pub-batch-1")
+    second_id = _make_image(session, "pub-batch-2")
+    repo = ImageInstanceRepository(session, scope=admin_scope())
+
+    shared = {
+        image_id: projects_of(session, ImageInstance, image_id)
+        for image_id in (first_id, second_id)
+    }
+    assert all(len(projects) == 1 for projects in shared.values())
+    expected = {image_id: next(iter(p)) for image_id, p in shared.items()}
+    assert repo.project_ids_for_images([first_id, second_id]) == expected
+
+    # An id that resolves to no image stays absent -- the caller's 404 hinge.
+    assert repo.project_ids_for_images([first_id, -1]) == {first_id: expected[first_id]}
 
 
 def test_get_with_storage_by_public_id_found_and_missing(session):

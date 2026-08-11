@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import (
@@ -17,7 +16,7 @@ from eyened_orm import (
 )
 from eyened_orm.tag import FormAnnotationTagLink, SegmentationTagLink
 from eyened_orm.authz.scope import AccessScope
-from eyened_orm.authz.scoping import projects_of
+from eyened_orm.authz.scoping import project_ids_of_images, projects_of
 
 from ._scoped import scoped_one
 
@@ -115,14 +114,13 @@ class ImageInstanceRepository:
         projects are the input to the caller's check. Filtering it by the scope
         would make every check trivially pass. Listed in the read-coverage
         guard's exemptions.
+
+        Resolves through ``project_ids_of_images`` rather than its own join, so
+        this gate and the read filters share the one declaration of an image's
+        route to its project.
         """
         rows = self._session.execute(
-            select(ImageInstance.ImageInstanceID, Patient.ProjectID)
-            .select_from(ImageInstance)
-            .join(Series, Series.SeriesID == ImageInstance.SeriesID)
-            .join(Study, Study.StudyID == Series.StudyID)
-            .join(Patient, Patient.PatientID == Study.PatientID)
-            .where(ImageInstance.ImageInstanceID.in_(image_instance_ids))
+            project_ids_of_images(image_instance_ids)
         ).all()
         return {int(image_id): int(project_id) for image_id, project_id in rows}
 

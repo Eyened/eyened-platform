@@ -10,7 +10,7 @@ not match what the API requires.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from collections.abc import Set as AbstractSet
 
 from sqlalchemy import ColumnElement, Select, exists, select
@@ -43,6 +43,7 @@ __all__ = [
     "apply_scope",
     "project_ids_of_form_annotation",
     "project_ids_of_image",
+    "project_ids_of_images",
     "project_ids_of_model_segmentation",
     "project_ids_of_patient",
     "project_ids_of_segmentation",
@@ -207,6 +208,30 @@ def project_ids_of_image(image_instance_id: int) -> Select:
     return _project_ids_from(
         ImageInstance, ImageInstance.ImageInstanceID, image_instance_id
     )
+
+
+def project_ids_of_images(image_instance_ids: Sequence[int]) -> Select:
+    """``(ImageInstanceID, ProjectID)`` for a batch of images, in one query.
+
+    The batched sibling of ``project_ids_of_image``, for a gate that must judge
+    a whole list of caller-supplied ids at once. It walks the same
+    ``_PARENT_OF`` chain as everything else, so a change to the route -- a
+    denormalized column, an anchor move, a predicate added to a hop -- reaches
+    this gate with the read filters instead of leaving it resolving projects by
+    a stale route with nothing red.
+
+    Pairs, not the bare project ids ``project_ids_of_*`` return: the caller
+    needs to tell *which* id resolved to nothing, and an id absent from the
+    result is what its 404 is built on. No ``.distinct()`` for the same reason
+    -- every hop of the chain is many-to-one, so one image yields one row, and
+    de-duplicating pairs would not save a caller keying them by image anyway.
+    """
+    return _join_to_patient(
+        select(ImageInstance.ImageInstanceID, Patient.ProjectID).select_from(
+            ImageInstance
+        ),
+        ImageInstance,
+    ).where(ImageInstance.ImageInstanceID.in_(image_instance_ids))
 
 
 def project_ids_of_segmentation(segmentation_id: int) -> Select:
