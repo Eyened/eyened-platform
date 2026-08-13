@@ -29,6 +29,7 @@ from eyened_orm.commands.rbac import (
     grant_for_task_cmd,
     init_admin,
     reactivate_cmd,
+    set_admin_cmd,
 )
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
 from eyened_orm.utils.db_users import create_user
@@ -326,3 +327,36 @@ def test_init_admin_writes_no_audit_row_when_nothing_changed(session, stub_datab
     assert result.exit_code == 0, result.output
     assert "root: unchanged" in result.output
     assert _init_admin_audit(session) == []
+
+
+def test_set_admin_round_trip_persists_and_reports_each_outcome(
+    session, stub_database, alice
+):
+    """The shell commits (else the second invocation would see a non-admin
+    again), and the command distinguishes a change it made from one it found
+    already done. The --off leg is the point of the command: init-admin can
+    already do --on."""
+    on = CliRunner().invoke(set_admin_cmd, ["--user", "alice", "--on"])
+    assert on.exit_code == 0, on.output
+    assert "is now an administrator" in on.output
+    assert alice.IsAdmin is True
+
+    again = CliRunner().invoke(set_admin_cmd, ["--user", "alice", "--on"])
+    assert again.exit_code == 0, again.output
+    assert "already an administrator; no change" in again.output
+
+    off = CliRunner().invoke(set_admin_cmd, ["--user", "alice", "--off"])
+    assert off.exit_code == 0, off.output
+    assert "is no longer an administrator" in off.output
+    assert alice.IsAdmin is False
+
+
+def test_set_admin_on_an_unknown_user_is_a_clean_error_not_a_traceback(
+    session, stub_database
+):
+    """ClickException exits 1 with its message on the stream; an unhandled
+    LookupError exits 1 too, so the message is what separates them."""
+    result = CliRunner().invoke(set_admin_cmd, ["--user", "nosuchuser", "--off"])
+    assert result.exit_code == 1
+    assert "nosuchuser" in result.output
+    assert "Traceback" not in result.output

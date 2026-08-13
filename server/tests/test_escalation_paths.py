@@ -38,7 +38,8 @@ _ROOT = pathlib.Path(__file__).resolve().parents[2]
 # Creator(**data) both slip past it, so this bounds the obvious writes rather
 # than proving there are no others.
 _ISADMIN_WRITERS = {
-    "orm/eyened_orm/authz/bootstrap.py",  # ensure_admin, the only writer
+    "orm/eyened_orm/authz/bootstrap.py",       # ensure_admin
+    "orm/eyened_orm/authz/administration.py",  # set_admin
 }
 
 # Files permitted to call AccessScope.trusted(). Every entry is a path v0.3
@@ -117,8 +118,10 @@ def _python_sources():
                 yield here / name
 
 
-def test_only_ensure_admin_writes_is_admin():
-    """Creator.IsAdmin has exactly one writer, and it is the bootstrap."""
+def test_is_admin_is_written_only_by_the_allow_listed_writers():
+    """Creator.IsAdmin is written only from the reviewed, allow-listed set:
+    ensure_admin (the bootstrap) and set_admin (the audited, trusted-path CLI
+    flip). Anything else is an escalation path this test has not seen."""
     # Each guard's exact-set assertion doubles as its own positive control: a
     # walk that collapsed to nothing would fail all three, because every list is
     # non-empty. What that does NOT catch is the scan quietly narrowing back to

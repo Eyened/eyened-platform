@@ -37,6 +37,7 @@ __all__ = [
     "resolve_creator",
     "resolve_project",
     "revoke",
+    "set_admin",
 ]
 
 
@@ -376,5 +377,41 @@ def reactivate(session: Session, *, username: str) -> bool:
         entity="Creator",
         entity_id=creator.CreatorID,
         changes={"username": username, "inactive": {"old": True, "new": False}},
+    )
+    return True
+
+
+def set_admin(session: Session, *, username: str, is_admin: bool) -> bool:
+    """Set or clear administrator status on an existing account.
+
+    Returns False when the account is already in the requested state, so an
+    unchanged call writes no audit row -- the same idempotence rule `grant`
+    follows.
+
+    Creating is not offered: `init-admin` is the bootstrap (it create-or-
+    promotes and owns the password), and this is the flip on an account that
+    already exists.
+
+    **Demoting the last administrator is permitted.** `deactivate` above
+    already commits to this for the equivalent risk, and recovery here is
+    strictly cheaper than it is there: `eorm init-admin --username U` restores
+    administrator status from the CLI, with no database access at all. A guard
+    would block a state that one documented command undoes.
+    """
+    creator = resolve_creator(session, username)
+    if bool(creator.IsAdmin) is is_admin:
+        return False
+    creator.IsAdmin = is_admin
+    session.flush()
+    audit_trusted(
+        session,
+        command="set-admin",
+        action="UPDATE",
+        entity="Creator",
+        entity_id=creator.CreatorID,
+        changes={
+            "username": username,
+            "is_admin": {"old": not is_admin, "new": is_admin},
+        },
     )
     return True

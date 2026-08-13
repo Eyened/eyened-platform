@@ -19,6 +19,7 @@ from ..authz.administration import (
     plan_grant_for_tasks,
     reactivate,
     revoke,
+    set_admin,
 )
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
 from ..authz.roles import ProjectRole
@@ -250,7 +251,42 @@ def reactivate_cmd(username: str):
     click.echo(f"{username}: {'reactivated' if changed else 'already active'}")
 
 
+@click.command("set-admin")
+@click.option("--user", "username", required=True)
+@click.option(
+    "--on/--off",
+    "is_admin",
+    required=True,
+    help="Grant (--on) or clear (--off) administrator status.",
+)
+def set_admin_cmd(username: str, is_admin: bool):
+    """Set or clear administrator status on an existing account.
+
+    `init-admin` is the bootstrap and can also promote; this is the flip, and
+    the only way back down.
+    """
+    database = get_database()
+    with database.get_session() as session:
+        try:
+            changed = set_admin(session, username=username, is_admin=is_admin)
+        except LookupError as exc:
+            raise click.ClickException(str(exc)) from exc
+        session.commit()
+    if changed:
+        click.echo(
+            f"{username}: is now an administrator"
+            if is_admin
+            else f"{username}: is no longer an administrator"
+        )
+    else:
+        click.echo(
+            f"{username}: already an administrator; no change"
+            if is_admin
+            else f"{username}: already not an administrator; no change"
+        )
+
+
 rbac_commands = [
     init_admin, grant_cmd, revoke_cmd, grant_for_task_cmd,
-    grant_all_cmd, deactivate_cmd, reactivate_cmd,
+    grant_all_cmd, deactivate_cmd, reactivate_cmd, set_admin_cmd,
 ]
