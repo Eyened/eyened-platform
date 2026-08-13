@@ -1,5 +1,6 @@
 import pytest
 from datetime import date
+from types import SimpleNamespace
 
 from eyened_orm import (
     Creator,
@@ -27,7 +28,9 @@ from eyened_orm.repositories.tag_repository import TagRepository
 from server.services.acting_user import ActingUser
 from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.form_annotation_service import FormAnnotationService
-from eyened_orm.utils.factories import admin_scope
+from eyened_orm.authz.errors import NotVisibleError
+from eyened_orm.authz.roles import ProjectRole
+from eyened_orm.utils.factories import admin_scope, scope_for
 
 
 class FakeAudit:
@@ -571,3 +574,81 @@ def test_untag_logs_delete(session):
         "comment": "bye",
         "creator_id": actor.id,
     }
+
+
+def _scoped_service(session, scope) -> FormAnnotationService:
+    return FormAnnotationService(
+        FormAnnotationRepository(session, scope=scope),
+        ImageInstanceRepository(session, scope=scope),
+        TagRepository(session, scope=scope),
+        scope=scope,
+        audit=None,
+    )
+
+
+def _annotation_across_two_projects(session):
+    """An annotation anchored in project A, plus a patient in project B.
+
+    The destination is the point: ``update`` resolves the annotation's projects
+    as they are *now*, so a re-anchor is a write into a project the check never
+    named.
+    """
+    from eyened_orm.utils.factories import (
+        make_creator,
+        make_form_annotation,
+        make_form_schema,
+        make_patient,
+        make_project,
+    )
+
+    project_a = make_project(session, "move-A")
+    project_b = make_project(session, "move-B")
+    patient_a = make_patient(session, project_a, "pat-move-A")
+    patient_b = make_patient(session, project_b, "pat-move-B")
+    schema = make_form_schema(session, "move-schema")
+    author = make_creator(session, "move-author")
+    annotation = make_form_annotation(session, schema, patient_a, author)
+
+    ids = SimpleNamespace(
+        project_a=project_a.ProjectID,
+        project_b=project_b.ProjectID,
+        patient_a=patient_a.PatientID,
+        patient_b=patient_b.PatientID,
+        author=author.CreatorID,
+        annotation=annotation.FormAnnotationID,
+    )
+    session.commit()
+    session.expunge_all()
+    return ids
+
+
+def test_update_refuses_to_re_anchor_an_annotation_into_an_unreachable_project(session):
+    """A grader in A only cannot move their own annotation to a patient in B."""
+    ids = _annotation_across_two_projects(session)
+    scope = scope_for(ids.project_a, role=ProjectRole.grader, actor_id=ids.author)
+
+    with pytest.raises(NotVisibleError):
+        _scoped_service(session, scope).update(
+            ids.annotation, {"patient_id": ids.patient_b}
+        )
+
+    # Read back through the identity map deliberately: a check that ran *after*
+    # the setattr would leave the new value on the in-session row, and a fresh
+    # read after an expunge would not see it.
+    assert session.get(FormAnnotation, ids.annotation).PatientID == ids.patient_a
+
+
+def test_update_allows_a_re_anchor_between_two_projects_the_caller_holds(session):
+    """The check is the union of before and after, not a ban on re-anchoring."""
+    ids = _annotation_across_two_projects(session)
+    scope = scope_for(
+        ids.project_a, ids.project_b, role=ProjectRole.grader, actor_id=ids.author
+    )
+
+    _scoped_service(session, scope).update(
+        ids.annotation, {"patient_id": ids.patient_b}
+    )
+
+    session.commit()
+    session.expunge_all()
+    assert session.get(FormAnnotation, ids.annotation).PatientID == ids.patient_b

@@ -187,8 +187,21 @@ class FormAnnotationService:
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
         projects = self.repository.project_ids(annotation_id)
+        # ``patient_id`` re-anchors the row: a FormAnnotation's project is its
+        # patient's, so this write is as much *into* the destination project as
+        # out of the current one. Judged on the union of before and after --
+        # the shape ``SubTaskService.add_image`` uses, and the same destination
+        # check ``create`` makes above. Without the second half a grader in one
+        # project could push their annotation into a project they hold nothing
+        # in, where it reads as legitimate data and its own project_admin can
+        # no longer reach it.
+        projects_after = (
+            self.repository.project_ids_of_patient(updates["patient_id"])
+            if "patient_id" in updates
+            else set()
+        )
         self.scope.require(
-            projects,
+            projects | projects_after,
             ProjectRole.grader,
             entity="FormAnnotation",
             entity_id=annotation_id,
