@@ -57,7 +57,15 @@ _ADMIN_SCOPE_BUILDERS = {
 
 # Build artifacts that are genuinely recursive: these names mean the same thing
 # wherever they appear, so they are pruned at any depth.
-_EXCLUDED_ANYWHERE = {".git", "node_modules", "__pycache__"}
+#
+# `node_modules` is deliberately NOT here, for the reason _EXCLUDED_ROOTS gives
+# below for anchoring `client`: it is a name anyone can create inside a Python
+# tree, and at any depth it let server/services/node_modules/esc.py hold
+# AccessScope(is_admin=True) with all three guards still green. Both real
+# node_modules trees live under client/ and docs/, which are root-pruned
+# already, so dropping it costs nothing -- measured 208 kept files before and
+# after, walk time unchanged.
+_EXCLUDED_ANYWHERE = {".git", "__pycache__"}
 
 # Trees that are not this repo's production Python, each naming one specific
 # top-level directory. Anchored at the root on purpose: matched at any depth,
