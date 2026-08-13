@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from eyened_orm import Feature
 from eyened_orm.segmentation import FeatureFeatureLink, Segmentation
 from eyened_orm.authz.scope import AccessScope
+from eyened_orm.authz.scoping import apply_scope
 
 
 class FeatureRepository:
@@ -46,18 +47,46 @@ class FeatureRepository:
         )
 
     def segmentation_counts(self) -> dict[int, int]:
-        """Return {FeatureID: segmentation count} for features that have any."""
+        """Return {FeatureID: segmentation count} for features the caller reaches.
+
+        A ``Feature`` is vocabulary and carries no project, which is why this
+        whole repository reads unfiltered -- but a ``Segmentation`` is project
+        data (a ``SINGLE_PROJECT_ENTITIES`` member with a route to ``Patient``),
+        and counting it is reading it. Unscoped, this told any authenticated
+        caller, including one with no memberships at all, the per-feature
+        annotation volume of every project in the database.
+        """
         rows = self._session.execute(
-            select(Segmentation.FeatureID, func.count()).group_by(Segmentation.FeatureID)
+            apply_scope(
+                select(Segmentation.FeatureID, func.count())
+                .select_from(Segmentation)
+                .group_by(Segmentation.FeatureID),
+                Segmentation,
+                self._scope,
+            )
         ).all()
         return {fid: cnt for fid, cnt in rows}
 
     def count_segmentations(self, feature_id: int) -> int:
-        """Return how many segmentations reference this feature."""
+        """Return how many of this feature's segmentations the caller reaches.
+
+        Scoped for the same reason as ``segmentation_counts``, and with one
+        consequence worth naming: the delete-conflict check built on this now
+        counts only what the caller can see, so a feature still referenced from
+        a project they cannot reach no longer produces that 409. It is not
+        deletable either -- the flush raises ``IntegrityError``, since
+        ``Segmentation.FeatureID`` is NOT NULL and ``ON DELETE RESTRICT`` -- so
+        the referenced rows cannot be lost; that caller just gets an
+        uninformative failure instead of the conflict body.
+        """
         return self._session.execute(
-            select(func.count())
-            .select_from(Segmentation)
-            .where(Segmentation.FeatureID == feature_id)
+            apply_scope(
+                select(func.count())
+                .select_from(Segmentation)
+                .where(Segmentation.FeatureID == feature_id),
+                Segmentation,
+                self._scope,
+            )
         ).scalar_one()
 
     def parent_names_of_child(self, feature_id: int) -> list[str]:

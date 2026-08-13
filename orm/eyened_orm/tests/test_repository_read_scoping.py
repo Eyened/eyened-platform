@@ -371,3 +371,61 @@ def test_list_active_returns_only_in_scope_rows(session, two_projects):
         session, scope=scope_for(two_projects["B"]["project"])
     ).list_active()
     assert {r.PatientID for r in b_rows} == {two_projects["B"]["patient"]}
+
+
+def _feature_with_segmentations_in_both_projects(session, two_projects):
+    """One segmentation on A's image, two on B's, all on one feature.
+
+    Asymmetric counts on purpose: with one each, a filter that returns the
+    *other* project's rows produces the same number as a correct one.
+    """
+    from eyened_orm import ImageInstance
+
+    creator = make_creator(session, "counter")
+    feature = make_feature(session, "counted")
+    for key, how_many in (("A", 1), ("B", 2)):
+        image = session.get(ImageInstance, two_projects[key]["image"])
+        for _ in range(how_many):
+            make_segmentation(session, image, feature, creator)
+    feature_id = feature.FeatureID
+    session.commit()
+    session.expunge_all()
+    return feature_id
+
+
+def test_segmentation_counts_are_scoped(session, two_projects):
+    """A member of one project is told its own volume, not the whole database.
+
+    ``Segmentation`` is a ``SINGLE_PROJECT_ENTITIES`` member, so an unscoped
+    ``func.count()`` over it hands any authenticated caller -- including one
+    with no memberships -- annotation-activity volume for every project.
+    """
+    from eyened_orm.repositories.feature_repository import FeatureRepository
+
+    feature_id = _feature_with_segmentations_in_both_projects(session, two_projects)
+
+    a_repo = FeatureRepository(session, scope=scope_for(two_projects["A"]["project"]))
+    b_repo = FeatureRepository(session, scope=scope_for(two_projects["B"]["project"]))
+
+    assert a_repo.segmentation_counts() == {feature_id: 1}
+    assert b_repo.segmentation_counts() == {feature_id: 2}
+    assert FeatureRepository(session, scope=admin_scope()).segmentation_counts() == {
+        feature_id: 3
+    }
+
+
+def test_count_segmentations_is_scoped(session, two_projects):
+    """The single-feature count follows the same rule as the grouped one."""
+    from eyened_orm.repositories.feature_repository import FeatureRepository
+
+    feature_id = _feature_with_segmentations_in_both_projects(session, two_projects)
+
+    a_repo = FeatureRepository(session, scope=scope_for(two_projects["A"]["project"]))
+    b_repo = FeatureRepository(session, scope=scope_for(two_projects["B"]["project"]))
+
+    assert a_repo.count_segmentations(feature_id) == 1
+    assert b_repo.count_segmentations(feature_id) == 2
+    assert (
+        FeatureRepository(session, scope=admin_scope()).count_segmentations(feature_id)
+        == 3
+    )

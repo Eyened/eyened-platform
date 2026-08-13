@@ -217,3 +217,59 @@ def test_delete_feature_logs_delete(session):
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
     assert audit.records[0]["entity"] == "Feature"
+
+
+def test_a_feature_referenced_only_from_another_project_is_still_not_deleted(session):
+    """The scoped count changes the *message*, never the outcome.
+
+    ``count_segmentations`` is scoped, so a project_admin in A is told 0 for a
+    feature referenced only from project B and the 409 conflict does not fire.
+    What must not follow is a deletion: the referencing rows are real, and this
+    pins that they survive. The caller gets an uninformative failure instead of
+    the conflict body -- which is a message-quality problem, not a data one.
+    """
+    from datetime import date
+
+    from sqlalchemy.exc import IntegrityError
+
+    from eyened_orm.authz.roles import ProjectRole
+    from eyened_orm.utils.factories import (
+        make_creator,
+        make_device,
+        make_feature,
+        make_image,
+        make_patient,
+        make_project,
+        make_segmentation,
+        make_series,
+        make_storage_backend,
+        make_study,
+        scope_for,
+    )
+
+    backend = make_storage_backend(session)
+    device = make_device(session, "d")
+    creator = make_creator(session, "c")
+    feature = make_feature(session, "cross-project-feature")
+    project_a = make_project(session, "del-A")
+    make_patient(session, project_a, "pat-del-A")
+    project_b = make_project(session, "del-B")
+    patient_b = make_patient(session, project_b, "pat-del-B")
+    study_b = make_study(session, patient_b, date(2024, 1, 1))
+    series_b = make_series(session, study_b)
+    image_b = make_image(session, series_b, device, backend, "img-del-B")
+    make_segmentation(session, image_b, feature, creator)
+    feature_id = feature.FeatureID
+    project_a_id = project_a.ProjectID
+    session.commit()
+    session.expunge_all()
+
+    scope = scope_for(project_a_id, role=ProjectRole.project_admin)
+    service = FeatureService(FeatureRepository(session, scope=scope), scope=scope)
+    assert service.repository.count_segmentations(feature_id) == 0
+
+    with pytest.raises(IntegrityError):
+        service.delete_feature(feature_id)
+
+    session.rollback()
+    assert session.get(Feature, feature_id) is not None

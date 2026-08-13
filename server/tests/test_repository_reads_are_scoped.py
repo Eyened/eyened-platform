@@ -37,7 +37,6 @@ _DTOS = _ROOT / "server" / "dtos"
 _UNSCOPED_REPOSITORIES = {
     "CreatorRepository",  # identity table, not project data
     "DeviceRepository",  # device catalogue, shared across projects
-    "FeatureRepository",  # annotation vocabulary
     "FormSchemaRepository",  # form definitions, shared across projects
     "TagRepository",  # a Tag is a label; the *link* is what sits in a project
     "ProjectMemberRepository",  # builds the scope rather than consuming it
@@ -46,6 +45,17 @@ _UNSCOPED_REPOSITORIES = {
 # Read methods on scoped repositories that deliberately do not filter.
 _UNSCOPED_METHODS = {
     "StudyRepository.get_tag": "returns a Tag, not a Study; a label carries no project",
+    # FeatureRepository is exempt per *method*, not as a class. "Annotation
+    # vocabulary" is true of these four -- a Feature and its composite links
+    # carry no project -- and was false of segmentation_counts and
+    # count_segmentations, which count project data and are now scoped. A
+    # class-wide entry cannot tell the two apart: it skips before any method is
+    # inspected, so neither was ever scanned and _EXPECTED_SCANNED_READS never
+    # moved.
+    "FeatureRepository.get_by_id": "annotation vocabulary; a Feature carries no project",
+    "FeatureRepository.list_all": "annotation vocabulary",
+    "FeatureRepository.parent_names_of_child": "feature-to-feature composite links",
+    "FeatureRepository.list_subfeature_ids": "feature-to-feature composite links",
     "SearchRepository.tag_names": "search-form vocabulary",
     "SearchRepository.active_form_creator_names": "search-form vocabulary",
     "SearchRepository.attribute_signature_rows": "attribute definitions, not rows",
@@ -93,7 +103,7 @@ _WRITE_PREFIXES = ("add", "save", "delete", "upsert", "remove", "replace")
 # mechanism that quietly stops finding methods still reports green, so the
 # number is pinned rather than merely asserted non-zero. Moving it is a
 # deliberate act: it means a read was added, removed or exempted.
-_EXPECTED_SCANNED_READS = 36
+_EXPECTED_SCANNED_READS = 38
 
 # Every function under server/dtos/ that touches a Session, pinned exactly.
 # A DTO converter is a read surface that satisfies both scope guards while
