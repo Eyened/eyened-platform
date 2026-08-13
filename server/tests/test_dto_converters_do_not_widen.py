@@ -12,8 +12,9 @@ Its test below is kept here for the widening assertion, which is the same
 property in a converter that now has only what it was handed.
 
 This file is the behavioural half, and it is *in addition* to that pin, not
-instead of it. Every converter here reads through a raw ``Session`` with no
-scope in the chain, so the property that keeps them honest is not filtering --
+instead of it. Every converter here except that one reads through a raw
+``Session`` with no scope in the chain, so the property that keeps them honest
+is not filtering --
 it is that each resolves only identifiers already carried by the row it was
 handed. So every test seeds a second project the caller cannot reach, converts
 a row from the first, and asserts twice:
