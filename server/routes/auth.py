@@ -334,7 +334,17 @@ async def register_user(
     audit: AuditService = Depends(get_audit_service),
 ):
     """Register a new user."""
-    new_user = create_user(session, user_data.username, user_data.password)
+    try:
+        new_user = create_user(session, user_data.username, user_data.password)
+    except ValueError as err:
+        # create_user only rejects an already-taken username. Uncaught, this
+        # reached main.py's blanket handler as a 500, which made an
+        # unauthenticated caller's 200-vs-500 a username-enumeration oracle.
+        # Answered the same way check_oidc_login answers the same ValueError.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this username already exists.",
+        ) from err
 
     audit.record(
         action="INSERT",

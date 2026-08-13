@@ -437,6 +437,36 @@ def test_a_deactivated_account_cannot_authenticate_through_oidc(session):
     assert exc.value.status_code == 401
 
 
+def test_registering_a_taken_username_is_a_409_not_a_500(client, session):
+    """``create_user`` raises a bare ``ValueError`` for a taken name, which the
+    route did not catch, so ``main.py``'s blanket handler turned it into a 500.
+    An unauthenticated caller could then tell 200 (name free) from 500 (name
+    taken) and enumerate every account name on the platform.
+
+    A 409 does not remove the distinction -- a registration endpoint cannot
+    hide a collision and still refuse the write -- and the endpoint staying
+    unauthenticated is separately an accepted risk. What it removes is the
+    server error: the collision is now an answer the route gives on purpose,
+    matching ``check_oidc_login``'s handling of the same ``ValueError`` in
+    this same module.
+
+    The free-name control is what makes the 409 mean "taken" rather than
+    "registration is broken".
+    """
+    first = client.post(
+        "/auth/register", json={"username": "newcomer", "password": "pw"}
+    )
+    assert first.status_code == 200, first.text
+
+    again = client.post(
+        "/auth/register", json={"username": "newcomer", "password": "other"}
+    )
+    assert again.status_code == 409, again.text
+
+    # The refusal must not have created a second row under the same name.
+    assert session.query(Creator).filter_by(CreatorName="newcomer").count() == 1
+
+
 def test_the_access_token_no_longer_carries_a_role_claim(signed_jwts):
     """Only one thing in the system is called 'role', and it is not the token."""
     import jwt
