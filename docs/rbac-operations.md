@@ -93,7 +93,7 @@ eorm create-user --username test_user --password test-pw
 | 5 | Containment | Grant both projects a spanning task touches, then `eorm revoke --user test_user --project <one of them>` | The task disappears from `GET /task` entirely -- not with fewer subtasks. Exercises the containment rule, the 404 policy and the absence of partial views at once |
 | 6 | Administrator overlay | `eorm set-admin --user test_user --on`, then `--off` | Every restriction vanishes, then returns to the granted view |
 | 7 | Deactivation | `eorm deactivate --user test_user` | Authentication is refused |
-| 8 | Reset | `eorm revoke --user test_user --all` | Back to scenario 1 |
+| 8 | Reset | `eorm reactivate --user test_user`, then `eorm revoke --user test_user --all` | Back to scenario 1 |
 
 Forgot the password? `eorm set-password --user test_user`. The `Creator` row
 cannot be deleted -- that is what `deactivate` exists for -- so re-minting is
@@ -106,24 +106,31 @@ For scenario 5, a production dump has task 70, which touches several projects.
 clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
 `eorm load-dump` -> `eorm init-admin` with a username matching
 `EYENED_API_ADMIN_USERNAME` -> `PUBLIC_AUTH_DISABLED=true` for feature work,
-`=false` plus row edits for RBAC work.
+`=false` plus the test_user loop below for RBAC work.
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
 | `eorm init-admin --username U [--password P]` | Create or promote the administrator (idempotent) |
+| `eorm create-user --username U --password P` | Create a new, non-administrator user account |
 | `eorm grant --user U --project P --role R` | Grant or change a role |
 | `eorm revoke --user U --project P` | Remove a membership |
 | `eorm revoke --user U --all` | Remove every membership the user holds; confirms unless `--yes` |
 | `eorm grant-for-task --user U --task N [--task M] --role R` | Grant every project the tasks touch, after review |
 | `eorm grant-all` | Cutover step 3 |
 | `eorm set-admin --user U --on/--off` | Set or clear administrator status on an existing account |
-| `eorm set-password --user U` | Set an existing user's password |
+| `eorm set-password --user U` | Set an existing user's password -- including an account (OIDC-provisioned, an AI model, attribution-only) that was never meant to log in by password at all |
 | `eorm deactivate --user U` / `eorm reactivate --user U` | Revoke every project; memberships are kept. Not an absolute lockout -- see the accepted risks |
 
 ## Accepted risks
 
+- **The CLI does not authenticate its operator.** Every command above is a
+  trusted path (see the module docstrings on `authz/administration.py` and
+  `commands/rbac.py`): anyone with shell access can run `eorm set-admin --user
+  U --on` and self-promote, and the audit row that records it names no actor
+  -- `ActorID` is NULL by design on this path, the same as every other command
+  here.
 - **`grant-all` grants every project to self-registered accounts.**
   `POST /auth/register` needs no authentication, and grant-all's population
   filter is `IsHuman AND NOT Inactive AND PasswordHash IS NOT NULL` -- which a
