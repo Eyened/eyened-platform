@@ -106,8 +106,8 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
   them, and `--yes` skips it entirely. The totals (`N membership(s) written for
   M creator(s) across P project(s)`) print after the commit -- after the rows
   exist. So the grant cannot be reviewed through the CLI *before* it is
-  written, and there is nothing at the prompt that would tell one of the
-  creators is a stranger. **Step 4 of the cutover is the mitigation, and it is
+  written, and there is nothing at the prompt that would tell you that one of
+  the creators is a stranger. **Step 4 of the cutover is the mitigation, and it is
   a query rather than a prompt: read `ProjectMember` (or the `Creator` rows the
   filter above selects) once the write is done, and look for accounts nobody
   recognises.**
