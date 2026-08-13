@@ -9,11 +9,11 @@ EyeNED is a web platform for browsing, annotating, and managing ophthalmic image
 
 ![Platform Architecture](../../assets/eyened_platform.png)
 
-**Request flow:** the browser talks to **fileserver** (nginx) on `PORT` (set in `docker/.env`, default `80`). Nginx proxies `/` to the **client** (viewer UI) and `/api/` to the **server** (FastAPI). Image bytes and thumbnails are served via nginx internal redirects — the API validates access, then tells nginx which file to send.
+**Request flow:** the browser talks to **fileserver** (nginx) on `HTTP_PORT` (set in `deploy/.env`, default `8080`). Nginx proxies `/` to the **client** (viewer UI) and `/api/` to the **server** (FastAPI). Image bytes and thumbnails are served via nginx internal redirects — the API validates access, then tells nginx which file to send.
 
 ## Runtime services
 
-These run from `docker/docker-compose.yaml`:
+These run from `deploy/compose.yaml`:
 
 | Service | Role |
 |---------|------|
@@ -28,7 +28,7 @@ The server also needs `EYENED_API_SECRET_KEY` and the `EYENED_DATABASE_*` variab
 
 ## Database
 
-MySQL stores all structured data: projects, patients, studies, images, annotations, tasks, users, and storage references. It is **not** bundled in the main compose stack — run the `database/` stack from the repository (`MYSQL_*` vars in `database/.env`) or point the app at an existing server via:
+MySQL stores all structured data: projects, patients, studies, images, annotations, tasks, users, and storage references. It **is** part of the stack, running under the `local-db` profile in `deploy/compose.yaml`. To point the app at an external server instead, remove `local-db` from `COMPOSE_PROFILES` in `deploy/.env` and set:
 
 - `EYENED_DATABASE_HOST`
 - `EYENED_DATABASE_PORT`
@@ -36,7 +36,7 @@ MySQL stores all structured data: projects, patients, studies, images, annotatio
 - `EYENED_DATABASE_PASSWORD`
 - `EYENED_DATABASE_DATABASE`
 
-Optional **Adminer** in the database stack is exposed on `EYENED_ADMINER_PORT` (default `8080`).
+Optional **Adminer** runs under the `tools` profile and is exposed on `ADMINER_PORT` (default `8081`).
 
 See [Getting Started](/eyened-platform/getting_started) for setup.
 
@@ -44,7 +44,9 @@ See [Getting Started](/eyened-platform/getting_started) for setup.
 
 Two distinct layers:
 
-**Image datasets** — original DICOM, PNG, etc. Files stay on disk (or object storage mounted into the container). Each file is registered in the database with a `storage_backend_key` and `object_key` (import/API fields; `StorageBackend.Key` and `ImageStorage.ObjectKey` in the database). Configure a matching nginx `location /{key}/` and read-only mount on the fileserver for each backend. The server and worker resolve local paths via the JSON env var `EYENED_STORAGE_MOUNTS` (e.g. `'{"local":"/path/to/images"}'`); the API serves files through nginx with `GET /api/images/{public_id}/data`.
+**Image datasets** — original DICOM, PNG, etc. Files stay on disk (or object storage mounted into the container). Each file is registered in the database with a `storage_backend_key` and `object_key` (import/API fields; `StorageBackend.Key` and `ImageStorage.ObjectKey` in the database). Add the key and its path to `deploy/storage-mounts.conf` and re-run the entry point (`./install.sh` or `make up`) — the fileserver mount, the nginx `location`, and `EYENED_STORAGE_MOUNTS` are all generated from that one file.
+
+The API itself does **not** read image bytes from disk: `GET /api/images/{public_id}/data` in `server/routes/instances.py` resolves a `StorageRef` and returns an nginx internal redirect (`X-Accel-Redirect`) — nginx reads the file, not the server process. `EYENED_STORAGE_MOUNTS` matters for **ORM-side processes** — GPU workers, notebooks, the thumbnail CLI — that read source pixels directly instead of going through the API. Mount a dataset only into the containers that actually need direct pixel access; the fileserver and API do not.
 
 **Platform storage** — writable data under `EYENED_STORAGE_ROOT` (default `/storage`):
 

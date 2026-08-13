@@ -3,113 +3,111 @@ title: Development Setup
 description: Set up your development environment for the Eyened platform
 ---
 
-The `dev/` stack runs the viewer, API, nginx, and Redis in Docker with source mounted for hot reload. MySQL is a **separate** compose stack — start it first, then point the dev server at it via `EYENED_DATABASE_*` in `.env`.
+The whole platform — viewer, API, nginx, Redis, **and** MySQL — runs from one Docker stack in
+`deploy/`, with `server/`, `orm/`, and `client/` bind-mounted for hot reload. There is no separate
+database stack to start first.
 
 ## Prerequisites
 
-- [Docker](https://www.docker.com/) and Docker Compose
+- [Docker](https://www.docker.com/), with **Compose 2.26 or newer** (`docker compose version`).
+  `make doctor` checks this and explains why if it fails.
 - [Git](https://git-scm.com/)
+- `make` (developer convenience; clients install without it)
 
-To run `eorm` or `pytest` on the host (outside containers), install the ORM — see **[ORM setup](/eyened-platform/orm/getting_started)**.
+To run `eorm` or `pytest` on the host, install the ORM — see
+**[ORM setup](/eyened-platform/orm/getting_started)**.
 
 ## First-time setup
 
-1. Clone the repository:
+```bash
+git clone https://github.com/Eyened/eyened-platform.git
+cd eyened-platform
+make up
+```
 
-    ```bash
-    git clone https://github.com/Eyened/eyened-platform.git
-    cd eyened-platform
-    ```
+That is the whole thing. `make up` runs preflight checks, creates `deploy/.env` from the template
+with generated secrets, builds the images, starts the stack, and — because the database is empty
+on a fresh clone — creates the schema, seeds the builtin form schemas, and creates an `admin`
+account whose password it prints once.
 
-2. Start MySQL (if you do not already have one):
+### On a machine shared with other developers
 
-    ```bash
-    cd database
-    cp .env.example .env   # set MYSQL_* and EYENED_DATABASE_* passwords
-    docker compose up -d
-    cd ../dev
-    ```
+Before the first `make up`, or any time afterwards, set these in `deploy/.env` to values nobody
+else is using:
 
-3. Configure the dev environment:
+| Variable | Purpose |
+| --- | --- |
+| `COMPOSE_PROJECT_NAME` | Prefix for containers and volumes — makes your stack independent |
+| `HTTP_PORT` | The port you open in a browser |
+| `ADMINER_PORT` | The bundled database browser |
 
-    ```bash
-    cp sample.env .env
-    ```
-
-    Set at minimum:
-
-    | Variable | Purpose |
-    | --- | --- |
-    | `EYENED_API_SECRET_KEY` | Session signing key |
-    | `EYENED_REDIS_PASSWORD` | Redis auth (required by compose) |
-    | `EYENED_STORAGE_ROOT` | Writable path for `segmentations.zarr` (mounted into the server container) |
-    | `EYENED_DATABASE_HOST` | Database hostname (`host.docker.internal` when MySQL runs on the Docker host) |
-    | `EYENED_DATABASE_PORT` | Host port MySQL listens on (e.g. `3306`) |
-    | `EYENED_DATABASE_USER` | Database user |
-    | `EYENED_DATABASE_PASSWORD` | Database password |
-    | `EYENED_DATABASE_DATABASE` | Database name (default `eyened_database`) |
-    | `DEV_NGINX_PORT` | Port for the app in your browser (e.g. `8080`) |
-
-4. Configure nginx and storage mounts in `docker-compose.yml` and `nginx.conf`:
-    - Add read-only volume mounts on **fileserver** for thumbnail and image dataset paths.
-    - Add matching `location /{storage_backend_key}/` blocks in `nginx.conf` (see [Platform Design](/eyened-platform/platform_design#storage)).
-    - Mount `EYENED_STORAGE_ROOT` into the **server** container if segmentations should persist.
-
-5. Build and start:
-
-    ```bash
-    docker compose up -d --build
-    ```
-
-6. Initialize a fresh database (once):
-
-    ```bash
-    docker compose exec server bash
-    eorm initialize-database
-    eorm seed-form-schemas
-    eorm create-user
-    ```
-
-    Or run the same commands on the host with `dev/.env` loaded if `eyened_orm` is installed locally.
+The bundled MySQL and Redis publish **no** host ports by default, which removes the commonest
+source of collisions. If you need one — DBeaver, or a host-side alembic — append
+`:compose.host-ports.yaml` to `COMPOSE_FILE` in `deploy/.env` and set `DB_PUBLISH_PORT`.
 
 ## Daily use
 
-From `dev/`:
-
 ```bash
-docker compose up -d        # start
-docker compose logs -f      # follow logs
-docker compose down         # stop
+make up          # start (also rebuilds and re-bootstraps; safe to repeat)
+make logs        # follow logs
+make down        # stop
+make doctor      # preflight checks on their own
 ```
 
-Open `http://<hostname>:<DEV_NGINX_PORT>/`. The **client** container runs Vite with hot reload; the **server** container runs uvicorn with `--reload` on mounted `server/` and `orm/` sources.
+The **client** container runs Vite with hot reload; the **server** container runs uvicorn with
+`--reload` over the mounted `server/` and `orm/` sources.
 
 :::caution
 WebGL state in the viewer can go stale after heavy client edits — refresh the page if overlays look wrong. Server reload usually picks up Python changes automatically; restart the server container if it does not.
 :::
 
-## Optional: OIDC login
+## Storage
 
-The base stack uses password auth only. To test OpenID Connect locally, layer the Keycloak override — see `dev/keycloak/README.md`:
+Platform storage (thumbnails, `segmentations.zarr`) lives at `/storage` inside the container,
+backed by this stack's own named volume — a clean clone never writes into shared or production
+storage. To attach to shared storage instead, set `PLATFORM_STORAGE_PATH` in `deploy/.env`.
+
+Image datasets are configured in `deploy/storage-mounts.conf` alone; re-running `make up`
+regenerates the container mounts, the nginx routes, and `EYENED_STORAGE_MOUNTS` from it. Full
+detail in `deploy/README.md`.
+
+## Migrations
 
 ```bash
-docker compose -f docker-compose.yml -f keycloak/docker-compose.keycloak.yml up -d
+make migrate     # alembic upgrade head, inside the server container
 ```
 
-Set `DEV_PUBLIC_HOST`, `EYENED_API_AUTH_OIDC_ENABLED=true`, and the `EYENED_OIDC_*` vars in `.env`. Full options: [Authentication](/eyened-platform/guides/authentication).
+It stays interactive on purpose: alembic prompts before touching a populated database. Take a
+snapshot first — MySQL commits DDL per statement, so a half-applied migration cannot be reliably
+undone:
+
+```bash
+make db-snapshot NAME=before-migration
+make db-restore  NAME=before-migration
+```
+
+## Optional: OIDC login
+
+The base stack uses password auth only. To test OpenID Connect locally, add `oidc` to
+`COMPOSE_PROFILES` in `deploy/.env` and set `PUBLIC_HOST`, then `make up` — see
+`deploy/keycloak/README.md`.
+
+Set `EYENED_API_AUTH_OIDC_ENABLED=true` and the `EYENED_OIDC_*` vars in `deploy/.env`. Full options: [Authentication](/eyened-platform/guides/authentication).
 
 ## Optional: existing data
 
-Load a dump:
+Load a prepared XtraBackup snapshot (`deploy/scripts/save_dump.sh` produces one from a running
+database; `make db-snapshot` produces a `.tgz` for `make db-restore` rather than a directory, so
+use `save_dump.sh` / `load_dump.sh` when moving data between machines):
 
 ```bash
-eorm load-dump -p /path/to/dump.sql
+deploy/scripts/load_dump.sh /path/to/backup-dir
 ```
 
 Apply pending migrations from `orm/migrations/`:
 
 ```bash
-alembic -x env_file=../../dev/.env upgrade head
+make migrate
 ```
 
 ## Tests
@@ -129,5 +127,5 @@ pytest
 Never commit secrets — keep them in `.env` only.
 
 :::tip
-More detail and edge cases: `dev/README.md` in the repository.
+More detail and edge cases: `deploy/README.md` in the repository.
 :::
