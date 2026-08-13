@@ -2,6 +2,7 @@ name: Deploy stack
 
 on:
   pull_request:
+    branches: [main, development]
     paths:
       - 'deploy/**'
       - 'install.sh'
@@ -29,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The floor this design depends on. GitHub's runners are well above it,
       # but asserting it here means a runner image downgrade shows up as a
@@ -49,6 +50,22 @@ jobs:
           sh -n install.sh
           for f in deploy/scripts/*.sh; do
             case "$f" in *load_dump.sh|*save_dump.sh) bash -n "$f" ;; *) sh -n "$f" ;; esac
+          done
+
+      # `Makefile` is a trigger path for this job but nothing above reads it.
+      # The Makefile deliberately has no `$(shell …)` (its own comments explain
+      # why: it would run at parse time, including on `make help`, and expand
+      # to the empty string when a tool is missing) so dry-running every
+      # .PHONY target is safe here. It catches parse errors (e.g. a
+      # space-indented recipe) and references to undefined targets, not just
+      # a syntax check of one target.
+      - name: Makefile parses and every target dry-runs
+        run: |
+          set -e
+          targets=$(awk '/^\.PHONY:/{sub(/^\.PHONY:[ \t]*/,""); line=$0; while (line ~ /\\$/) { sub(/\\$/,"",line); getline cont; line = line " " cont }; print line }' Makefile)
+          for t in $targets; do
+            echo "--- make -n $t ---"
+            make -n "$t" >/dev/null
           done
 
       - name: Generate the storage layer
