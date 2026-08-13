@@ -20,3 +20,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [Auth service-layer conversion — last unconverted domain](2026-07-27-auth-service-layer-conversion.md)
 - [Task→project map: materialize it, or task listings degrade linearly](2026-08-07-task-project-materialized-map.md)
 - [DTO layer reads the database unscoped, and no guard covers it](2026-08-07-dto-layer-unscoped-reads.md)
+- [Scoped segmentation counts walk four tables on the boot path](2026-08-13-segmentation-project-denormalization.md)
