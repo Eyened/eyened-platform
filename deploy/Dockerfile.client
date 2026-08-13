@@ -9,17 +9,30 @@ WORKDIR /app/client
 # unreachable dead weight that also invalidated the npm ci layer on every
 # source edit.
 #
+# .npmrc belongs in this set. It carries engine-strict=true against the engines
+# constraint in package.json, and the RUNTIME install is strict either way
+# because it runs against the bind mount, where .npmrc is present. Omitting it
+# here would leave the two installs configured differently while the lock stamp
+# below treats them as interchangeable.
+COPY client/package.json client/package-lock.json client/.npmrc ./
+
 # Plain `npm ci` — NOT `npm ci --only=production`. vite is a devDependency and
 # is the entire point of this image.
-COPY client/package.json client/package-lock.json ./
-
+#
 # The stamp records which lockfile these modules were installed from. It lives
 # inside node_modules so it travels with the named volume that seeds from this
 # image; the entrypoint compares it against the mounted lockfile and reinstalls
 # on a mismatch. Writing it here means a freshly seeded volume does NOT
 # reinstall on first boot. The npm cache is 220 MB and is not needed at runtime.
+#
+# md5sum's status is checked before the hash is split out, rather than piping
+# into `cut`: a pipeline reports only the LAST command's status and `cut`
+# succeeds on empty input, so the piped form writes an EMPTY stamp and still
+# exits 0 — producing an image whose stamp can never match, and which therefore
+# reinstalls on every freshly seeded volume.
 RUN npm ci \
-    && md5sum package-lock.json | cut -d' ' -f1 > node_modules/.lock-stamp \
+    && stamp=$(md5sum package-lock.json) \
+    && printf '%s\n' "${stamp%% *}" > node_modules/.lock-stamp \
     && npm cache clean --force
 
 COPY deploy/entrypoint-client.sh /entrypoint.sh

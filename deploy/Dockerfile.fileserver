@@ -9,13 +9,19 @@ FROM node:24-slim AS build
 WORKDIR /app/client
 
 # Manifests before source, so a frontend edit re-runs only `npm run build` and
-# not the ~59s `npm ci`. The source COPY below cannot clobber the installed
-# tree: .dockerignore excludes **/node_modules, so the host's copy never
-# enters the build context.
+# not the much slower `npm ci`. The source COPY below cannot clobber the
+# installed tree: .dockerignore excludes **/node_modules, so the host's copy
+# never enters the build context.
+#
+# .npmrc is part of the manifest set, not source. It carries engine-strict=true
+# against the engines constraint in package.json, so leaving it to arrive with
+# the source COPY below would run THIS npm ci non-strict while the build that
+# follows runs strict — the guardrail would then first fire at container boot
+# instead of failing the build here.
 #
 # Plain `npm ci` — NOT `npm ci --only=production`. vite and svelte are
 # devDependencies, and this stage runs `npm run build`.
-COPY client/package.json client/package-lock.json ./
+COPY client/package.json client/package-lock.json client/.npmrc ./
 RUN npm ci
 
 COPY client /app/client
