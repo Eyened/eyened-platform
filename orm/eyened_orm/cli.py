@@ -182,10 +182,10 @@ def create_user(username: str, password: str, is_human: bool, description: str |
                 is_human=is_human,
                 description=description,
             )
-            session.commit()
-            print(f"User created successfully")
         except ValueError as e:
-            print(f"Error creating user: {e}")
+            raise click.ClickException(str(e)) from e
+        session.commit()
+    click.echo("User created successfully")
 
 
 @eorm.command()
