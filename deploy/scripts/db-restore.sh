@@ -124,6 +124,21 @@ case "$answer" in y|Y|yes|YES) ;; *) die "cancelled." ;; esac
 # is no timing window left in which a signal can land between "the work
 # finished" and "the host notices" — the file's state on disk IS the
 # datadir's state, not a proxy the host has to keep in sync by hand.
+#
+# The `touch` is a PRECONDITION of the wipe, not a best-effort annotation of
+# it, which is why it is `|| exit 90` and not `;`. If the sentinel cannot be
+# written, the script has no way left to report a half-restored datadir — so
+# it must not create one. Left unchecked, a failed touch fell through to the
+# `rm -rf` and cleanup() then read the missing file as "nothing was touched"
+# and restarted MySQL on a datadir that had just been emptied, silently:
+# precisely the failure this sentinel exists to prevent, reached from the
+# other direction (measured with an unwritable /state — datadir came back
+# empty with no warning). Aborting first makes cleanup()'s "restarting the
+# database" branch true rather than merely quiet, because nothing has been
+# destroyed yet. Reachable whenever the bind mount is not writable: SELinux
+# enforcing without a :z/:Z label (where `-v .../snapshots:/in:ro` above is
+# refused by the same rule), or a full or read-only TMPDIR. 90 is chosen to
+# not collide with tar's 1/2 or docker's own 125-127.
 restarted=0
 sentinel_dir="${TMPDIR:-/tmp}/db-restore-state.$$"
 mkdir "$sentinel_dir" || die "error: could not create a temp directory at
@@ -159,7 +174,7 @@ docker run --rm \
     -v "$mount_src:/data" \
     -v "$DEPLOY_DIR/snapshots:/in:ro" \
     -v "$sentinel_dir:/state" \
-    alpine sh -c "touch /state/wiping; rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null; tar xzf /in/$name.tgz -C /data && rm -f /state/wiping"
+    alpine sh -c "touch /state/wiping || exit 90; rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null; tar xzf /in/$name.tgz -C /data && rm -f /state/wiping"
 
 echo "==> starting the database"
 compose start database
