@@ -259,6 +259,7 @@ def test_prepare_rows_does_not_override_caller_patient_modality_series():
         options=PreparationOptions(
             infer_image_format=False,
             infer_metadata_from_dicom_header=True,
+            link_oct_enface_series=True,
             raw_loader=_loader,
         ),
     )[0]
@@ -450,6 +451,61 @@ def test_prepare_rows_link_despite_series_anonymous_identity():
     assert out[1].series_instance_uid == oct_series
     assert out[0].series_anonymous_identity == 7
     assert out[1].series_anonymous_identity == 7
+
+
+def test_prepare_rows_link_respects_explicit_series_instance_uid():
+    """Caller-set series_instance_uid is not rewritten by OCT–enface linking."""
+    enface_sop = "1.2.3.enface.pinuid"
+    oct_sop = "1.2.3.oct.pinuid"
+    oct_series = "1.2.3.oct.series.pinuid"
+    caller_enface_series = "1.2.3.caller.enface.series"
+    for_uid = "1.2.3.for.pinuid"
+
+    enface_ds = _base_file_dataset(sop_instance_uid=enface_sop)
+    enface_ds.Modality = "OP"
+    enface_ds.ImageType = ["ORIGINAL", "PRIMARY", "", "RED"]
+    enface_ds.SeriesInstanceUID = "1.2.3.enface.series.pinuid"
+    enface_ds.FrameOfReferenceUID = for_uid
+    enface_raw = _save_ds(enface_ds)
+
+    oct_ds = _base_file_dataset(sop_instance_uid=oct_sop)
+    oct_ds.Modality = "OPT"
+    oct_ds.SeriesInstanceUID = oct_series
+    oct_ds.FrameOfReferenceUID = for_uid
+    ref_item = Dataset()
+    ref_item.ReferencedSOPInstanceUID = enface_sop
+    shared = Dataset()
+    shared.ReferencedImageSequence = Sequence([ref_item])
+    oct_ds.SharedFunctionalGroupsSequence = Sequence([shared])
+    oct_raw = _save_ds(oct_ds)
+
+    by_key = {"e.dcm": enface_raw, "o.dcm": oct_raw}
+
+    out = prepare_rows(
+        [
+            ImportRow(
+                project_name="p",
+                storage_backend_key="sb",
+                object_key="e.dcm",
+                image_storage_format="dicom",
+                series_instance_uid=caller_enface_series,
+            ),
+            ImportRow(
+                project_name="p",
+                storage_backend_key="sb",
+                object_key="o.dcm",
+                image_storage_format="dicom",
+            ),
+        ],
+        options=PreparationOptions(
+            infer_image_format=False,
+            infer_metadata_from_dicom_header=True,
+            link_oct_enface_series=True,
+            raw_loader=lambda r: by_key.get(r.object_key or ""),
+        ),
+    )
+    assert out[0].series_instance_uid == caller_enface_series
+    assert out[1].series_instance_uid == oct_series
 
 
 def test_prepare_rows_link_respects_explicit_series_id():

@@ -134,7 +134,7 @@ With `link_oct_enface_series=True`, preparation builds a parallel `SeriesLinkMet
 1. Finds OPT/OCT rows and their referenced enface SOP UIDs (FoR fallback if needed)
 2. Sets all members of each pair/group to the **OCT’s** `series_instance_uid`
 
-So they land in one `Series` for the viewer and for export localizer heuristics. Rows with an explicit `series_id` are left alone. Confirmed links still apply if `series_anonymous_identity` is set (otherwise distinct DICOM series UIDs would keep the pair apart). Modality is **not** written to the row unless `infer_metadata_from_dicom_header=True` (or you set it yourself).
+So they land in one `Series` for the viewer and for export localizer heuristics. Rows with an explicit `series_id` or an explicitly set `series_instance_uid` are left alone. Confirmed links still apply if `series_anonymous_identity` is set (otherwise distinct DICOM series UIDs would keep the pair apart). Modality is **not** written to the row unless `infer_metadata_from_dicom_header=True` (or you set it yourself).
 
 ::::caution
 If `link_oct_enface_series=True` but DICOM bytes cannot be read (unreadable mounts/`object_key`, or missing FoR/references), linking is a **no-op** and a warning is logged.

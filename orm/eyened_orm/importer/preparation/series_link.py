@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import AbstractSet, Any, Sequence
 
 from eyened_orm.image_instance import Modality, ModalityType
 
@@ -65,14 +65,25 @@ def _is_enface_meta(meta: SeriesLinkMeta | None) -> bool:
     )
 
 
-def _protected_from_series_rewrite(state: dict[str, Any]) -> bool:
-    """Caller pinned an existing Series by PK; do not rewrite series_instance_uid."""
-    return state.get("series_id") is not None
+def _protected_from_series_rewrite(
+    state: dict[str, Any],
+    pinned: AbstractSet[str] | None = None,
+) -> bool:
+    """
+    Do not rewrite ``series_instance_uid`` when the caller pinned an existing
+    Series by PK or explicitly set ``series_instance_uid`` on the row.
+    """
+    if state.get("series_id") is not None:
+        return True
+    if pinned is not None and "series_instance_uid" in pinned:
+        return True
+    return False
 
 
 def link_oct_enface_series(
     states: list[dict[str, Any]],
     metas: Sequence[SeriesLinkMeta | None],
+    pinned_fields: Sequence[AbstractSet[str]] | None = None,
 ) -> int:
     """
     Co-locate each OPT/OCT volume with its enface localizer under one Series.
@@ -84,6 +95,9 @@ def link_oct_enface_series(
     ``states``). Row state only supplies ``sop_instance_uid``,
     ``series_instance_uid``, and ``series_id``.
 
+    Rows with an explicit ``series_id`` or a pinned ``series_instance_uid``
+    (in ``pinned_fields``) are left alone.
+
     Returns the number of OCT–enface groups whose ``series_instance_uid`` was
     rewritten (0 if nothing changed).
     """
@@ -91,6 +105,15 @@ def link_oct_enface_series(
         raise ValueError(
             f"link_oct_enface_series: metas length {len(metas)} != states {len(states)}"
         )
+    if pinned_fields is None:
+        pinned_by_row: list[AbstractSet[str]] = [frozenset() for _ in states]
+    else:
+        if len(pinned_fields) != len(states):
+            raise ValueError(
+                "link_oct_enface_series: pinned_fields length "
+                f"{len(pinned_fields)} != states {len(states)}"
+            )
+        pinned_by_row = list(pinned_fields)
 
     by_sop: dict[str, list[int]] = {}
     for i, st in enumerate(states):
@@ -107,14 +130,14 @@ def link_oct_enface_series(
         meta = metas[i]
         if not _is_oct_meta(meta):
             continue
-        if _protected_from_series_rewrite(st):
+        if _protected_from_series_rewrite(st, pinned_by_row[i]):
             continue
 
         members: set[int] = {i}
         refs = meta.referenced_sop_instance_uids if meta else ()
         for ref in refs:
             for j in by_sop.get(str(ref), []):
-                if not _protected_from_series_rewrite(states[j]):
+                if not _protected_from_series_rewrite(states[j], pinned_by_row[j]):
                     members.add(j)
 
         if len(members) == 1:
@@ -123,7 +146,7 @@ def link_oct_enface_series(
                 for j, other in enumerate(states):
                     if j == i or j in claimed:
                         continue
-                    if _protected_from_series_rewrite(other):
+                    if _protected_from_series_rewrite(other, pinned_by_row[j]):
                         continue
                     other_meta = metas[j]
                     if other_meta is None:
@@ -166,7 +189,7 @@ def link_oct_enface_series(
             continue
 
         for k in members:
-            if _protected_from_series_rewrite(states[k]):
+            if _protected_from_series_rewrite(states[k], pinned_by_row[k]):
                 continue
             states[k]["series_instance_uid"] = target_uid
         rewritten += 1

@@ -205,6 +205,7 @@ def prepare_rows(
     _defaults = opts.defaults or {}
     states: list[dict[str, Any]] = []
     link_metas: list[SeriesLinkMeta | None] = []
+    pinned_by_row: list[set[str]] = []
     dicom_rows = 0
     dicom_headers_read = 0
     parse_dicom = opts.infer_metadata_from_dicom_header or opts.link_oct_enface_series
@@ -264,13 +265,16 @@ def prepare_rows(
 
         states.append(state)
         link_metas.append(link_meta)
+        pinned_by_row.append(pinned)
 
     if opts.infer_metadata_from_dicom_header:
         _warn_modality_heuristics(states)
 
     linked_groups = 0
     if opts.link_oct_enface_series:
-        linked_groups = link_oct_enface_series(states, link_metas)
+        linked_groups = link_oct_enface_series(
+            states, link_metas, pinned_fields=pinned_by_row
+        )
         _warn_series_link_limitations(
             link_metas,
             dicom_rows=dicom_rows,
