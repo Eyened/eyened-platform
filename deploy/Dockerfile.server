@@ -13,8 +13,15 @@ ENV PIP_NO_CACHE_DIR=1
 COPY orm /app/orm
 RUN pip install -e /app/orm
 
-COPY server /app/server
+# Manifest before source: copying the whole server tree here would invalidate
+# the install below on every .py edit, costing a full dependency reinstall for
+# a one-character change. The orm install stays ahead of this one — it is what
+# resolves most of the tree, and preserving the order keeps the resulting
+# package set identical.
+COPY server/requirements.txt /app/server/requirements.txt
 RUN pip install -r /app/server/requirements.txt
+
+COPY server /app/server
 
 EXPOSE 8000
 

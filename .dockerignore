@@ -20,3 +20,10 @@ database
 deploy
 !deploy/entrypoint-client.sh
 *.zip
+
+# Docker does not read .gitignore, and *.env is gitignored — so a developer's
+# server/.env is invisible in `git status` AND would be baked into the image
+# by `COPY server`. deploy/ is already excluded wholesale above; this covers
+# the directories the images actually copy.
+**/.env
+**/.env.*
