@@ -23,6 +23,13 @@ The following commands are available:
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
 - update-hashes: Update FileChecksum and DataHash for ImageInstances where they are NULL.
 - load-dump: Load a database dump file, replacing the entire database.
+- init-admin: Create or promote the administrator account (idempotent).
+- grant: Grant or change a project role for a user.
+- revoke: Remove a user's membership from a project.
+- grant-for-task: Grant every project a set of tasks touch, after review.
+- grant-all: Cutover step 3 -- grant every authenticating creator a role in every project.
+- deactivate: Revoke all of a user's memberships.
+- reactivate: Restore a deactivated user's memberships.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """

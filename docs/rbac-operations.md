@@ -1,0 +1,123 @@
+# RBAC operations
+
+## Cutover
+
+Every step before the last is invisible to users. Memberships are inert rows
+until enforcement reads them, and the CLI is a trusted path that works
+regardless of enforcement state -- so the grants happen while the system is
+still open, and the flip lands with everyone already granted.
+
+1. Deploy the migration alone (`ProjectMember`, `Creator.IsAdmin`,
+   `Creator.Inactive` exist; nothing reads them).
+2. `eorm init-admin --username <the EYENED_API_ADMIN_USERNAME value>`
+3. `eorm grant-all` -- grader in all 44 projects for every creator that can
+   authenticate.
+4. Review the grant; announce the cutover.
+5. Deploy the enforcing server.
+
+**Rollback is redeploying the previous server.** The membership rows stay and
+do nothing. There is no feature flag: a flag means two code paths where the
+"off" one is fail-open, and it would need testing as carefully as the real one.
+
+## What changes at step 5
+
+| Operation | Before | After |
+|---|---|---|
+| Read anything, in any project | yes | yes |
+| Create annotations; modify and delete **own** | yes | yes |
+| Create a task | yes | yes (vacuous -- a new task holds no images) |
+| Update task/subtask status; add/remove subtasks and images | yes | yes |
+| **Modify another user's annotation** | yes | **no** |
+| **Delete another user's annotation** | yes | **no** -- project admin |
+| **Delete a populated task** | yes | **no** -- project admin |
+
+The first is the requirement doing its job. The other two are collateral from
+`grader` not reaching `project_admin`, and both have a working recovery path:
+administrators are data superusers and can perform them immediately.
+
+## RBAC ships inert
+
+Granting everyone `grader` everywhere is **not an escalation** -- it is writing
+down the status quo. Today any authenticated user can already do all of this to
+all 44 projects; the grant makes that state explicit and, for the first time,
+revocable.
+
+But the upper bound is 32 creators x 44 projects = 1,408 memberships against a
+~185-row steady state, so the great majority must be revoked before the
+platform restricts anything. **Until pruning happens, the mechanism is
+installed and enforcing a policy that permits everything.**
+
+Users who read without writing are not distinguishable from anyone else under
+the bulk grant, so pruning cannot be driven from authored work alone -- whoever
+prunes needs the intended membership list from the consortium, not a query.
+
+## Local development
+
+- **Everyday feature work:** `EYENED_API_PUBLIC_AUTH_DISABLED=true` logs you in
+  as the `EYENED_API_ADMIN_USERNAME` account, which sees every project in a
+  loaded dump. The dev-bypass branch calls `ensure_admin`, so a pre-cutover
+  dump does not show you an empty platform.
+- **Working *on* enforcement:** being a permanent administrator hides every 403
+  and 404. Edit your own `ProjectMember` rows in the dev database and refresh --
+  scope resolves per request, so there is no re-login and no fixture seed. A
+  production dump already contains other users' annotations, so the ownership
+  overlay is testable with no seeding at all: try to edit someone else's
+  segmentation and expect a 403.
+- **Named-account login:** with `PUBLIC_AUTH_DISABLED=false` you authenticate
+  as a specific `Creator` and see exactly what its `IsAdmin` flag and
+  memberships grant. This path does **not** auto-promote, which is also the
+  cheapest way to reproduce a new joiner's view.
+- **The joiner flow, for free:** the bundled Keycloak (`dev/keycloak/`) with
+  `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` auto-provisions a fresh login as a
+  zero-access user.
+- **Testing containment:** a production dump has task 70, which touches several
+  projects. Revoke yourself from one of them and the task should vanish from
+  `GET /task` entirely rather than appear with fewer subtasks. That single check
+  exercises the containment rule, the 404 policy and the absence of partial
+  views at once.
+
+## New-dev checklist
+
+clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
+`eorm load-dump` -> `eorm init-admin` with a username matching
+`EYENED_API_ADMIN_USERNAME` -> `PUBLIC_AUTH_DISABLED=true` for feature work,
+`=false` plus row edits for RBAC work.
+
+## Commands
+
+| Command | Purpose |
+|---|---|
+| `eorm init-admin --username U [--password P]` | Create or promote the administrator (idempotent) |
+| `eorm grant --user U --project P --role R` | Grant or change a role |
+| `eorm revoke --user U --project P` | Remove a membership |
+| `eorm grant-for-task --user U --task N [--task M] --role R` | Grant every project the tasks touch, after review |
+| `eorm grant-all` | Cutover step 3 |
+| `eorm deactivate --user U` / `eorm reactivate --user U` | Revoke everything / restore it; memberships are kept |
+
+## Accepted risks
+
+- **Objects touching no projects are unrestricted.** 3 tasks and 230 subtasks
+  hold no images today, and every task is empty between creation and its first
+  image. Any authenticated user can see, modify and delete them. Accepted in
+  v0.3 to keep the rule one sentence long.
+- **Adding an image can evict collaborators.** Adding an image from a new
+  project narrows who can see the task; anyone lacking the new project loses all
+  of it. Nothing is deleted and nothing leaks, but grading in progress can
+  become unreachable to the people doing it. `eorm grant-for-task` and the
+  `projects` field on `TaskGET` are the remedies.
+- **Removing an image can widen access.** When the last image of a project
+  leaves a task, subtask comments and grading state recorded while it spanned
+  more become visible to users who could not see them before.
+- **15 mis-scoped `FormAnnotation` rows** land in the wrong project's scope
+  until a DBA script runs. `Patient.ProjectID` is the sole project authority, so
+  a row whose `PatientID` disagrees with its image surfaces to the wrong
+  project's members. Nothing here stops the population growing (the write-time
+  guard was dropped, 2026-08-10). Two things bound it. For a grader, both sides
+  of a new mismatch must already be in reach — the create path checks the
+  patient's project at `grader` and resolves the image through a scoped read —
+  so what remains is an authorised user mislabelling data they can already see,
+  not an escalation. For an **administrator, and for any deployment running
+  `public_auth_disabled`, neither check applies at all**: admins are unbounded by
+  construction, so an admin-authenticated client can still write a mismatched
+  row freely. That is the case the dropped guard would have caught, and the one
+  to re-open if the row count keeps climbing.

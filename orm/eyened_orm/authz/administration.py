@@ -260,7 +260,7 @@ def grant_all(
     second cleanup pass that is easy to forget.
 
     Writes one summary AuditLog row rather than one per membership: the
-    per-row detail is the ProjectMember table itself, and 3,256 audit rows for
+    per-row detail is the ProjectMember table itself, and 1,408 audit rows for
     a single operator action is noise, not attribution.
 
     ``PasswordHash.is_not(None)`` rather than a password-validity check on
