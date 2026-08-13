@@ -1,0 +1,142 @@
+name: Deploy stack
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/**'
+      - 'install.sh'
+      - 'Makefile'
+      - '.dockerignore'
+      - '.github/workflows/deploy-validate.yml'
+  push:
+    branches: [main, development]
+    paths:
+      - 'deploy/**'
+      - 'install.sh'
+      - 'Makefile'
+      - '.dockerignore'
+      - '.github/workflows/deploy-validate.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # The floor this design depends on. GitHub's runners are well above it,
+      # but asserting it here means a runner image downgrade shows up as a
+      # clear failure rather than as `required: false` quietly not working.
+      - name: Assert the compose version floor
+        run: |
+          version=$(docker compose version --short | tr -d 'v ')
+          echo "compose $version"
+          major=${version%%.*}; rest=${version#*.}; minor=${rest%%.*}
+          if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 26 ]; }; then
+            echo "::error::compose $version is below the required 2.26"
+            exit 1
+          fi
+
+      - name: POSIX sh syntax
+        run: |
+          sh -n install.sh
+          for f in deploy/scripts/*.sh; do
+            case "$f" in *load_dump.sh|*save_dump.sh) bash -n "$f" ;; *) sh -n "$f" ;; esac
+          done
+
+      - name: Generate the storage layer
+        run: |
+          cp deploy/.env.example deploy/.env
+          # AMENDMENT (f): .env.example ships EYENED_API_SECRET_KEY empty on
+          # purpose — only first_run_env() generates it, and a plain `cp` never
+          # calls that. compose.yaml:125 requires it with `${...:?}`, which
+          # rejects empty as well as unset, so without this line EVERY
+          # `docker compose config` below fails and the job is red on every PR.
+          # Config-only validation never starts the stack, so a fixed
+          # placeholder is correct and keeps the run deterministic.
+          sed 's/^EYENED_API_SECRET_KEY=$/EYENED_API_SECRET_KEY=ci-config-validation-only-not-a-secret/' \
+              deploy/.env > deploy/.env.ci && mv deploy/.env.ci deploy/.env
+          cp deploy/storage-mounts.conf.example deploy/storage-mounts.conf
+          deploy/scripts/gen-storage.sh
+
+      - name: Every layer combination resolves
+        working-directory: deploy
+        run: |
+          set -e
+          fail=0
+          check() {
+            echo "--- $1 ($2) ---"
+            if ! COMPOSE_FILE="$1" COMPOSE_PROFILES="$2" docker compose config -q; then
+              echo "::error::layer combination failed: COMPOSE_FILE=$1 COMPOSE_PROFILES=$2"
+              fail=1
+            fi
+          }
+          check "compose.yaml:compose.dev.yaml:compose.storage.yaml" "local-db"
+          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db"
+          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     ""
+          check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.host-ports.yaml" "local-db"
+          check "compose.yaml:compose.dev.yaml:compose.storage.yaml" "local-db,oidc"
+          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db,tools"
+          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db,backup"
+          exit $fail
+
+      # The two invariants that are cheap to check and expensive to discover.
+      - name: Invariants
+        working-directory: deploy
+        run: |
+          set -e
+          dev="compose.yaml:compose.dev.yaml:compose.storage.yaml"
+          prod="compose.yaml:compose.storage.yaml:compose.prod.yaml"
+
+          # Exactly one `location /` snippet reaches nginx in each mode.
+          for mode in "$dev" "$prod"; do
+            n=$(COMPOSE_FILE=$mode COMPOSE_PROFILES=local-db docker compose config \
+                  | grep -c 'client.d/client.conf' || true)
+            [ "$n" = "1" ] || { echo "::error::$mode mounts $n client.d snippets, want 1"; exit 1; }
+          done
+
+          # The prod fileserver build must not be tagged as the official nginx.
+          COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config \
+            | grep -q 'eyened-fileserver:local' \
+            || { echo "::error::prod fileserver is not tagged eyened-fileserver:local"; exit 1; }
+
+          # An external-database stack must resolve with no database service.
+          svc=$(COMPOSE_FILE=$prod COMPOSE_PROFILES= docker compose config --services | sort | tr '\n' ' ')
+          echo "external-db services: $svc"
+          case "$svc" in *database*) echo "::error::database present with no local-db profile"; exit 1 ;; esac
+
+          # adminer is opt-in. A client install runs with local-db, so if
+          # adminer ever drifts back onto that profile every installation
+          # starts publishing a database admin UI.
+          svc=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config --services | sort | tr '\n' ' ')
+          case "$svc" in *adminer*) echo "::error::adminer is reachable from the local-db profile alone"; exit 1 ;; esac
+          svc=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db,tools docker compose config --services | sort | tr '\n' ' ')
+          case "$svc" in *adminer*) ;; *) echo "::error::adminer missing from the tools profile"; exit 1 ;; esac
+
+          # No container but `database` may be handed the MySQL root password.
+          # This is what dropping env_file: bought; without a check it silently
+          # comes back the first time someone adds `env_file: .env` to a service.
+          n=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config \
+                | grep -c 'MYSQL_ROOT_PASSWORD' || true)
+          if [ "$n" = "1" ]; then
+            echo "ok: MYSQL_ROOT_PASSWORD appears once"
+          else
+            echo "::error::MYSQL_ROOT_PASSWORD appears $n times, want 1 (database only)"; exit 1
+          fi
+
+      - name: nginx config is valid in both modes
+        run: |
+          set -e
+          for variant in dev prod; do
+            docker run --rm \
+              -v "$PWD/deploy/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro" \
+              -v "$PWD/deploy/nginx/client.d/$variant.conf:/etc/nginx/client.d/client.conf:ro" \
+              -v "$PWD/deploy/nginx/storage.d:/etc/nginx/storage.d:ro" \
+              nginx:1.27-alpine nginx -t
