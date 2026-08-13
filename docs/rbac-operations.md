@@ -101,10 +101,16 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
   filter is `IsHuman AND NOT Inactive AND PasswordHash IS NOT NULL` -- which a
   self-registered row matches exactly. Anyone who registers before cutover
   receives `grader` in all 44 projects. Accepted by decision on 2026-08-13; no
-  code change. **Step 4 of the cutover is the mitigation, so review the grant
-  for accounts nobody recognises** -- not just the totals. The confirmation
-  prompt shows a count and nothing else, so it will not tell you that one of
-  the creators is a stranger.
+  code change. The confirmation prompt discloses nothing to decide on: it is a
+  bare yes/no question that names no creator and does not so much as count
+  them, and `--yes` skips it entirely. The totals (`N membership(s) written for
+  M creator(s) across P project(s)`) print after the commit -- after the rows
+  exist. So the grant cannot be reviewed through the CLI *before* it is
+  written, and there is nothing at the prompt that would tell one of the
+  creators is a stranger. **Step 4 of the cutover is the mitigation, and it is
+  a query rather than a prompt: read `ProjectMember` (or the `Creator` rows the
+  filter above selects) once the write is done, and look for accounts nobody
+  recognises.**
 - **Deactivation revokes access, it does not black out the account.** A
   deactivated user cannot log in, cannot refresh a token, and cannot change
   their password; `get_access_scope` refuses them with a 401, so every route
