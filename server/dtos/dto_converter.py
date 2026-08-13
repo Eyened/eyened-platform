@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
 from eyened_orm import Model, SubTaskState
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session, object_session
 
 from .dtos_aux import CreatorGET, CreatorMeta, TagGET, TagMeta
@@ -563,16 +564,27 @@ class DTOConverter:
         annotation: "FormAnnotationORM", with_tag_metadata: bool = False
     ) -> FormAnnotationGET:
         """Convert FormAnnotation ORM object to FormAnnotationGET."""
+        # Read the load state BEFORE touching the relationship: the getattr
+        # below triggers a lazy load and would make every annotation look
+        # "loaded". A repository that eager-loads ImageInstance under a scope
+        # predicate leaves this attribute loaded and *empty* for an image the
+        # caller may not see -- a deliberate withholding, not a missing load.
+        # Re-resolving it from the raw Session, as the fallback does, would
+        # hand back exactly the identifier the loader refused.
+        state = sa_inspect(annotation, raiseerr=False)
+        withheld = state is not None and "ImageInstance" not in state.unloaded
+
         public_image_id = getattr(
             getattr(annotation, "ImageInstance", None), "PublicID", None
         )
-        if public_image_id is None:
+        if public_image_id is None and not withheld:
             sess = object_session(annotation)
             public_image_id = DTOConverter._get_public_id_for_instance_id(
                 sess, annotation.ImageInstanceID
             )
         if annotation.ImageInstanceID is not None:
-            if public_image_id is None:
+            if public_image_id is None and not withheld:
+                # Still a genuine data error when nothing withheld it.
                 raise ValueError("FormAnnotation missing ImageInstance PublicID")
             obj_type = "image_instance"
         elif annotation.StudyID is not None:

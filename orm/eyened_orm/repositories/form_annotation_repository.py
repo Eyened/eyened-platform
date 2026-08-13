@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, with_loader_criteria
 
 from eyened_orm import (
     FormAnnotation,
@@ -14,7 +14,7 @@ from eyened_orm import (
     SubTask,
 )
 from eyened_orm.authz.scope import AccessScope
-from eyened_orm.authz.scoping import apply_scope, projects_of
+from eyened_orm.authz.scoping import apply_scope, projects_of, scope_criteria
 from eyened_orm.repositories._scoped import scoped_one
 
 
@@ -141,6 +141,15 @@ class FormAnnotationRepository:
                 .selectinload(ImageInstanceTagLink.Creator),
             )
         )
+        # The annotation is anchored on PatientID; the image it names has its
+        # own, different anchor, and a selectinload issues its own SELECT that
+        # the root's WHERE never reaches. Without this, a caller entitled to a
+        # mis-scoped annotation is handed the PublicID of an image in a project
+        # they hold nothing in. Same predicate as the root, via the same
+        # registry walk -- not a second hand-written rule.
+        image_criteria = scope_criteria(ImageInstance, self._scope)
+        if image_criteria is not None:
+            query = query.options(with_loader_criteria(ImageInstance, image_criteria))
         if patient_id is not None:
             query = query.filter(FormAnnotation.PatientID == patient_id)
         if study_id is not None:

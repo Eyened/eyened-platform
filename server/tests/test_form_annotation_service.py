@@ -652,3 +652,124 @@ def test_update_allows_a_re_anchor_between_two_projects_the_caller_holds(session
     session.commit()
     session.expunge_all()
     assert session.get(FormAnnotation, ids.annotation).PatientID == ids.patient_b
+
+
+def _cross_anchored_annotations(session):
+    """Two annotations anchored in project B, one pointing at project A's image.
+
+    The mis-scoped shape is real -- 15 such ``FormAnnotation`` rows exist in
+    production, where ``PatientID`` and ``ImageInstanceID`` disagree about
+    which project the row belongs to. The annotation is anchored on
+    ``PatientID``, so a grader in B legitimately reaches it; the image it
+    names is not theirs to know about.
+
+    The in-scope twin is what makes the assertion mean "out of reach" rather
+    than "``image_id`` stopped being emitted at all".
+    """
+    from eyened_orm.utils.factories import (
+        make_creator,
+        make_device,
+        make_image,
+        make_patient,
+        make_project,
+        make_series,
+        make_storage_backend,
+        make_study,
+    )
+
+    backend = make_storage_backend(session)
+    device = make_device(session, "leak")
+    creator = make_creator(session, "leak-c")
+    schema = FormSchema(SchemaName="S-leak")
+    session.add(schema)
+    session.flush()
+
+    images = {}
+    patients = {}
+    for name in ("A", "B"):
+        project = make_project(session, f"leak-{name}")
+        patient = make_patient(session, project, f"pat-leak-{name}")
+        study = make_study(session, patient, date(2024, 1, 1))
+        series = make_series(session, study)
+        images[name] = make_image(
+            session, series, device, backend, f"img-leak-{name}"
+        )
+        patients[name] = patient
+
+    annotations = {}
+    for label, image in (("crossed", images["A"]), ("in_scope", images["B"])):
+        ann = FormAnnotation(
+            FormSchemaID=schema.FormSchemaID,
+            PatientID=patients["B"].PatientID,
+            ImageInstanceID=image.ImageInstanceID,
+            CreatorID=creator.CreatorID,
+            FormData={"answer": 1},
+        )
+        session.add(ann)
+        session.flush()
+        annotations[label] = ann.FormAnnotationID
+
+    seed = {
+        "project_b": patients["B"].ProjectID,
+        "patient_b": patients["B"].PatientID,
+        "public_a": images["A"].PublicID,
+        "public_b": images["B"].PublicID,
+        **annotations,
+    }
+    # Ids read out before the commit and the identity map emptied after it, so
+    # the read below issues real SELECTs instead of being answered from memory.
+    session.commit()
+    session.expunge_all()
+    return seed
+
+
+def _listed_by_id(session, scope, seed):
+    from server.dtos.dto_converter import DTOConverter
+
+    service = FormAnnotationService(
+        FormAnnotationRepository(session, scope=scope),
+        ImageInstanceRepository(session, scope=scope),
+        TagRepository(session, scope=scope),
+        scope=scope,
+    )
+    rows = service.list_annotations(
+        patient_id=seed["patient_b"],
+        study_id=None,
+        image_id=None,
+        form_schema_id=None,
+        sub_task_id=None,
+    )
+    return {r.FormAnnotationID: DTOConverter.form_annotation_to_get(r) for r in rows}
+
+
+def test_listing_does_not_disclose_the_public_id_of_an_out_of_reach_image(session):
+    """``list_active`` eager-loads ``FormAnnotation.ImageInstance`` and the DTO
+    emits its ``PublicID`` as ``image_id`` -- the mirror of the eager-loaded
+    annotations collection fixed earlier on this branch, in the other
+    direction.
+
+    The annotation itself stays: the caller is entitled to it. Only the
+    identifier of the image they cannot reach is withheld. That id 404s on
+    ``/images/{id}`` anyway, so this is a bare-identifier leak rather than
+    data -- but it still tells a grader in B that a particular image exists
+    in a project they hold nothing in.
+    """
+    seed = _cross_anchored_annotations(session)
+    scope = scope_for(seed["project_b"], role=ProjectRole.grader)
+
+    listed = _listed_by_id(session, scope, seed)
+
+    assert set(listed) == {seed["crossed"], seed["in_scope"]}
+    assert listed[seed["in_scope"]].image_id == seed["public_b"]
+    assert listed[seed["crossed"]].image_id is None
+
+
+def test_an_administrator_still_sees_both_image_ids(session):
+    """The control for the test above: an unbounded scope withholds nothing,
+    so the None there means "out of reach" and not "this field went away"."""
+    seed = _cross_anchored_annotations(session)
+
+    listed = _listed_by_id(session, admin_scope(), seed)
+
+    assert listed[seed["in_scope"]].image_id == seed["public_b"]
+    assert listed[seed["crossed"]].image_id == seed["public_a"]
