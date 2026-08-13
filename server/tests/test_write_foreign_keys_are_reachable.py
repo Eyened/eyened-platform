@@ -78,7 +78,7 @@ def two_projects(session):
 
     per_project = {}
     for name in ("A", "B"):
-        project = make_patient_chain = make_project(session, f"fk-{name}")
+        project = make_project(session, f"fk-{name}")
         patient = make_patient(session, project, f"fk-pat-{name}")
         study = make_study(session, patient, date(2024, 1, 1))
         series = make_series(session, study)
