@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session, selectinload
 
-from eyened_orm import ModelSegmentation, Segmentation
+from eyened_orm import ModelSegmentation, Segmentation, SubTask
 from eyened_orm.tag import SegmentationTagLink
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.authz.scoping import projects_of
@@ -38,6 +38,18 @@ class SegmentationRepository:
             Segmentation,
             self._scope,
             Segmentation.SegmentationID == segmentation_id,
+        )
+
+    def get_subtask(self, subtask_id: int) -> SubTask | None:
+        """Return the subtask by id, or None if absent or out of scope.
+
+        Beside its only caller -- the create path's ``SubTaskID`` -- rather
+        than reaching for a ``SubTaskRepository`` this service does not hold.
+        A ``SubTask`` is scoped by its parent task's whole project set, so a
+        ``None`` here means the caller cannot see that task at all.
+        """
+        return scoped_one(
+            self._session, SubTask, self._scope, SubTask.SubTaskID == subtask_id
         )
 
     def get_with_tag_links(self, segmentation_id: int) -> Segmentation | None:

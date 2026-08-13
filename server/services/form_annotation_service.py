@@ -68,6 +68,34 @@ class FormAnnotationService:
             raise NotFoundError("ImageInstance not found")
         return instance.ImageInstanceID
 
+    def _require_reachable_references(self, values: dict[str, Any]) -> None:
+        """Refuse an id the caller cannot reach, before it is written.
+
+        ``values`` carries only the reference fields present on this call
+        (``None`` is a legitimate value meaning "clear it", so it passes). Each
+        id is resolved through a **scoped** lookup, which is what ``image_id``
+        has always done -- an id outside the caller's reach comes back as
+        ``None`` and is answered exactly as a non-existent one is. Without this
+        a grader could file an annotation under another project's study or
+        subtask, or cite its annotation as a reference; that is an
+        unauthorized write, and it is how a row whose anchors disagree gets
+        made in the first place.
+
+        Not a consistency guard: nothing here asks whether the study belongs to
+        the patient. That question was deliberately left open.
+        """
+        study_id = values.get("study_id")
+        if study_id is not None and self.repository.get_study(study_id) is None:
+            raise NotFoundError("Study not found")
+
+        sub_task_id = values.get("sub_task_id")
+        if sub_task_id is not None and self.repository.get_subtask(sub_task_id) is None:
+            raise NotFoundError("SubTask not found")
+
+        reference_id = values.get("form_annotation_reference_id")
+        if reference_id is not None and self.repository.get_by_id(reference_id) is None:
+            raise NotFoundError("Referenced FormAnnotation not found")
+
     def list_annotations(
         self,
         *,
@@ -131,6 +159,13 @@ class FormAnnotationService:
             NotFoundError: If image_id is given but resolves to no instance.
         """
         image_instance_id = self._resolve_image_instance_id(image_id)
+        self._require_reachable_references(
+            {
+                "study_id": study_id,
+                "sub_task_id": sub_task_id,
+                "form_annotation_reference_id": form_annotation_reference_id,
+            }
+        )
         # No ownership overlay on create: the row does not exist yet and its
         # author is the caller by construction (CreatorID below). The floor is
         # judged on the patient's project -- ``FormAnnotation``'s own anchor --
@@ -213,6 +248,10 @@ class FormAnnotationService:
             entity_id=annotation_id,
             projects=projects,
         )
+
+        # After the floor and the overlay, not before: the caller must be
+        # entitled to modify this row before the request body is judged at all.
+        self._require_reachable_references(updates)
 
         # Column list is purely updates-key-driven, so it can be built before
         # any mutation happens -- which is what snapshot() requires.

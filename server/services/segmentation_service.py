@@ -61,6 +61,32 @@ class SegmentationService:
         self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
+    def _require_reachable_references(
+        self,
+        *,
+        subtask_id: int | None = None,
+        reference_segmentation_id: int | None = None,
+    ) -> None:
+        """Refuse an id the caller cannot reach, before it is written.
+
+        ``None`` passes through -- it is a legitimate value, not an omission.
+        Each id is resolved through a **scoped** lookup, mirroring what
+        ``image_id`` already does on this same create path: an id outside the
+        caller's reach comes back as ``None`` and is answered exactly as a
+        non-existent one is.
+
+        Not a consistency guard: nothing here asks whether the subtask holds
+        this image, or whether the reference is of the same feature. Those
+        questions were deliberately left open.
+        """
+        if subtask_id is not None and self.repository.get_subtask(subtask_id) is None:
+            raise NotFoundError("SubTask not found")
+        if (
+            reference_segmentation_id is not None
+            and self.repository.get_by_id(reference_segmentation_id) is None
+        ):
+            raise NotFoundError("Referenced Segmentation not found")
+
     def get_segmentation(self, segmentation_id: int) -> Segmentation:
         """Return a segmentation by id (tag links loaded).
 
@@ -121,6 +147,10 @@ class SegmentationService:
         instance = self.images.get_by_public_id(image_id)
         if instance is None:
             raise NotFoundError("ImageInstance not found")
+        self._require_reachable_references(
+            subtask_id=subtask_id,
+            reference_segmentation_id=reference_segmentation_id,
+        )
         # No ownership overlay on create: the row does not exist yet and its
         # author is the caller by construction (CreatorID below). The floor is
         # judged on the image's project, which is the only project the new
@@ -369,6 +399,12 @@ class SegmentationService:
             entity="Segmentation",
             entity_id=segmentation_id,
             projects=projects,
+        )
+
+        # After the floor and the overlay, not before: the caller must be
+        # entitled to modify this row before the request body is judged at all.
+        self._require_reachable_references(
+            reference_segmentation_id=reference_segmentation_id
         )
 
         before = AuditService.snapshot(

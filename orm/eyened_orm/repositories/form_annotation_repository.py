@@ -11,6 +11,7 @@ from eyened_orm import (
     Patient,
     Study,
     StudyTagLink,
+    SubTask,
 )
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.authz.scoping import apply_scope, projects_of
@@ -48,6 +49,31 @@ class FormAnnotationRepository:
         the one the create path already holds. Deliberately unscoped, as above.
         """
         return projects_of(self._session, Patient, patient_id)
+
+    def get_study(self, study_id: int) -> Study | None:
+        """Return the study by id, or None if absent or out of scope.
+
+        Here rather than on ``StudyRepository`` for the same reason
+        ``project_ids_of_patient`` is: an annotation's ``StudyID`` is written by
+        the create/update path, and this is the repository that path already
+        holds. What it returns is unused -- ``None`` is the whole answer, and
+        it means "you cannot point an annotation at this", indistinguishable
+        from "it does not exist" by design.
+        """
+        return scoped_one(
+            self._session, Study, self._scope, Study.StudyID == study_id
+        )
+
+    def get_subtask(self, subtask_id: int) -> SubTask | None:
+        """Return the subtask by id, or None if absent or out of scope.
+
+        A ``SubTask`` is scoped by its parent task's whole project set, so this
+        answers "may this caller file an annotation under that subtask" with
+        the same rule that decides whether they can see the task at all.
+        """
+        return scoped_one(
+            self._session, SubTask, self._scope, SubTask.SubTaskID == subtask_id
+        )
 
     def get_by_id(self, annotation_id: int) -> FormAnnotation | None:
         """Return the annotation by id, or None if absent or out of scope."""
