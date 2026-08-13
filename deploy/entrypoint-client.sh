@@ -7,8 +7,15 @@ cd /app/client
 # (node_modules/.package-lock.json) was missing — that is, only when the
 # directory had never been installed into at all. It left a developer on stale
 # dependencies after a package-lock.json bump, silently, until someone thought
-# to run `docker compose down -v`. It now also compares a hash of the mounted
-# lockfile against the stamp written when these modules were installed.
+# to run `docker compose down -v` — which is a bad habit to fall into here, as
+# it also destroys db_data and platform_storage. It now also compares a hash of
+# the mounted lockfile against the stamp written when these modules were
+# installed.
+#
+# Consequence worth knowing: `npm ci` below removes node_modules before it can
+# fail, so a developer who boots offline after a lockfile bump loses a working
+# node_modules until the registry is reachable again. That is the accepted
+# trade — failing loudly beats starting vite on dependencies nobody verified.
 stamp=node_modules/.lock-stamp
 
 # NOT `md5sum ... | cut ...`: a pipeline reports only the last command's exit
@@ -25,9 +32,12 @@ want=${want%% *}
 have=$(cat "$stamp" 2>/dev/null || true)
 
 # The marker test stays as a second condition rather than being replaced by the
-# stamp comparison: it is the only thing that catches a node_modules emptied or
-# corrupted by hand while a matching stamp survived. A missing stamp alone is
-# already covered, since $have is then empty and cannot equal a real hash.
+# stamp comparison, but its remaining job is narrow: it catches only the case
+# where npm's marker was removed while a matching .lock-stamp survived. It does
+# NOT cover an emptied node_modules — the stamp lives inside that directory, so
+# emptying it takes the stamp too, leaving $have empty and firing the hash
+# comparison instead. Keep it anyway; it is cheap and it is the one state the
+# hash cannot see.
 if [ ! -f node_modules/.package-lock.json ] || [ "$want" != "$have" ]; then
   echo "entrypoint-client: dependencies do not match package-lock.json, installing"
   npm ci
