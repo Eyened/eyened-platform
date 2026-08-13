@@ -14,6 +14,16 @@ the first would leave a green suite and an open door.
 These guards are allow-lists over source, so they are exact-set assertions on
 purpose: a file that stops needing the power must leave the list, and the test
 failing is how you find out.
+
+Their bound, stated exactly. Both scan for a syntactic shape, so what they
+prove is "no file outside the list contains this shape", not "no file outside
+the list obtains the power". The constructor guard matches the ``is_admin=``
+keyword only; ``AccessScope`` is ``kw_only=True`` so a positional third
+argument no longer exists, but an alias (``S = AccessScope; S(is_admin=True)``),
+``**kwargs`` expansion, ``dataclasses.replace`` and ``object.__setattr__`` are
+all invisible to it, as ``setattr(creator, "IsAdmin", True)`` is to the
+IsAdmin guard. Files under a ``tests`` path component are not scanned at all.
+Nothing here bounds those; review does.
 """
 from __future__ import annotations
 

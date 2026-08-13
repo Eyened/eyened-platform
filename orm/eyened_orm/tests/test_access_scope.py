@@ -17,6 +17,23 @@ def _member(**roles: ProjectRole) -> AccessScope:
     )
 
 
+def test_a_scope_cannot_be_built_positionally():
+    """The escalation guard matches ``is_admin=`` keywords, so nothing else may exist.
+
+    Before ``kw_only=True``, ``AccessScope(9, "mallory", True)`` built an
+    unbounded scope that
+    ``test_only_the_allow_listed_files_decide_a_scopes_admin_flag`` could not
+    see -- it walks ``node.keywords``, and a positional argument is in
+    ``node.args``. Widening the guard to inspect positions would still need it
+    to know which position ``is_admin`` occupies; deleting the shape from the
+    language does not. This test is the only thing standing between a future
+    ``kw_only`` removal and a silently reopened door, so it asserts the
+    constructor, not the guard.
+    """
+    with pytest.raises(TypeError):
+        AccessScope(9, "mallory", True)  # type: ignore[misc]
+
+
 def test_effective_role_short_circuits_for_an_administrator():
     """An admin's power is the short-circuit, not a row set."""
     admin = AccessScope(actor_id=1, username="root", is_admin=True, roles={})

@@ -11,7 +11,12 @@ from .roles import ProjectRole
 __all__ = ["AccessScope"]
 
 
-@dataclass(frozen=True)
+# kw_only=True: `is_admin` is otherwise the third *positional* field, and
+# `AccessScope(9, "mallory", True)` builds an unbounded scope that the AST guard
+# in server/tests/test_escalation_paths.py cannot see -- it matches keywords.
+# Making every field keyword-only deletes that shape from the language rather
+# than asking a scanner to recognise it.
+@dataclass(frozen=True, kw_only=True)
 class AccessScope:
     """Everything one request may do, resolved once from the database.
 
@@ -54,14 +59,25 @@ class AccessScope:
         The ``eorm`` CLI and the RQ worker reach repositories without one.
         Never returned by ``get_access_scope``.
 
-        The call sites ARE pinned to an allow-list:
-        ``test_only_the_allow_listed_files_call_access_scope_trusted`` in
-        ``server/tests/test_escalation_paths.py`` asserts the exact set over
-        repository source, so a new caller turns the suite red rather than
-        relying on review to notice it. Its sibling there guards the second
-        door, ``AccessScope(..., is_admin=True)``, which a scan for this method
-        cannot see. The service-factory guard additionally bans it there, which
-        is the one place it would be invisible.
+        What IS pinned: ``test_only_the_allow_listed_files_call_access_scope_trusted``
+        in ``server/tests/test_escalation_paths.py`` asserts the exact set of
+        files containing a ``.trusted()`` attribute call, and its sibling
+        asserts the exact set containing an ``AccessScope(is_admin=...)``
+        keyword whose value is not a literal ``False`` -- the second door, which
+        a scan for this method cannot see. Since ``kw_only=True`` above, the
+        keyword is the only way to construct one, so that scan is exhaustive
+        over constructor calls. The service-factory guard additionally bans
+        ``.trusted()`` there, which is the one place it would be invisible.
+
+        What is NOT pinned, and do not let a reader believe otherwise: the
+        guards read source text, so they see neither an alias
+        (``S = AccessScope; S(is_admin=True)``) nor ``**kwargs`` expansion
+        (``AccessScope(**{"is_admin": True})``), and they see no post-hoc
+        mutation -- ``dataclasses.replace(scope, is_admin=True)`` and
+        ``object.__setattr__(scope, "is_admin", True)`` both defeat
+        ``frozen=True`` and are invisible here. Files under a ``tests`` path
+        component are not scanned at all. These are the residual paths; review
+        is the only control on them.
         """
         return cls(actor_id=actor_id, username=username, is_admin=True, roles={})
 
