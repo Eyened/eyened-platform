@@ -414,8 +414,22 @@ def test_segmentation_counts_are_scoped(session, two_projects):
     }
 
 
-def test_count_segmentations_is_scoped(session, two_projects):
-    """The single-feature count follows the same rule as the grouped one."""
+def test_count_segmentations_is_deliberately_global(session, two_projects):
+    """The single-feature count does **not** follow the grouped one, by design.
+
+    ``count_segmentations`` is the referential-integrity guard behind the
+    delete-conflict check, not display data. Scoped, a feature still
+    referenced from a project the caller cannot reach counts 0, the 409 never
+    fires, and the delete dies at the flush as an unmapped ``IntegrityError``
+    -- a correct refusal replaced by a 500. It therefore reads every
+    referencing row, and the *message* built on it carries no number (see
+    ``server/services/feature_service.py``), which is what keeps the count
+    from leaking.
+
+    The last assertion is the point of putting both methods in one test: its
+    scoped sibling must stay scoped on this very same seed, so a future edit
+    cannot revert the two together in either direction and stay green.
+    """
     from eyened_orm.repositories.feature_repository import FeatureRepository
 
     feature_id = _feature_with_segmentations_in_both_projects(session, two_projects)
@@ -423,9 +437,11 @@ def test_count_segmentations_is_scoped(session, two_projects):
     a_repo = FeatureRepository(session, scope=scope_for(two_projects["A"]["project"]))
     b_repo = FeatureRepository(session, scope=scope_for(two_projects["B"]["project"]))
 
-    assert a_repo.count_segmentations(feature_id) == 1
-    assert b_repo.count_segmentations(feature_id) == 2
+    assert a_repo.count_segmentations(feature_id) == 3
+    assert b_repo.count_segmentations(feature_id) == 3
     assert (
         FeatureRepository(session, scope=admin_scope()).count_segmentations(feature_id)
         == 3
     )
+
+    assert a_repo.segmentation_counts() == {feature_id: 1}

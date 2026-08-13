@@ -103,15 +103,18 @@ class FeatureService:
         if feature is None:
             raise NotFoundError(f"Feature {feature_id} not found")
 
-        seg_count = self.repository.count_segmentations(feature_id)
-        if seg_count > 0:
+        # count_segmentations is database-wide on purpose (it decides whether
+        # the delete is legal, and deletion is global), so the number it
+        # returns may include projects this caller cannot reach. It therefore
+        # decides *whether* to refuse and never appears in the refusal: no
+        # count in the message, and no count in the payload.
+        if self.repository.count_segmentations(feature_id) > 0:
             raise ConflictError({
                 "code": "FEATURE_HAS_SEGMENTATIONS",
                 "message": (
-                    f"Cannot delete feature '{feature.FeatureName}' because it has "
-                    f"{seg_count} linked segmentation(s)."
+                    f"Cannot delete feature '{feature.FeatureName}' because "
+                    "segmentations reference it."
                 ),
-                "segmentation_count": seg_count,
             })
 
         parents = self.repository.parent_names_of_child(feature_id)

@@ -204,7 +204,13 @@ def test_delete_feature_blocked_by_segmentations_raises_conflict(session):
 
     detail = exc.value.detail
     assert detail["code"] == "FEATURE_HAS_SEGMENTATIONS"
-    assert detail["segmentation_count"] == 3
+    # The count decides *whether* the conflict fires, never what it says: the
+    # fake returns 3 while the body carries no number anywhere. Its previous
+    # assertion (segmentation_count == 3) pinned the disclosure this wave
+    # removes -- ``count_segmentations`` is global, so that 3 could include
+    # rows in projects the caller cannot reach.
+    assert "segmentation_count" not in detail
+    assert "3" not in detail["message"]
 
 
 def test_delete_feature_logs_delete(session):
@@ -219,18 +225,24 @@ def test_delete_feature_logs_delete(session):
     assert audit.records[0]["entity"] == "Feature"
 
 
-def test_a_feature_referenced_only_from_another_project_is_still_not_deleted(session):
-    """The scoped count changes the *message*, never the outcome.
+def test_a_feature_referenced_only_from_another_project_is_refused_without_a_count(
+    session,
+):
+    """A cross-project reference must produce the 409, and no number.
 
-    ``count_segmentations`` is scoped, so a project_admin in A is told 0 for a
-    feature referenced only from project B and the 409 conflict does not fire.
-    What must not follow is a deletion: the referencing rows are real, and this
-    pins that they survive. The caller gets an uninformative failure instead of
-    the conflict body -- which is a message-quality problem, not a data one.
+    Two things at once, and each fails without the other half of the fix:
+
+    - ``count_segmentations`` is global, so a ``project_admin`` in A is told
+      the feature is in use even though every referencing row lives in B. With
+      it scoped the count is 0, the conflict never fires, and the delete dies
+      at the flush as an ``IntegrityError`` -- a 500 where a 409 belongs.
+    - The refusal carries no count. The number is the cross-project fact the
+      caller is not entitled to; the fact of use is not. So the message holds
+      no digits and the body has no ``segmentation_count`` key -- removing it
+      from the prose while leaving it in the payload would disclose exactly
+      the same thing.
     """
     from datetime import date
-
-    from sqlalchemy.exc import IntegrityError
 
     from eyened_orm.authz.roles import ProjectRole
     from eyened_orm.utils.factories import (
@@ -266,10 +278,12 @@ def test_a_feature_referenced_only_from_another_project_is_still_not_deleted(ses
 
     scope = scope_for(project_a_id, role=ProjectRole.project_admin)
     service = FeatureService(FeatureRepository(session, scope=scope), scope=scope)
-    assert service.repository.count_segmentations(feature_id) == 0
 
-    with pytest.raises(IntegrityError):
+    with pytest.raises(ConflictError) as exc:
         service.delete_feature(feature_id)
 
-    session.rollback()
+    detail = exc.value.detail
+    assert detail["code"] == "FEATURE_HAS_SEGMENTATIONS"
+    assert "segmentation_count" not in detail
+    assert not any(char.isdigit() for char in detail["message"]), detail["message"]
     assert session.get(Feature, feature_id) is not None

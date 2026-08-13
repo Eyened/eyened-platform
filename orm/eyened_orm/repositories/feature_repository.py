@@ -68,25 +68,27 @@ class FeatureRepository:
         return {fid: cnt for fid, cnt in rows}
 
     def count_segmentations(self, feature_id: int) -> int:
-        """Return how many of this feature's segmentations the caller reaches.
+        """Return how many segmentations reference this feature, database-wide.
 
-        Scoped for the same reason as ``segmentation_counts``, and with one
-        consequence worth naming: the delete-conflict check built on this now
-        counts only what the caller can see, so a feature still referenced from
-        a project they cannot reach no longer produces that 409. It is not
-        deletable either -- the flush raises ``IntegrityError``, since
-        ``Segmentation.FeatureID`` is NOT NULL and ``ON DELETE RESTRICT`` -- so
-        the referenced rows cannot be lost; that caller just gets an
-        uninformative failure instead of the conflict body.
+        Deliberately **unscoped**, and the one method here where that is a
+        decision rather than an oversight. This is a referential-integrity
+        guard, not display data: it answers "may this row be deleted", and
+        deletion is global. Filtered by the caller's scope it returns 0 for a
+        feature referenced only from a project they cannot reach, the
+        delete-conflict check passes, and the delete then dies at the flush as
+        an unmapped ``IntegrityError`` (``Segmentation.FeatureID`` is NOT NULL
+        under ``ON DELETE RESTRICT``, so nothing is lost) -- turning a correct
+        409 into an uninformative 500.
+
+        Its sibling ``segmentation_counts`` is the opposite case and stays
+        scoped. What keeps the number from leaking here is that no caller ever
+        sees it: ``FeatureService.delete_feature`` reports that the feature is
+        in use *without* the count.
         """
         return self._session.execute(
-            apply_scope(
-                select(func.count())
-                .select_from(Segmentation)
-                .where(Segmentation.FeatureID == feature_id),
-                Segmentation,
-                self._scope,
-            )
+            select(func.count())
+            .select_from(Segmentation)
+            .where(Segmentation.FeatureID == feature_id)
         ).scalar_one()
 
     def parent_names_of_child(self, feature_id: int) -> list[str]:
