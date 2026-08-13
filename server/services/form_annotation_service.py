@@ -55,8 +55,13 @@ class FormAnnotationService:
         self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
-    def _resolve_image_instance_id(self, image_id: str | None) -> int | None:
-        """Map a PublicID to its ImageInstanceID (None passes through).
+    def _resolve_image_instance(self, image_id: str | None) -> Any | None:
+        """Map a PublicID to its ImageInstance (None passes through).
+
+        Returns the row rather than its id so the write paths can assign the
+        **relationship**, not just the FK: the response DTO reads an image id
+        only off a loaded relationship, and this lookup is scoped, so the object
+        it returns is one the caller is entitled to name.
 
         Raises:
             NotFoundError: If a non-None image_id resolves to no instance.
@@ -66,7 +71,16 @@ class FormAnnotationService:
         instance = self.images.get_by_public_id(image_id)
         if instance is None:
             raise NotFoundError("ImageInstance not found")
-        return instance.ImageInstanceID
+        return instance
+
+    def _resolve_image_instance_id(self, image_id: str | None) -> int | None:
+        """Map a PublicID to its ImageInstanceID (None passes through).
+
+        Raises:
+            NotFoundError: If a non-None image_id resolves to no instance.
+        """
+        instance = self._resolve_image_instance(image_id)
+        return instance.ImageInstanceID if instance is not None else None
 
     def _require_reachable_references(self, values: dict[str, Any]) -> None:
         """Refuse an id the caller cannot reach, before it is written.
@@ -125,7 +139,9 @@ class FormAnnotationService:
         Raises:
             NotFoundError: If the annotation does not exist.
         """
-        item = self.repository.get_with_tag_links(annotation_id)
+        # Opts into the scoped image load: this is the read behind
+        # ``GET /form-annotations/{id}``, whose response carries ``image_id``.
+        item = self.repository.get_with_tag_links(annotation_id, with_image=True)
         if item is None:
             raise NotFoundError("FormAnnotation not found")
         return item
@@ -158,7 +174,7 @@ class FormAnnotationService:
         Raises:
             NotFoundError: If image_id is given but resolves to no instance.
         """
-        image_instance_id = self._resolve_image_instance_id(image_id)
+        image = self._resolve_image_instance(image_id)
         self._require_reachable_references(
             {
                 "study_id": study_id,
@@ -180,13 +196,19 @@ class FormAnnotationService:
             FormSchemaID=form_schema_id,
             PatientID=patient_id,
             StudyID=study_id,
-            ImageInstanceID=image_instance_id,
+            ImageInstanceID=image.ImageInstanceID if image is not None else None,
             Laterality=laterality,
             CreatorID=self.scope.actor_id,
             SubTaskID=sub_task_id,
             FormData=form_data,
             FormAnnotationReferenceID=form_annotation_reference_id,
         )
+        # The create response is serialised from this object, and the DTO reads
+        # an image id only off a loaded relationship. Assigning the row the
+        # scoped lookup already returned is how the create path opts in -- no
+        # second read, and nothing here can name an image the resolution above
+        # refused. ``None`` is assigned too: loaded-and-empty, not unasked.
+        annotation.ImageInstance = image
         self.repository.add(annotation)
         if self.audit is not None:
             self.audit.record(
@@ -218,7 +240,10 @@ class FormAnnotationService:
         Raises:
             NotFoundError: If the annotation, or a given image_id, is unknown.
         """
-        annotation = self.repository.get_by_id(annotation_id)
+        # Opts into the scoped image load: the route converts what this returns
+        # straight into the PATCH response, so it is a response read whether or
+        # not the image was touched.
+        annotation = self.repository.get_by_id(annotation_id, with_image=True)
         if annotation is None:
             raise NotFoundError("FormAnnotation not found")
         projects = self.repository.project_ids(annotation_id)
@@ -261,9 +286,18 @@ class FormAnnotationService:
         before = AuditService.snapshot(annotation, *applied_columns)
 
         if "image_id" in updates:
-            annotation.ImageInstanceID = self._resolve_image_instance_id(
-                updates["image_id"]
+            # Both halves, deliberately. The FK is what the audit diff reads
+            # (it runs before the flush that would sync it from the
+            # relationship), and the relationship is what the response DTO
+            # reads -- ``get_by_id(with_image=True)`` above left it loaded with
+            # the *old* image, and a flush does not expire it, so setting only
+            # the FK would answer the PATCH with the id of the image that was
+            # just replaced.
+            image = self._resolve_image_instance(updates["image_id"])
+            annotation.ImageInstanceID = (
+                image.ImageInstanceID if image is not None else None
             )
+            annotation.ImageInstance = image
         for key, attr in _FIELD_MAP.items():
             if key in updates:
                 setattr(annotation, attr, updates[key])

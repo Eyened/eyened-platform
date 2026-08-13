@@ -1,10 +1,15 @@
-"""What the six database-reading DTO converters actually return.
+"""What the database-reading DTO converters actually return.
 
 ``test_repository_reads_are_scoped.py`` pins their *names* -- ``_DTO_SESSION_TOUCHES``
-is an exact set, so a seventh converter that starts reading, or a rename of one
-of these six, turns that guard red. It observes nothing about what any of them
+is an exact set, so a converter that starts reading, or a rename of one of the
+five on it, turns that guard red. It observes nothing about what any of them
 returns: replacing ``_get_public_id_for_instance_id``'s body with
 ``return "leaked-public-id"`` left the whole suite green.
+
+``form_annotation_to_get`` is tested here too and is no longer one of them: it
+came off that set when it stopped resolving an image id from the raw Session.
+Its test below is kept here for the widening assertion, which is the same
+property in a converter that now has only what it was handed.
 
 This file is the behavioural half, and it is *in addition* to that pin, not
 instead of it. Every converter here reads through a raw ``Session`` with no
@@ -229,7 +234,19 @@ def test_model_segmentation_get_carries_its_own_images_public_id(
     assert _OUT_OF_REACH not in _dumped(dto)
 
 
-def test_form_annotation_get_carries_its_own_images_public_id(session, two_projects):
+def test_form_annotation_get_carries_the_loaded_images_public_id(
+    session, two_projects
+):
+    """The one converter here that no longer reads a Session.
+
+    It emits an image id only off a **loaded** relationship -- see
+    ``form_annotation_to_get`` -- so the relationship is assigned here, which is
+    what a repository asked for the scoped load leaves behind. The two
+    assertions this file exists for are unchanged: the id resolved is the
+    in-reach one exactly, and the out-of-reach PublicID appears nowhere. The
+    withholding half (unloaded means withheld, and no id is invented for it)
+    lives in ``test_form_annotation_service.py``.
+    """
     annotation = make_form_annotation(
         session,
         make_form_schema(session, "s"),
@@ -237,6 +254,7 @@ def test_form_annotation_get_carries_its_own_images_public_id(session, two_proje
         two_projects["creator"],
         image=two_projects["image_a"],
     )
+    annotation.ImageInstance = two_projects["image_a"]
 
     dto = DTOConverter.form_annotation_to_get(annotation)
 

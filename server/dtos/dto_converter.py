@@ -564,27 +564,36 @@ class DTOConverter:
         annotation: "FormAnnotationORM", with_tag_metadata: bool = False
     ) -> FormAnnotationGET:
         """Convert FormAnnotation ORM object to FormAnnotationGET."""
-        # Read the load state BEFORE touching the relationship: the getattr
-        # below triggers a lazy load and would make every annotation look
-        # "loaded". A repository that eager-loads ImageInstance under a scope
-        # predicate leaves this attribute loaded and *empty* for an image the
-        # caller may not see -- a deliberate withholding, not a missing load.
-        # Re-resolving it from the raw Session, as the fallback does, would
-        # hand back exactly the identifier the loader refused.
+        # An unloaded ImageInstance means **withheld**, full stop -- this
+        # converter never resolves one itself.
+        #
+        # A FormAnnotation is anchored on PatientID; the image it names has its
+        # own, different anchor, so a caller legitimately holding the annotation
+        # may hold nothing in the image's project. Only a *scoped* read can
+        # decide that, and the only scoped read available here is the one the
+        # repository already did. Both ways of resolving it from here --
+        # letting ``annotation.ImageInstance`` lazy-load, or looking the id up
+        # through ``object_session`` -- go straight to the raw Session with no
+        # scope in the chain, and hand back exactly the identifier a scoped
+        # loader refused. So the load state is read first and is the whole
+        # decision: loaded-and-empty (deliberately withheld by the loader's
+        # criteria) and never-loaded (the caller did not ask for it) are
+        # answered identically, with None.
+        #
+        # The consequence is deliberate: a caller that serialises an annotation
+        # without asking its repository to load the image emits ``image_id:
+        # None`` for an image it could have shown. That is a visible functional
+        # degradation, and it is the fail-closed direction -- the alternative
+        # fails open, silently, on a caller that forgot.
         state = sa_inspect(annotation, raiseerr=False)
-        withheld = state is not None and "ImageInstance" not in state.unloaded
+        loaded = state is not None and "ImageInstance" not in state.unloaded
+        image = annotation.ImageInstance if loaded else None
+        public_image_id = getattr(image, "PublicID", None)
 
-        public_image_id = getattr(
-            getattr(annotation, "ImageInstance", None), "PublicID", None
-        )
-        if public_image_id is None and not withheld:
-            sess = object_session(annotation)
-            public_image_id = DTOConverter._get_public_id_for_instance_id(
-                sess, annotation.ImageInstanceID
-            )
         if annotation.ImageInstanceID is not None:
-            if public_image_id is None and not withheld:
-                # Still a genuine data error when nothing withheld it.
+            if image is not None and public_image_id is None:
+                # The loader handed back a row with no PublicID: nothing
+                # withheld this, so it is a genuine data error.
                 raise ValueError("FormAnnotation missing ImageInstance PublicID")
             obj_type = "image_instance"
         elif annotation.StudyID is not None:

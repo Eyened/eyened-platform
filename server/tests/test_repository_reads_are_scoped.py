@@ -137,13 +137,17 @@ _SCOPE_ATTRIBUTE_READS = {
 # a new entry means a new unguarded read. These are known, open, and NOT
 # blessed as safe -- patient_to_detail_get resolves Registration image ids on
 # the raw request session with no scope in the chain.
+#
+# ``form_annotation_to_get`` was on this list and came off it: it no longer
+# resolves an image id itself at all, and reads one only off a relationship a
+# scoped repository already loaded. The pin comes down with it, which is what
+# "set equality" is for -- a stale entry would read as a still-open hole.
 _DTO_SESSION_TOUCHES = {
     "DTOConverter._get_public_id_for_instance_id",
     "DTOConverter._registration_attr_to_public_ids",
     "DTOConverter.patient_to_detail_get",
     "DTOConverter.model_segmentation_to_get",
     "DTOConverter.segmentation_to_get",
-    "DTOConverter.form_annotation_to_get",
 }
 
 

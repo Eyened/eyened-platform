@@ -96,6 +96,17 @@ class ImageInstanceRepository:
                 selectinload(ImageInstance.FormAnnotations)
                 .selectinload(FormAnnotation.FormAnnotationTagLinks)
                 .selectinload(FormAnnotationTagLink.Creator),
+                # The annotation DTO names an image only off a *loaded*
+                # relationship -- it resolves none itself -- so without this
+                # every annotation nested in this response comes back with
+                # ``image_id: null``. No scope criteria on this one, and it
+                # needs none: this collection is the root image's own
+                # ``FormAnnotations``, so each row's ``ImageInstanceID`` is the
+                # root's by construction and the root read already scoped it.
+                # The load resolves out of the identity map, not a second row.
+                selectinload(ImageInstance.FormAnnotations).selectinload(
+                    FormAnnotation.ImageInstance
+                ),
             ]
             criteria = scope_criteria(FormAnnotation, self._scope)
             if criteria is not None:

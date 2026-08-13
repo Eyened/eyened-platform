@@ -75,55 +75,72 @@ class FormAnnotationRepository:
             self._session, SubTask, self._scope, SubTask.SubTaskID == subtask_id
         )
 
-    def _scoped_image_options(self) -> tuple:
-        """Eager-load ``ImageInstance`` under the scope, so an out-of-reach one
-        arrives loaded and **None** rather than lazily resolving later.
+    def _scoped_image_options(self, with_image: bool) -> tuple:
+        """Eager-load ``ImageInstance`` under the scope when ``with_image``, so
+        an out-of-reach one arrives loaded and **None**; load nothing otherwise.
 
         A ``FormAnnotation`` is anchored on ``PatientID``; the image it names has
         its own, different anchor, so a row whose two anchors disagree is
-        legitimately readable by a caller who cannot see the image. Left
-        unloaded, the DTO's ``getattr(annotation.ImageInstance, "PublicID")``
-        lazy-loads it with no scope in the chain and emits the PublicID of an
-        image in a project the caller holds nothing in.
+        legitimately readable by a caller who cannot see the image. This is the
+        only place that decides, under the caller's scope, whether the image may
+        be named at all -- ``form_annotation_to_get`` does not resolve one
+        itself, by design.
 
-        Eager-loading is not incidental here: ``form_annotation_to_get`` decides
-        whether an absent image means "withheld" or "resolve it from the raw
-        Session" by asking whether the relationship is loaded. An unloaded
-        relationship takes the fallback and re-discloses exactly what this
-        withholds, so the ``selectinload`` must be present whenever the criteria
-        are -- the two are one option set, deliberately built together.
+        Not loading it is therefore **not** the unsafe direction: an unloaded
+        relationship reads as withheld, so a caller that skips this emits no
+        image id rather than an unscoped one. That is why the flag defaults off:
+        forgetting it costs a field, where forgetting the scope would cost the
+        secret.
+
+        The cost of asking for it, measured on a single ``get_by_id`` against
+        the test database: **2 SELECTs -> 14** for a row that carries an image,
+        and 2 -> 2 for a row that does not. ``ImageInstance`` declares its own
+        ``lazy="selectin"`` relationships, so loading it cascades into Series,
+        Study, Patient, Project, ImageStorage, StorageBackend, the device pair
+        and the tag tables -- twelve extra queries, not the one an earlier
+        revision of this docstring claimed. Only the response paths pay it.
 
         ``scope_criteria`` returns None for an administrator (and for an
         unfiltered entity), where a tautology would read as a filter that is in
         force. Same predicate as ``apply_scope`` puts on an ImageInstance read,
         via the same registry walk -- not a second hand-written rule.
         """
+        if not with_image:
+            return ()
         options: list = [selectinload(FormAnnotation.ImageInstance)]
         criteria = scope_criteria(ImageInstance, self._scope)
         if criteria is not None:
             options.append(with_loader_criteria(ImageInstance, criteria))
         return tuple(options)
 
-    def get_by_id(self, annotation_id: int) -> FormAnnotation | None:
+    def get_by_id(
+        self, annotation_id: int, *, with_image: bool = False
+    ) -> FormAnnotation | None:
         """Return the annotation by id, or None if absent or out of scope.
 
-        The image is eager-loaded under the scope because this is the read the
-        **update** path returns, and the route converts what it returns
-        straight into the response. The other callers here ignore the
-        relationship; one selectin query is the price of the two response paths
-        not disagreeing with the listing about the same row.
+        ``with_image`` eager-loads ``ImageInstance`` under the scope and is for
+        callers that will **serialise** the row: without it the DTO emits no
+        ``image_id`` at all. It is off by default because most callers here only
+        mutate the row or read a column off it, and the load is expensive (see
+        ``_scoped_image_options``).
         """
         return scoped_one(
             self._session,
             FormAnnotation,
             self._scope,
             FormAnnotation.FormAnnotationID == annotation_id,
-            options=self._scoped_image_options(),
+            options=self._scoped_image_options(with_image),
         )
 
-    def get_with_tag_links(self, annotation_id: int) -> FormAnnotation | None:
+    def get_with_tag_links(
+        self, annotation_id: int, *, with_image: bool = False
+    ) -> FormAnnotation | None:
         """Return the annotation by id with its tag links loaded, or None if
-        absent or out of scope."""
+        absent or out of scope.
+
+        ``with_image`` is as on ``get_by_id``: the tag links are loaded either
+        way, the image only on request.
+        """
         return scoped_one(
             self._session,
             FormAnnotation,
@@ -136,7 +153,7 @@ class FormAnnotationRepository:
                 selectinload(
                     FormAnnotation.FormAnnotationTagLinks
                 ).selectinload(FormAnnotationTagLink.Creator),
-                *self._scoped_image_options(),
+                *self._scoped_image_options(with_image),
             ),
         )
 

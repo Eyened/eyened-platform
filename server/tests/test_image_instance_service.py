@@ -498,3 +498,44 @@ def test_an_in_project_annotation_still_loads_for_a_member(session):
     item = _scoped_service(session, scope).get_instance(ids.image, **_WITH_ANNOTATIONS)
 
     assert [a.FormAnnotationID for a in item.FormAnnotations] == [in_project_id]
+
+
+def test_a_nested_annotation_still_names_the_image_it_hangs_off(session):
+    """The nested DTO's ``image_id`` survives the load, and is not resolved.
+
+    ``form_annotation_to_get`` names an image only off a relationship that is
+    already loaded -- it resolves none from the Session, on purpose -- so this
+    reader has to load ``FormAnnotation.ImageInstance`` or every annotation
+    nested in an image response comes back with ``image_id: null``. That is the
+    fail-closed direction rather than a leak, which is exactly why a green
+    suite would not otherwise say a word about it.
+
+    The id asserted is the root image's own PublicID: this collection cannot
+    contain an annotation pointing anywhere else.
+    """
+    from eyened_orm.utils.factories import (
+        make_creator,
+        make_form_annotation,
+        make_form_schema,
+        make_patient,
+    )
+    from eyened_orm import Project
+    from server.dtos.dto_converter import DTOConverter
+
+    ids = _cross_anchored_annotation(session)
+    patient_a = make_patient(session, session.get(Project, ids.project_a), "pat-nest")
+    make_form_annotation(
+        session,
+        make_form_schema(session, "nest-schema"),
+        patient_a,
+        make_creator(session, "nest-author"),
+        image=session.get(ImageInstance, ids.image),
+    )
+    session.commit()
+    session.expunge_all()
+
+    scope = scope_for(ids.project_a, role=ProjectRole.read_only)
+    item = _scoped_service(session, scope).get_instance(ids.image, **_WITH_ANNOTATIONS)
+    dto = DTOConverter.image_instance_to_get(item, with_form_annotations=True)
+
+    assert [a.image_id for a in dto.form_annotations] == [ids.public_id]

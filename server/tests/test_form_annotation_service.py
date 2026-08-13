@@ -696,6 +696,14 @@ def _cross_anchored_annotations(session):
             session, series, device, backend, f"img-leak-{name}"
         )
         patients[name] = patient
+        if name == "B":
+            # A second image the caller *can* reach, so "the response named the
+            # image the update set" can be told apart from "the response named
+            # the image it already had" -- the two are the same assertion
+            # otherwise, and the stale-relationship defect passes it.
+            images["B2"] = make_image(
+                session, series, device, backend, "img-leak-B2"
+            )
 
     annotations = {}
     for label, image in (("crossed", images["A"]), ("in_scope", images["B"])):
@@ -715,6 +723,7 @@ def _cross_anchored_annotations(session):
         "patient_b": patients["B"].PatientID,
         "public_a": images["A"].PublicID,
         "public_b": images["B"].PublicID,
+        "public_b2": images["B2"].PublicID,
         # For the single-annotation paths below: `update` runs the ownership
         # overlay, so its caller has to be this author, and `create` needs a
         # schema to file against.
@@ -896,3 +905,165 @@ def test_the_create_response_carries_the_image_id_the_caller_named(session):
     )
 
     assert dto.image_id == seed["public_b"]
+
+
+# --- the scoped image load is opt-in, and not opting in is the safe half -----
+#
+# The four tests above pin what a caller that *does* opt in receives. These pin
+# the rest of the contract: an unloaded relationship is withheld rather than
+# resolved, that is what a caller who did not opt in gets, and the load the flag
+# controls is the expensive part rather than a spare keyword.
+
+
+def _repo(session, scope) -> FormAnnotationRepository:
+    return FormAnnotationRepository(session, scope=scope)
+
+
+def test_an_unloaded_image_is_withheld_rather_than_resolved(session):
+    """The DTO must not resolve an image the read did not load, for **anyone**.
+
+    The scope here is an administrator, so nothing is being withheld by a
+    criteria filter -- ``get_by_id`` without ``with_image`` simply did not load
+    the relationship, and the identifier is unreachable from the converter as a
+    result. Restoring either raw-Session path this replaced (letting
+    ``annotation.ImageInstance`` lazy-load, or the ``object_session`` lookup of
+    ``ImageInstanceID``) makes this id come back, which is exactly the
+    disclosure the loader's criteria exist to prevent for a non-admin.
+    """
+    seed = _cross_anchored_annotations(session)
+    scope = admin_scope()
+
+    annotation = _repo(session, scope).get_by_id(seed["in_scope"])
+    dto = DTOConverter.form_annotation_to_get(annotation)
+
+    # The row came back and still names an image: what is missing is only the
+    # identifier, so "None" cannot be satisfied by a 404 or an empty column.
+    assert dto.id == seed["in_scope"]
+    assert annotation.ImageInstanceID is not None
+    assert dto.object_type == "image_instance"
+    assert dto.image_id is None
+    # ...and the same read, having asked for the image, does emit it. Without
+    # this leg the assertion above would also hold for a converter that stopped
+    # emitting image_id altogether.
+    assert (
+        DTOConverter.form_annotation_to_get(
+            _repo(session, scope).get_by_id(seed["in_scope"], with_image=True)
+        ).image_id
+        == seed["public_b"]
+    )
+
+
+def test_the_default_read_cannot_emit_an_image_id_at_all(session):
+    """Fail-closed default, on the path a forgetful caller would take.
+
+    ``get_value``/``tag``/``untag`` and the reference check all take this read
+    and never touch the relationship. If one of them were ever wired to a
+    response, the response would be missing a field -- visibly degraded --
+    rather than carrying an image id no scope ever checked.
+    """
+    seed = _cross_anchored_annotations(session)
+    scope = admin_scope()
+
+    for annotation_id in (seed["crossed"], seed["in_scope"]):
+        dto = DTOConverter.form_annotation_to_get(
+            _repo(session, scope).get_by_id(annotation_id)
+        )
+        assert dto.id == annotation_id
+        assert dto.image_id is None
+
+
+def _selects_during(session, fn) -> int:
+    """Statements issued against the bound engine while ``fn`` runs."""
+    from sqlalchemy import event
+
+    count = 0
+
+    def before(conn, cursor, statement, parameters, context, executemany):
+        nonlocal count
+        count += 1
+
+    bind = session.get_bind()
+    event.listen(bind, "before_cursor_execute", before)
+    try:
+        fn()
+    finally:
+        event.remove(bind, "before_cursor_execute", before)
+    return count
+
+
+def test_the_image_load_is_what_the_flag_actually_costs(session):
+    """The flag is not cosmetic: the load it controls is the expensive part.
+
+    Measured on this database, ``get_by_id`` for a row carrying an image is 2
+    statements by default and 14 with ``with_image=True`` -- ``ImageInstance``
+    declares its own ``lazy="selectin"`` relationships, so asking for it
+    cascades into a dozen more. Asserted as a relation rather than as the
+    literal 14, which would break on any unrelated relationship added to
+    ``ImageInstance``: the default must cost exactly what a row with no image
+    costs (i.e. nothing extra), and the opt-in must cost strictly more.
+
+    Without this, "the default is cheaper" is an unmeasured claim -- which is
+    the defect this whole change exists to correct.
+    """
+    seed = _cross_anchored_annotations(session)
+    scope = admin_scope()
+
+    def read(annotation_id, **kwargs):
+        session.expunge_all()
+        repo = _repo(session, scope)
+        return _selects_during(session, lambda: repo.get_by_id(annotation_id, **kwargs))
+
+    no_image_at_all = read(_annotation_without_an_image(session, seed))
+    default = read(seed["in_scope"])
+    opted_in = read(seed["in_scope"], with_image=True)
+
+    assert default == no_image_at_all
+    assert opted_in > default
+
+
+def _annotation_without_an_image(session, seed) -> int:
+    """A sibling annotation with no ImageInstanceID -- the zero-cost control."""
+    annotation = FormAnnotation(
+        FormSchemaID=seed["schema"],
+        PatientID=seed["patient_b"],
+        CreatorID=seed["author"],
+        FormData={"answer": 0},
+    )
+    session.add(annotation)
+    session.flush()
+    annotation_id = annotation.FormAnnotationID
+    session.commit()
+    session.expunge_all()
+    return annotation_id
+
+
+def test_the_update_response_names_the_image_the_update_just_set(session):
+    """A changed ``image_id`` must not be answered with the previous one.
+
+    ``update`` reads the row with the image already loaded, and a flush does
+    not expire it, so writing only ``ImageInstanceID`` would leave the response
+    naming the image that was just replaced -- a wrong id in a 200, on the one
+    request that definitely cares. The annotation starts on image B and is
+    moved to B2, both in reach, so neither id can be explained by withholding.
+    """
+    seed = _cross_anchored_annotations(session)
+    service = _scoped_service(session, _grader_in_b(seed))
+
+    dto = DTOConverter.form_annotation_to_get(
+        service.update(seed["in_scope"], {"image_id": seed["public_b2"]})
+    )
+
+    assert dto.image_id == seed["public_b2"]
+
+
+def test_an_image_the_update_clears_is_gone_from_the_response(session):
+    """The other direction: clearing it must not leave the old id behind."""
+    seed = _cross_anchored_annotations(session)
+    service = _scoped_service(session, _grader_in_b(seed))
+
+    dto = DTOConverter.form_annotation_to_get(
+        service.update(seed["in_scope"], {"image_id": None})
+    )
+
+    assert dto.image_id is None
+    assert dto.object_type == "patient"
