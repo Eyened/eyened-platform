@@ -21,6 +21,7 @@ from ..audit_log import AuditLog
 from ..creator import Creator
 from ..project import Project
 from ..repositories.project_member_repository import ProjectMemberRepository
+from ..utils.db_users import hash_password
 from .roles import ProjectRole
 
 __all__ = [
@@ -40,6 +41,7 @@ __all__ = [
     "resolve_project",
     "revoke",
     "set_admin",
+    "set_password",
 ]
 
 
@@ -463,3 +465,29 @@ def set_admin(session: Session, *, username: str, is_admin: bool) -> bool:
         },
     )
     return True
+
+
+def set_password(session: Session, *, username: str, password: str) -> None:
+    """Replace an existing user's password.
+
+    Unconditional -- there is no "unchanged" case to detect. Hashing is salted,
+    so re-hashing the same password yields a different string, and a command
+    whose only job is to set the password has no reason to skip the write.
+
+    `init-admin` owns the administrator's credential and reads
+    EYENED_API_ADMIN_PASSWORD; this owns everyone else's and reads no
+    environment variable at all.
+    """
+    creator = resolve_creator(session, username)
+    creator.PasswordHash = hash_password(password)
+    session.flush()
+    audit_trusted(
+        session,
+        command="set-password",
+        action="UPDATE",
+        entity="Creator",
+        entity_id=creator.CreatorID,
+        # Never the password and never the hash -- only that a reset occurred,
+        # the same rule init-admin follows.
+        changes={"username": username, "password_changed": True},
+    )

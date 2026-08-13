@@ -18,7 +18,7 @@ import pytest
 from click.testing import CliRunner
 from sqlalchemy import select
 
-from eyened_orm import AuditLog, ProjectMember
+from eyened_orm import AuditLog, Creator, ProjectMember
 from eyened_orm.authz.administration import grant
 from eyened_orm.authz.bootstrap import ensure_admin
 from eyened_orm.authz.roles import ProjectRole
@@ -32,9 +32,10 @@ from eyened_orm.commands.rbac import (
     reactivate_cmd,
     revoke_cmd,
     set_admin_cmd,
+    set_password_cmd,
 )
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
-from eyened_orm.utils.db_users import create_user
+from eyened_orm.utils.db_users import create_user, verify_password
 from eyened_orm.utils.factories import make_creator, make_project
 
 
@@ -400,3 +401,46 @@ def test_revoke_requires_exactly_one_of_project_and_all(session, stub_database, 
     assert result.exit_code == 2
     assert "exactly one of --project or --all" in result.output
     assert "Traceback" not in result.output
+
+
+def test_set_password_replaces_the_hash_so_only_the_new_password_verifies(
+    session, stub_database
+):
+    """Both halves matter: asserting only that the new password verifies would
+    also pass if the command appended a second credential instead of replacing
+    the first."""
+    create_user(session, "alice", "old-pw")
+    session.commit()
+
+    result = CliRunner().invoke(
+        set_password_cmd, ["--user", "alice", "--password", "new-pw"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "alice: password set" in result.output
+
+    stored = session.scalars(
+        select(Creator).where(Creator.CreatorName == "alice")
+    ).one()
+    assert verify_password("new-pw", stored.PasswordHash) is True
+    assert verify_password("old-pw", stored.PasswordHash) is False
+
+
+def test_set_password_refuses_an_empty_password(session, stub_database):
+    """`--password ""` is the only route to an empty value -- an empty entry at
+    the interactive prompt makes Click re-prompt -- and it is exactly how the
+    `_init_admin` helper above invokes its command, so it is a realistic
+    invocation rather than a hypothetical one. Without this test the guard can
+    be deleted and the suite stays green, leaving a login-disabling hash where
+    a password was intended.
+    """
+    create_user(session, "alice", "old-pw")
+    session.commit()
+
+    result = CliRunner().invoke(set_password_cmd, ["--user", "alice", "--password", ""])
+    assert result.exit_code == 2
+    assert "password must not be empty" in result.output
+
+    stored = session.scalars(
+        select(Creator).where(Creator.CreatorName == "alice")
+    ).one()
+    assert verify_password("old-pw", stored.PasswordHash) is True

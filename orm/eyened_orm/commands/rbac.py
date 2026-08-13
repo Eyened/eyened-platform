@@ -22,6 +22,7 @@ from ..authz.administration import (
     reactivate,
     revoke,
     set_admin,
+    set_password,
 )
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
 from ..authz.roles import ProjectRole
@@ -325,7 +326,39 @@ def set_admin_cmd(username: str, is_admin: bool):
         )
 
 
+@click.command("set-password")
+@click.option("--user", "username", required=True)
+@click.option(
+    "--password",
+    type=str,
+    prompt=True,
+    hide_input=True,
+    confirmation_prompt=True,
+    help=(
+        "Prompts twice without echoing input. Reads no environment variable: "
+        "EYENED_API_ADMIN_PASSWORD belongs to init-admin, and honouring it "
+        "here would set an arbitrary account's password to the "
+        "administrator's."
+    ),
+)
+def set_password_cmd(username: str, password: str):
+    """Set an existing user's password."""
+    # init-admin reads a blank password as "leave unchanged", which is
+    # meaningless for a command whose only job is to change it.
+    if not password:
+        raise click.BadParameter("password must not be empty", param_hint="--password")
+    database = get_database()
+    with database.get_session() as session:
+        try:
+            set_password(session, username=username, password=password)
+        except LookupError as exc:
+            raise click.ClickException(str(exc)) from exc
+        session.commit()
+    click.echo(f"{username}: password set")
+
+
 rbac_commands = [
     init_admin, grant_cmd, revoke_cmd, grant_for_task_cmd,
     grant_all_cmd, deactivate_cmd, reactivate_cmd, set_admin_cmd,
+    set_password_cmd,
 ]
