@@ -12,8 +12,9 @@ complement: it fails on omission, never on behaviour, and it must never be
 merged into or overwritten by that one.
 
 Scope, stated so the guard is not over-trusted: it checks that a method's body
-reaches ``apply_scope``/``scoped_one`` or references ``self._scope``, not that
-the argument is the right entity. Review is the backstop for that.
+calls ``apply_scope``/``scoped_one``, or is one of the few allow-listed methods
+that *consume* ``self._scope`` by hand, not that the argument is the right
+entity. Review is the backstop for that.
 
 The DTO detector below has its own, narrower blind spot: it matches only a
 bare-``Name`` call to ``object_session(...)`` and a parameter annotated
@@ -114,6 +115,22 @@ _WRITE_PREFIXES = ("add", "save", "delete", "upsert", "remove", "replace")
 # deliberate act: it means a read was added, removed or exempted.
 _EXPECTED_SCANNED_READS = 37
 
+# Read methods allowed to scope themselves by consuming ``self._scope`` instead
+# of calling ``apply_scope``/``scoped_one``. Set equality, like every other
+# allow-list here: a method that loses its real scoping and keeps a live-looking
+# mention of the scope lands in this set, and adding it becomes a deliberate,
+# reviewable act rather than something a green suite hides.
+#
+# The one entry is the anchor case ``_consumes_the_scope_directly`` documents:
+# Project has no route to itself, so this method filters Project.ProjectID
+# against the scope by hand. Its *behaviour* is pinned by
+# test_instance_signature_empty_scope_sees_no_project_names and
+# test_study_signature_scopes_project_names_to_the_caller, so nothing about it
+# rests on this structural guard alone.
+_SCOPE_ATTRIBUTE_READS = {
+    "SearchRepository.visible_project_names",
+}
+
 # Every function under server/dtos/ that touches a Session, pinned exactly.
 # A DTO converter is a read surface that satisfies both scope guards while
 # reading whatever it likes, so the set is frozen rather than merely bounded:
@@ -134,28 +151,63 @@ def _is_read(name: str) -> bool:
     return not name.startswith("_") and not name.startswith(_WRITE_PREFIXES)
 
 
-def _consults_scope(node: ast.AST) -> bool:
-    """True if the body reaches a scoping helper or the repository's own scope.
+def _calls_a_scoping_helper(node: ast.AST) -> bool:
+    """True if the body calls ``apply_scope`` or ``scoped_one``."""
+    return any(
+        isinstance(child, ast.Call)
+        and isinstance(child.func, ast.Name)
+        and child.func.id in {"apply_scope", "scoped_one"}
+        for child in ast.walk(node)
+    )
 
-    ``self._scope`` counts because a scoped read need not go through
-    ``apply_scope``: ``Project`` is the anchor other entities route *to* and
-    has no route of its own, so ``SearchRepository.visible_project_names``
-    filters ``Project.ProjectID`` against the scope directly. Accepting only
-    the two helper names would force that method onto the exemption list,
-    where it would read as "deliberately unfiltered" -- the opposite of true.
+
+def _consumes_the_scope_directly(node: ast.AST) -> bool:
+    """True if the body *uses* ``self._scope`` rather than merely naming it.
+
+    ``self._scope`` has to count for something, because a scoped read need not
+    go through ``apply_scope``: ``Project`` is the anchor other entities route
+    *to* and has no route of its own, so
+    ``SearchRepository.visible_project_names`` filters ``Project.ProjectID``
+    against the scope directly. Accepting only the two helper names would force
+    that method onto the exemption list, where it would read as "deliberately
+    unfiltered" -- the opposite of true.
+
+    But a *mention* is not a use. The previous version of this returned True for
+    any ``self._scope`` node anywhere in the body, so deleting a method's real
+    scoping and leaving ``_ = self._scope`` behind kept the guard green: it
+    protected against removing the call, not against neutering it. So the
+    reference must now be **consumed** -- read through (``self._scope.is_admin``),
+    passed to something, compared, subscripted -- and an inert one is ignored.
+    Inert means the node is a bare expression statement, or is the whole
+    right-hand side of an assignment: exactly the two shapes a neutering edit
+    leaves behind.
+
+    Bound, so this is not over-trusted: a *deeper* dead expression
+    (``_ = self._scope.project_ids``) still reads as consumed. Nothing here can
+    tell that value from one that reaches the query. What bounds it is
+    ``_SCOPE_ATTRIBUTE_READS`` below -- only the methods named there may qualify
+    this way at all, and the one method on it is pinned behaviourally in
+    ``server/tests/test_routes_search_signature.py``.
     """
-    for child in ast.walk(node):
-        if isinstance(child, ast.Call) and isinstance(child.func, ast.Name):
-            if child.func.id in {"apply_scope", "scoped_one"}:
-                return True
-        if (
-            isinstance(child, ast.Attribute)
-            and child.attr == "_scope"
-            and isinstance(child.value, ast.Name)
-            and child.value.id == "self"
-        ):
-            return True
-    return False
+    consumed: set[int] = set()
+    for parent in ast.walk(node):
+        inert = set()
+        if isinstance(parent, ast.Expr):
+            inert = {id(parent.value)}
+        elif isinstance(parent, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            inert = {id(parent.value)} if parent.value is not None else set()
+        for child in ast.iter_child_nodes(parent):
+            if id(child) not in inert:
+                consumed.add(id(child))
+
+    return any(
+        isinstance(child, ast.Attribute)
+        and child.attr == "_scope"
+        and isinstance(child.value, ast.Name)
+        and child.value.id == "self"
+        and id(child) in consumed
+        for child in ast.walk(node)
+    )
 
 
 def _scanned_reads() -> list[tuple[str, str, ast.AST]]:
@@ -227,9 +279,27 @@ def test_every_read_of_a_scoped_repository_consults_the_scope():
     offenders = [
         f"{filename}::{qualname}"
         for qualname, filename, body in _scanned_reads()
-        if not _consults_scope(body)
+        if not (
+            _calls_a_scoping_helper(body) or _consumes_the_scope_directly(body)
+        )
     ]
     assert offenders == []
+
+
+def test_only_the_allow_listed_reads_scope_themselves_by_hand():
+    """Everything else must go through ``apply_scope``/``scoped_one``.
+
+    Without this, any read could qualify by touching ``self._scope``, and the
+    guard above would accept a method whose real scoping had been deleted as
+    long as something scope-shaped survived the edit. Pinned as an exact set so
+    a method *joining* it is as visible as a method leaving.
+    """
+    by_hand = {
+        qualname
+        for qualname, _, body in _scanned_reads()
+        if _consumes_the_scope_directly(body) and not _calls_a_scoping_helper(body)
+    }
+    assert by_hand == _SCOPE_ATTRIBUTE_READS
 
 
 def test_the_read_guard_scans_the_expected_number_of_methods():
