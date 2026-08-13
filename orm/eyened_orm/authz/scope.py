@@ -46,14 +46,22 @@ class AccessScope:
     def trusted(
         cls, *, actor_id: int = 0, username: str = "trusted-path"
     ) -> "AccessScope":
-        """Unrestricted scope for the non-API paths v0.3 places outside
-        enforcement: the ``eorm`` CLI, RQ workers, and the pre-authentication
-        login path. Never returned by ``get_access_scope``.
+        """Unrestricted scope for the paths v0.3 places outside enforcement.
 
-        NOT yet pinned to an allow-list of call sites: an unbounded escape
-        hatch needs one, and until that guard is written the only thing
-        stopping a new call site is review. The service-factory guard bans it
-        there, which is the one place it would be invisible.
+        Its only caller today is the pre-authentication login path in
+        ``server/routes/auth.py`` -- token refresh and OIDC auto-provision,
+        which must reach a Creator row before there is an actor to scope by.
+        The ``eorm`` CLI and the RQ worker reach repositories without one.
+        Never returned by ``get_access_scope``.
+
+        The call sites ARE pinned to an allow-list:
+        ``test_only_the_allow_listed_files_call_access_scope_trusted`` in
+        ``server/tests/test_escalation_paths.py`` asserts the exact set over
+        repository source, so a new caller turns the suite red rather than
+        relying on review to notice it. Its sibling there guards the second
+        door, ``AccessScope(..., is_admin=True)``, which a scan for this method
+        cannot see. The service-factory guard additionally bans it there, which
+        is the one place it would be invisible.
         """
         return cls(actor_id=actor_id, username=username, is_admin=True, roles={})
 

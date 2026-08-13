@@ -280,6 +280,104 @@ def spanning(session):
 
 
 @pytest.fixture()
+def one_project(session):
+    """One project holding every shape the single-project role floors need.
+
+    The gap tests in ``test_project_role_permissions.py`` all act inside one
+    project -- containment across two is ``spanning``'s job -- and they share
+    one shape, so a per-test fixture would triple that file.
+
+    Attribute names mirror ``spanning``'s keys in the singular (``project``,
+    ``image``, ``public_id``, ``task``, ``subtask``) so the two do not drift.
+
+    Two segmentations, authored by two different creators: the delete-own cell
+    needs a row the actor wrote, and the author-identity cell needs a row it
+    did **not**, or "the response carries an author" would be satisfied by the
+    caller's own name.
+
+    Every value returned is a plain id read out *before* ``commit()``:
+    ``expire_on_commit=True``, so returning live ORM instances would make each
+    attribute access a fresh load through whatever session the test then has.
+    """
+    from datetime import date
+
+    from eyened_orm import SubTask, Task, TaskDefinition
+    from eyened_orm.task import SubTaskImageLink, SubTaskState, TaskState
+    from eyened_orm.utils.factories import (
+        make_creator,
+        make_device,
+        make_feature,
+        make_image,
+        make_patient,
+        make_project,
+        make_segmentation,
+        make_series,
+        make_storage_backend,
+        make_study,
+        scope_for,
+    )
+
+    backend = make_storage_backend(session)
+    device = make_device(session, "d")
+    project = make_project(session, "P")
+    patient = make_patient(session, project, "pat")
+    study = make_study(session, patient, date(2024, 1, 1))
+    series = make_series(session, study)
+    image = make_image(session, series, device, backend, "img")
+    feature = make_feature(session, "feat")
+
+    actor = make_creator(session, "actor")
+    other = make_creator(session, "other")
+    own_segmentation = make_segmentation(session, image, feature, actor)
+    foreign_segmentation = make_segmentation(session, image, feature, other)
+
+    taskdef = TaskDefinition(TaskDefinitionName="def")
+    session.add(taskdef)
+    session.flush()
+    task = Task(
+        TaskName="t",
+        TaskDefinitionID=taskdef.TaskDefinitionID,
+        TaskState=TaskState.NotStarted,
+    )
+    session.add(task)
+    session.flush()
+    subtask = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
+    session.add(subtask)
+    session.flush()
+    # The link is what makes the task *populated*: without it the task touches
+    # no projects and every floor on it fails closed, so the project-admin
+    # delete cell would pass for the wrong reason.
+    session.add(
+        SubTaskImageLink(
+            SubTaskID=subtask.SubTaskID,
+            ImageInstanceID=image.ImageInstanceID,
+            ImageIndex=0,
+        )
+    )
+    session.flush()
+
+    project_id = project.ProjectID
+    actor_id = actor.CreatorID
+    data = SimpleNamespace(
+        project=project_id,
+        patient=patient.PatientID,
+        study=study.StudyID,
+        image=image.ImageInstanceID,
+        public_id=image.PublicID,
+        feature=feature.FeatureID,
+        actor=actor_id,
+        other=other.CreatorID,
+        own_segmentation=own_segmentation.SegmentationID,
+        foreign_segmentation=foreign_segmentation.SegmentationID,
+        task=task.TaskID,
+        subtask=subtask.SubTaskID,
+        scope=lambda role: scope_for(project_id, role=role, actor_id=actor_id),
+    )
+    session.commit()
+    return data
+
+
+@pytest.fixture()
 def signed_jwts(monkeypatch):
     """Give JWT issuance/verification a usable HMAC key.
 
