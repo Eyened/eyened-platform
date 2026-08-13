@@ -58,11 +58,9 @@ prunes needs the intended membership list from the consortium, not a query.
   loaded dump. The dev-bypass branch calls `ensure_admin`, so a pre-cutover
   dump does not show you an empty platform.
 - **Working *on* enforcement:** being a permanent administrator hides every 403
-  and 404. Edit your own `ProjectMember` rows in the dev database and refresh --
-  scope resolves per request, so there is no re-login and no fixture seed. A
-  production dump already contains other users' annotations, so the ownership
-  overlay is testable with no seeding at all: try to edit someone else's
-  segmentation and expect a 403.
+  and 404, so drive a dedicated account instead. Scope resolves per request, so
+  every change below lands on a refresh -- no re-login, no fixture seed. See
+  "The test_user loop" below.
 - **Named-account login:** with `PUBLIC_AUTH_DISABLED=false` you authenticate
   as a specific `Creator` and see exactly what its `IsAdmin` flag and
   memberships grant. This path does **not** auto-promote, which is also the
@@ -75,6 +73,33 @@ prunes needs the intended membership list from the consortium, not a query.
   `GET /task` entirely rather than appear with fewer subtasks. That single check
   exercises the containment rule, the 404 policy and the absence of partial
   views at once.
+
+## The test_user loop
+
+One account, driven from the CLI, watched in the browser. Log in as it with
+`EYENED_API_PUBLIC_AUTH_DISABLED=false`; every step below takes effect on a
+refresh.
+
+```bash
+eorm create-user --username test_user --password test-pw
+```
+
+| # | Scenario | Command | Expect in the client |
+|---|---|---|---|
+| 1 | Zero-access joiner | *(none -- just log in)* | An empty platform: no projects, no patients, no tasks |
+| 2 | First grant | `eorm grant --user test_user --project P --role read_only` | Project P's data appears |
+| 3 | Role floor | `eorm grant --user test_user --project P --role grader` | Writes that were refused at `read_only` now succeed |
+| 4 | Ownership overlay | *(none)* | As `grader`, editing another user's annotation is 403. A production dump supplies one, so nothing needs seeding |
+| 5 | Containment | Grant both projects a spanning task touches, then `eorm revoke --user test_user --project <one of them>` | The task disappears from `GET /task` entirely -- not with fewer subtasks. Exercises the containment rule, the 404 policy and the absence of partial views at once |
+| 6 | Administrator overlay | `eorm set-admin --user test_user --on`, then `--off` | Every restriction vanishes, then returns to the granted view |
+| 7 | Deactivation | `eorm deactivate --user test_user` | Authentication is refused |
+| 8 | Reset | `eorm revoke --user test_user --all` | Back to scenario 1 |
+
+Forgot the password? `eorm set-password --user test_user`. The `Creator` row
+cannot be deleted -- that is what `deactivate` exists for -- so re-minting is
+not an option.
+
+For scenario 5, a production dump has task 70, which touches several projects.
 
 ## New-dev checklist
 
@@ -90,8 +115,11 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
 | `eorm init-admin --username U [--password P]` | Create or promote the administrator (idempotent) |
 | `eorm grant --user U --project P --role R` | Grant or change a role |
 | `eorm revoke --user U --project P` | Remove a membership |
+| `eorm revoke --user U --all` | Remove every membership the user holds; confirms unless `--yes` |
 | `eorm grant-for-task --user U --task N [--task M] --role R` | Grant every project the tasks touch, after review |
 | `eorm grant-all` | Cutover step 3 |
+| `eorm set-admin --user U --on/--off` | Set or clear administrator status on an existing account |
+| `eorm set-password --user U` | Set an existing user's password |
 | `eorm deactivate --user U` / `eorm reactivate --user U` | Revoke every project; memberships are kept. Not an absolute lockout -- see the accepted risks |
 
 ## Accepted risks
