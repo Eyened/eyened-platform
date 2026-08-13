@@ -46,7 +46,7 @@ Two distinct layers:
 
 **Image datasets** — original DICOM, PNG, etc. Files stay on disk (or object storage mounted into the container). Each file is registered in the database with a `storage_backend_key` and `object_key` (import/API fields; `StorageBackend.Key` and `ImageStorage.ObjectKey` in the database). Add the key and its path to `deploy/storage-mounts.conf` and re-run the entry point (`./install.sh` or `make up`) — the fileserver mount, the nginx `location`, and `EYENED_STORAGE_MOUNTS` are all generated from that one file.
 
-The API itself does **not** read image bytes from disk: `GET /api/images/{public_id}/data` in `server/routes/instances.py` resolves a `StorageRef` and returns an nginx internal redirect (`X-Accel-Redirect`) — nginx reads the file, not the server process. `EYENED_STORAGE_MOUNTS` matters for **ORM-side processes** — GPU workers, notebooks, the thumbnail CLI — that read source pixels directly instead of going through the API. Mount a dataset only into the containers that actually need direct pixel access; the fileserver and API do not.
+The API itself does **not** read image bytes from disk: `GET /api/images/{image_id}/data` in `server/routes/instances.py` resolves a `StorageRef` and returns an nginx internal redirect (`X-Accel-Redirect`) — nginx reads the file, not the server process. `EYENED_STORAGE_MOUNTS` matters for **ORM-side processes** — GPU workers, notebooks, the thumbnail CLI — that read source pixels directly instead of going through the API.
 
 **Platform storage** — writable data under `EYENED_STORAGE_ROOT` (default `/storage`):
 

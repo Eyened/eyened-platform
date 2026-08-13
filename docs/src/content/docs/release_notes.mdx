@@ -47,10 +47,9 @@ description: EyeNED Platform v2026.07.0 release notes
 - **`eorm` confirmation prompts on database state.** `initialize-database` and `load-dump` ask
   for the typed confirmation code only when the target database contains tables, which is what
   makes an unattended first-run bootstrap possible. A populated database is still gated.
-- **Fixed: in-process image reads.** The server container now receives `EYENED_STORAGE_MOUNTS`,
-  so Python-side pixel reads (thumbnail regeneration, inference, reports) use local files
-  instead of failing in the API adapter. `EYENED_API_USER` was also silently ignored — the
-  correct name is `EYENED_API_USERNAME`.
+- **Fixed: in-process image reads.** Once datasets are configured in `deploy/storage-mounts.conf`,
+  the server container receives `EYENED_STORAGE_MOUNTS`, so Python-side pixel reads (thumbnail
+  regeneration, inference, reports) use local files instead of failing in the API adapter.
 
 ## v2026.07.0
 
