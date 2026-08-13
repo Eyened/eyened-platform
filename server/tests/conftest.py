@@ -361,12 +361,10 @@ def one_project(session):
     data = SimpleNamespace(
         project=project_id,
         patient=patient.PatientID,
-        study=study.StudyID,
         image=image.ImageInstanceID,
         public_id=image.PublicID,
         feature=feature.FeatureID,
         actor=actor_id,
-        other=other.CreatorID,
         own_segmentation=own_segmentation.SegmentationID,
         foreign_segmentation=foreign_segmentation.SegmentationID,
         task=task.TaskID,

@@ -55,7 +55,7 @@ def fake_segmentation_store(monkeypatch):
 # 422 that looks nothing like an authorization result.
 
 
-@pytest.mark.parametrize("role", [_R, _G, _PA])
+@pytest.mark.parametrize("role", [_R, _G, _PA], ids=lambda r: r.name)
 def test_every_member_role_reads_project_data(client_scoped, one_project, role):
     """G1: the floor for reads is membership, not privilege."""
     client, set_scope = client_scoped
@@ -74,7 +74,7 @@ def test_a_non_member_cannot_read_project_data(client_scoped, one_project):
 # --- G2: create annotations ------------------------------------------------
 
 
-@pytest.mark.parametrize("role", [_G, _PA])
+@pytest.mark.parametrize("role", [_G, _PA], ids=lambda r: r.name)
 def test_a_grader_or_project_admin_creates_an_annotation(
     client_scoped, one_project, fake_segmentation_store, role
 ):
@@ -140,7 +140,7 @@ def test_a_project_admin_deletes_a_populated_task(client_scoped, one_project):
 # --- G6: view annotation author identity ------------------------------------
 
 
-@pytest.mark.parametrize("role", [_R, _G, _PA])
+@pytest.mark.parametrize("role", [_R, _G, _PA], ids=lambda r: r.name)
 def test_every_member_role_sees_another_users_annotation_author(
     client_scoped, one_project, role
 ):
@@ -220,11 +220,14 @@ def test_the_real_dependency_chain_filters_a_logged_in_users_reads(
     from server.services.access_scope import get_access_scope
     from server.tests.conftest import _SessionBoundDatabase
 
-    # app_api.dependency_overrides is module-level singleton state and this test
-    # asserts their *absence*; a leak from elsewhere would make it pass while
-    # proving nothing about the chain.
-    assert not app_api.dependency_overrides, "an override leaked from another fixture"
-    assert get_access_scope not in app_api.dependency_overrides
+    # app_api.dependency_overrides is module-level singleton state, and this
+    # test asserts this one override's *absence*: a leak from another fixture
+    # would let it pass while proving nothing about the chain. Targeted rather
+    # than blanket -- an unrelated override says nothing about this chain, and
+    # failing on it would make the suite's other fixtures this test's business.
+    assert get_access_scope not in app_api.dependency_overrides, (
+        "an override leaked from another fixture; the chain cannot be observed"
+    )
 
     alice = create_user(session, "alice", "pw")
     ProjectMemberRepository(session).upsert(
