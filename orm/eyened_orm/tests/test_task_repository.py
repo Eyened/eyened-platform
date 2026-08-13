@@ -194,49 +194,72 @@ def test_list_for_task_filters_by_status(session):
     assert [r.SubTaskID for r in rows] == [ready.SubTaskID]
 
 
-def test_list_for_task_with_images_loads_links(session):
-    """with_images eager-loads the SubTaskImageLinks -> ImageInstance chain."""
+def _seed_subtask_with_one_image(session) -> tuple[int, int]:
+    """Seed a task/subtask/image link and COMMIT. Returns (task_id, subtask_id).
+
+    Committing rather than flushing, and returning ids rather than instances, is
+    what makes the two eager-load tests below able to fail. Seeding and reading
+    on one uncommitted session serves every relationship access out of the
+    identity map, so the loader's presence is unobservable -- these two tests
+    were fully green with the eager loading deleted outright.
+
+    Ids are captured before the commit: ``expire_on_commit=True`` (production's
+    setting, mirrored by the fixture) expires every attribute, and after
+    ``expunge_all()`` a re-read would raise ``DetachedInstanceError``.
+    """
+    from eyened_orm import SubTaskImageLink
+
     creator = _creator(session)
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
     st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     image_id = _make_image(session, "pub-1")
-    from eyened_orm import SubTaskImageLink
-
     session.add(
         SubTaskImageLink(
             SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=0
         )
     )
-    session.flush()
+    task_id, subtask_id = task.TaskID, st.SubTaskID
+    session.commit()
+    session.expunge_all()
+    return task_id, subtask_id
+
+
+def test_list_for_task_with_images_loads_links(session):
+    """with_images eager-loads the SubTaskImageLinks -> ImageInstance chain.
+
+    The chain is walked while the rows are **detached**, which is the only way
+    to tell an eager load from a lazy one: an attached row lazy-loads on demand
+    and looks identical. Detaching reproduces the production failure -- the
+    request session closes before subtask DTO conversion finishes walking
+    SubTaskImageLinks -> ImageInstance per row -- so dropping the loader raises
+    DetachedInstanceError here instead of silently issuing ~4 queries per
+    subtask.
+    """
+    task_id, _ = _seed_subtask_with_one_image(session)
 
     rows = SubTaskRepository(session, scope=admin_scope()).list_for_task(
-        task.TaskID, limit=10, offset=0, with_images=True
+        task_id, limit=10, offset=0, with_images=True
     )
-
     assert len(rows) == 1
+    session.expunge_all()
+
     assert [link.ImageInstance.PublicID for link in rows[0].SubTaskImageLinks] == [
         "pub-1"
     ]
 
 
 def test_get_with_images_loads_link_chain(session):
-    """get_with_images returns the subtask with its image links eager-loaded."""
-    creator = _creator(session)
-    td = _task_def(session)
-    task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
-    st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
-    image_id = _make_image(session, "pub-1")
-    from eyened_orm import SubTaskImageLink
+    """get_with_images returns the subtask with its image links eager-loaded.
 
-    session.add(
-        SubTaskImageLink(SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=0)
-    )
-    session.flush()
+    Detached read, for the reason given on the sibling test above.
+    """
+    _, subtask_id = _seed_subtask_with_one_image(session)
 
-    loaded = SubTaskRepository(session, scope=admin_scope()).get_with_images(st.SubTaskID)
-
+    loaded = SubTaskRepository(session, scope=admin_scope()).get_with_images(subtask_id)
     assert loaded is not None
+    session.expunge_all()
+
     assert [link.ImageInstance.PublicID for link in loaded.SubTaskImageLinks] == ["pub-1"]
 
 
