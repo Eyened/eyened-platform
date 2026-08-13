@@ -63,6 +63,34 @@ jobs:
         run: |
           set -e
           targets=$(awk '/^\.PHONY:/{sub(/^\.PHONY:[ \t]*/,""); line=$0; while (line ~ /\\$/) { sub(/\\$/,"",line); getline cont; line = line " " cont }; print line }' Makefile)
+
+          # An extraction that finds nothing is a broken check, not a clean
+          # bill of health: reformat, indent, or rename `.PHONY` and the awk
+          # above stops matching, `targets` comes back empty, the loop below
+          # runs zero times, and this step goes green having dry-run nothing.
+          if [ -z "$targets" ]; then
+            echo "::error::no .PHONY targets extracted from Makefile — the awk pattern found no match, so this step would validate nothing"
+            exit 1
+          fi
+
+          # Coverage: every rule the Makefile declares must appear in the
+          # extracted .PHONY list, or that rule dry-runs unchecked (e.g. a
+          # target added without a matching .PHONY entry). Strictly stronger
+          # than the empty-extraction guard above.
+          rules=$(grep -oE '^[a-zA-Z][a-zA-Z0-9_-]*:' Makefile | tr -d ':' | sort -u)
+          missing=""
+          for r in $rules; do
+            covered=0
+            for t in $targets; do
+              [ "$r" = "$t" ] && { covered=1; break; }
+            done
+            [ "$covered" = "1" ] || missing="$missing $r"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Makefile rule(s) not covered by .PHONY dry-run:$missing"
+            exit 1
+          fi
+
           for t in $targets; do
             echo "--- make -n $t ---"
             make -n "$t" >/dev/null
