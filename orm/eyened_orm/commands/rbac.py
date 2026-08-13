@@ -49,14 +49,39 @@ def init_admin(username: str, password: str) -> None:
         creator, outcome = ensure_admin(session, username, password)
         # None means "nothing happened, so nothing to audit" -- keeping that in the
         # match keeps the audit condition from being written twice and drifting.
+        #
+        # ``changes`` is built per outcome rather than hardcoded, so the row
+        # claims only what the call actually did: ``is_admin`` appears when
+        # administrator status was granted and not otherwise, and a credential
+        # rotation says so. Never the password or the hash -- only that a reset
+        # occurred.
         action: str | None
+        changes: dict | None
         match outcome:
             case BootstrapOutcome.unchanged:
-                action = None
+                action, changes = None, None
             case BootstrapOutcome.created:
                 action = "INSERT"
-            case BootstrapOutcome.promoted | BootstrapOutcome.reactivated:
+                changes = {"username": username, "is_admin": True}
+            case BootstrapOutcome.promoted:
                 action = "UPDATE"
+                changes = {"username": username, "is_admin": True}
+            case BootstrapOutcome.password_reset:
+                action = "UPDATE"
+                changes = {"username": username, "password_changed": True}
+            case BootstrapOutcome.promoted_and_password_reset:
+                action = "UPDATE"
+                changes = {
+                    "username": username,
+                    "is_admin": True,
+                    "password_changed": True,
+                }
+            case BootstrapOutcome.reactivated:
+                # Unreachable from this command -- init-admin never passes
+                # reactivate=True; `eorm reactivate` is the recovery path. The
+                # arm exists so a future caller cannot fall into the ValueError.
+                action = "UPDATE"
+                changes = {"username": username, "inactive": False}
             case _:
                 raise ValueError(f"unhandled BootstrapOutcome: {outcome!r}")
         if action is not None:
@@ -66,11 +91,7 @@ def init_admin(username: str, password: str) -> None:
                 action=action,
                 entity="Creator",
                 entity_id=creator.CreatorID,
-                changes={
-                    "username": username,
-                    "is_admin": True,
-                    "outcome": outcome.value,
-                },
+                changes={**changes, "outcome": outcome.value},
             )
         session.commit()
     click.echo(f"{username}: {outcome.value}")

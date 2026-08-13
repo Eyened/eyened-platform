@@ -16,8 +16,10 @@ from contextlib import contextmanager
 
 import pytest
 from click.testing import CliRunner
+from sqlalchemy import select
 
-from eyened_orm import ProjectMember
+from eyened_orm import AuditLog, ProjectMember
+from eyened_orm.authz.bootstrap import ensure_admin
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.commands import rbac as rbac_module
 from eyened_orm.commands.rbac import (
@@ -25,6 +27,7 @@ from eyened_orm.commands.rbac import (
     grant_all_cmd,
     grant_cmd,
     grant_for_task_cmd,
+    init_admin,
     reactivate_cmd,
 )
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
@@ -208,3 +211,118 @@ def test_an_unknown_user_is_a_clean_error_not_a_traceback(session, stub_database
     assert result.exit_code == 1
     assert "nosuchuser" in result.output
     assert "Traceback" not in result.output
+
+
+def _init_admin(username: str, password: str):
+    """Invoke ``eorm init-admin`` non-interactively.
+
+    ``--password`` is passed explicitly on every call, including the empty
+    string: the option declares ``envvar="EYENED_API_ADMIN_PASSWORD"``, so
+    omitting it would let a value in the developer's own environment decide
+    what these tests measure.
+    """
+    return CliRunner().invoke(
+        init_admin, ["--username", username, "--password", password]
+    )
+
+
+def _init_admin_audit(session):
+    return session.scalars(
+        select(AuditLog)
+        .where(AuditLog.TrustedPath == "eorm init-admin")
+        .order_by(AuditLog.AuditLogID)
+    ).all()
+
+
+def test_init_admin_audits_a_creation_as_a_creation(session, stub_database):
+    result = _init_admin("root", "s3cret")
+
+    assert result.exit_code == 0, result.output
+    assert "root: created" in result.output
+    rows = _init_admin_audit(session)
+    assert len(rows) == 1
+    assert rows[0].Action == "INSERT"
+    assert rows[0].Changes == {
+        "username": "root",
+        "is_admin": True,
+        "outcome": "created",
+    }
+
+
+def test_init_admin_audits_a_promotion_as_a_promotion(session, stub_database):
+    make_creator(session, "root")
+    session.commit()
+
+    result = _init_admin("root", "")
+
+    assert result.exit_code == 0, result.output
+    assert "root: promoted" in result.output
+    rows = _init_admin_audit(session)
+    assert len(rows) == 1
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Changes == {
+        "username": "root",
+        "is_admin": True,
+        "outcome": "promoted",
+    }
+
+
+def test_init_admin_audits_a_password_reset_as_a_password_reset(session, stub_database):
+    """The defect this pins: an already-administrator account given a new
+    password produced an audit row identical to a real promotion -- asserting
+    a privilege change that did not occur, while the credential rotation on
+    the highest-privilege account in the system went unrecorded.
+
+    ``is_admin`` must be *absent*, not False: the key's presence is what an
+    auditor reconstructing administrator grants keys on.
+    """
+    ensure_admin(session, "root", "s3cret")
+    session.commit()
+
+    result = _init_admin("root", "rotated")
+
+    assert result.exit_code == 0, result.output
+    assert "root: password_reset" in result.output
+    rows = _init_admin_audit(session)
+    assert len(rows) == 1
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Changes == {
+        "username": "root",
+        "password_changed": True,
+        "outcome": "password_reset",
+    }
+    # Never the secret itself, nor the hash.
+    assert "rotated" not in str(rows[0].Changes)
+
+
+def test_init_admin_audits_a_promotion_with_a_password_as_both(session, stub_database):
+    make_creator(session, "root")
+    session.commit()
+
+    result = _init_admin("root", "s3cret")
+
+    assert result.exit_code == 0, result.output
+    assert "root: promoted_and_password_reset" in result.output
+    rows = _init_admin_audit(session)
+    assert len(rows) == 1
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Changes == {
+        "username": "root",
+        "is_admin": True,
+        "password_changed": True,
+        "outcome": "promoted_and_password_reset",
+    }
+
+
+def test_init_admin_writes_no_audit_row_when_nothing_changed(session, stub_database):
+    """The control for the four above: a re-run that changes nothing must not
+    add a row, or every assertion on `len(rows) == 1` above would be satisfied
+    by a command that audits unconditionally."""
+    ensure_admin(session, "root", "s3cret")
+    session.commit()
+
+    result = _init_admin("root", "s3cret")
+
+    assert result.exit_code == 0, result.output
+    assert "root: unchanged" in result.output
+    assert _init_admin_audit(session) == []

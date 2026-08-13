@@ -20,8 +20,18 @@ __all__ = ["BootstrapOutcome", "count_admins", "ensure_admin"]
 
 
 class BootstrapOutcome(str, enum.Enum):
+    """What ``ensure_admin`` actually did, one member per distinguishable event.
+
+    A promotion and a password reset are separate members, and doing both in
+    one call is a third: the caller audits from this value, and a single
+    borrowed name would make the compliance record assert a privilege change
+    that did not happen (or lose the credential change that did).
+    """
+
     created = "created"
     promoted = "promoted"
+    password_reset = "password_reset"
+    promoted_and_password_reset = "promoted_and_password_reset"
     reactivated = "reactivated"
     unchanged = "unchanged"
 
@@ -72,19 +82,30 @@ def ensure_admin(
         session.flush()
         return creator, BootstrapOutcome.created
 
-    outcome = BootstrapOutcome.unchanged
+    promoted = False
     if not creator.IsAdmin:
         creator.IsAdmin = True
-        outcome = BootstrapOutcome.promoted
+        promoted = True
     # Only re-hash when the supplied password does not already verify: hashing
     # is salted, so an unconditional re-hash writes a different string every
     # time and would report a change on an unchanged account.
-    if password and not (
+    password_reset = bool(password) and not (
         creator.PasswordHash and verify_password(password, creator.PasswordHash)
-    ):
+    )
+    if password_reset:
         creator.PasswordHash = hash_password(password)
-        if outcome is BootstrapOutcome.unchanged:
-            outcome = BootstrapOutcome.promoted
+
+    # Tracked as two booleans and collapsed here, rather than one variable
+    # overwritten twice: the two events are independent, and the previous
+    # single-valued assignment could only report whichever ran last.
+    if promoted and password_reset:
+        outcome = BootstrapOutcome.promoted_and_password_reset
+    elif promoted:
+        outcome = BootstrapOutcome.promoted
+    elif password_reset:
+        outcome = BootstrapOutcome.password_reset
+    else:
+        outcome = BootstrapOutcome.unchanged
     if reactivate and creator.Inactive:
         creator.Inactive = False
         outcome = BootstrapOutcome.reactivated

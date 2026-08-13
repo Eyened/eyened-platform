@@ -54,6 +54,34 @@ def test_flushes_without_committing(session):
     )
 
 
+def test_a_password_reset_on_an_existing_administrator_is_not_a_promotion(session):
+    """The one event that must not borrow ``promoted``.
+
+    ``IsAdmin`` is already True and does not move; the only thing that changes
+    is the platform superuser's credential. Reporting that as ``promoted``
+    makes the audit row assert a privilege change that did not happen and
+    leaves the change that did happen recorded nowhere.
+    """
+    creator, _ = ensure_admin(session, "root", "s3cret")
+    assert creator.IsAdmin is True
+
+    _, outcome = ensure_admin(session, "root", "rotated")
+    assert outcome is BootstrapOutcome.password_reset
+    assert creator.IsAdmin is True
+    assert verify_password("rotated", creator.PasswordHash)
+
+
+def test_a_promotion_that_also_sets_a_password_reports_both(session):
+    """Both-at-once is its own result: a single-valued ``promoted`` here would
+    lose the credential change, and a single-valued ``password_reset`` would
+    lose the grant of administrator."""
+    make_creator(session, "root")
+    creator, outcome = ensure_admin(session, "root", "s3cret")
+    assert outcome is BootstrapOutcome.promoted_and_password_reset
+    assert creator.IsAdmin is True
+    assert verify_password("s3cret", creator.PasswordHash)
+
+
 def test_reactivate_is_opt_in(session):
     creator, _ = ensure_admin(session, "root", "s3cret")
     creator.Inactive = True
