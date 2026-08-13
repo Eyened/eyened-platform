@@ -25,6 +25,7 @@ from eyened_orm.repositories.image_instance_repository import (
 )
 from eyened_orm.repositories.tag_repository import TagRepository
 
+from server.dtos.dto_converter import DTOConverter
 from server.services.acting_user import ActingUser
 from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.form_annotation_service import FormAnnotationService
@@ -714,6 +715,11 @@ def _cross_anchored_annotations(session):
         "patient_b": patients["B"].PatientID,
         "public_a": images["A"].PublicID,
         "public_b": images["B"].PublicID,
+        # For the single-annotation paths below: `update` runs the ownership
+        # overlay, so its caller has to be this author, and `create` needs a
+        # schema to file against.
+        "author": creator.CreatorID,
+        "schema": schema.FormSchemaID,
         **annotations,
     }
     # Ids read out before the commit and the identity map emptied after it, so
@@ -773,3 +779,120 @@ def test_an_administrator_still_sees_both_image_ids(session):
 
     assert listed[seed["in_scope"]].image_id == seed["public_b"]
     assert listed[seed["crossed"]].image_id == seed["public_a"]
+
+
+# --- the same withholding on the three single-annotation response paths -------
+#
+# The listing above was closed first; these three emit the identical DTO from
+# the identical converter and were still resolving the image lazily, with no
+# scope in the chain. The annotation itself is never suppressed -- the caller
+# is entitled to it -- and every test below asserts the row came back before it
+# asserts what was withheld from it, so "image_id is None" can never be
+# satisfied by a 404.
+
+
+def _grader_in_b(seed):
+    """A grader in project B who authored the annotations -- update's overlay."""
+    return scope_for(seed["project_b"], role=ProjectRole.grader, actor_id=seed["author"])
+
+
+def test_get_by_id_does_not_disclose_an_out_of_reach_images_public_id(session):
+    seed = _cross_anchored_annotations(session)
+    service = _scoped_service(session, _grader_in_b(seed))
+
+    crossed = DTOConverter.form_annotation_to_get(service.get_annotation(seed["crossed"]))
+    in_scope = DTOConverter.form_annotation_to_get(
+        service.get_annotation(seed["in_scope"])
+    )
+
+    assert crossed.id == seed["crossed"]
+    assert crossed.image_id is None
+    # The in-scope twin is the control: it proves image_id is still emitted, so
+    # the None above means "out of reach" rather than "this field went away".
+    assert in_scope.image_id == seed["public_b"]
+
+
+def test_an_administrator_still_sees_the_image_id_on_get_by_id(session):
+    """scope_criteria returns None for an admin, so nothing is withheld."""
+    seed = _cross_anchored_annotations(session)
+
+    dto = DTOConverter.form_annotation_to_get(
+        _scoped_service(session, admin_scope()).get_annotation(seed["crossed"])
+    )
+
+    assert dto.image_id == seed["public_a"]
+
+
+def test_the_update_response_does_not_disclose_an_out_of_reach_images_public_id(
+    session,
+):
+    """The PATCH body is converted from what ``update`` returns, so the read
+    behind it is a response read whether or not the image was touched."""
+    seed = _cross_anchored_annotations(session)
+    service = _scoped_service(session, _grader_in_b(seed))
+
+    dto = DTOConverter.form_annotation_to_get(
+        service.update(seed["crossed"], {"form_data": {"answer": 2}})
+    )
+
+    assert dto.id == seed["crossed"]
+    assert dto.form_data == {"answer": 2}
+    assert dto.image_id is None
+
+
+def test_the_update_response_still_carries_an_image_id_the_caller_can_reach(session):
+    seed = _cross_anchored_annotations(session)
+    service = _scoped_service(session, _grader_in_b(seed))
+
+    dto = DTOConverter.form_annotation_to_get(
+        service.update(seed["in_scope"], {"form_data": {"answer": 3}})
+    )
+
+    assert dto.image_id == seed["public_b"]
+
+
+def test_create_cannot_attach_an_out_of_reach_image_at_all(session):
+    """Why the create response needs no withholding, pinned rather than assumed.
+
+    ``create`` resolves ``image_id`` through ``ImageInstanceRepository``'s
+    scoped PublicID lookup, so an image the caller cannot reach comes back as
+    None and is refused as a non-existent one is. That refusal is the whole
+    reason a freshly created row cannot carry an identifier its author cannot
+    see -- so if it is ever relaxed, the create response starts leaking and
+    this test is what says so.
+    """
+    seed = _cross_anchored_annotations(session)
+    service = _scoped_service(session, _grader_in_b(seed))
+
+    with pytest.raises(NotFoundError):
+        service.create(
+            form_schema_id=seed["schema"],
+            patient_id=seed["patient_b"],
+            study_id=None,
+            image_id=seed["public_a"],
+            laterality=None,
+            sub_task_id=None,
+            form_data={},
+            form_annotation_reference_id=None,
+        )
+
+
+def test_the_create_response_carries_the_image_id_the_caller_named(session):
+    """The positive half: create is not withholding indiscriminately."""
+    seed = _cross_anchored_annotations(session)
+    service = _scoped_service(session, _grader_in_b(seed))
+
+    dto = DTOConverter.form_annotation_to_get(
+        service.create(
+            form_schema_id=seed["schema"],
+            patient_id=seed["patient_b"],
+            study_id=None,
+            image_id=seed["public_b"],
+            laterality=None,
+            sub_task_id=None,
+            form_data={"answer": 4},
+            form_annotation_reference_id=None,
+        )
+    )
+
+    assert dto.image_id == seed["public_b"]

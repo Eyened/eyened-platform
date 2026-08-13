@@ -75,13 +75,50 @@ class FormAnnotationRepository:
             self._session, SubTask, self._scope, SubTask.SubTaskID == subtask_id
         )
 
+    def _scoped_image_options(self) -> tuple:
+        """Eager-load ``ImageInstance`` under the scope, so an out-of-reach one
+        arrives loaded and **None** rather than lazily resolving later.
+
+        A ``FormAnnotation`` is anchored on ``PatientID``; the image it names has
+        its own, different anchor, so a row whose two anchors disagree is
+        legitimately readable by a caller who cannot see the image. Left
+        unloaded, the DTO's ``getattr(annotation.ImageInstance, "PublicID")``
+        lazy-loads it with no scope in the chain and emits the PublicID of an
+        image in a project the caller holds nothing in.
+
+        Eager-loading is not incidental here: ``form_annotation_to_get`` decides
+        whether an absent image means "withheld" or "resolve it from the raw
+        Session" by asking whether the relationship is loaded. An unloaded
+        relationship takes the fallback and re-discloses exactly what this
+        withholds, so the ``selectinload`` must be present whenever the criteria
+        are -- the two are one option set, deliberately built together.
+
+        ``scope_criteria`` returns None for an administrator (and for an
+        unfiltered entity), where a tautology would read as a filter that is in
+        force. Same predicate as ``apply_scope`` puts on an ImageInstance read,
+        via the same registry walk -- not a second hand-written rule.
+        """
+        options: list = [selectinload(FormAnnotation.ImageInstance)]
+        criteria = scope_criteria(ImageInstance, self._scope)
+        if criteria is not None:
+            options.append(with_loader_criteria(ImageInstance, criteria))
+        return tuple(options)
+
     def get_by_id(self, annotation_id: int) -> FormAnnotation | None:
-        """Return the annotation by id, or None if absent or out of scope."""
+        """Return the annotation by id, or None if absent or out of scope.
+
+        The image is eager-loaded under the scope because this is the read the
+        **update** path returns, and the route converts what it returns
+        straight into the response. The other callers here ignore the
+        relationship; one selectin query is the price of the two response paths
+        not disagreeing with the listing about the same row.
+        """
         return scoped_one(
             self._session,
             FormAnnotation,
             self._scope,
             FormAnnotation.FormAnnotationID == annotation_id,
+            options=self._scoped_image_options(),
         )
 
     def get_with_tag_links(self, annotation_id: int) -> FormAnnotation | None:
@@ -99,6 +136,7 @@ class FormAnnotationRepository:
                 selectinload(
                     FormAnnotation.FormAnnotationTagLinks
                 ).selectinload(FormAnnotationTagLink.Creator),
+                *self._scoped_image_options(),
             ),
         )
 
