@@ -1,6 +1,8 @@
 from hashlib import pbkdf2_hmac
 from types import SimpleNamespace
 
+import pytest
+
 from eyened_orm import AuditLog, Creator
 from eyened_orm.utils.db_users import hash_password
 
@@ -302,6 +304,137 @@ def test_dev_bypass_never_forwards_a_password_to_ensure_admin(session, monkeypat
         select(Creator).where(Creator.CreatorName == "devadmin")
     ).first()
     assert verify_password("operator-set-password", reloaded.PasswordHash)
+
+
+def _seed_deactivatable_account(session):
+    """A creator with a real password, a project membership, and a patient in it.
+
+    The membership is load-bearing: without it the active control's
+    ``GET /patients/{id}`` would 404 for want of reach, and the deactivated
+    401 would then be indistinguishable from "this account never had access".
+    """
+    from eyened_orm.authz.roles import ProjectRole
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.factories import make_patient, make_project
+
+    creator = Creator(
+        CreatorName="revoked",
+        PasswordHash=hash_password("pw0"),
+        IsHuman=True,
+        Inactive=False,
+    )
+    session.add(creator)
+    session.flush()
+    project = make_project(session, "revoked-P")
+    patient = make_patient(session, project, "revoked-pat")
+    ProjectMemberRepository(session).upsert(
+        creator.CreatorID, project.ProjectID, ProjectRole.grader
+    )
+    creator_id = creator.CreatorID
+    patient_id = patient.PatientID
+    session.commit()
+    return creator_id, patient_id
+
+
+def test_a_deactivated_account_cannot_authenticate(
+    client_anonymous, session, signed_jwts
+):
+    """v0.3: "A deactivated user cannot authenticate and holds no access."
+
+    Six lines of the same probe, run twice against the same account -- once
+    active, once deactivated -- through the real ``get_current_user`` and
+    ``get_access_scope`` (this is why the fixture is ``client_anonymous``: the
+    ``client`` fixture overrides both and the probe would prove nothing).
+
+    The active half is not decoration. Every 401 below must mean "deactivated";
+    with no positive control a route that is simply broken, or a password that
+    never verified, produces exactly the same six 401s.
+
+    ``GET /auth/me`` is pinned at 200 in *both* halves on purpose. It is
+    decided entirely by the signature on an already-issued access token --
+    ``get_current_user`` makes no database read on the header path -- so the
+    fix to ``check_login``/``/auth/refresh``/``check_oidc_login`` does not and
+    should not move it. Pinning it states that residual rather than leaving it
+    unmeasured: a deactivated holder of an unexpired token can still read back
+    their own username until it expires, and reaches no data with it.
+    """
+    from server.routes.auth import create_access_token, create_refresh_token
+
+    creator_id, patient_id = _seed_deactivatable_account(session)
+    bearer = {"Authorization": f"Bearer {create_access_token(creator_id, 'revoked')}"}
+    client_anonymous.cookies.set("refresh_token", create_refresh_token(creator_id))
+
+    # --- active: the probe's positive control -------------------------------
+    assert client_anonymous.get(f"/patients/{patient_id}", headers=bearer).status_code == 200
+    assert client_anonymous.post(
+        "/auth/login", json={"username": "revoked", "password": "pw0"}
+    ).status_code == 200
+    assert client_anonymous.post(
+        "/auth/token", json={"username": "revoked", "password": "pw0"}
+    ).status_code == 200
+    assert client_anonymous.get("/auth/me", headers=bearer).status_code == 200
+    assert client_anonymous.post(
+        "/auth/change-password",
+        json={"old_password": "pw0", "new_password": "pw1"},
+        headers=bearer,
+    ).status_code == 200
+    assert client_anonymous.post("/auth/refresh").status_code == 200
+
+    session.get(Creator, creator_id).Inactive = True
+    session.commit()
+
+    # --- deactivated --------------------------------------------------------
+    assert client_anonymous.get(f"/patients/{patient_id}", headers=bearer).status_code == 401
+    assert client_anonymous.post(
+        "/auth/login", json={"username": "revoked", "password": "pw1"}
+    ).status_code == 401
+    assert client_anonymous.post(
+        "/auth/token", json={"username": "revoked", "password": "pw1"}
+    ).status_code == 401
+    assert client_anonymous.get("/auth/me", headers=bearer).status_code == 200
+    assert client_anonymous.post(
+        "/auth/change-password",
+        json={"old_password": "pw1", "new_password": "pw2"},
+        headers=bearer,
+    ).status_code == 401
+    assert client_anonymous.post("/auth/refresh").status_code == 401
+
+    # The refusal must not have been a silent success: the password the
+    # deactivated call tried to set must not be the one on the row.
+    from eyened_orm.utils.db_users import verify_password
+
+    assert verify_password("pw1", session.get(Creator, creator_id).PasswordHash)
+
+
+def test_a_deactivated_account_cannot_authenticate_through_oidc(session):
+    """``check_oidc_login`` resolves an existing account by claim and never
+    looked at ``Inactive`` -- the same revocation, a different front door.
+
+    The active control shares the seed and differs only in the flag, so the
+    401 means "deactivated" rather than "this identifier does not resolve".
+    """
+    from fastapi import HTTPException
+
+    from server.routes.auth import check_oidc_login
+
+    active = Creator(
+        CreatorName="oidc-active", EmployeeIdentifier="oidc:sub:live", IsHuman=True,
+        Inactive=False,
+    )
+    revoked = Creator(
+        CreatorName="oidc-revoked", EmployeeIdentifier="oidc:sub:dead", IsHuman=True,
+        Inactive=True,
+    )
+    session.add_all([active, revoked])
+    session.commit()
+
+    assert check_oidc_login({"sub": "live"}, session).CreatorName == "oidc-active"
+
+    with pytest.raises(HTTPException) as exc:
+        check_oidc_login({"sub": "dead"}, session)
+    assert exc.value.status_code == 401
 
 
 def test_the_access_token_no_longer_carries_a_role_claim(signed_jwts):

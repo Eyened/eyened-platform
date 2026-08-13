@@ -188,7 +188,13 @@ def creator_to_response(
 def check_login(username: str, password: str, db: Session) -> Creator:
     """Verify user credentials and return the user."""
     creator = db.query(Creator).where(Creator.CreatorName == username).first()
-    if creator is None:
+    if creator is None or creator.Inactive:
+        # v0.3: a deactivated user *cannot authenticate* and holds no access.
+        # Checked before the password is verified, and answered with the same
+        # "Invalid credentials" as an unknown name, so the refusal does not
+        # tell a caller whether the account exists or whether the password was
+        # right. It also stops the legacy-hash migration below from writing to
+        # a revoked row.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
@@ -363,7 +369,11 @@ async def refresh_token(
         creator = CreatorRepository(session, scope=AccessScope.trusted()).get_by_id(
             int(payload["sub"])
         )
-        if not creator:
+        if not creator or creator.Inactive:
+            # A deactivated account must not be able to renew its session
+            # indefinitely off a refresh token minted while it was still
+            # active. Same 401 either way: whether the account was deleted or
+            # revoked is not the holder's business.
             raise HTTPException(status_code=401, detail="User not found")
 
         # Create new access token
@@ -601,6 +611,17 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
                 break
 
     if creator:
+        if creator.Inactive:
+            # Same revocation as the password path, a different front door.
+            # Refused before the identifier-migration write below, so a
+            # deactivated account's row is not touched on a denied login.
+            logger.warning(
+                f"Denied OIDC access to deactivated account '{creator.CreatorName}'"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="OIDC account not authorized",
+            )
         if not creator.EmployeeIdentifier.startswith("oidc:sub:"):
             # The use of identification claims other than the 'Subject' claim is in general insecure, as claims
             # such as the email address or firstname-lastname combinations might change in the future,
