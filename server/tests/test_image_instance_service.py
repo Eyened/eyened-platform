@@ -1,4 +1,5 @@
 import datetime
+from types import SimpleNamespace
 
 import pytest
 
@@ -22,7 +23,8 @@ from eyened_orm.tag import TagType
 from server.services.acting_user import ActingUser
 from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.image_instance_service import ImageInstanceService
-from eyened_orm.utils.factories import admin_scope
+from eyened_orm.authz.roles import ProjectRole
+from eyened_orm.utils.factories import admin_scope, scope_for
 
 
 class FakeAudit:
@@ -361,3 +363,138 @@ def test_untag_instance_logs_delete_when_audit_present(session):
         "comment": "bye",
         "creator_id": actor.id,
     }
+
+
+def _cross_anchored_annotation(session):
+    """Seed the mis-scoped shape: image in project A, annotation anchored in B.
+
+    ``FormAnnotation``'s project anchor is its ``PatientID``
+    (``_PARENT_OF[FormAnnotation]``), a different anchor from the image's, so a
+    row whose ``PatientID`` sits in project B and whose ``ImageInstanceID`` sits
+    in project A belongs to B while hanging off an A image. That disagreement
+    is what makes the eager-loaded collection worth a scope of its own: the
+    scoped root passes on A, and the row rides along.
+
+    Ids are read out *before* ``commit()`` and the session is emptied after it,
+    so the read under test issues real SELECTs instead of being served the
+    relationship from the identity map -- which would pass whatever the loader
+    options say.
+    """
+    from eyened_orm.utils.factories import (
+        make_creator,
+        make_device,
+        make_form_annotation,
+        make_form_schema,
+        make_image,
+        make_patient,
+        make_project,
+        make_series,
+        make_storage_backend,
+        make_study,
+    )
+
+    backend = make_storage_backend(session)
+    device = make_device(session, "cross")
+    project_a = make_project(session, "cross-A")
+    patient_a = make_patient(session, project_a, "pat-cross-A")
+    study_a = make_study(session, patient_a, datetime.date(2024, 1, 1))
+    series_a = make_series(session, study_a)
+    image_a = make_image(session, series_a, device, backend, "img-cross-A")
+
+    project_b = make_project(session, "cross-B")
+    patient_b = make_patient(session, project_b, "pat-cross-B")
+    schema = make_form_schema(session, "cross-schema")
+    author = make_creator(session, "cross-author")
+    annotation = make_form_annotation(session, schema, patient_b, author, image=image_a)
+    annotation.FormData = {"PHI": "project-B-only-diagnosis"}
+    session.flush()
+
+    ids = SimpleNamespace(
+        project_a=project_a.ProjectID,
+        image=image_a.ImageInstanceID,
+        public_id=image_a.PublicID,
+        annotation=annotation.FormAnnotationID,
+    )
+    session.commit()
+    session.expunge_all()
+    return ids
+
+
+def _scoped_service(session, scope) -> ImageInstanceService:
+    return ImageInstanceService(
+        ImageInstanceRepository(session, scope=scope),
+        TagRepository(session, scope=scope),
+        scope=scope,
+    )
+
+
+_WITH_ANNOTATIONS = dict(
+    with_segmentations=False,
+    with_form_annotations=True,
+    with_model_segmentations=False,
+)
+
+
+def test_eager_loaded_form_annotations_are_scoped_to_the_caller(session):
+    """A member of A only never receives an annotation anchored in project B."""
+    ids = _cross_anchored_annotation(session)
+    scope = scope_for(ids.project_a, role=ProjectRole.read_only)
+
+    item = _scoped_service(session, scope).get_instance(ids.image, **_WITH_ANNOTATIONS)
+
+    assert [a.FormAnnotationID for a in item.FormAnnotations] == []
+
+
+def test_eager_loaded_form_annotations_are_scoped_on_the_public_id_read_too(session):
+    """The PublicID reader shares the loader options, so it shares the filter."""
+    ids = _cross_anchored_annotation(session)
+    scope = scope_for(ids.project_a, role=ProjectRole.read_only)
+
+    item = _scoped_service(session, scope).get_by_public_id(
+        ids.public_id, **_WITH_ANNOTATIONS
+    )
+
+    assert [a.FormAnnotationID for a in item.FormAnnotations] == []
+
+
+def test_an_admin_still_receives_the_eager_loaded_form_annotation(session):
+    """The filter must narrow a member's read, not everyone's: admins see all."""
+    ids = _cross_anchored_annotation(session)
+
+    item = _service(session).get_instance(ids.image, **_WITH_ANNOTATIONS)
+
+    assert [a.FormAnnotationID for a in item.FormAnnotations] == [ids.annotation]
+
+
+def test_an_in_project_annotation_still_loads_for_a_member(session):
+    """The scoped loader must not empty the collection wholesale.
+
+    Without this the two assertions above are satisfied by a loader that
+    returns nothing at all, which is not the fix and would silently break the
+    endpoint.
+    """
+    from eyened_orm.utils.factories import (
+        make_creator,
+        make_form_annotation,
+        make_form_schema,
+        make_patient,
+    )
+    from eyened_orm import Project
+
+    ids = _cross_anchored_annotation(session)
+    project_a = session.get(Project, ids.project_a)
+    patient_a = make_patient(session, project_a, "pat-cross-A2")
+    schema = make_form_schema(session, "in-project-schema")
+    author = make_creator(session, "in-project-author")
+    image = session.get(ImageInstance, ids.image)
+    in_project = make_form_annotation(
+        session, schema, patient_a, author, image=image
+    )
+    in_project_id = in_project.FormAnnotationID
+    session.commit()
+    session.expunge_all()
+
+    scope = scope_for(ids.project_a, role=ProjectRole.read_only)
+    item = _scoped_service(session, scope).get_instance(ids.image, **_WITH_ANNOTATIONS)
+
+    assert [a.FormAnnotationID for a in item.FormAnnotations] == [in_project_id]

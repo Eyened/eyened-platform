@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, with_loader_criteria
 
 from eyened_orm import (
     DeviceInstance,
@@ -16,7 +16,11 @@ from eyened_orm import (
 )
 from eyened_orm.tag import FormAnnotationTagLink, SegmentationTagLink
 from eyened_orm.authz.scope import AccessScope
-from eyened_orm.authz.scoping import image_project_pairs, projects_of
+from eyened_orm.authz.scoping import (
+    image_project_pairs,
+    projects_of,
+    scope_criteria,
+)
 
 from ._scoped import scoped_one
 
@@ -25,68 +29,89 @@ _STORAGE_LOADER = selectinload(ImageInstance.ImageStorages).selectinload(
 )
 
 
-def _full_graph_options(
-    with_segmentations: bool,
-    with_form_annotations: bool,
-    with_model_segmentations: bool,
-) -> list:
-    """Build the conditional selectinload chain the two GET readers share."""
-    opts = [
-        selectinload(ImageInstance.Series)
-        .selectinload(Series.Study)
-        .selectinload(Study.Patient)
-        .selectinload(Patient.Project),
-        selectinload(ImageInstance.DeviceInstance).selectinload(
-            DeviceInstance.DeviceModel
-        ),
-        selectinload(ImageInstance.Scan),
-        _STORAGE_LOADER,
-        selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(
-            ImageInstanceTagLink.Tag
-        ),
-        selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(
-            ImageInstanceTagLink.Creator
-        ),
-    ]
-    if with_segmentations:
-        opts += [
-            selectinload(ImageInstance.Segmentations).selectinload(
-                Segmentation.Feature
-            ),
-            selectinload(ImageInstance.Segmentations).selectinload(
-                Segmentation.Creator
-            ),
-            selectinload(ImageInstance.Segmentations)
-            .selectinload(Segmentation.SegmentationTagLinks)
-            .selectinload(SegmentationTagLink.Tag),
-            selectinload(ImageInstance.Segmentations)
-            .selectinload(Segmentation.SegmentationTagLinks)
-            .selectinload(SegmentationTagLink.Creator),
-        ]
-    if with_form_annotations:
-        opts += [
-            selectinload(ImageInstance.FormAnnotations)
-            .selectinload(FormAnnotation.FormAnnotationTagLinks)
-            .selectinload(FormAnnotationTagLink.Tag),
-            selectinload(ImageInstance.FormAnnotations)
-            .selectinload(FormAnnotation.FormAnnotationTagLinks)
-            .selectinload(FormAnnotationTagLink.Creator),
-        ]
-    if with_model_segmentations:
-        opts += [
-            selectinload(ImageInstance.ModelSegmentations).selectinload(
-                ModelSegmentation.Model
-            ),
-        ]
-    return opts
-
-
 class ImageInstanceRepository:
     """Data access for ImageInstance reads and its Tag links."""
 
     def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
         self._scope = scope
+
+    def _full_graph_options(
+        self,
+        with_segmentations: bool,
+        with_form_annotations: bool,
+        with_model_segmentations: bool,
+    ) -> list:
+        """Build the conditional selectinload chain the two GET readers share.
+
+        A method rather than a module helper because the ``FormAnnotations``
+        branch needs the caller's scope, and a scope is this repository's
+        constructor state -- never a per-call argument.
+
+        Why that branch needs it at all: ``scoped_one`` filters the statement's
+        *root*, and a ``selectinload`` runs its own SELECT that the root's
+        WHERE never reaches. Every other load here stays on the image's own
+        ``Patient`` chain, so the root filter already governs it;
+        ``FormAnnotation`` is anchored to its ``PatientID`` instead, which can
+        differ from the image's, and that collection therefore carries the
+        caller's predicate itself.
+        """
+        opts = [
+            selectinload(ImageInstance.Series)
+            .selectinload(Series.Study)
+            .selectinload(Study.Patient)
+            .selectinload(Patient.Project),
+            selectinload(ImageInstance.DeviceInstance).selectinload(
+                DeviceInstance.DeviceModel
+            ),
+            selectinload(ImageInstance.Scan),
+            _STORAGE_LOADER,
+            selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(
+                ImageInstanceTagLink.Tag
+            ),
+            selectinload(ImageInstance.ImageInstanceTagLinks).selectinload(
+                ImageInstanceTagLink.Creator
+            ),
+        ]
+        if with_segmentations:
+            opts += [
+                selectinload(ImageInstance.Segmentations).selectinload(
+                    Segmentation.Feature
+                ),
+                selectinload(ImageInstance.Segmentations).selectinload(
+                    Segmentation.Creator
+                ),
+                selectinload(ImageInstance.Segmentations)
+                .selectinload(Segmentation.SegmentationTagLinks)
+                .selectinload(SegmentationTagLink.Tag),
+                selectinload(ImageInstance.Segmentations)
+                .selectinload(Segmentation.SegmentationTagLinks)
+                .selectinload(SegmentationTagLink.Creator),
+            ]
+        if with_form_annotations:
+            opts += [
+                selectinload(ImageInstance.FormAnnotations)
+                .selectinload(FormAnnotation.FormAnnotationTagLinks)
+                .selectinload(FormAnnotationTagLink.Tag),
+                selectinload(ImageInstance.FormAnnotations)
+                .selectinload(FormAnnotation.FormAnnotationTagLinks)
+                .selectinload(FormAnnotationTagLink.Creator),
+            ]
+            criteria = scope_criteria(FormAnnotation, self._scope)
+            if criteria is not None:
+                # None is an admin (or an unfiltered entity), where adding a
+                # tautology would read as a filter that is in force. The predicate
+                # is the same one ``apply_scope`` puts on a FormAnnotation read, so
+                # this collection and ``GET /form-annotations/{id}`` cannot give
+                # two answers for one row.
+                opts.append(with_loader_criteria(FormAnnotation, criteria))
+        if with_model_segmentations:
+            opts += [
+                selectinload(ImageInstance.ModelSegmentations).selectinload(
+                    ModelSegmentation.Model
+                ),
+            ]
+        return opts
 
     def project_ids(self, image_instance_id: int) -> set[int]:
         """The project this image sits in, for a write check to be judged on.
@@ -131,7 +156,7 @@ class ImageInstanceRepository:
         with_model_segmentations: bool,
     ) -> ImageInstance | None:
         """Return the instance by int id with the conditional graph, or None."""
-        opts = _full_graph_options(
+        opts = self._full_graph_options(
             with_segmentations, with_form_annotations, with_model_segmentations
         )
         return scoped_one(
@@ -151,7 +176,7 @@ class ImageInstanceRepository:
         with_model_segmentations: bool,
     ) -> ImageInstance | None:
         """Return the instance by PublicID (numeric-PK fallback), or None."""
-        opts = _full_graph_options(
+        opts = self._full_graph_options(
             with_segmentations, with_form_annotations, with_model_segmentations
         )
         item = scoped_one(

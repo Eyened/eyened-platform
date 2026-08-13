@@ -52,6 +52,7 @@ __all__ = [
     "project_ids_of_subtask",
     "project_ids_of_task",
     "projects_of",
+    "scope_criteria",
 ]
 
 
@@ -373,6 +374,41 @@ def projects_of(session: Session, entity: type[Base], entity_id: int) -> set[int
     return set(session.scalars(PROJECT_IDS_OF[entity](entity_id)).all())
 
 
+def scope_criteria(
+    entity: type[Base], scope: AccessScope
+) -> ColumnElement[bool] | None:
+    """The predicate ``apply_scope`` would add, as a standalone criterion.
+
+    ``apply_scope`` filters one statement, which reaches the entity that
+    statement selects and nothing else. A ``selectinload`` issues a *second*
+    SELECT for the collection, which the root's WHERE never touches -- so a
+    relationship whose target has a different project anchor from its parent
+    (``ImageInstance.FormAnnotations`` is the one such load on the read path)
+    needs the same predicate handed to ``with_loader_criteria`` instead. This
+    function is what both consume, so the collection is filtered by the same
+    ``_PARENT_OF`` walk as the root rather than by a second hand-written rule.
+
+    ``None`` means "add nothing": an admin scope, or an entity declared safe to
+    read unfiltered. Returning a tautology instead would put a
+    ``with_loader_criteria(..., true())`` on every admin read and read as
+    though a filter were in force.
+    """
+    if scope.is_admin:
+        return None
+    accessible = frozenset(scope.project_ids)
+    if entity in SET_VALUED_ENTITIES:
+        return _set_valued_predicate(entity, accessible)
+    if entity in SINGLE_PROJECT_ENTITIES:
+        return _single_project_predicate(entity, accessible)
+    if entity in SAFE_UNFILTERED_ENTITIES:
+        return None
+    raise KeyError(
+        f"{entity.__name__} is in no scoping registry and is not declared "
+        "safe to read unfiltered; add it to SINGLE_PROJECT_ENTITIES, "
+        "SET_VALUED_ENTITIES or SAFE_UNFILTERED_ENTITIES"
+    )
+
+
 def apply_scope(stmt: Select, entity: type[Base], scope: AccessScope) -> Select:
     """Restrict ``stmt`` to rows of ``entity`` the scope may read.
 
@@ -398,18 +434,10 @@ def apply_scope(stmt: Select, entity: type[Base], scope: AccessScope) -> Select:
     where this one is not -- an admin scope short-circuits here before any
     registry is consulted, so ``scoped_one(session, Project, admin)`` raises
     while ``apply_scope(stmt, Project, admin)`` returns the statement untouched.
+
+    The registry decisions themselves live in ``scope_criteria``, which the
+    eager-load path also consumes; everything described above is that
+    function's behaviour, applied to a statement.
     """
-    if scope.is_admin:
-        return stmt
-    accessible = frozenset(scope.project_ids)
-    if entity in SET_VALUED_ENTITIES:
-        return stmt.where(_set_valued_predicate(entity, accessible))
-    if entity in SINGLE_PROJECT_ENTITIES:
-        return stmt.where(_single_project_predicate(entity, accessible))
-    if entity in SAFE_UNFILTERED_ENTITIES:
-        return stmt
-    raise KeyError(
-        f"{entity.__name__} is in no scoping registry and is not declared "
-        "safe to read unfiltered; add it to SINGLE_PROJECT_ENTITIES, "
-        "SET_VALUED_ENTITIES or SAFE_UNFILTERED_ENTITIES"
-    )
+    criteria = scope_criteria(entity, scope)
+    return stmt if criteria is None else stmt.where(criteria)
