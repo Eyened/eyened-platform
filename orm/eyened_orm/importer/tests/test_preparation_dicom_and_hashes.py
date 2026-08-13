@@ -191,7 +191,7 @@ def test_prepare_rows_dicom_header_via_raw_loader():
     opts = PreparationOptions(
         infer_image_format=False,
         defaults=None,
-        read_dicom_header=True,
+        infer_metadata_from_dicom_header=True,
         raw_loader=_loader,
     )
     out = prepare_rows([row], options=opts)[0]
@@ -224,7 +224,7 @@ def test_prepare_rows_fills_patient_study_modality_from_dicom():
         [row],
         options=PreparationOptions(
             infer_image_format=False,
-            read_dicom_header=True,
+            infer_metadata_from_dicom_header=True,
             raw_loader=_loader,
         ),
     )[0]
@@ -258,7 +258,7 @@ def test_prepare_rows_does_not_override_caller_patient_modality_series():
         [row],
         options=PreparationOptions(
             infer_image_format=False,
-            read_dicom_header=True,
+            infer_metadata_from_dicom_header=True,
             raw_loader=_loader,
         ),
     )[0]
@@ -326,7 +326,7 @@ def test_prepare_rows_link_oct_enface_via_referenced_sop():
         rows,
         options=PreparationOptions(
             infer_image_format=False,
-            read_dicom_header=True,
+            infer_metadata_from_dicom_header=True,
             link_oct_enface_series=True,
             raw_loader=_loader,
         ),
@@ -383,7 +383,7 @@ def test_prepare_rows_link_oct_enface_via_frame_of_reference_fallback():
         ],
         options=PreparationOptions(
             infer_image_format=False,
-            read_dicom_header=True,
+            infer_metadata_from_dicom_header=True,
             link_oct_enface_series=True,
             raw_loader=_loader,
         ),
@@ -441,7 +441,7 @@ def test_prepare_rows_link_despite_series_anonymous_identity():
         ],
         options=PreparationOptions(
             infer_image_format=False,
-            read_dicom_header=True,
+            infer_metadata_from_dicom_header=True,
             link_oct_enface_series=True,
             raw_loader=_loader,
         ),
@@ -500,7 +500,7 @@ def test_prepare_rows_link_respects_explicit_series_id():
         ],
         options=PreparationOptions(
             infer_image_format=False,
-            read_dicom_header=True,
+            infer_metadata_from_dicom_header=True,
             link_oct_enface_series=True,
             raw_loader=_loader,
         ),
@@ -557,23 +557,158 @@ def test_prepare_rows_does_not_override_existing_hash():
     assert out.image_storage_hash == existing
 
 
-def test_prepare_rows_warns_when_link_without_read_dicom_header(caplog):
+def test_prepare_rows_explicit_none_pins_blank_against_dicom():
+    ds = _base_file_dataset(sop_instance_uid="1.2.3.pin")
+    ds.PatientID = "FROM_DICOM"
+    ds.StudyDate = "20200101"
+    ds.Modality = "OPT"
+    ds.SeriesInstanceUID = "1.2.3.pin.series"
+    raw = _save_ds(ds)
+
     row = ImportRow(
         project_name="p",
         storage_backend_key="sb",
-        object_key="x.dcm",
+        object_key="vol.dcm",
+        image_storage_format="dicom",
+        patient_identifier=None,
+    )
+    assert "patient_identifier" in row.model_fields_set
+    out = prepare_rows(
+        [row],
+        options=PreparationOptions(
+            infer_image_format=False,
+            infer_metadata_from_dicom_header=True,
+            raw_loader=lambda _r: raw,
+        ),
+    )[0]
+    assert out.patient_identifier is None
+    assert out.study_date == date(2020, 1, 1)
+
+
+def test_prepare_rows_omitted_patient_filled_from_dicom():
+    ds = _base_file_dataset(sop_instance_uid="1.2.3.fill")
+    ds.PatientID = "FROM_DICOM"
+    ds.SeriesInstanceUID = "1.2.3.fill.series"
+    raw = _save_ds(ds)
+
+    row = ImportRow(
+        project_name="p",
+        storage_backend_key="sb",
+        object_key="vol.dcm",
         image_storage_format="dicom",
     )
-    with caplog.at_level("WARNING", logger="eyened_orm.importer.preparation.pipeline"):
-        prepare_rows(
-            [row],
-            options=PreparationOptions(
-                infer_image_format=False,
-                read_dicom_header=False,
-                link_oct_enface_series=True,
+    assert "patient_identifier" not in row.model_fields_set
+    out = prepare_rows(
+        [row],
+        options=PreparationOptions(
+            infer_image_format=False,
+            infer_metadata_from_dicom_header=True,
+            raw_loader=lambda _r: raw,
+        ),
+    )[0]
+    assert out.patient_identifier == "FROM_DICOM"
+
+
+def test_prepare_rows_link_without_full_header_infer():
+    """link_oct_enface_series reads linkage keys only when infer flag is False."""
+    enface_sop = "1.2.3.enface.linkonly"
+    oct_sop = "1.2.3.oct.linkonly"
+    oct_series = "1.2.3.oct.series.linkonly"
+    for_uid = "1.2.3.for.linkonly"
+
+    enface_ds = _base_file_dataset(sop_instance_uid=enface_sop)
+    enface_ds.PatientID = "SHOULD_NOT_FILL"
+    enface_ds.Modality = "OP"
+    enface_ds.ImageType = ["ORIGINAL", "PRIMARY", "", "RED"]
+    enface_ds.SeriesInstanceUID = "1.2.3.enface.series.linkonly"
+    enface_ds.FrameOfReferenceUID = for_uid
+    enface_ds.Rows = 768
+    enface_ds.Columns = 768
+    enface_raw = _save_ds(enface_ds)
+
+    oct_ds = _base_file_dataset(
+        sop_instance_uid=oct_sop,
+        sop_class_uid="1.2.840.10008.5.1.4.1.1.77.1.5.4",
+    )
+    oct_ds.PatientID = "SHOULD_NOT_FILL"
+    oct_ds.Modality = "OPT"
+    oct_ds.SeriesInstanceUID = oct_series
+    oct_ds.FrameOfReferenceUID = for_uid
+    oct_ds.NumberOfFrames = 37
+    oct_ds.Rows = 496
+    oct_ds.Columns = 512
+    ref_item = Dataset()
+    ref_item.ReferencedSOPClassUID = "1.2.840.10008.5.1.4.1.1.77.1.5.1"
+    ref_item.ReferencedSOPInstanceUID = enface_sop
+    shared = Dataset()
+    shared.ReferencedImageSequence = Sequence([ref_item])
+    oct_ds.SharedFunctionalGroupsSequence = Sequence([shared])
+    oct_raw = _save_ds(oct_ds)
+
+    by_key = {"enface.dcm": enface_raw, "oct.dcm": oct_raw}
+
+    out = prepare_rows(
+        [
+            ImportRow(
+                project_name="p",
+                storage_backend_key="sb",
+                object_key="enface.dcm",
+                image_storage_format="dicom",
             ),
-        )
-    assert any("read_dicom_header=False" in r.message for r in caplog.records)
+            ImportRow(
+                project_name="p",
+                storage_backend_key="sb",
+                object_key="oct.dcm",
+                image_storage_format="dicom",
+            ),
+        ],
+        options=PreparationOptions(
+            infer_image_format=False,
+            infer_metadata_from_dicom_header=False,
+            link_oct_enface_series=True,
+            raw_loader=lambda r: by_key.get(r.object_key or ""),
+        ),
+    )
+    assert out[0].series_instance_uid == oct_series
+    assert out[1].series_instance_uid == oct_series
+    assert out[0].patient_identifier is None
+    assert out[1].patient_identifier is None
+    assert out[0].width is None
+    assert out[1].width is None
+    assert out[0].modality is None
+    assert out[1].modality is None
+    assert out[0].dicom_modality is None
+    assert out[1].dicom_modality is None
+    assert out[0].sop_instance_uid == enface_sop
+    assert out[1].sop_instance_uid == oct_sop
+
+
+def test_prepare_rows_csv_empty_patient_still_filled_from_dicom(tmp_path):
+    from eyened_orm.importer.import_csv import read_import_rows_csv
+
+    ds = _base_file_dataset(sop_instance_uid="1.2.3.csv")
+    ds.PatientID = "FROM_DICOM"
+    ds.SeriesInstanceUID = "1.2.3.csv.series"
+    raw = _save_ds(ds)
+
+    csv_path = tmp_path / "rows.csv"
+    csv_path.write_text(
+        "project_name,storage_backend_key,object_key,image_storage_format,patient_identifier\n"
+        "p,sb,vol.dcm,dicom,\n",
+        encoding="utf-8",
+    )
+    rows = read_import_rows_csv(csv_path)
+    assert "patient_identifier" not in rows[0].model_fields_set
+
+    out = prepare_rows(
+        rows,
+        options=PreparationOptions(
+            infer_image_format=False,
+            infer_metadata_from_dicom_header=True,
+            raw_loader=lambda _r: raw,
+        ),
+    )[0]
+    assert out.patient_identifier == "FROM_DICOM"
 
 
 def test_prepare_rows_warns_when_link_cannot_read_headers(caplog):
@@ -588,7 +723,7 @@ def test_prepare_rows_warns_when_link_cannot_read_headers(caplog):
             [row],
             options=PreparationOptions(
                 infer_image_format=False,
-                read_dicom_header=True,
+                infer_metadata_from_dicom_header=True,
                 link_oct_enface_series=True,
                 raw_loader=lambda _r: None,
             ),
@@ -617,7 +752,7 @@ def test_prepare_rows_warns_opt_mapped_to_oct_not_octa(caplog):
             ],
             options=PreparationOptions(
                 infer_image_format=False,
-                read_dicom_header=True,
+                infer_metadata_from_dicom_header=True,
                 raw_loader=lambda _r: raw,
             ),
         )
@@ -644,7 +779,7 @@ def test_prepare_rows_warns_op_without_viewer_modality(caplog):
             ],
             options=PreparationOptions(
                 infer_image_format=False,
-                read_dicom_header=True,
+                infer_metadata_from_dicom_header=True,
                 raw_loader=lambda _r: raw,
             ),
         )

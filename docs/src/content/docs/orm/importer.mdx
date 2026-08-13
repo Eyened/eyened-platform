@@ -78,15 +78,15 @@ Before planning, `plan_image_import` / `build_image_import_rows` call `prepare_r
 |--------|---------|--------|
 | `infer_image_format` | `True` | Set `image_storage_format` from `object_key` (e.g. `.dcm` → `"dicom"`) |
 | `defaults` | `None` | Fill missing row fields from a dict |
-| `read_dicom_header` | `False` | Parse DICOM headers (no pixels) and merge missing ImportRow fields |
-| `link_oct_enface_series` | `False` | Co-locate OPT/OCT + enface under one `series_instance_uid` (needs header metadata) |
+| `infer_metadata_from_dicom_header` | `False` | Parse DICOM headers (no pixels) and merge missing ImportRow fields |
+| `link_oct_enface_series` | `False` | Co-locate OPT/OCT + enface under one `series_instance_uid` (reads linkage DICOM keys even without full-header infer) |
 | `read_image_header` | `False` | Read PNG/JPEG dimensions |
 | `compute_storage_hash` / `compute_storage_checksum` | `False` | SHA-256 / MD5 of file bytes |
 | `raw_loader` | `None` | Optional `Callable[[ImportRow], bytes \| None]` instead of storage mounts |
 
-**Merge rule:** preparation only fills fields that are still `None`. Values you set on the `ImportRow` (or in `defaults`) always win — for example an explicit `patient_identifier` overrides DICOM `PatientID`.
+**Merge rule:** preparation only fills fields that are still `None` and were **not** explicitly set on the `ImportRow`. Values you set on the row (or in `defaults`) always win — for example an explicit `patient_identifier` overrides DICOM `PatientID`. Passing `patient_identifier=None` pins the field blank so DICOM/defaults will not fill it; omitting the field leaves it unset so preparation may fill it.
 
-**Reading files:** with `read_dicom_header` (or hashes), bytes are loaded via `EYENED_STORAGE_MOUNTS[storage_backend_key] / object_key`, or via `raw_loader`. Use a **relative** `object_key` under the mount (not an absolute path).
+**Reading files:** with `infer_metadata_from_dicom_header`, `link_oct_enface_series`, or hashes, bytes are loaded via `EYENED_STORAGE_MOUNTS[storage_backend_key] / object_key`, or via `raw_loader`. Use a **relative** `object_key` under the mount (not an absolute path).
 
 ```python
 from eyened_orm.importer import ImportRow, PreparationOptions, plan_image_import
@@ -94,7 +94,7 @@ from eyened_orm.importer import ImportRow, PreparationOptions, plan_image_import
 opts = PreparationOptions(
     defaults=defaults,
     infer_image_format=True,
-    read_dicom_header=True,
+    infer_metadata_from_dicom_header=True,
     link_oct_enface_series=True,
 )
 run = plan_image_import(session, rows, options=opts)
@@ -102,7 +102,7 @@ run = plan_image_import(session, rows, options=opts)
 
 ### DICOM header fields
 
-When `read_dicom_header=True` and `image_storage_format == "dicom"`, `dicom_header_patches_from_bytes` may fill (among others):
+When `infer_metadata_from_dicom_header=True` and `image_storage_format == "dicom"`, `dicom_header_patches_from_bytes` may fill (among others):
 
 | DICOM source | ImportRow field |
 |--------------|-----------------|
@@ -129,21 +129,23 @@ Preparation logs **warnings** when OPT→OCT mapping is used, when OP has no vie
 
 Some exports (notably Heidelberg) give each file its own `SeriesInstanceUID`, while OCT and the IR/AF localizer still belong together. They typically share `FrameOfReferenceUID`, and the OPT references the enface via `ReferencedImageSequence` / Ophthalmic Frame Location.
 
-With `link_oct_enface_series=True` (and `read_dicom_header=True` so that metadata is present), preparation:
+With `link_oct_enface_series=True`, preparation builds a parallel `SeriesLinkMeta` from the DICOM header (modality classification, FrameOfReferenceUID, referenced SOPs) and only merges series/SOP UID fields into the row when `infer_metadata_from_dicom_header=False`. It then:
 
 1. Finds OPT/OCT rows and their referenced enface SOP UIDs (FoR fallback if needed)
 2. Sets all members of each pair/group to the **OCT’s** `series_instance_uid`
 
-So they land in one `Series` for the viewer and for export localizer heuristics. Rows with an explicit `series_id` are left alone. Confirmed links still apply if `series_anonymous_identity` is set (otherwise distinct DICOM series UIDs would keep the pair apart).
+So they land in one `Series` for the viewer and for export localizer heuristics. Rows with an explicit `series_id` are left alone. Confirmed links still apply if `series_anonymous_identity` is set (otherwise distinct DICOM series UIDs would keep the pair apart). Modality is **not** written to the row unless `infer_metadata_from_dicom_header=True` (or you set it yourself).
 
 ::::caution
-If `link_oct_enface_series=True` but headers are not read (`read_dicom_header=False`, unreadable mounts/`object_key`, or missing FoR/references), linking is a **no-op** and a warning is logged.
+If `link_oct_enface_series=True` but DICOM bytes cannot be read (unreadable mounts/`object_key`, or missing FoR/references), linking is a **no-op** and a warning is logged.
 ::::
 
 ## Import from CSV
 
 If you already have metadata in a CSV, you can load it directly into `ImportRow` objects.
 The CSV header should use `ImportRow` field names (snake_case), for example `project_name`, `patient_identifier`, `study_date`, `public_id`, `object_key`, ...
+
+Empty CSV cells are omitted (field unset), so preparation may still fill them from DICOM or `defaults`. To leave a field blank on purpose, build the row in Python with an explicit `None`.
 
 ```python
 from pathlib import Path

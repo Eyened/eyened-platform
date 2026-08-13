@@ -2,24 +2,36 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Sequence
+from typing import AbstractSet, Any, Callable, Optional, Sequence
 
 from eyened_orm.image_instance import Modality, ModalityType
 from eyened_orm.importer.importer_dtos import ImportRow
 
 from . import steps
-from .dicom_meta import dicom_header_patches_from_bytes, strip_link_meta
+from .dicom_meta import (
+    DICOM_SERIES_LINKAGE_KEYS,
+    LINK_META_KEYS,
+    dicom_header_patches_from_bytes,
+    strip_link_meta,
+)
 from .hashes import md5_hex, sha256_bytes
 from .image_meta import raster_image_header_patches_from_bytes
-from .series_link import link_oct_enface_series
+from .series_link import SeriesLinkMeta, link_oct_enface_series, series_link_meta_from_patch
 from .storage_io import try_read_storage_object_bytes
 
 logger = logging.getLogger(__name__)
 
 
-def _merge_missing(state: dict[str, Any], patch: dict[str, Any]) -> None:
+def _merge_missing(
+    state: dict[str, Any],
+    patch: dict[str, Any],
+    *,
+    skip: AbstractSet[str] | None = None,
+) -> None:
     for k, v in patch.items():
         if v is None:
+            continue
+        if skip is not None and k in skip:
             continue
         if state.get(k) is None:
             state[k] = v
@@ -37,7 +49,7 @@ class PreparationOptions:
     infer_image_format: bool = True
     defaults: Optional[dict[str, Any]] = None
     read_image_header: bool = False
-    read_dicom_header: bool = False
+    infer_metadata_from_dicom_header: bool = False
     link_oct_enface_series: bool = False
     compute_storage_hash: bool = False
     compute_storage_checksum: bool = False
@@ -46,7 +58,8 @@ class PreparationOptions:
 
 def _needs_raw_bytes(opts: PreparationOptions) -> bool:
     return (
-        opts.read_dicom_header
+        opts.infer_metadata_from_dicom_header
+        or opts.link_oct_enface_series
         or opts.read_image_header
         or opts.compute_storage_hash
         or opts.compute_storage_checksum
@@ -98,22 +111,13 @@ def _warn_modality_heuristics(states: list[dict[str, Any]]) -> None:
 
 
 def _warn_series_link_limitations(
-    opts: PreparationOptions,
-    states: list[dict[str, Any]],
+    metas: Sequence[SeriesLinkMeta | None],
     *,
     dicom_rows: int,
     dicom_headers_read: int,
     linked_groups: int,
 ) -> None:
     """Warn when OCT–enface series linking is enabled but likely ineffective."""
-    if not opts.read_dicom_header:
-        logger.warning(
-            "link_oct_enface_series=True but read_dicom_header=False; "
-            "linking needs DICOM FrameOfReferenceUID / ReferencedSOPInstanceUID "
-            "from header parsing and will be a no-op."
-        )
-        return
-
     if dicom_rows and dicom_headers_read == 0:
         logger.warning(
             "link_oct_enface_series=True but no DICOM headers were read for %d "
@@ -133,14 +137,18 @@ def _warn_series_link_limitations(
 
     if linked_groups == 0 and dicom_headers_read > 0:
         has_oct = any(
-            _is_opt_dicom_modality(st.get("dicom_modality"))
-            or st.get("modality") is Modality.OCT
-            or st.get("modality") == Modality.OCT.value
-            for st in states
+            meta is not None
+            and (
+                _is_opt_dicom_modality(meta.dicom_modality)
+                or meta.modality is Modality.OCT
+                or meta.modality == Modality.OCT.value
+            )
+            for meta in metas
         )
         has_link_meta = any(
-            st.get("referenced_sop_instance_uids") or st.get("frame_of_reference_uid")
-            for st in states
+            meta is not None
+            and (meta.referenced_sop_instance_uids or meta.frame_of_reference_uid)
+            for meta in metas
         )
         if has_oct and not has_link_meta:
             logger.warning(
@@ -148,6 +156,17 @@ def _warn_series_link_limitations(
                 "ReferencedSOPInstanceUID metadata was found on prepared rows; "
                 "OCT–enface series linking was a no-op."
             )
+
+
+def _row_patch_from_dicom(
+    patch: dict[str, Any],
+    *,
+    full_header: bool,
+) -> dict[str, Any]:
+    """Keep only ImportRow-bound keys; never include linker-only FoR/refs."""
+    if full_header:
+        return {k: v for k, v in patch.items() if k not in LINK_META_KEYS}
+    return {k: v for k, v in patch.items() if k in DICOM_SERIES_LINKAGE_KEYS}
 
 
 def prepare_rows(
@@ -167,9 +186,13 @@ def prepare_rows(
     Optional steps read bytes via ``EYENED_STORAGE_MOUNTS`` (``storage_backend_key`` +
     ``object_key``), or via ``PreparationOptions.raw_loader``.
 
-    When ``link_oct_enface_series`` is True (typically with ``read_dicom_header``),
-    OCT volumes and their referenced enface images are assigned a shared
-    ``series_instance_uid`` so they land in one Series.
+    Fields explicitly set on an ``ImportRow`` (including ``None``) are pinned and
+    are never filled from ``defaults`` or DICOM/image header parsing.
+
+    When ``link_oct_enface_series`` is True, OCT volumes and their referenced
+    enface images are assigned a shared ``series_instance_uid`` so they land in
+    one Series. Linking uses a parallel ``SeriesLinkMeta`` list (modality / FoR /
+    refs) and does not require ``infer_metadata_from_dicom_header``.
     """
     if options is None:
         opts = PreparationOptions(
@@ -181,21 +204,27 @@ def prepare_rows(
 
     _defaults = opts.defaults or {}
     states: list[dict[str, Any]] = []
+    link_metas: list[SeriesLinkMeta | None] = []
     dicom_rows = 0
     dicom_headers_read = 0
+    parse_dicom = opts.infer_metadata_from_dicom_header or opts.link_oct_enface_series
 
     for row in rows:
+        pinned = set(row.model_fields_set)
         state: dict[str, Any] = {**row.model_dump()}
 
         if opts.infer_image_format:
             r = ImportRow.model_validate(strip_link_meta(state))
-            _merge_missing(state, steps.step_infer_image_storage_format(r))
+            _merge_missing(
+                state, steps.step_infer_image_storage_format(r), skip=pinned
+            )
 
         _merge_missing(
             state,
             steps.step_apply_defaults(
                 ImportRow.model_validate(strip_link_meta(state)), _defaults
             ),
+            skip=pinned,
         )
 
         raw: bytes | None = None
@@ -206,36 +235,44 @@ def prepare_rows(
         if fmt == "dicom":
             dicom_rows += 1
 
-        if opts.read_dicom_header and raw and fmt == "dicom":
-            _merge_missing(state, dicom_header_patches_from_bytes(raw))
+        link_meta: SeriesLinkMeta | None = None
+        if parse_dicom and raw and fmt == "dicom":
+            patch = dicom_header_patches_from_bytes(raw)
+            link_meta = series_link_meta_from_patch(patch)
+            row_patch = _row_patch_from_dicom(
+                patch, full_header=opts.infer_metadata_from_dicom_header
+            )
+            _merge_missing(state, row_patch, skip=pinned)
             dicom_headers_read += 1
 
         if opts.read_image_header and raw and fmt in {"image/png", "image/jpeg"}:
-            _merge_missing(state, raster_image_header_patches_from_bytes(raw))
+            _merge_missing(
+                state, raster_image_header_patches_from_bytes(raw), skip=pinned
+            )
 
         if opts.compute_storage_hash and raw:
             patch_h: dict[str, Any] = {}
             if state.get("image_storage_hash") is None:
                 patch_h["image_storage_hash"] = sha256_bytes(raw)
-            _merge_missing(state, patch_h)
+            _merge_missing(state, patch_h, skip=pinned)
 
         if opts.compute_storage_checksum and raw:
             patch_c: dict[str, Any] = {}
             if state.get("image_storage_checksum") is None:
                 patch_c["image_storage_checksum"] = md5_hex(raw)
-            _merge_missing(state, patch_c)
+            _merge_missing(state, patch_c, skip=pinned)
 
         states.append(state)
+        link_metas.append(link_meta)
 
-    if opts.read_dicom_header:
+    if opts.infer_metadata_from_dicom_header:
         _warn_modality_heuristics(states)
 
     linked_groups = 0
     if opts.link_oct_enface_series:
-        linked_groups = link_oct_enface_series(states)
+        linked_groups = link_oct_enface_series(states, link_metas)
         _warn_series_link_limitations(
-            opts,
-            states,
+            link_metas,
             dicom_rows=dicom_rows,
             dicom_headers_read=dicom_headers_read,
             linked_groups=linked_groups,

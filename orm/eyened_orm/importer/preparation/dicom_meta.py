@@ -9,11 +9,21 @@ from pydicom.valuerep import DA, TM
 
 from eyened_orm.image_instance import Laterality, Modality, ModalityType
 
-# Keys used for OCT–enface linking; stripped before ImportRow validation.
+# Linker-only keys that must never reach ImportRow validation.
 LINK_META_KEYS = frozenset(
     {
         "frame_of_reference_uid",
         "referenced_sop_instance_uids",
+    }
+)
+
+# ImportRow fields applied from DICOM when linking without full-header infer.
+DICOM_SERIES_LINKAGE_KEYS = frozenset(
+    {
+        "series_instance_uid",
+        "study_instance_uid",
+        "series_number",
+        "sop_instance_uid",
     }
 )
 

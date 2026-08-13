@@ -20,7 +20,7 @@ The **ORM importer** is the primary way to load data. Use it from Python or the 
 Typical workflow:
 
 1. Build `ImportRow` objects (or load from CSV)
-2. Optionally enable [row preparation](/eyened-platform/orm/importer#row-preparation) (`PreparationOptions`) — e.g. read DICOM headers for PatientID/StudyDate/modality/resolutions, or link OCT–enface into one series
+2. Optionally enable [row preparation](/eyened-platform/orm/importer#row-preparation) (`PreparationOptions`) — e.g. `infer_metadata_from_dicom_header` for PatientID/StudyDate/modality/resolutions, or `link_oct_enface_series` to co-locate OCT–enface
 3. `plan_image_import(session, rows, ...)` — preview what will be created or matched
 4. `run.display_summary()` — review the plan
 5. `run.apply()` then `session.commit()` — write to the database

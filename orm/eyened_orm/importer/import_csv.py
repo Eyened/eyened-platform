@@ -112,7 +112,9 @@ def read_import_rows_csv(
     Read a CSV into a list of ImportRow objects.
 
     - Columns should match ImportRow field names (snake_case).
-    - Empty cells are treated as None.
+    - Empty cells are omitted (field unset), so DICOM/defaults preparation may fill them.
+      To leave a field blank on purpose, construct ``ImportRow`` in Python with an
+      explicit ``None`` (see row preparation pinning).
     - A small default set of converters is applied for common typed fields (bool/int/float/date/datetime).
     - If strict_columns is True, unknown columns raise a ValueError (instead of being ignored by Pydantic).
     """
@@ -140,12 +142,14 @@ def read_import_rows_csv(
                 vv = _none_if_empty(v)
                 if key in converters:
                     try:
-                        data[key] = converters[key](vv)
+                        parsed = converters[key](vv)
                     except Exception as e:
                         raise ValueError(
                             f"CSV parse error line {i}, column {key!r}: {e}"
                         ) from e
-                else:
+                    if parsed is not None:
+                        data[key] = parsed
+                elif vv is not None:
                     data[key] = vv
 
             try:

@@ -32,7 +32,7 @@ def test_read_import_rows_csv_parses_common_types(tmp_path):
     assert r.object_key == "img-1.png"
 
 
-def test_read_import_rows_csv_empty_cells_become_none(tmp_path):
+def test_read_import_rows_csv_empty_cells_are_omitted(tmp_path):
     csv_path = tmp_path / "import.csv"
     csv_path.write_text(
         "\n".join(
@@ -47,6 +47,8 @@ def test_read_import_rows_csv_empty_cells_become_none(tmp_path):
 
     rows = read_import_rows_csv(csv_path)
     assert rows[0].study_date is None
+    assert "study_date" not in rows[0].model_fields_set
+    assert "patient_identifier" in rows[0].model_fields_set
 
 
 def test_read_import_rows_csv_strict_columns_raises(tmp_path):
@@ -64,4 +66,3 @@ def test_read_import_rows_csv_strict_columns_raises(tmp_path):
 
     with pytest.raises(ValueError, match="Unknown column"):
         read_import_rows_csv(csv_path, strict_columns=True)
-

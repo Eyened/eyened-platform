@@ -166,7 +166,7 @@ Files are referenced by storage backend + path within that backend (resolved via
 
 ## DICOM preparation (optional)
 
-With `PreparationOptions(read_dicom_header=True)` on the [ORM importer](/eyened-platform/orm/importer#row-preparation), missing fields above can be filled from the DICOM file at `storage_backend_key` + `object_key` (relative path under `EYENED_STORAGE_MOUNTS`). Explicit row/default values are never overwritten.
+With `PreparationOptions(infer_metadata_from_dicom_header=True)` on the [ORM importer](/eyened-platform/orm/importer#row-preparation), missing fields above can be filled from the DICOM file at `storage_backend_key` + `object_key` (relative path under `EYENED_STORAGE_MOUNTS`). Explicitly set row values (including `None`) and `defaults` are never overwritten by DICOM.
 
 Common auto-fills: `patient_identifier` ← `PatientID`, `study_date` ← `StudyDate`, `dicom_modality` / `modality` from DICOM `Modality` + `ImageType`, geometry and `resolution_*` (including OPT spacing from Shared Functional Groups `PixelMeasuresSequence`), series/SOP UIDs, laterality, acquisition datetime.
 
