@@ -364,6 +364,26 @@ def test_set_admin_on_an_unknown_user_is_a_clean_error_not_a_traceback(
     assert "nosuchuser" in result.output
 
 
+def test_revoke_removes_the_single_membership_and_echoes_it(
+    session, stub_database, alice
+):
+    """The `--project` branch: `--all` already has three tests, but the rewrite
+    that moved `--project` off `required=True` gave this path its own `if` and
+    an early `return`, and nothing at the CLI level pinned it -- a dropped
+    `session.commit()` or a fallthrough into the `--all` block would stay
+    green."""
+    make_project(session, "A")
+    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    session.commit()
+
+    result = CliRunner().invoke(
+        revoke_cmd, ["--user", "alice", "--project", "A"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "alice: revoked from A" in result.output
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
+
+
 def test_revoke_all_removes_every_membership_and_names_each(
     session, stub_database, alice
 ):
