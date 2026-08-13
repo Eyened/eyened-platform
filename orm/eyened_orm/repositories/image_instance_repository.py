@@ -103,10 +103,21 @@ class ImageInstanceRepository:
                 # needs none: this collection is the root image's own
                 # ``FormAnnotations``, so each row's ``ImageInstanceID`` is the
                 # root's by construction and the root read already scoped it.
-                # The load resolves out of the identity map, not a second row.
-                selectinload(ImageInstance.FormAnnotations).selectinload(
-                    FormAnnotation.ImageInstance
-                ),
+                #
+                # ``lazyload("*")`` is what keeps it cheap, and it is not
+                # optional. The nested object *is* the root image, already
+                # fully populated by this same option chain, but loading it
+                # again re-triggers ``ImageInstance``'s own ``lazy="selectin"``
+                # relationships -- Series/Study/Patient/Project, ImageStorage/
+                # StorageBackend, device, tags. Measured on
+                # ``get_instance(..., with_form_annotations=True)`` with three
+                # nested annotations: 14 statements with this leg absent (and
+                # ``image_id: null``), 26 with the leg alone, 15 with the leg
+                # and this suppression. Suppressing the re-cascade changes
+                # nothing the DTO reads.
+                selectinload(ImageInstance.FormAnnotations)
+                .selectinload(FormAnnotation.ImageInstance)
+                .lazyload("*"),
             ]
             criteria = scope_criteria(FormAnnotation, self._scope)
             if criteria is not None:
