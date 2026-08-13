@@ -19,6 +19,7 @@ from click.testing import CliRunner
 from sqlalchemy import select
 
 from eyened_orm import AuditLog, ProjectMember
+from eyened_orm.authz.administration import grant
 from eyened_orm.authz.bootstrap import ensure_admin
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.commands import rbac as rbac_module
@@ -29,6 +30,7 @@ from eyened_orm.commands.rbac import (
     grant_for_task_cmd,
     init_admin,
     reactivate_cmd,
+    revoke_cmd,
     set_admin_cmd,
 )
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
@@ -359,4 +361,42 @@ def test_set_admin_on_an_unknown_user_is_a_clean_error_not_a_traceback(
     result = CliRunner().invoke(set_admin_cmd, ["--user", "nosuchuser", "--off"])
     assert result.exit_code == 1
     assert "nosuchuser" in result.output
+
+
+def test_revoke_all_removes_every_membership_and_names_each(
+    session, stub_database, alice
+):
+    """The reset step of the developer loop. Naming each removal is the only
+    read-back this phase ships, so the echo is part of the contract, not
+    decoration."""
+    make_project(session, "A")
+    make_project(session, "B")
+    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    grant(session, username="alice", project_name="B", role=ProjectRole.read_only)
+    session.commit()
+
+    result = CliRunner().invoke(revoke_cmd, ["--user", "alice", "--all", "--yes"])
+    assert result.exit_code == 0, result.output
+    assert "REVOKE grader in A" in result.output
+    assert "REVOKE read_only in B" in result.output
+    assert "alice: revoked from 2 project(s)" in result.output
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
+
+
+@pytest.mark.parametrize(
+    "args",
+    (
+        ["--user", "alice"],
+        ["--user", "alice", "--project", "A", "--all"],
+    ),
+    ids=("neither", "both"),
+)
+def test_revoke_requires_exactly_one_of_project_and_all(session, stub_database, args):
+    """Neither is a typo that would otherwise silently do nothing; both is a
+    typo that would otherwise silently do everything. Click has no native
+    construct for 'exactly one of', so this guard is hand-written and can be
+    deleted without any other test noticing."""
+    result = CliRunner().invoke(revoke_cmd, args)
+    assert result.exit_code == 2
+    assert "exactly one of --project or --all" in result.output
     assert "Traceback" not in result.output

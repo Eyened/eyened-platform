@@ -11,10 +11,12 @@ import click
 
 from ..authz.administration import (
     apply_grant_plan,
+    apply_revoke_all,
     audit_trusted,
     deactivate,
     grant,
     grant_all,
+    memberships_of,
     parse_role,
     plan_grant_for_tasks,
     reactivate,
@@ -133,21 +135,58 @@ def grant_cmd(username: str, project_name: str, role: str):
 
 @click.command("revoke")
 @click.option("--user", "username", required=True)
-@click.option("--project", "project_name", required=True)
-def revoke_cmd(username: str, project_name: str):
-    """Remove a user's membership in a project."""
+@click.option("--project", "project_name", required=False)
+@click.option(
+    "--all",
+    "all_projects",
+    is_flag=True,
+    default=False,
+    help="Remove every membership this user holds.",
+)
+@click.option("--yes", is_flag=True, default=False, help="Skip the confirmation.")
+def revoke_cmd(
+    username: str, project_name: str | None, all_projects: bool, yes: bool
+):
+    """Remove a user's membership in one project, or in every project."""
+    # Click has no native "exactly one of these", so --project loses its
+    # required=True and the requirement moves here. Defaulting either way turns
+    # a typo into a silent no-op or a silent full revocation.
+    if all_projects == bool(project_name):
+        raise click.UsageError("pass exactly one of --project or --all")
+
     database = get_database()
     with database.get_session() as session:
+        if not all_projects:
+            try:
+                removed = revoke(
+                    session, username=username, project_name=project_name
+                )
+            except LookupError as exc:
+                raise click.ClickException(str(exc)) from exc
+            session.commit()
+            click.echo(
+                f"{username}: revoked from {project_name}"
+                if removed
+                else f"{username}: no membership in {project_name}; nothing to do"
+            )
+            return
+
         try:
-            removed = revoke(session, username=username, project_name=project_name)
+            held = memberships_of(session, username=username)
         except LookupError as exc:
             raise click.ClickException(str(exc)) from exc
+        if not held:
+            click.echo(f"{username}: holds no memberships; nothing to do")
+            return
+        for _, name, role in held:
+            click.echo(f"  REVOKE {role.name} in {name}")
+        if not yes:
+            click.confirm(
+                f"Remove all {len(held)} membership(s) from {username}?", abort=True
+            )
+        apply_revoke_all(session, username=username, held=held)
         session.commit()
-    click.echo(
-        f"{username}: revoked from {project_name}"
-        if removed
-        else f"{username}: no membership in {project_name}; nothing to do"
-    )
+    click.echo(f"{username}: revoked from {len(held)} project(s)")
 
 
 @click.command("grant-for-task")

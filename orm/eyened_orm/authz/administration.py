@@ -27,10 +27,12 @@ __all__ = [
     "GrantResult",
     "TaskGrantPlan",
     "apply_grant_plan",
+    "apply_revoke_all",
     "audit_trusted",
     "deactivate",
     "grant",
     "grant_all",
+    "memberships_of",
     "parse_role",
     "plan_grant_for_tasks",
     "reactivate",
@@ -330,6 +332,52 @@ def revoke(session: Session, *, username: str, project_name: str) -> bool:
         },
     )
     return True
+
+
+def memberships_of(
+    session: Session, *, username: str
+) -> list[tuple[int, str, ProjectRole]]:
+    """Every membership a user holds, as (project_id, project_name, role).
+
+    Ordered by project name so the review block a command prints is stable
+    between runs. Read-only: the administrator sees the list before confirming.
+    """
+    creator = resolve_creator(session, username)
+    members = ProjectMemberRepository(session).list_for_creator(creator.CreatorID)
+    names = dict(
+        session.execute(
+            select(Project.ProjectID, Project.ProjectName).where(
+                Project.ProjectID.in_([m.ProjectID for m in members])
+            )
+        ).all()
+    )
+    return sorted(
+        ((m.ProjectID, names[m.ProjectID], m.Role) for m in members),
+        key=lambda row: row[1],
+    )
+
+
+def apply_revoke_all(
+    session: Session,
+    *,
+    username: str,
+    held: Sequence[tuple[int, str, ProjectRole]],
+) -> None:
+    """Remove every membership in a list already produced by `memberships_of`.
+
+    Takes the list rather than recomputing it, mirroring
+    `apply_grant_plan(session, plan=...)`: the command has already printed this
+    exact set and had it confirmed, so re-deriving it would both repeat the
+    query and let the set applied drift from the set reviewed.
+
+    Loops over `revoke` rather than issuing one bulk DELETE, exactly as
+    `apply_grant_plan` loops over `grant`. That inherits one audit row per
+    membership, which is right at this scale: a user holds at most one row per
+    project, so this is bounded by the project count -- not the 1,408-row scale
+    that made `grant_all` write a single summary row instead.
+    """
+    for _, project_name, _ in held:
+        revoke(session, username=username, project_name=project_name)
 
 
 def deactivate(session: Session, *, username: str) -> bool:
