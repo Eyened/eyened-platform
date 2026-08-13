@@ -371,9 +371,19 @@ def test_revoke_removes_the_single_membership_and_echoes_it(
     that moved `--project` off `required=True` gave this path its own `if` and
     an early `return`, and nothing at the CLI level pinned it -- a dropped
     `session.commit()` or a fallthrough into the `--all` block would stay
-    green."""
+    green.
+
+    Alice also holds a membership in project B, which this invocation is never
+    asked to touch. With only one membership, a missing `return` is invisible:
+    `memberships_of` would find nothing left, the `--all` block would take its
+    "holds no memberships; nothing to do" exit, and the already-printed
+    "alice: revoked from A" would still satisfy the assertions below -- so a
+    second, untouched membership is required to make that fallthrough loud.
+    Do not shrink this back to a single project."""
     make_project(session, "A")
+    project_b = make_project(session, "B")
     grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    grant(session, username="alice", project_name="B", role=ProjectRole.read_only)
     session.commit()
 
     result = CliRunner().invoke(
@@ -381,7 +391,9 @@ def test_revoke_removes_the_single_membership_and_echoes_it(
     )
     assert result.exit_code == 0, result.output
     assert "alice: revoked from A" in result.output
-    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {
+        project_b.ProjectID: ProjectRole.read_only
+    }
 
 
 def test_revoke_all_removes_every_membership_and_names_each(
