@@ -425,6 +425,32 @@ def test_set_password_replaces_the_hash_so_only_the_new_password_verifies(
     assert verify_password("old-pw", stored.PasswordHash) is False
 
 
+def test_set_password_clears_the_legacy_hash_so_the_old_password_stops_working(
+    session, stub_database
+):
+    """check_login (server/routes/auth.py) verifies PasswordHash first and
+    falls through to the legacy `Password` column if that misses. If
+    `set_password` left a pre-existing legacy hash in place, the password
+    being reset away from would keep authenticating through that fallback --
+    a "Forgot the password?" reset that doesn't actually revoke the old one.
+    `create_user` never populates `Password`, so this seeds it directly rather
+    than reusing the fixture above."""
+    creator = make_creator(session, "alice")
+    creator.PasswordHash = "existing-hash"
+    creator.Password = b"\x00" * 32  # legacy pbkdf2 hash, still live
+    session.commit()
+
+    result = CliRunner().invoke(
+        set_password_cmd, ["--user", "alice", "--password", "new-pw"]
+    )
+    assert result.exit_code == 0, result.output
+
+    stored = session.scalars(
+        select(Creator).where(Creator.CreatorName == "alice")
+    ).one()
+    assert stored.Password is None
+
+
 def test_set_password_refuses_an_empty_password(session, stub_database):
     """`--password ""` is the only route to an empty value -- an empty entry at
     the interactive prompt makes Click re-prompt -- and it is exactly how the

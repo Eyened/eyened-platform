@@ -480,6 +480,13 @@ def set_password(session: Session, *, username: str, password: str) -> None:
     """
     creator = resolve_creator(session, username)
     creator.PasswordHash = hash_password(password)
+    # check_login falls through to this legacy pbkdf2 column when PasswordHash
+    # misses. Leaving it set would let the password this command is resetting
+    # away from keep authenticating -- a reset that doesn't reset. Do not
+    # "simplify" this away: on a row with no legacy hash it is a no-op, but on
+    # one that still carries it, it is the only line that actually revokes the
+    # old credential.
+    creator.Password = None
     session.flush()
     audit_trusted(
         session,
