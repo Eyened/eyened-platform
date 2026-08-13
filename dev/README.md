@@ -30,9 +30,13 @@
 
 ### OIDC login (optional)
 
-The base stack runs without OIDC. To test the OIDC login flow, either point the
-`EYENED_OIDC_*` values in `.env` at a real provider, or spin up the bundled local
-Keycloak — see [keycloak/README.md](./keycloak/README.md).
+The base stack runs without OIDC. To test the OIDC login flow, point the
+`EYENED_OIDC_*` values in `.env` at a real provider.
+
+The bundled local Keycloak is no longer available from this stack: it moved to
+the unified `deploy/` stack, where it runs behind the `oidc` profile — see
+[../deploy/keycloak/README.md](../deploy/keycloak/README.md). There is no
+override to layer on here any more.
 
 ## 3. Populate the Database [Optional]
 To copy over data (for example from a production environment), run this:

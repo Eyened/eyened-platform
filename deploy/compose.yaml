@@ -145,6 +145,27 @@ services:
       EYENED_OIDC_METADATA_URL: http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}/realms/eyened-dev/.well-known/openid-configuration
       EYENED_OIDC_REDIRECT_URL: ${PUBLIC_URL:-http://${PUBLIC_HOST:-localhost}:${HTTP_PORT:-8080}}/users/oidc-callback
       EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS: iss=http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}/realms/eyened-dev
+      # The switch the three URLs above are inert without. Unlike them these
+      # carry no derivation — they are the operator's own values — and they
+      # must be named HERE: `server` has no env_file (see the note above this
+      # block), and compose reads .env for INTERPOLATION only, so a name that
+      # exists only in .env reaches no container. Without these five lines the
+      # oidc profile starts a working Keycloak behind a switch wired to
+      # nothing, and nothing is logged to say so.
+      EYENED_API_AUTH_OIDC_ENABLED: ${EYENED_API_AUTH_OIDC_ENABLED:-false}
+      EYENED_OIDC_CLIENT_ID: ${EYENED_OIDC_CLIENT_ID:-}
+      EYENED_OIDC_CLIENT_SECRET: ${EYENED_OIDC_CLIENT_SECRET:-}
+      # NOT `:-`, and do not "tidy" it to match the four around it: `X: ${X:-}`
+      # sets X to the EMPTY STRING in the container, it does not leave X unset,
+      # and an empty string overrides a pydantic default. That is harmless for
+      # the two above (server/config.py defaults both to "") and for the two
+      # booleans, but provider_name defaults to "OpenID Connect" and
+      # /auth/options hands it straight to the login page — so `:-` would blank
+      # the provider label on every stack that never set it. Restating the
+      # default here is the same convention EYENED_API_PUBLIC_AUTH_DISABLED and
+      # EYENED_API_DEBUG already follow.
+      EYENED_OIDC_PROVIDER_NAME: "${EYENED_OIDC_PROVIDER_NAME:-OpenID Connect}"
+      EYENED_OIDC_CREATE_NEW_ACCOUNTS: ${EYENED_OIDC_CREATE_NEW_ACCOUNTS:-false}
     volumes:
       # Unset PLATFORM_STORAGE_PATH -> the named volume below (a clean clone
       # writes nothing outside its own stack). Set to an absolute host path ->
@@ -212,6 +233,67 @@ services:
     # layer is in play — the dev override or compose.prod.yaml. The base alone
     # serves the API and thumbnails but has no frontend route, which is fine:
     # it is never run without a layer.
+
+  # Development/testing OIDC provider. Off by default: add 'oidc' to
+  # COMPOSE_PROFILES to enable. The realm template is a dev realm — this is
+  # not a production identity provider.
+  keycloak:
+    profiles: ["oidc"]
+    image: quay.io/keycloak/keycloak:26.0
+    # Every other service in THIS file carries both, and the header comment
+    # says logs are capped everywhere — a service here that omits them is an
+    # uncapped json-file log on a shared host. Anchors reach it because it is
+    # defined in the same file that declares them.
+    logging: *default-logging
+    restart: *default-restart
+    # No `env_file: .env` — every variable Keycloak needs is listed below, and
+    # the file also holds the MySQL root password and the API signing key.
+    #
+    # No `depends_on: keycloak` on the server either, and do not add one: the
+    # server carries no profile, and on compose >= 2.26 a depends_on pointing
+    # at a profile-disabled service is a hard error — it would break the
+    # DEFAULT stack for everyone not running OIDC. The server discovers the
+    # provider lazily over HTTP, so start order does not matter here.
+    entrypoint: ["/bin/bash", "/opt/keycloak/entrypoint.sh"]
+    environment:
+      # Hostname v2 (the default since Keycloak 25): ONE absolute URL, and no
+      # hostname-port / hostname-strict-https — those are v1 options. Keycloak
+      # 26.0.8 does not abort on them, it logs an ERROR at every startup and
+      # ignores them, which is worse. The old value here was a BARE hostname,
+      # and v2 takes scheme and port from the request for one of those: probed
+      # with `Host: elsewhere.example:9999`, KC_HOSTNAME_PORT was inert and the
+      # issuer's PORT came from the request (the host stayed pinned — only the
+      # port moved). An absolute URL pins all of it. It has to be pinned,
+      # because EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS above compares against
+      # the issuer by exact string, so a port that follows the Host header
+      # fails token validation with nothing in the log to say why.
+      #
+      # KC_HOSTNAME_STRICT was dropped too, and that is deliberate. Note it is
+      # NOT a v1 option — it survives into v2, which is why it is missing from
+      # the ERROR above — it is simply inert next to an absolute hostname, and
+      # Keycloak says so itself at every boot: "If hostanme is specified,
+      # hostname-strict is effectively ignored" (its typo). Re-adding "false"
+      # therefore changes nothing WHILE this line stands; it only matters if
+      # KC_HOSTNAME is ever removed, and then it is what re-enables the
+      # request-header inference this line exists to prevent.
+      KC_HOSTNAME: http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}
+      # KC_BOOTSTRAP_ADMIN_*, not KEYCLOAK_ADMIN/KEYCLOAK_ADMIN_PASSWORD: the
+      # old pair still works in 26 but logs KC-SERVICES0110 deprecation
+      # warnings, and this is a first-boot bootstrap credential either way.
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Read by entrypoint.sh INSIDE the container, not by compose. Dropping
+      # `env_file: .env` (above) is what makes listing them here mandatory:
+      # entrypoint.sh runs `set -u` with `${PUBLIC_HOST:?}`, so if these are
+      # absent it exits before kc.sh and the profile silently starts nothing.
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+      HTTP_PORT: ${HTTP_PORT:-8080}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+    ports:
+      - "${KEYCLOAK_PORT:-8180}:8080"
+    volumes:
+      - ./keycloak/entrypoint.sh:/opt/keycloak/entrypoint.sh:ro
+      - ./keycloak/realm-eyened-dev.json.template:/opt/keycloak/import-template/realm-eyened-dev.json:ro
 
 volumes:
   db_data:
