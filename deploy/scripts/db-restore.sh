@@ -33,6 +33,22 @@ esac
 cid=$(compose ps -a -q database || true)
 [ -n "$cid" ] || die "error: this stack has no 'database' container to restore into."
 
+# `-a` can also match more than one id: a leftover `docker compose run
+# database ...` one-off container is included alongside the real service
+# container. Left unguarded, the `docker inspect` calls below would fail on
+# whichever id happens to come first with a raw "No such object" instead of
+# a `die` naming the actual problem.
+case "$(printf '%s\n' "$cid" | wc -l)" in
+    1) ;;
+    *) die "error: found more than one 'database' container:
+$cid
+      This is usually a leftover 'docker compose run database ...' one-off
+      alongside the real service container.
+      Fix: remove the extra one, e.g. '(cd deploy && $COMPOSE_BIN rm -f
+      <container-id>)', so exactly one 'database' container remains, then
+      re-run make db-restore." ;;
+esac
+
 # A durable deployment sets DB_DATA_PATH (see compose.yaml), which makes
 # /var/lib/mysql a bind mount, not a named volume — `.Name` is empty for
 # those. Resolve `.Type` first, then pull the right identifier: `.Name` for
@@ -83,33 +99,53 @@ case "$answer" in y|Y|yes|YES) ;; *) die "cancelled." ;; esac
 # idempotent (guarded by $restarted) because the re-raise can also trigger
 # the EXIT trap.
 #
-# $wipe_started tracks a narrower, worse state than "interrupted": whether
-# the destructive `rm -rf ... && tar xzf ...` step below has STARTED but not
-# COMPLETED. In that state the datadir holds neither the old contents (wiped)
-# nor the new ones (extraction unfinished) — silently running `compose start
-# database` on it, the way the ordinary interrupted-before-the-wipe case
-# does, would bring MySQL up on a half-written datadir while telling the
-# operator "restarting the database" as if that were a recovery. It is not:
-# cleanup below leaves the database STOPPED in that specific case and says so
-# loudly, rather than start mysqld on files it cannot know are consistent.
+# $wipe_started used to be a HOST-side flag, set immediately before the
+# `docker run` below and cleared immediately after, and cleanup() read it to
+# decide whether the datadir is INCONSISTENT. That tracked the host's INTENT
+# to run the wipe, not whether the wipe actually happened: a `docker run`
+# that fails before touching anything — an unavailable image is the
+# realistic case, since this is exactly the script that runs on a fresh DR
+# host and nothing else in the stack pulls `alpine` — still set the flag, so
+# cleanup() reported "INCONSISTENT... previous contents were removed"
+# against a datadir that was never touched (measured directly). The same gap
+# existed at the other end: a signal landing after a fully successful
+# `docker run` returns, but before the host's next statement cleared the
+# flag, reported the same false INCONSISTENT message against a fully
+# restored datadir.
+#
+# Fixed by moving the source of truth INSIDE the container instead of
+# tracking host-side timing at all. $sentinel_dir is a host-owned scratch
+# directory bind-mounted at /state; the container itself touches
+# /state/wiping immediately before `rm -rf` and removes it immediately after
+# `tar xzf` succeeds. cleanup() below tests for that file's presence. A
+# `docker run` that never got far enough to run `touch` leaves no file
+# (correctly read as untouched); a `docker run` that finished the whole `&&`
+# chain has already removed it before control returns to the host, so there
+# is no timing window left in which a signal can land between "the work
+# finished" and "the host notices" — the file's state on disk IS the
+# datadir's state, not a proxy the host has to keep in sync by hand.
 restarted=0
-wipe_started=0
+sentinel_dir="${TMPDIR:-/tmp}/db-restore-state.$$"
+mkdir "$sentinel_dir" || die "error: could not create a temp directory at
+      $sentinel_dir to track restore progress.
+      Fix: check that ${TMPDIR:-/tmp} exists and is writable."
 cleanup() {
     if [ "$restarted" -eq 0 ]; then
         restarted=1
-        if [ "$wipe_started" -eq 1 ]; then
+        if [ -e "$sentinel_dir/wiping" ]; then
             printf '%s\n' "==> interrupted mid-restore: the datadir for $mount_desc is now
       INCONSISTENT — the previous contents were removed and the archive was
       only partially extracted. The database has been left STOPPED on
       purpose: starting MySQL on a half-written datadir risks it coming up
       on corrupt files instead of failing loudly.
-      Fix: re-run 'db-restore.sh $name' to finish the restore before using
-      this database again." >&2
+      Fix: re-run 'make db-restore NAME=$name' to finish the restore before
+      using this database again." >&2
         else
             echo "==> interrupted or failed: restarting the database" >&2
             compose start database || echo "error: could not restart the database — start it by hand: (cd deploy && $COMPOSE_BIN start database)" >&2
         fi
     fi
+    rm -rf "$sentinel_dir" 2>/dev/null
 }
 trap cleanup EXIT
 trap 'cleanup; trap - INT; kill -INT $$' INT
@@ -119,15 +155,15 @@ trap 'cleanup; trap - HUP; kill -HUP $$' HUP
 echo "==> stopping the database"
 compose stop database
 
-wipe_started=1
 docker run --rm \
     -v "$mount_src:/data" \
     -v "$DEPLOY_DIR/snapshots:/in:ro" \
-    alpine sh -c "rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null; tar xzf /in/$name.tgz -C /data"
-wipe_started=0
+    -v "$sentinel_dir:/state" \
+    alpine sh -c "touch /state/wiping; rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null; tar xzf /in/$name.tgz -C /data && rm -f /state/wiping"
 
 echo "==> starting the database"
 compose start database
 restarted=1
 trap - EXIT INT TERM HUP
+rm -rf "$sentinel_dir" 2>/dev/null
 echo "restored from $archive"
