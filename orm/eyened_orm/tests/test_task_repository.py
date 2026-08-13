@@ -95,6 +95,12 @@ def _make_image(session, public_id: str) -> "int":
 
     Returns the new ImageInstanceID. Mirrors the smallest row set that
     satisfies ImageInstance's NOT NULL FKs under PRAGMA foreign_keys=ON.
+
+    Plus one ``ImageStorage`` on its own ``StorageBackend``: those are not FK
+    requirements, they are the last two legs of ``_SUBTASK_IMAGE_LOADER``, and
+    the eager-load tests below cannot observe a leg with no row at the end of
+    it. Keys are derived from ``public_id`` so two images in one test do not
+    collide.
     """
     import datetime
 
@@ -102,9 +108,11 @@ def _make_image(session, public_id: str) -> "int":
         DeviceInstance,
         DeviceModel,
         ImageInstance,
+        ImageStorage,
         Patient,
         Project,
         Series,
+        StorageBackend,
         Study,
     )
     from eyened_orm.project import ExternalEnum
@@ -134,6 +142,19 @@ def _make_image(session, public_id: str) -> "int":
         DatasetIdentifier="ds",
     )
     session.add(image)
+    session.flush()
+    backend = StorageBackend(Key=f"backend-{public_id}", Kind="local")
+    session.add(backend)
+    session.flush()
+    session.add(
+        ImageStorage(
+            ImageInstanceID=image.ImageInstanceID,
+            StorageBackendID=backend.StorageBackendID,
+            ObjectKey=f"obj-{public_id}",
+            Format="png",
+            IsPrimary=True,
+        )
+    )
     session.flush()
     return image.ImageInstanceID
 
@@ -232,9 +253,29 @@ def test_list_for_task_with_images_loads_links(session):
     to tell an eager load from a lazy one: an attached row lazy-loads on demand
     and looks identical. Detaching reproduces the production failure -- the
     request session closes before subtask DTO conversion finishes walking
-    SubTaskImageLinks -> ImageInstance per row -- so dropping the loader raises
-    DetachedInstanceError here instead of silently issuing ~4 queries per
-    subtask.
+    SubTaskImageLinks -> ImageInstance -> ImageStorages -> StorageBackend per
+    row -- so dropping the loader raises DetachedInstanceError here instead of
+    silently issuing ~4 queries per subtask.
+
+    Walked to the **end** of that chain, not to its second leg. Asserting only
+    ``link.ImageInstance.PublicID`` stopped two legs short of what DTO
+    conversion actually walks, so nothing here observed whether the deeper ones
+    resolve at all.
+
+    What that covers, precisely, because it is not what it looks like: dropping
+    the last two legs from ``_SUBTASK_IMAGE_LOADER`` alone is **not** a
+    degradation and this test correctly stays green for it. ``ImageStorages``
+    and ``ImageStorage.StorageBackend`` are ``lazy="selectin"`` on the mappers,
+    so they load either way -- measured at 14 statements and **zero** lazy
+    loads during a full attached walk, with and without those legs. The legs
+    are redundant belt-and-braces, and a test made to fail on their removal
+    would be pinning a spelling rather than a behaviour.
+
+    What this does pin is the behaviour: the chain is available on a detached
+    row, whichever declaration provides it. It goes red when that stops being
+    true from either direction -- truncating the loader *and* taking
+    ``lazy="selectin"`` off either mapper raises ``DetachedInstanceError`` on
+    exactly the leg that lost its loader.
     """
     task_id, _ = _seed_subtask_with_one_image(session)
 
@@ -247,12 +288,18 @@ def test_list_for_task_with_images_loads_links(session):
     assert [link.ImageInstance.PublicID for link in rows[0].SubTaskImageLinks] == [
         "pub-1"
     ]
+    assert [
+        storage.StorageBackend.Key
+        for link in rows[0].SubTaskImageLinks
+        for storage in link.ImageInstance.ImageStorages
+    ] == ["backend-pub-1"]
 
 
 def test_get_with_images_loads_link_chain(session):
     """get_with_images returns the subtask with its image links eager-loaded.
 
-    Detached read, for the reason given on the sibling test above.
+    Detached read, and walked to the end of the four-leg chain, for the two
+    reasons given on the sibling test above.
     """
     _, subtask_id = _seed_subtask_with_one_image(session)
 
@@ -261,6 +308,11 @@ def test_get_with_images_loads_link_chain(session):
     session.expunge_all()
 
     assert [link.ImageInstance.PublicID for link in loaded.SubTaskImageLinks] == ["pub-1"]
+    assert [
+        storage.StorageBackend.Key
+        for link in loaded.SubTaskImageLinks
+        for storage in link.ImageInstance.ImageStorages
+    ] == ["backend-pub-1"]
 
 
 def test_resolve_image_instance_id_found_and_missing(session):

@@ -165,6 +165,15 @@ class TaskRepository:
 
 # Eager-load the subtask's images down to their storage backend (mirrors the
 # route's former with_images option chain).
+#
+# The last two legs are redundant and deliberately kept: ImageInstance.
+# ImageStorages and ImageStorage.StorageBackend are lazy="selectin" on the
+# mappers, so removing them here changes nothing (measured: identical statement
+# count, zero lazy loads on a detached walk). They stay because this chain is
+# the contract subtask DTO conversion depends on and the mapper defaults are
+# not this module's to rely on. What guards the chain is the detached walk in
+# test_task_repository.py, which covers it whichever declaration provides it --
+# not the presence of these two lines.
 _SUBTASK_IMAGE_LOADER = (
     selectinload(SubTask.SubTaskImageLinks)
     .selectinload(SubTaskImageLink.ImageInstance)
