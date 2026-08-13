@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -23,6 +23,9 @@ from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
 from .exceptions import BadRequestError, NotFoundError
+
+if TYPE_CHECKING:
+    from eyened_orm import ImageInstance
 
 
 _FIELD_MAP = {
@@ -55,7 +58,7 @@ class FormAnnotationService:
         self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
-    def _resolve_image_instance(self, image_id: str | None) -> Any | None:
+    def _resolve_image_instance(self, image_id: str | None) -> ImageInstance | None:
         """Map a PublicID to its ImageInstance (None passes through).
 
         Returns the row rather than its id so the write paths can assign the
