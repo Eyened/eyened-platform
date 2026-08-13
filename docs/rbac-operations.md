@@ -92,10 +92,37 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
 | `eorm revoke --user U --project P` | Remove a membership |
 | `eorm grant-for-task --user U --task N [--task M] --role R` | Grant every project the tasks touch, after review |
 | `eorm grant-all` | Cutover step 3 |
-| `eorm deactivate --user U` / `eorm reactivate --user U` | Revoke everything / restore it; memberships are kept |
+| `eorm deactivate --user U` / `eorm reactivate --user U` | Revoke every project; memberships are kept. Not an absolute lockout -- see the accepted risks |
 
 ## Accepted risks
 
+- **`grant-all` grants every project to self-registered accounts.**
+  `POST /auth/register` needs no authentication, and grant-all's population
+  filter is `IsHuman AND NOT Inactive AND PasswordHash IS NOT NULL` -- which a
+  self-registered row matches exactly. Anyone who registers before cutover
+  receives `grader` in all 44 projects. Accepted by decision on 2026-08-13; no
+  code change. **Step 4 of the cutover is the mitigation, so review the grant
+  for accounts nobody recognises** -- not just the totals. The confirmation
+  prompt shows a count and nothing else, so it will not tell you that one of
+  the creators is a stranger.
+- **Deactivation revokes access, it does not black out the account.** A
+  deactivated user cannot log in, cannot refresh a token, and cannot change
+  their password; `get_access_scope` refuses them with a 401, so every route
+  that reads or writes project data is closed to them on the next request even
+  with a valid token. What still answers is `GET /auth/me`, for an unexpired
+  access token they already hold -- it resolves the token without re-reading
+  `Inactive`. It returns their own account details and nothing else, and the
+  token expires on its own schedule. If you need the account shut immediately
+  rather than on expiry, deactivation is not the tool.
+- **Deactivation is not absolute against OIDC.** A deactivated password-only
+  account has `EmployeeIdentifier = NULL`, and the OIDC existing-account lookup
+  matches on that column, so such an account is invisible to it. With
+  `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` the same human can sign in through the
+  IdP under a different username and receive a **new, active** account. Three
+  things bound it: the setting defaults to `False`; an exact username match is
+  refused with 409 rather than linked; and the new account holds no
+  memberships, so it reaches no project data until someone grants it. Verified
+  by execution.
 - **Objects touching no projects are unrestricted.** 3 tasks and 230 subtasks
   hold no images today, and every task is empty between creation and its first
   image. Any authenticated user can see, modify and delete them. Accepted in
