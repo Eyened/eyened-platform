@@ -6,9 +6,20 @@
 # the old docker/ stack carried. The artifact lives in the image, so rolling
 # back to a previous tag rolls back the frontend with it.
 FROM node:24-slim AS build
-COPY client /app/client
 WORKDIR /app/client
-RUN npm ci && npm run build
+
+# Manifests before source, so a frontend edit re-runs only `npm run build` and
+# not the ~59s `npm ci`. The source COPY below cannot clobber the installed
+# tree: .dockerignore excludes **/node_modules, so the host's copy never
+# enters the build context.
+#
+# Plain `npm ci` — NOT `npm ci --only=production`. vite and svelte are
+# devDependencies, and this stage runs `npm run build`.
+COPY client/package.json client/package-lock.json ./
+RUN npm ci
+
+COPY client /app/client
+RUN npm run build
 
 FROM nginx:1.27-alpine
 COPY --from=build /app/client/build /usr/share/nginx/html
