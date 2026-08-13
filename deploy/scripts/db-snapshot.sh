@@ -5,7 +5,7 @@
 # half-applied migration cannot be reliably undone with `alembic downgrade`.
 # This is the safety net for `make migrate`.
 #
-# Usage: db-snapshot.sh <name>
+# Usage: make db-snapshot NAME=<name>
 set -eu
 
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -40,7 +40,8 @@ esac
 # db-restore.sh, those are NOT safe to snapshot here: a `created` container
 # has no data yet, and a stopped one may hold a datadir an interrupted
 # restore left inconsistent on purpose. Measured: with `-a`, a `created`
-# container DOES resolve to something (an 85-byte tarball of nothing, which
+# container DOES resolve to something (a tarball of nothing — under 100
+# bytes; gzip stores an mtime, so the exact size moves run to run — which
 # this script would call a successful snapshot) — the RUNNING-state check
 # below, not `-a` itself, is what keeps this script from acting on it.
 cid=$(compose ps -a -q database || true)
@@ -55,7 +56,7 @@ cid=$(compose ps -a -q database || true)
 # container. Left unguarded, the `docker inspect` calls below would fail on
 # whichever id happens to come first with a raw "No such object" instead of
 # a `die` naming the actual problem.
-case "$(printf '%s\n' "$cid" | wc -l)" in
+case "$(printf '%s\n' "$cid" | wc -l | tr -d ' ')" in
     1) ;;
     *) die "error: found more than one 'database' container:
 $cid

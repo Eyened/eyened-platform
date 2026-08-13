@@ -1,7 +1,7 @@
 #!/bin/sh
 # Restore a snapshot written by db-snapshot.sh, replacing the data volume.
 #
-# Usage: db-restore.sh <name>
+# Usage: make db-restore NAME=<name>
 set -eu
 
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -38,7 +38,7 @@ cid=$(compose ps -a -q database || true)
 # container. Left unguarded, the `docker inspect` calls below would fail on
 # whichever id happens to come first with a raw "No such object" instead of
 # a `die` naming the actual problem.
-case "$(printf '%s\n' "$cid" | wc -l)" in
+case "$(printf '%s\n' "$cid" | wc -l | tr -d ' ')" in
     1) ;;
     *) die "error: found more than one 'database' container:
 $cid
