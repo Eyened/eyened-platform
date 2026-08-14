@@ -39,9 +39,11 @@ from .selects import (
 class SearchRepository:
     """Query construction and execution for instance and study search."""
 
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
     def search_instances(
         self,
-        session: Session,
         *,
         conditions: List[ResolvedCondition],
         attr_conditions: List[AttributeConditionSpec],
@@ -61,7 +63,7 @@ class SearchRepository:
             conditions, attr_conditions, attr_defs, order_by, order
         )
         return list(
-            session.execute(
+            self._session.execute(
                 stmt.options(*instance_options()).limit(limit).offset(offset)
             )
             .scalars()
@@ -70,7 +72,6 @@ class SearchRepository:
 
     def count_instances(
         self,
-        session: Session,
         *,
         conditions: List[ResolvedCondition],
         attr_conditions: List[AttributeConditionSpec],
@@ -78,12 +79,12 @@ class SearchRepository:
     ) -> int:
         """Count instances matching the same predicate ``search_instances`` applies."""
         stmt = instance_filtered_select(conditions, attr_conditions, attr_defs)
-        return session.execute(
+        return self._session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
 
     def resolve_attribute_definitions(
-        self, session: Session, specs: List[AttributeConditionSpec]
+        self, specs: List[AttributeConditionSpec]
     ) -> dict[tuple[str | None, str, str | None], AttributeDefinition]:
         """Resolve attribute specs to their definitions, keyed by (model, attr, feature).
 
@@ -92,11 +93,10 @@ class SearchRepository:
         dropping the filter. Data access only; the HTTP-status policy stays upstream.
         """
         keys = [(s.model, s.attribute, s.feature) for s in specs]
-        return _resolve_attribute_definitions(session, keys)
+        return _resolve_attribute_definitions(self._session, keys)
 
     def search_studies(
         self,
-        session: Session,
         *,
         conditions: List[ResolvedCondition],
         order_by: Any,
@@ -107,7 +107,7 @@ class SearchRepository:
         """Return studies matching the conditions, ordered and windowed."""
         stmt = build_study_select(conditions, order_by, order)
         return list(
-            session.execute(
+            self._session.execute(
                 stmt.options(*study_options()).limit(limit).offset(offset)
             )
             .scalars()
@@ -116,30 +116,29 @@ class SearchRepository:
 
     def count_studies(
         self,
-        session: Session,
         *,
         conditions: List[ResolvedCondition],
     ) -> int:
         """Count studies matching the same predicate ``search_studies`` applies."""
         stmt = study_filtered_select(conditions)
-        return session.execute(
+        return self._session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
 
-    def tag_names(self, session: Session, link_table: Any) -> List[str]:
+    def tag_names(self, link_table: Any) -> List[str]:
         """Distinct tag names reachable through the given tag link table, sorted."""
         return sorted(
-            session.scalars(
+            self._session.scalars(
                 select(Tag.TagName)
                 .join(link_table, link_table.TagID == Tag.TagID)
                 .distinct()
             ).all()
         )
 
-    def active_form_creator_names(self, session: Session) -> List[str]:
+    def active_form_creator_names(self) -> List[str]:
         """Names of creators with at least one active form annotation, sorted."""
         return sorted(
-            session.scalars(
+            self._session.scalars(
                 select(Creator.CreatorName)
                 .join(FormAnnotation, FormAnnotation.CreatorID == Creator.CreatorID)
                 .where(~FormAnnotation.Inactive)
@@ -148,7 +147,7 @@ class SearchRepository:
         )
 
     def attribute_signature_rows(
-        self, session: Session
+        self,
     ) -> List[Tuple[str, AttributeDataType, Optional[str]]]:
         """(AttributeName, AttributeDataType, ModelName) for every non-JSON attribute.
 
@@ -173,9 +172,9 @@ class SearchRepository:
             .where(AttributeDefinition.AttributeDataType != AttributeDataType.JSON)
             .distinct()
         )
-        return [tuple(row) for row in session.execute(stmt).all()]
+        return [tuple(row) for row in self._session.execute(stmt).all()]
 
-    def studies_by_ids(self, session: Session, study_ids: List[int]) -> List[Study]:
+    def studies_by_ids(self, study_ids: List[int]) -> List[Study]:
         """Return the given studies with their active instances eager-loaded.
 
         Unordered -- the caller owns the ordering, which on the instances surface
@@ -188,11 +187,9 @@ class SearchRepository:
             .where(Study.StudyID.in_(study_ids))
             .options(*study_options())
         )
-        return list(session.execute(stmt).scalars().all())
+        return list(self._session.execute(stmt).scalars().all())
 
-    def instances_for_studies(
-        self, session: Session, study_ids: List[int]
-    ) -> List[ImageInstance]:
+    def instances_for_studies(self, study_ids: List[int]) -> List[ImageInstance]:
         """Return the active instances of the given studies (empty list for no ids)."""
         if not study_ids:
             return []
@@ -204,4 +201,12 @@ class SearchRepository:
             .options(*instance_options())
             .distinct()
         )
-        return list(session.execute(stmt).scalars().all())
+        return list(self._session.execute(stmt).scalars().all())
+
+    def column_values(self, model: Any, column: Any, *, where: Any = None) -> List[Any]:
+        """Distinct values of a column on ``model`` (thin wrapper over ``Model.query_column``).
+
+        Lets the service enumerate a reference column (e.g. ``Creator.CreatorName``)
+        without touching a ``Session`` directly.
+        """
+        return model.query_column(self._session, column, where=where)

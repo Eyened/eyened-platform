@@ -9,15 +9,31 @@ export type ClientConfigLayout = {
     prepend: QuickFormPanelConfig[];
 };
 
+/** Viewer point-tool marker appearance (Form / Registration; ETDRS hardcodes its own). */
+export type PointMarkerStyle = "circle" | "cross" | "rect";
+
+export type PointMarkerConfig = {
+    style: PointMarkerStyle;
+    radius: number;
+    /** CSS color for marker stroke/fill (e.g. "rgba(0, 255, 0, 1)"). */
+    color: string;
+};
+
 export type ClientConfig = {
     form_schema_name?: string;
     update_subtask_image_links: boolean;
     layout: ClientConfigLayout;
+    point_marker: PointMarkerConfig;
 };
 
 export const CLIENT_DEFAULTS: ClientConfig = {
     update_subtask_image_links: false,
     layout: { hide: [], prepend: [] },
+    point_marker: {
+        style: "cross",
+        radius: 16,
+        color: "rgba(0, 255, 0, 1)",
+    },
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -33,6 +49,10 @@ function isQuickFormPanel(value: unknown): value is QuickFormPanelConfig {
     );
 }
 
+function isPointMarkerStyle(value: unknown): value is PointMarkerStyle {
+    return value === "circle" || value === "cross" || value === "rect";
+}
+
 export function mergeClientConfig(
     defaults: ClientConfig,
     override: unknown,
@@ -44,6 +64,7 @@ export function mergeClientConfig(
                 hide: [...defaults.layout.hide],
                 prepend: [...defaults.layout.prepend],
             },
+            point_marker: { ...defaults.point_marker },
         };
     }
 
@@ -53,6 +74,7 @@ export function mergeClientConfig(
             hide: [...defaults.layout.hide],
             prepend: [...defaults.layout.prepend],
         },
+        point_marker: { ...defaults.point_marker },
     };
 
     if (typeof override.form_schema_name === "string") {
@@ -71,6 +93,23 @@ export function mergeClientConfig(
         }
         if (Array.isArray(layout.prepend)) {
             next.layout.prepend = layout.prepend.filter(isQuickFormPanel);
+        }
+    }
+
+    if (isRecord(override.point_marker)) {
+        const pm = override.point_marker;
+        if (isPointMarkerStyle(pm.style)) {
+            next.point_marker.style = pm.style;
+        }
+        if (
+            typeof pm.radius === "number" &&
+            Number.isFinite(pm.radius) &&
+            pm.radius > 0
+        ) {
+            next.point_marker.radius = pm.radius;
+        }
+        if (typeof pm.color === "string" && pm.color.length > 0) {
+            next.point_marker.color = pm.color;
         }
     }
 

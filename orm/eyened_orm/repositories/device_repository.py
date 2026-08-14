@@ -9,10 +9,13 @@ from eyened_orm import DeviceModel
 class DeviceRepository:
     """Data access for DeviceModel rows."""
 
-    def list_all(self, session: Session) -> list[DeviceModel]:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def list_all(self) -> list[DeviceModel]:
         """Return all device models, ordered by manufacturer then model name."""
         return list(
-            session.scalars(
+            self._session.scalars(
                 select(DeviceModel).order_by(
                     DeviceModel.Manufacturer.asc(),
                     DeviceModel.ManufacturerModelName.asc(),

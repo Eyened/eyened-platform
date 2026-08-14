@@ -1,7 +1,8 @@
+import { formAnnotations } from "$lib/data";
 import type { Registration } from "$lib/registration/registration";
 import type { Position, Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
-import type { ViewerContext } from "../viewerContext.svelte";
+import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
 
 const [C, I, O] = [1, 3, 6];
 const additionalCircles: Record<string, number> = {
@@ -20,6 +21,12 @@ export type etdrsGridType = {
         disc_edge: { x: number; y: number };
     };
 };
+
+/** Live FormAnnotation from the store, or a static snapshot (e.g. AI auto grid). */
+export type ETDRSGridSource =
+    | { kind: "annotation"; id: number }
+    | { kind: "snapshot"; data: etdrsGridType };
+
 export class ETDRSGridItemOverlay implements Overlay {
     lineWidth = 1;
     strokeStyle = "rgba(255,255,255, 1)";
@@ -27,10 +34,42 @@ export class ETDRSGridItemOverlay implements Overlay {
     cursorCircle: string | undefined = undefined;
 
     constructor(
-        private readonly annotation: etdrsGridType,
+        private readonly source: ETDRSGridSource,
         private readonly registration: Registration,
         private readonly settings: { radiusFraction: number },
     ) {}
+
+    /** Back-compat: FormAnnotation-like or etdrsGridType snapshot. */
+    static fromAnnotationLike(
+        annotation: etdrsGridType & { id?: number },
+        registration: Registration,
+        settings: { radiusFraction: number },
+    ) {
+        if (typeof annotation.id === "number") {
+            return new ETDRSGridItemOverlay(
+                { kind: "annotation", id: annotation.id },
+                registration,
+                settings,
+            );
+        }
+        return new ETDRSGridItemOverlay(
+            { kind: "snapshot", data: annotation },
+            registration,
+            settings,
+        );
+    }
+
+    private resolveGrid(): etdrsGridType | undefined {
+        if (this.source.kind === "snapshot") {
+            return this.source.data;
+        }
+        const annotation = formAnnotations.get(this.source.id);
+        if (!annotation?.form_data) return undefined;
+        return {
+            image_id: String(annotation.image_id ?? ""),
+            form_data: annotation.form_data as etdrsGridType["form_data"],
+        };
+    }
 
     keydown(keyEvent: ViewerEvent<KeyboardEvent>) {
         const { event } = keyEvent;
@@ -50,28 +89,42 @@ export class ETDRSGridItemOverlay implements Overlay {
 
     repaint(viewerContext: ViewerContext) {
         const { image, context2D } = viewerContext;
+        const resolved = this.resolveGrid();
+        if (!resolved) return;
 
-        const f = this.annotation.form_data?.fovea;
-        const d = this.annotation.form_data?.disc_edge;
-        let srcId = String(this.annotation.image_id);
-        // ETDRS landmarks are 2D enface coords; avoid OCTToProj remapping index → y
-        if (image.image_id.endsWith("_proj") && !srcId.endsWith("_proj")) {
-            srcId = `${srcId}_proj`;
-        }
-
+        const f = resolved.form_data?.fovea;
+        const d = resolved.form_data?.disc_edge;
         if (!f || !d) return;
 
+        const srcId = this.enfaceSourceId(String(resolved.image_id));
         const fovea = this.registration.mapPosition(srcId, image.image_id, {
-            ...f,
+            x: f.x,
+            y: f.y,
             index: 0,
         } as Position);
         const discEdge = this.registration.mapPosition(srcId, image.image_id, {
-            ...d,
+            x: d.x,
+            y: d.y,
             index: 0,
         } as Position);
         if (!fovea || !discEdge) return;
 
         this.paint(context2D, viewerContext, fovea, discEdge);
+    }
+
+    /**
+     * ETDRS landmarks are always enface 2D `(x, y)`.
+     * For OCT volumes the enface plane is `${id}_proj` — use that node so we
+     * never go through OCTToProj (which remaps `index → y` and drops enface y).
+     * Plain CF PublicIDs have no proj edge and stay as-is (do *not* append `_proj`).
+     */
+    private enfaceSourceId(annotationImageId: string): string {
+        if (annotationImageId.endsWith("_proj")) return annotationImageId;
+        const projId = `${annotationImageId}_proj`;
+        if (this.registration.getRegistrationItem(annotationImageId, projId)) {
+            return projId;
+        }
+        return annotationImageId;
     }
 
     private paint(
@@ -178,9 +231,7 @@ export class ETDRSGridItemOverlay implements Overlay {
                 2 * Math.PI,
             );
             ctx.stroke();
-            viewerContext.cursorStyle = "none";
-        } else {
-            viewerContext.cursorStyle = "default";
+            viewerContext.claimCursor("none", CursorPriority.Hide);
         }
     }
 }

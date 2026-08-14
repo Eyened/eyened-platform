@@ -1,7 +1,7 @@
 """Condition carriers and SQLAlchemy-expression construction for search.
 
-The two frozen dataclasses are the repository's typed public boundary (spec fix
-#5): callers hand in ``ResolvedCondition`` (variable already resolved to an ORM
+The two frozen dataclasses are the repository's typed public boundary:
+callers hand in ``ResolvedCondition`` (variable already resolved to an ORM
 attribute) and ``AttributeConditionSpec`` (attribute still addressed by name,
 resolved against the DB inside the repository). The expression helpers below
 (``format_condition``, ``and_expr``, the attribute value coercion, ``entity_of``,

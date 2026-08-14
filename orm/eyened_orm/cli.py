@@ -165,6 +165,7 @@ def create_user(username: str, password: str, is_human: bool, description: str |
                 is_human=is_human,
                 description=description,
             )
+            session.commit()
             print(f"User created successfully")
         except ValueError as e:
             print(f"Error creating user: {e}")

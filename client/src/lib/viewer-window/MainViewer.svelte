@@ -17,6 +17,8 @@
     import { FeaturePipetteOverlay } from "./panelSegmentation/FeaturePipetteOverlay";
     import { resolvePanels } from "./resolvePanels";
     import { CLIENT_DEFAULTS, mergeClientConfig } from "./taskConfigLayout";
+    import { pointArming } from "$lib/forms/pointArming.svelte";
+    import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
     interface Props {
         image: AbstractImage;
     }
@@ -110,6 +112,52 @@
         for (const name of expandedPanelNames) {
             activePanels.add(name);
         }
+    });
+
+    // Form PointField: mount PointTool while a session is armed. Live SoT is
+    // session.fieldValue — do not remount when it changes (only on session key).
+    $effect(() => {
+        const session = pointArming.session;
+        if (!session) return;
+        const sessionKey = session.key;
+        const { analysis } = session;
+        void sessionKey;
+
+        const publicId = () => viewerContext.image.instance.id;
+
+        const tool = new PointTool({
+            canEdit: session.canEdit,
+            label: session.label ?? "Point",
+            pointStyle: session.pointStyle,
+            radius: session.radius,
+            color: session.color,
+            cardinality: analysis.cardinality,
+            sparse: analysis.sparse,
+            coordinateSpace: analysis.coordinateSpace,
+            enumExtras: analysis.enumExtras,
+            onChange: (points) => {
+                session.setPoints(publicId(), points);
+            },
+            onPersist: (points) => {
+                session.setPoints(publicId(), points);
+                session.persist();
+            },
+        });
+
+        const remove = viewerContext.addOverlay(tool);
+
+        // Keep tool.points in sync with session (PointField edits, other viewers).
+        const stopSync = $effect.root(() => {
+            $effect(() => {
+                tool.points = session.getPoints(publicId());
+            });
+        });
+
+        return () => {
+            stopSync();
+            tool.destroy();
+            remove();
+        };
     });
 </script>
 

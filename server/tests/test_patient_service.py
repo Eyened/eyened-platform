@@ -22,15 +22,15 @@ def test_get_patient_returns_the_patient(session):
     """An existing patient is returned by the service unchanged."""
     patient = _make_patient(session)
 
-    service = PatientService(PatientRepository())
-    result = service.get_patient(session, patient.PatientID)
+    service = PatientService(PatientRepository(session))
+    result = service.get_patient(patient.PatientID)
 
     assert result.PatientIdentifier == "ID1"
 
 
 def test_get_patient_unknown_id_raises_not_found(session):
     """A missing patient makes the service raise NotFoundError (→ 404 via handler)."""
-    service = PatientService(PatientRepository())
+    service = PatientService(PatientRepository(session))
 
     with pytest.raises(NotFoundError):
-        service.get_patient(session, 999_999)
+        service.get_patient(999_999)

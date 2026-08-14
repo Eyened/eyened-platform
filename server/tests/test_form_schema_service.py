@@ -12,8 +12,8 @@ def test_list_form_schemas_returns_rows_in_order(session):
     session.add_all([FormSchema(SchemaName="Zeta"), FormSchema(SchemaName="Alpha")])
     session.flush()
 
-    service = FormSchemaService(FormSchemaRepository())
-    result = service.list_form_schemas(session)
+    service = FormSchemaService(FormSchemaRepository(session))
+    result = service.list_form_schemas()
 
     assert [s.SchemaName for s in result] == ["Alpha", "Zeta"]
 
@@ -24,15 +24,15 @@ def test_get_form_schema_returns_the_schema(session):
     session.add(schema)
     session.flush()
 
-    service = FormSchemaService(FormSchemaRepository())
-    result = service.get_form_schema(session, schema.FormSchemaID)
+    service = FormSchemaService(FormSchemaRepository(session))
+    result = service.get_form_schema(schema.FormSchemaID)
 
     assert result.SchemaName == "Alpha"
 
 
 def test_get_form_schema_unknown_id_raises_not_found(session):
     """A missing schema makes the service raise NotFoundError (-> 404 via handler)."""
-    service = FormSchemaService(FormSchemaRepository())
+    service = FormSchemaService(FormSchemaRepository(session))
 
     with pytest.raises(NotFoundError):
-        service.get_form_schema(session, 999_999)
+        service.get_form_schema(999_999)

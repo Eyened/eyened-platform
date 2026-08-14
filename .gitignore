@@ -3,6 +3,7 @@ docker/.env
 *.zip
 *.pyc
 notebooks/hrfav/**/*
+notebooks/schema.json
 node_modules/**/*
 extensions.ts
 client/src/lib/extensions.ts
@@ -22,3 +23,17 @@ segmentations.zarr/
 client/src/lib/extensions.ts
 venv
 trash
+scratch.txt
+dev/.venv
+
+# Graphify (Claude Code) - regenerable knowledge graph, rebuild with `graphify update .`
+graphify-out/
+
+# Claude Code local config and agent working files
+.claude/
+.superpowers/
+CLAUDE.md
+docs/superpowers/
+
+# Agent / superpowers working docs (local only)
+.agents/

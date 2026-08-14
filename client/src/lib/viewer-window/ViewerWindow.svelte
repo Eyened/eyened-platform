@@ -10,7 +10,7 @@ Keeps track of the main panels and the top row of images.
     import TopRowImages from "./TopRowImages.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
     import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
-    import { formAnnotations, instances, patients } from "$lib/data";
+    import { instances, patients } from "$lib/data";
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
 
@@ -80,10 +80,7 @@ Keeps track of the main panels and the top row of images.
     }
 </script>
 
-{#each Array.from(formAnnotations.values()) as formAnnotation}
-    <RegistrationItemLoader {registration} {formAnnotation} />
-{/each}
-
+<!-- Patient attrs first, then form pointset/affine (pointset wins on conflict). -->
 <RegistrationItemLoader {registration} {registrationSet} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
