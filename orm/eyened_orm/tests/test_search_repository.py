@@ -6,7 +6,10 @@ from eyened_orm.repositories.search import (
     ResolvedCondition,
     SearchRepository,
 )
-from eyened_orm.utils.factories import seed_search_dataset
+from eyened_orm.utils.factories import (
+    admin_scope,
+    seed_search_dataset,
+)
 
 
 @pytest.fixture()
@@ -16,7 +19,7 @@ def data(session):
 
 @pytest.fixture()
 def repo(session):
-    return SearchRepository(session)
+    return SearchRepository(session, scope=admin_scope())
 
 
 def _ids(rows):

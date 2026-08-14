@@ -8,6 +8,7 @@ import logging
 from typing import TYPE_CHECKING, List, Optional
 
 from eyened_orm import Model, SubTaskState
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session, object_session
 from sqlalchemy.orm.exc import DetachedInstanceError
 
@@ -578,16 +579,36 @@ class DTOConverter:
         annotation: "FormAnnotationORM", with_tag_metadata: bool = False
     ) -> FormAnnotationGET:
         """Convert FormAnnotation ORM object to FormAnnotationGET."""
-        public_image_id = getattr(
-            getattr(annotation, "ImageInstance", None), "PublicID", None
-        )
-        if public_image_id is None:
-            sess = object_session(annotation)
-            public_image_id = DTOConverter._get_public_id_for_instance_id(
-                sess, annotation.ImageInstanceID
-            )
+        # An unloaded ImageInstance means **withheld**, full stop -- this
+        # converter never resolves one itself.
+        #
+        # A FormAnnotation is anchored on PatientID; the image it names has its
+        # own, different anchor, so a caller legitimately holding the annotation
+        # may hold nothing in the image's project. Only a *scoped* read can
+        # decide that, and the only scoped read available here is the one the
+        # repository already did. Both ways of resolving it from here --
+        # letting ``annotation.ImageInstance`` lazy-load, or looking the id up
+        # through ``object_session`` -- go straight to the raw Session with no
+        # scope in the chain, and hand back exactly the identifier a scoped
+        # loader refused. So the load state is read first and is the whole
+        # decision: loaded-and-empty (deliberately withheld by the loader's
+        # criteria) and never-loaded (the caller did not ask for it) are
+        # answered identically, with None.
+        #
+        # The consequence is deliberate: a caller that serialises an annotation
+        # without asking its repository to load the image emits ``image_id:
+        # None`` for an image it could have shown. That is a visible functional
+        # degradation, and it is the fail-closed direction -- the alternative
+        # fails open, silently, on a caller that forgot.
+        state = sa_inspect(annotation, raiseerr=False)
+        loaded = state is not None and "ImageInstance" not in state.unloaded
+        image = annotation.ImageInstance if loaded else None
+        public_image_id = getattr(image, "PublicID", None)
+
         if annotation.ImageInstanceID is not None:
-            if public_image_id is None:
+            if image is not None and public_image_id is None:
+                # The loader handed back a row with no PublicID: nothing
+                # withheld this, so it is a genuine data error.
                 raise ValueError("FormAnnotation missing ImageInstance PublicID")
             obj_type = "image_instance"
         elif annotation.StudyID is not None:
@@ -637,8 +658,17 @@ class DTOConverter:
         *,
         num_tasks: int | None = None,
         num_tasks_ready: int | None = None,
+        projects: list[tuple[int, str]],
     ) -> TaskGET:
-        """Convert Task ORM object to TaskGET."""
+        """Convert Task ORM object to TaskGET.
+
+        ``projects`` is required and takes no default on purpose. The DTO field
+        defaults to ``[]``, so a call site that forgot to pass the task's
+        projects would answer "this task spans nothing" for a task spanning
+        two -- the exact wrong answer, delivered confidently, to the admin this
+        field exists to warn. Requiring it turns that omission into a
+        TypeError.
+        """
         if num_tasks is None or num_tasks_ready is None:
             subs = getattr(task, "SubTasks", []) or []
             if num_tasks is None:
@@ -664,6 +694,10 @@ class DTOConverter:
             ),
             task_state=getattr(task, "TaskState", None),
             task_definition=DTOConverter.task_definition_to_get(task.TaskDefinition),
+            projects=[
+                ProjectMeta(id=project_id, name=project_name)
+                for project_id, project_name in projects
+            ],
         )
 
     @staticmethod

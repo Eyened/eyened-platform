@@ -6,8 +6,12 @@ from sqlalchemy.orm import Session
 from eyened_orm import StudyTagLink
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.study_repository import StudyRepository
+from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
+from eyened_orm.authz.roles import ProjectRole
+from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
+from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
 from .exceptions import BadRequestError, NotFoundError
@@ -19,9 +23,13 @@ class StudyService:
     def __init__(
         self,
         repository: StudyRepository,
+        *,
+        scope: AccessScope,
         audit: AuditService | None = None,
     ) -> None:
         self.repository = repository
+        self.scope = scope
+        self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
     def tag_study(
@@ -29,7 +37,6 @@ class StudyService:
         study_id: int,
         tag_id: int,
         comment: str | None,
-        actor: ActingUser,
     ) -> StudyTagLink:
         """Attach a Study tag to a study (idempotent; updates comment if linked).
 
@@ -45,13 +52,23 @@ class StudyService:
             raise NotFoundError(f"Tag {tag_id} not found")
         if tag.TagType != TagType.Study:
             raise BadRequestError("Tag type must be Study")
+        # A tag link carries no project of its own, so it is authorized against
+        # its *parent* -- the deliberate asymmetry recorded at ``PROJECT_IDS_OF``
+        # (``projects_of(session, StudyTagLink, ...)`` raises by design). The
+        # floor therefore names the parent, whose projects it is judged on; the
+        # ownership overlay names the link, whose CreatorID it reads, with
+        # ``entity_id=None`` because a link's primary key is composite.
+        projects = self.repository.project_ids(study_id)
+        self.scope.require(
+            projects, ProjectRole.grader, entity="Study", entity_id=study_id
+        )
 
         link = self.repository.get_link(tag_id, study_id)
         if link is None:
             link = self.repository.add_link(
                 tag_id=tag.TagID,
                 study_id=study_id,
-                creator_id=actor.id,
+                creator_id=self.scope.actor_id,
                 comment=comment,
             )
             link.Tag = tag
@@ -59,7 +76,7 @@ class StudyService:
                 self.audit.record(
                     action="INSERT",
                     entity="StudyTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes={
                         "tag_id": tag.TagID,
                         "study_id": study_id,
@@ -67,6 +84,16 @@ class StudyService:
                     },
                 )
         elif comment is not None:
+            # This branch overwrites an existing link's comment, so it is a
+            # modify and takes the same overlay ``patch_study_tag`` does.
+            # Without it POST would be a standing bypass of PATCH's check.
+            require_owner(
+                self.scope,
+                owner_id=link.CreatorID,
+                entity="StudyTagLink",
+                entity_id=None,
+                projects=projects,
+            )
             before = AuditService.snapshot(link, "Comment")
             link.Comment = comment
             # StudyTagLink has a composite PK, so entity_id is null; fold the
@@ -83,7 +110,7 @@ class StudyService:
                 self.audit.record(
                     action="UPDATE",
                     entity="StudyTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=changes,
                 )
         return link
@@ -92,7 +119,6 @@ class StudyService:
         self,
         study_id: int,
         tag_id: int,
-        actor: ActingUser,
     ) -> None:
         """Remove a Study tag from a study (idempotent).
 
@@ -102,9 +128,20 @@ class StudyService:
         study = self.repository.get_by_id(study_id)
         if study is None:
             raise NotFoundError(f"Study {study_id} not found")
+        projects = self.repository.project_ids(study_id)
+        self.scope.require(
+            projects, ProjectRole.grader, entity="Study", entity_id=study_id
+        )
         link = self.repository.get_link(tag_id, study_id)
         if link is None:
             return None
+        require_owner_or_project_admin(
+            self.scope,
+            owner_id=link.CreatorID,
+            entity="StudyTagLink",
+            entity_id=None,
+            projects=projects,
+        )
 
         deleted_data = {
             "tag_id": tag_id,
@@ -117,7 +154,7 @@ class StudyService:
             self.audit.record(
                 action="DELETE",
                 entity="StudyTagLink",
-                actor=actor,
+                actor=self._actor,
                 changes=deleted_data,
             )
         return None
@@ -127,7 +164,6 @@ class StudyService:
         study_id: int,
         tag_id: int,
         comment: str | None,
-        actor: ActingUser,
     ) -> StudyTagLink:
         """Update the comment on an existing Study tag link.
 
@@ -143,9 +179,20 @@ class StudyService:
             raise NotFoundError(f"Tag {tag_id} not found")
         if tag.TagType != TagType.Study:
             raise BadRequestError("Tag type must be Study")
+        projects = self.repository.project_ids(study_id)
+        self.scope.require(
+            projects, ProjectRole.grader, entity="Study", entity_id=study_id
+        )
         link = self.repository.get_link(tag_id, study_id)
         if link is None:
             raise NotFoundError(f"Tag {tag_id} is not linked to study {study_id}")
+        require_owner(
+            self.scope,
+            owner_id=link.CreatorID,
+            entity="StudyTagLink",
+            entity_id=None,
+            projects=projects,
+        )
 
         if comment is not None:
             before = AuditService.snapshot(link, "Comment")
@@ -163,13 +210,20 @@ class StudyService:
                 self.audit.record(
                     action="UPDATE",
                     entity="StudyTagLink",
-                    actor=actor,
+                    actor=self._actor,
                     changes=changes,
                 )
         link.Tag = tag
         return link
 
 
-def get_study_service(db: Session = Depends(get_db)) -> StudyService:
+def get_study_service(
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
+) -> StudyService:
     """Default StudyService wiring for FastAPI ``Depends()``."""
-    return StudyService(StudyRepository(db), audit=get_audit_service(db))
+    return StudyService(
+        StudyRepository(db, scope=scope),
+        scope=scope,
+        audit=get_audit_service(db),
+    )

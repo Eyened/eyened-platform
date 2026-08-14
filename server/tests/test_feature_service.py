@@ -6,6 +6,7 @@ from eyened_orm.repositories.feature_repository import FeatureRepository
 from server.services.acting_user import ActingUser
 from server.services.exceptions import ConflictError, NotFoundError
 from server.services.feature_service import FeatureService
+from eyened_orm.utils.factories import admin_scope
 
 
 def _make_feature(session, name: str) -> Feature:
@@ -15,12 +16,19 @@ def _make_feature(session, name: str) -> Feature:
     return f
 
 
-def _service(session, audit=None) -> FeatureService:
-    return FeatureService(FeatureRepository(session), audit=audit)
-
-
-def _actor() -> ActingUser:
-    return ActingUser(id=1, username="alice")
+def _service(
+    session, actor: ActingUser | None = None, *, audit=None
+) -> FeatureService:
+    scope = (
+        admin_scope(actor_id=actor.id, username=actor.username)
+        if actor is not None
+        else admin_scope()
+    )
+    return FeatureService(
+        FeatureRepository(session, scope=scope),
+        scope=scope,
+        audit=audit,
+    )
 
 
 class FakeAudit:
@@ -49,31 +57,36 @@ def test_create_feature_persists_with_subfeatures(session):
     """Creating a feature with subfeature ids writes the ordered child links."""
     child = _make_feature(session, "child")
 
-    feature = _service(session).create_feature("parent", [child.FeatureID], _actor())
+    feature = _service(session).create_feature("parent", [child.FeatureID])
 
     assert feature.FeatureName == "parent"
-    assert FeatureRepository(session).list_subfeature_ids(feature.FeatureID) == [
+    assert FeatureRepository(session, scope=admin_scope()).list_subfeature_ids(feature.FeatureID) == [
         child.FeatureID
     ]
 
 
 def test_create_feature_without_subfeatures(session):
     """Creating a feature with no subfeatures leaves it childless."""
-    feature = _service(session).create_feature("solo", None, _actor())
+    feature = _service(session).create_feature("solo", None)
 
     assert feature.FeatureName == "solo"
-    assert FeatureRepository(session).list_subfeature_ids(feature.FeatureID) == []
+    assert FeatureRepository(session, scope=admin_scope()).list_subfeature_ids(feature.FeatureID) == []
 
 
 def test_create_feature_logs_insert(session):
     """Creating a feature emits one INSERT audit record naming the entity."""
+    actor = ActingUser(id=7, username="feature-actor")
     audit = FakeAudit()
 
-    _service(session, audit).create_feature("solo", None, _actor())
+    _service(session, actor, audit=audit).create_feature("solo", None)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
     assert audit.records[0]["entity"] == "Feature"
+    # Pins the service's `self._actor = ActingUser.from_scope(scope)` line.
+    # Without it the service can attribute every audit row to the wrong user
+    # and stay green -- the audit trail is the artefact, so it needs the pin.
+    assert audit.records[0]["actor"] == actor
 
 
 def test_get_feature_unknown_raises_not_found(session):
@@ -97,7 +110,7 @@ def test_update_feature_changes_name(session):
     """Updating name overwrites FeatureName in place."""
     feature = _make_feature(session, "old")
 
-    updated = _service(session).update_feature(feature.FeatureID, "new", None, _actor())
+    updated = _service(session).update_feature(feature.FeatureID, "new", None)
 
     assert updated.FeatureName == "new"
 
@@ -108,11 +121,11 @@ def test_update_feature_replaces_subfeatures(session):
     a = _make_feature(session, "a")
     b = _make_feature(session, "b")
     service = _service(session)
-    service.update_feature(parent.FeatureID, None, [a.FeatureID], _actor())
+    service.update_feature(parent.FeatureID, None, [a.FeatureID])
 
-    service.update_feature(parent.FeatureID, None, [b.FeatureID], _actor())
+    service.update_feature(parent.FeatureID, None, [b.FeatureID])
 
-    assert FeatureRepository(session).list_subfeature_ids(parent.FeatureID) == [
+    assert FeatureRepository(session, scope=admin_scope()).list_subfeature_ids(parent.FeatureID) == [
         b.FeatureID
     ]
 
@@ -120,7 +133,7 @@ def test_update_feature_replaces_subfeatures(session):
 def test_update_feature_unknown_raises_not_found(session):
     """Updating a missing feature is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).update_feature(999_999, "x", None, _actor())
+        _service(session).update_feature(999_999, "x", None)
 
 
 def test_update_feature_logs_rename_as_diff(session):
@@ -128,7 +141,7 @@ def test_update_feature_logs_rename_as_diff(session):
     feature = _make_feature(session, "old")
     audit = FakeAudit()
 
-    _service(session, audit).update_feature(feature.FeatureID, "new", None, _actor())
+    _service(session, audit=audit).update_feature(feature.FeatureID, "new", None)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "UPDATE"
@@ -143,8 +156,8 @@ def test_update_feature_logs_both_name_and_subfeatures_diff(session):
     child = _make_feature(session, "child")
     audit = FakeAudit()
 
-    _service(session, audit).update_feature(
-        parent.FeatureID, "new", [child.FeatureID], _actor()
+    _service(session, audit=audit).update_feature(
+        parent.FeatureID, "new", [child.FeatureID]
     )
 
     assert audit.records[0]["changes"] == {
@@ -157,25 +170,25 @@ def test_delete_feature_removes_it(session):
     """Deleting an unreferenced feature removes it from the database."""
     feature = _make_feature(session, "gone")
 
-    _service(session).delete_feature(feature.FeatureID, _actor())
+    _service(session).delete_feature(feature.FeatureID)
 
-    assert FeatureRepository(session).get_by_id(feature.FeatureID) is None
+    assert FeatureRepository(session, scope=admin_scope()).get_by_id(feature.FeatureID) is None
 
 
 def test_delete_feature_unknown_raises_not_found(session):
     """Deleting a missing feature is translated to NotFoundError (-> 404)."""
     with pytest.raises(NotFoundError):
-        _service(session).delete_feature(999_999, _actor())
+        _service(session).delete_feature(999_999)
 
 
 def test_delete_feature_blocked_by_child_link_raises_conflict(session):
     """A feature that is a child of another cannot be deleted (409 FEATURE_IS_CHILD)."""
     parent = _make_feature(session, "parent")
     child = _make_feature(session, "child")
-    FeatureRepository(session).replace_subfeatures(parent.FeatureID, [child.FeatureID])
+    FeatureRepository(session, scope=admin_scope()).replace_subfeatures(parent.FeatureID, [child.FeatureID])
 
     with pytest.raises(ConflictError) as exc:
-        _service(session).delete_feature(child.FeatureID, _actor())
+        _service(session).delete_feature(child.FeatureID)
 
     detail = exc.value.detail
     assert detail["code"] == "FEATURE_IS_CHILD"
@@ -184,14 +197,20 @@ def test_delete_feature_blocked_by_child_link_raises_conflict(session):
 
 def test_delete_feature_blocked_by_segmentations_raises_conflict(session):
     """A feature with linked segmentations cannot be deleted (409 FEATURE_HAS_SEGMENTATIONS)."""
-    service = FeatureService(_SegBlockingRepo())
+    service = FeatureService(_SegBlockingRepo(), scope=admin_scope())
 
     with pytest.raises(ConflictError) as exc:
-        service.delete_feature(7, _actor())
+        service.delete_feature(7)
 
     detail = exc.value.detail
     assert detail["code"] == "FEATURE_HAS_SEGMENTATIONS"
-    assert detail["segmentation_count"] == 3
+    # The count decides *whether* the conflict fires, never what it says: the
+    # fake returns 3 while the body carries no number anywhere. Its previous
+    # assertion (segmentation_count == 3) pinned the disclosure this wave
+    # removes -- ``count_segmentations`` is global, so that 3 could include
+    # rows in projects the caller cannot reach.
+    assert "segmentation_count" not in detail
+    assert "3" not in detail["message"]
 
 
 def test_delete_feature_logs_delete(session):
@@ -199,8 +218,72 @@ def test_delete_feature_logs_delete(session):
     feature = _make_feature(session, "gone")
     audit = FakeAudit()
 
-    _service(session, audit).delete_feature(feature.FeatureID, _actor())
+    _service(session, audit=audit).delete_feature(feature.FeatureID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
     assert audit.records[0]["entity"] == "Feature"
+
+
+def test_a_feature_referenced_only_from_another_project_is_refused_without_a_count(
+    session,
+):
+    """A cross-project reference must produce the 409, and no number.
+
+    Two things at once, and each fails without the other half of the fix:
+
+    - ``count_segmentations`` is global, so a ``project_admin`` in A is told
+      the feature is in use even though every referencing row lives in B. With
+      it scoped the count is 0, the conflict never fires, and the delete dies
+      at the flush as an ``IntegrityError`` -- a 500 where a 409 belongs.
+    - The refusal carries no count. The number is the cross-project fact the
+      caller is not entitled to; the fact of use is not. So the message holds
+      no digits and the body has no ``segmentation_count`` key -- removing it
+      from the prose while leaving it in the payload would disclose exactly
+      the same thing.
+    """
+    from datetime import date
+
+    from eyened_orm.authz.roles import ProjectRole
+    from eyened_orm.utils.factories import (
+        make_creator,
+        make_device,
+        make_feature,
+        make_image,
+        make_patient,
+        make_project,
+        make_segmentation,
+        make_series,
+        make_storage_backend,
+        make_study,
+        scope_for,
+    )
+
+    backend = make_storage_backend(session)
+    device = make_device(session, "d")
+    creator = make_creator(session, "c")
+    feature = make_feature(session, "cross-project-feature")
+    project_a = make_project(session, "del-A")
+    make_patient(session, project_a, "pat-del-A")
+    project_b = make_project(session, "del-B")
+    patient_b = make_patient(session, project_b, "pat-del-B")
+    study_b = make_study(session, patient_b, date(2024, 1, 1))
+    series_b = make_series(session, study_b)
+    image_b = make_image(session, series_b, device, backend, "img-del-B")
+    make_segmentation(session, image_b, feature, creator)
+    feature_id = feature.FeatureID
+    project_a_id = project_a.ProjectID
+    session.commit()
+    session.expunge_all()
+
+    scope = scope_for(project_a_id, role=ProjectRole.project_admin)
+    service = FeatureService(FeatureRepository(session, scope=scope), scope=scope)
+
+    with pytest.raises(ConflictError) as exc:
+        service.delete_feature(feature_id)
+
+    detail = exc.value.detail
+    assert detail["code"] == "FEATURE_HAS_SEGMENTATIONS"
+    assert "segmentation_count" not in detail
+    assert not any(char.isdigit() for char in detail["message"]), detail["message"]
+    assert session.get(Feature, feature_id) is not None

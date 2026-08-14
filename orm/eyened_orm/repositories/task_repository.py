@@ -3,8 +3,22 @@ from __future__ import annotations
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from eyened_orm import ImageInstance, ImageStorage, SubTask, SubTaskImageLink, Task
+from eyened_orm import (
+    ImageInstance,
+    ImageStorage,
+    Patient,
+    Project,
+    Series,
+    Study,
+    SubTask,
+    SubTaskImageLink,
+    Task,
+)
 from eyened_orm.task import SubTaskState
+from eyened_orm.authz.scope import AccessScope
+from eyened_orm.authz.scoping import apply_scope, projects_of
+
+from ._scoped import scoped_one
 
 # Load task metadata without eager-loading every SubTask row (mirrors the
 # route's former ``_task_query_options``).
@@ -17,8 +31,9 @@ _TASK_RELATIONS = (
 class TaskRepository:
     """Data access for Task rows and their subtask counts."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def add(self, task: Task) -> None:
         """Stage a new task and flush so its PK is assigned."""
@@ -31,8 +46,8 @@ class TaskRepository:
         self._session.flush()
 
     def get_by_id(self, task_id: int) -> Task | None:
-        """Return the task with the given id, or None if absent."""
-        return self._session.get(Task, task_id)
+        """Return the task with the given id, or None if absent or out of scope."""
+        return scoped_one(self._session, Task, self._scope, Task.TaskID == task_id)
 
     def save(self, task: Task) -> None:
         """Persist in-place mutations to ``task`` within the request transaction.
@@ -44,34 +59,46 @@ class TaskRepository:
 
     def get_with_relations(self, task_id: int) -> Task | None:
         """Return the task with Creator + TaskDefinition eager-loaded, or None."""
-        return (
-            self._session.execute(
-                select(Task).options(*_TASK_RELATIONS).where(Task.TaskID == task_id)
-            )
-            .scalars()
-            .first()
+        return scoped_one(
+            self._session,
+            Task,
+            self._scope,
+            Task.TaskID == task_id,
+            options=_TASK_RELATIONS,
         )
 
+    def project_ids(self, task_id: int) -> set[int]:
+        """The projects this task touches, for a write check to be judged on.
+
+        The repository owns the Session, so the authz resolution runs here
+        rather than a service reaching through for a Session it must not hold.
+        Uses ``projects_of``, the one definition the reads and the CLI share.
+
+        Deliberately unscoped: the returned set is the *input* to
+        ``AccessScope.require``, so filtering it by the caller's scope would
+        remove exactly the projects the check exists to catch and make every
+        floor pass.
+        """
+        return projects_of(self._session, Task, task_id)
+
     def list_all(self) -> list[Task]:
-        """Return all tasks (TaskID order) with Creator + TaskDefinition loaded."""
-        return list(
-            self._session.execute(
-                select(Task).options(*_TASK_RELATIONS).order_by(Task.TaskID)
-            )
-            .scalars()
-            .all()
+        """Return every task the scope may read (TaskID order), relations loaded."""
+        stmt = apply_scope(
+            select(Task).options(*_TASK_RELATIONS).order_by(Task.TaskID),
+            Task,
+            self._scope,
         )
+        return list(self._session.execute(stmt).scalars().all())
 
     def subtask_counts(self, task_ids: list[int]) -> dict[int, tuple[int, int]]:
         """Return {task_id: (num_subtasks, num_ready)} for the given task ids.
 
-        One grouped aggregate over ``SubTask`` (mirrors the route's former
-        ``_subtask_counts_by_task_id``). Every requested id is present in the
-        result: ids with no subtasks map to ``(0, 0)``.
+        Scoped through SubTask, so a hidden task reports (0, 0) rather than a
+        partial view. Every requested id is still present in the result.
         """
         if not task_ids:
             return {}
-        rows = self._session.execute(
+        stmt = apply_scope(
             select(
                 SubTask.TaskID,
                 func.count().label("num"),
@@ -82,15 +109,71 @@ class TaskRepository:
                     0,
                 ).label("ready"),
             )
+            .select_from(SubTask)
             .where(SubTask.TaskID.in_(task_ids))
-            .group_by(SubTask.TaskID)
-        ).all()
+            .group_by(SubTask.TaskID),
+            SubTask,
+            self._scope,
+        )
+        rows = self._session.execute(stmt).all()
         counts = {int(tid): (int(n), int(r)) for tid, n, r in rows}
         return {tid: counts.get(tid, (0, 0)) for tid in task_ids}
+
+    def projects_for_tasks(
+        self, task_ids: list[int]
+    ) -> dict[int, list[tuple[int, str]]]:
+        """Return {task_id: [(project_id, project_name), ...]} for the given ids.
+
+        Walks the same join path enforcement uses, re-expressed for batching
+        and names: ``projects_of`` answers for one entity and returns bare ids,
+        which cannot back a grouped, name-carrying query. The two must not
+        drift -- grant-for-task and this endpoint are the two sides of one
+        promise -- so a test pins them to the same answer.
+
+        One grouped query. Every requested id is present in the result, and an
+        empty list means one of *two* things: the task genuinely has no images,
+        or the caller's scope cannot see the subtasks that carry them. Callers
+        must not read ``[]`` as "spans nothing" on its own; the routes are safe
+        because they 404 an invisible task before the field is read.
+        """
+        if not task_ids:
+            return {}
+        rows = self._session.execute(
+            apply_scope(
+                select(SubTask.TaskID, Patient.ProjectID, Project.ProjectName)
+                .select_from(SubTask)
+                .join(SubTaskImageLink, SubTaskImageLink.SubTaskID == SubTask.SubTaskID)
+                .join(
+                    ImageInstance,
+                    ImageInstance.ImageInstanceID == SubTaskImageLink.ImageInstanceID,
+                )
+                .join(Series, Series.SeriesID == ImageInstance.SeriesID)
+                .join(Study, Study.StudyID == Series.StudyID)
+                .join(Patient, Patient.PatientID == Study.PatientID)
+                .join(Project, Project.ProjectID == Patient.ProjectID)
+                .where(SubTask.TaskID.in_(task_ids))
+                .distinct(),
+                SubTask,
+                self._scope,
+            )
+        ).all()
+        found: dict[int, list[tuple[int, str]]] = {}
+        for task_id, project_id, project_name in rows:
+            found.setdefault(int(task_id), []).append((int(project_id), project_name))
+        return {tid: sorted(found.get(tid, [])) for tid in task_ids}
 
 
 # Eager-load the subtask's images down to their storage backend (mirrors the
 # route's former with_images option chain).
+#
+# The last two legs are redundant and deliberately kept: ImageInstance.
+# ImageStorages and ImageStorage.StorageBackend are lazy="selectin" on the
+# mappers, so removing them here changes nothing (measured: identical statement
+# count, zero lazy loads on a detached walk). They stay because this chain is
+# the contract subtask DTO conversion depends on and the mapper defaults are
+# not this module's to rely on. What guards the chain is the detached walk in
+# test_task_repository.py, which covers it whichever declaration provides it --
+# not the presence of these two lines.
 _SUBTASK_IMAGE_LOADER = (
     selectinload(SubTask.SubTaskImageLinks)
     .selectinload(SubTaskImageLink.ImageInstance)
@@ -102,8 +185,9 @@ _SUBTASK_IMAGE_LOADER = (
 class SubTaskRepository:
     """Data access for a task's SubTask rows and their image links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def add(self, subtask: SubTask) -> None:
         """Stage a new subtask and flush so its PK is assigned."""
@@ -135,15 +219,14 @@ class SubTaskRepository:
 
     def all_ids_for_task(self, task_id: int) -> list[int]:
         """Return the task's SubTaskIDs ordered ascending (backs absolute index)."""
-        return list(
-            self._session.execute(
-                select(SubTask.SubTaskID)
-                .where(SubTask.TaskID == task_id)
-                .order_by(SubTask.SubTaskID)
-            )
-            .scalars()
-            .all()
+        stmt = apply_scope(
+            select(SubTask.SubTaskID)
+            .where(SubTask.TaskID == task_id)
+            .order_by(SubTask.SubTaskID),
+            SubTask,
+            self._scope,
         )
+        return list(self._session.execute(stmt).scalars().all())
 
     def count_for_task(
         self,
@@ -157,6 +240,7 @@ class SubTaskRepository:
         )
         if status is not None:
             stmt = stmt.where(SubTask.TaskState == status)
+        stmt = apply_scope(stmt, SubTask, self._scope)
         return self._session.scalar(stmt) or 0
 
     def list_for_task(
@@ -178,13 +262,16 @@ class SubTaskRepository:
         stmt = stmt.order_by(SubTask.SubTaskID)
         if with_images:
             stmt = stmt.options(_SUBTASK_IMAGE_LOADER)
+        stmt = apply_scope(stmt, SubTask, self._scope)
         return list(
             self._session.execute(stmt.limit(limit).offset(offset)).scalars().all()
         )
 
     def get_by_id(self, subtask_id: int) -> SubTask | None:
-        """Return the subtask with the given id, or None if absent."""
-        return self._session.get(SubTask, subtask_id)
+        """Return the subtask with the given id, or None if absent or out of scope."""
+        return scoped_one(
+            self._session, SubTask, self._scope, SubTask.SubTaskID == subtask_id
+        )
 
     def save(self, subtask: SubTask) -> None:
         """Persist in-place mutations to ``subtask`` within the request transaction.
@@ -196,15 +283,38 @@ class SubTaskRepository:
 
     def get_with_images(self, subtask_id: int) -> SubTask | None:
         """Return the subtask with its image links eager-loaded, or None."""
-        return (
-            self._session.execute(
-                select(SubTask)
-                .options(_SUBTASK_IMAGE_LOADER)
-                .where(SubTask.SubTaskID == subtask_id)
-            )
-            .scalars()
-            .first()
+        return scoped_one(
+            self._session,
+            SubTask,
+            self._scope,
+            SubTask.SubTaskID == subtask_id,
+            options=(_SUBTASK_IMAGE_LOADER,),
         )
+
+    def project_ids(self, subtask_id: int) -> set[int]:
+        """The **parent task's** project set -- what a subtask write is judged on.
+
+        A superset of the subtask's own images, matching the read predicate:
+        you get a whole task or none of it, so a mutation is authorized against
+        the whole task too.
+
+        Deliberately unscoped, for the same reason as ``TaskRepository`` -- see
+        the note there. This is project resolution, not row access.
+        """
+        return projects_of(self._session, SubTask, subtask_id)
+
+    def project_ids_of_image(self, image_instance_id: int) -> set[int]:
+        """The project an image sits in, for the *after* half of a link write.
+
+        Lives here rather than on ``ImageInstanceRepository`` because this
+        repository already resolves image ids (``resolve_image_instance_id``)
+        on behalf of the link writes that are its only caller.
+
+        Deliberately unscoped: same reason as ``project_ids`` above. Scoping it
+        would silently drop the out-of-scope project whose presence is the
+        whole point of the *after* check.
+        """
+        return projects_of(self._session, ImageInstance, image_instance_id)
 
     def resolve_image_instance_id(self, public_id: str) -> int | None:
         """Return the ImageInstanceID for a PublicID, or None if no image matches."""

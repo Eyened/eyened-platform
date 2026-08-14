@@ -4,13 +4,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from eyened_orm import FormSchema
+from eyened_orm.authz.scope import AccessScope
 
 
 class FormSchemaRepository:
     """Data access for FormSchema rows."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def list_all(self) -> list[FormSchema]:
         """Return all form schemas, ordered by schema name ascending."""

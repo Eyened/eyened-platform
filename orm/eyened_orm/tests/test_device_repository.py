@@ -1,5 +1,6 @@
 from eyened_orm import DeviceModel
 from eyened_orm.repositories.device_repository import DeviceRepository
+from eyened_orm.utils.factories import admin_scope
 
 
 def test_list_all_orders_by_manufacturer_then_model(session):
@@ -13,7 +14,7 @@ def test_list_all_orders_by_manufacturer_then_model(session):
     )
     session.flush()
 
-    result = DeviceRepository(session).list_all()
+    result = DeviceRepository(session, scope=admin_scope()).list_all()
 
     names = [(d.Manufacturer, d.ManufacturerModelName) for d in result]
     assert names == [

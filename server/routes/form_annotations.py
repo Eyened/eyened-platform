@@ -9,7 +9,6 @@ from ..dtos.dtos_main import (
     FormAnnotationPATCH,
     FormAnnotationPUT,
 )
-from ..services.acting_user import ActingUser
 from ..services.form_annotation_service import (
     FormAnnotationService,
     get_form_annotation_service,
@@ -27,7 +26,6 @@ async def create_form_annotation(
 ):
     """Create a form annotation."""
     item = service.create(
-        actor=ActingUser(id=current_user.id, username=current_user.username),
         **annotation.dict(),
     )
     return DTOConverter.form_annotation_to_get(item)
@@ -76,7 +74,6 @@ async def update_form_annotation(
     item = service.update(
         annotation_id,
         annotation.dict(exclude_unset=True),
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.form_annotation_to_get(item)
 
@@ -90,7 +87,6 @@ async def delete_form_annotation(
     """Soft-delete a form annotation."""
     service.soft_delete(
         annotation_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)
 
@@ -117,7 +113,6 @@ async def update_form_annotation_value(
     service.set_value(
         form_annotation_id,
         form_data,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)
 
@@ -134,7 +129,6 @@ async def tag_form_annotation(
         annotation_id,
         body.tag_id,
         body.comment,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -150,7 +144,6 @@ async def untag_form_annotation(
     service.untag(
         annotation_id,
         tag_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)
 
@@ -170,6 +163,5 @@ async def patch_form_annotation_tag(
         annotation_id,
         tag_id,
         body.comment,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)

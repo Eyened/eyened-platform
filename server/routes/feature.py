@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Response
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_main import FeatureGET, FeaturePATCH, FeaturePUT
-from ..services.acting_user import ActingUser
 from ..services.feature_service import FeatureService, get_feature_service
 from .auth import CurrentUser, get_current_user
 
@@ -32,7 +31,6 @@ async def create_feature(
     feature = service.create_feature(
         dto.name,
         dto.subfeature_ids,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.feature_to_get(feature)
 
@@ -59,7 +57,6 @@ async def patch_feature(
         feature_id,
         dto.name,
         dto.subfeature_ids,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.feature_to_get(feature)
 
@@ -73,6 +70,5 @@ async def delete_feature(
     """Delete a feature (409 if it has segmentations or is a child of another)."""
     service.delete_feature(
         feature_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)

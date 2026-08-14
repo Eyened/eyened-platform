@@ -24,6 +24,15 @@ The following commands are available:
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
 - update-hashes: Update FileChecksum and DataHash for ImageInstances where they are NULL.
 - load-dump: Load a database dump file, replacing the entire database.
+- init-admin: Create or promote the administrator account (idempotent).
+- grant: Grant or change a project role for a user.
+- revoke: Remove a user's membership from a project, or from every project with --all.
+- grant-for-task: Grant every project a set of tasks touch, after review.
+- grant-all: Cutover step 3 -- grant every authenticating creator a role in every project.
+- set-admin: Set or clear administrator status on an existing account.
+- set-password: Set an existing user's password.
+- deactivate: Revoke all of a user's memberships.
+- reactivate: Restore a deactivated user's memberships.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """
@@ -69,6 +78,16 @@ def _register_model_commands():
 
 
 _register_model_commands()
+
+
+def _register_rbac_commands():
+    from .commands.rbac import rbac_commands
+
+    for command in rbac_commands:
+        eorm.add_command(command)
+
+
+_register_rbac_commands()
 
 
 @eorm.command()
@@ -166,10 +185,10 @@ def create_user(username: str, password: str, is_human: bool, description: str |
                 is_human=is_human,
                 description=description,
             )
-            session.commit()
-            print(f"User created successfully")
         except ValueError as e:
-            print(f"Error creating user: {e}")
+            raise click.ClickException(str(e)) from e
+        session.commit()
+    click.echo("User created successfully")
 
 
 @eorm.command()
