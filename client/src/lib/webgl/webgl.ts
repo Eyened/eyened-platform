@@ -68,6 +68,11 @@ export class WebGL {
         }
         gl.shaderSource(shader, shaderSource);
         gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            const log = gl.getShaderInfoLog(shader);
+            gl.deleteShader(shader);
+            throw new Error(`Shader compilation failed: ${log ?? "no log"}`);
+        }
         return shader;
     }
 }

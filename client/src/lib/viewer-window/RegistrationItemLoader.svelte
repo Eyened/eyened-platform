@@ -5,7 +5,7 @@
         getAffineTransforms,
         getPointsetRegistrations,
     } from "$lib/registration/pointsetRegistration";
-    import type { Registration } from "$lib/registration/registration";
+    import type { Registration } from "$lib/registration/registration.svelte";
     import {
         getRegistrationSets,
         type RegistrationSet,

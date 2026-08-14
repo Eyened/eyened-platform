@@ -24,14 +24,19 @@ export class ProgramInfo {
 
     constructor(
         private readonly gl: WebGL2RenderingContext,
-        vertexShader: WebGLShader,
-        fragmentShader: WebGLShader,
+        private readonly vertexShader: WebGLShader,
+        private readonly fragmentShader: WebGLShader,
     ) {
         const program = gl.createProgram()!;
 
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            const log = gl.getProgramInfoLog(program);
+            gl.deleteProgram(program);
+            throw new Error(`Program link failed: ${log ?? "no log"}`);
+        }
 
         this.program = program;
 
@@ -198,5 +203,12 @@ export class ProgramInfo {
                 throw new Error(`Missing uniform ${name}`);
             }
         }
+    }
+
+    dispose(): void {
+        const gl = this.gl;
+        gl.deleteProgram(this.program);
+        gl.deleteShader(this.vertexShader);
+        gl.deleteShader(this.fragmentShader);
     }
 }

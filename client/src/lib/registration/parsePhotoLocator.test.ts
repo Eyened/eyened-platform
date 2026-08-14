@@ -156,3 +156,22 @@ describe("CirclePhotoLocator.paint", () => {
         expect(ctx.ellipse).not.toHaveBeenCalled();
     });
 });
+
+describe("CirclePhotoLocator.enfaceToOCT", () => {
+    it("fract-wraps start_angle=π so circumferential x stays in [0, width)", () => {
+        const width = 100;
+        const locator = new CirclePhotoLocator(
+            "ir",
+            "oct",
+            { x: 50, y: 50 },
+            20,
+            Math.PI,
+            0,
+            width,
+        );
+        // Point east of center (angle 0): without wrap, r would be negative.
+        const { position } = locator.enfaceToOCT({ x: 70, y: 50, index: 0 });
+        expect(position.x).toBeGreaterThanOrEqual(0);
+        expect(position.x).toBeLessThan(width);
+    });
+});

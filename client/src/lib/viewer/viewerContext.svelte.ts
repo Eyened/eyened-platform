@@ -5,7 +5,7 @@ import { BaseImageRenderer } from "$lib/webgl/imageRenderer";
 import type { Shaders } from "$lib/webgl/shaders";
 import { SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
-import type { Registration } from "../registration/registration";
+import type { Registration } from "../registration/registration.svelte";
 import type { ViewerWindowContext } from "../viewer-window/viewerWindowContext.svelte";
 import { HotKeys } from "./controls/hotkeys";
 import { ScrollOCT } from "./controls/scrollOCT";
@@ -67,6 +67,11 @@ export class ViewerContext {
     hideOverlays: boolean = $state(false);
     renderMode: RenderMode = $state("Original");
     enfaceProjectionMode: EnfaceProjectionMode = $state("off");
+    /** Per-OCT enface overlay mode for non-_proj top-row images. */
+    enfaceProjectionModesByOct: Map<string, EnfaceProjectionMode> = $state(
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
+        new Map(),
+    );
     lockScroll: boolean = $state(false);
     windowLevel: WindowLevel = $state({ min: 0, max: 255 });
     cursorStyle: cursorStyle = $state("default");
@@ -188,6 +193,17 @@ export class ViewerContext {
             index: i,
         });
         this.index = i;
+    }
+
+    cycleEnfaceProjectionModeForOct(octPublicId: string): void {
+        const modes: EnfaceProjectionMode[] = ["off", "binary", "heatmap"];
+        const current =
+            this.enfaceProjectionModesByOct.get(octPublicId) ?? "off";
+        const next = modes[(modes.indexOf(current) + 1) % modes.length];
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
+        const map = new Map(this.enfaceProjectionModesByOct);
+        map.set(octPublicId, next);
+        this.enfaceProjectionModesByOct = map;
     }
 
     initTransform() {

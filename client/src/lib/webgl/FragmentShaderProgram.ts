@@ -21,6 +21,8 @@ export abstract class FragmentShaderProgram {
 }
 
 export class BaseTextureShaderProgram extends FragmentShaderProgram {
+    private readonly positionBuffer: WebGLBuffer;
+
     constructor(webgl: WebGL, vertexShader: string, fragmentShader: string) {
         /*
 		draw inside a rectangle with fragment coordinates v_uv 0-1
@@ -39,7 +41,7 @@ export class BaseTextureShaderProgram extends FragmentShaderProgram {
             programInfo.program,
             "a_position",
         );
-        const positionBuffer = gl.createBuffer();
+        const positionBuffer = gl.createBuffer()!;
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.bufferData(
             gl.ARRAY_BUFFER,
@@ -62,6 +64,14 @@ export class BaseTextureShaderProgram extends FragmentShaderProgram {
         gl.enable(gl.SCISSOR_TEST);
 
         super(gl, vertexArrayObject, programInfo);
+        this.positionBuffer = positionBuffer;
+    }
+
+    dispose(): void {
+        const gl = this.gl;
+        gl.deleteVertexArray(this.vertexArrayObject);
+        gl.deleteBuffer(this.positionBuffer);
+        this.programInfo.dispose();
     }
 
     pass(renderTarget: RenderTarget, uniforms: { [name: string]: any }) {
