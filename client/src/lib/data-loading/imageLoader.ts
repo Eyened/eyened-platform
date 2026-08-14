@@ -1,5 +1,7 @@
+import { createVolumeImage } from "$lib/webgl/createVolumeImage";
 import { Image2D } from "$lib/webgl/image2D";
 import { Image3D } from "$lib/webgl/image3D";
+import { ImageSliceStack } from "$lib/webgl/imageSliceStack";
 import type { Dimensions } from "$lib/webgl/types";
 import type { WebGL } from "$lib/webgl/webgl";
 import type { ImageGET } from "../../types/openapi_types";
@@ -19,7 +21,11 @@ cornerstoneWADOImageLoader.configure({
     useWebWorkers: true,
 });
 
-export type LoadedImages = [Image2D] | [Image3D] | [Image2D, Image3D];
+export type LoadedImages =
+    | [Image2D]
+    | [Image3D]
+    | [ImageSliceStack]
+    | [Image2D, Image3D];
 
 export class ImageLoader {
     minBscansForEnface = 5;
@@ -31,8 +37,14 @@ export class ImageLoader {
         const dataUrl = this.buildDataUrl(imageId);
         // Convert to lowercase for case-insensitive comparison
         const dataFormat = instance.data_format;
+        console.info(
+            `[imageLoader] load image ${img_id} format=${dataFormat} ` +
+                `rows=${instance.rows} cols=${instance.columns} frames=${instance.nr_of_frames ?? 1}`,
+        );
         if (dataFormat === "image/png" || dataFormat === "image/jpeg") {
-            return [await this.loadImage2D(instance, img_id)];
+            const image = await this.loadImage2D(instance, img_id);
+            console.info(`[imageLoader] image ${img_id} → Image2D (raster)`);
+            return [image];
         } else if (dataFormat === "binary") {
             const meta = await this.loadBinaryMeta(imageId);
             const image = await this.loadBinary3D(
@@ -41,7 +53,7 @@ export class ImageLoader {
                 img_id,
                 meta,
             );
-            return this.returnImage3D(image);
+            return this.returnLoadedVolume(image);
         } else if (dataFormat === "dicom") {
             return this.loadDicom(instance, img_id, imageId);
         } else if (dataFormat === "png_series") {
@@ -94,7 +106,7 @@ export class ImageLoader {
                     ),
                 ];
             }
-            const img3d = new Image3D(
+            const volume = createVolumeImage(
                 instance,
                 this.webgl,
                 img_id,
@@ -102,10 +114,30 @@ export class ImageLoader {
                 dimensions!,
                 meta,
             );
-            return await this.returnImage3D(img3d);
+            return await this.returnLoadedVolume(volume);
         }
 
         throw new Error("No image metadata found for png_series");
+    }
+
+    async returnLoadedVolume(
+        volume: Image2D | Image3D | ImageSliceStack,
+    ): Promise<LoadedImages> {
+        if (volume instanceof Image2D) {
+            console.info(
+                `[imageLoader] image ${volume.image_id} loaded as Image2D`,
+            );
+            return [volume];
+        }
+        if (volume instanceof ImageSliceStack) {
+            console.info(
+                `[imageLoader] image ${volume.image_id} loaded as ImageSliceStack ` +
+                    `(${volume.width}x${volume.height}x${volume.depth}; no enface path)`,
+            );
+            return [volume];
+        }
+
+        return this.returnImage3D(volume);
     }
 
     async returnImage3D(img3d: Image3D): Promise<LoadedImages> {
@@ -113,8 +145,16 @@ export class ImageLoader {
             img3d.depth > this.minBscansForEnface &&
             img3d.orientation === "axial"
         ) {
+            console.info(
+                `[imageLoader] image ${img3d.image_id} loaded as Image3D + enface ` +
+                    `(${img3d.width}x${img3d.height}x${img3d.depth}, orientation=${img3d.orientation})`,
+            );
             return [await img3d.createEnfaceProjection(), img3d];
         } else {
+            console.info(
+                `[imageLoader] image ${img3d.image_id} loaded as Image3D ` +
+                    `(${img3d.width}x${img3d.height}x${img3d.depth}, orientation=${img3d.orientation})`,
+            );
             return [img3d];
         }
     }
@@ -151,7 +191,7 @@ export class ImageLoader {
         url: string,
         img_id: string,
         meta?: any,
-    ): Promise<Image3D> {
+    ): Promise<Image2D | Image3D | ImageSliceStack> {
         const response = await fetch(url);
         const buffer = await response.arrayBuffer();
         const pixelData = new Uint8Array(buffer);
@@ -196,7 +236,7 @@ export class ImageLoader {
             dimensions.width_mm =
                 instance.resolution_horizontal * dimensions.width;
         }
-        return new Image3D(
+        return createVolumeImage(
             instance,
             this.webgl,
             img_id,
@@ -221,19 +261,24 @@ export class ImageLoader {
         const dimensions = this.extractDimensions(meta);
 
         const photometricInterpretation = meta.x00280004;
+        const transferSyntax = meta.x00020010;
         const { width, height, depth } = dimensions;
 
         const pixelData = ds.elements.x7fe00010;
 
         // pixeldata is already in the correct format
         if (pixelData.length === width * height * depth) {
+            console.info(
+                `[imageLoader] dicom ${img_id}: uncompressed pixel data ` +
+                    `${width}x${height}x${depth} (transferSyntax=${transferSyntax})`,
+            );
             const dicomBytes = ds.byteArray as Uint8Array;
             const volume = dicomBytes.subarray(
                 pixelData.dataOffset,
                 pixelData.dataOffset + pixelData.length,
             );
-            return this.returnImage3D(
-                new Image3D(
+            return this.returnLoadedVolume(
+                createVolumeImage(
                     instance,
                     this.webgl,
                     img_id,
@@ -245,7 +290,11 @@ export class ImageLoader {
         }
 
         if (depth > 1 || meta.x00080060 === "OPT") {
-            // 3D OCT
+            // 3D OCT — cornerstone/OpenJPEG may emit j2k INFO lines per frame
+            console.info(
+                `[imageLoader] dicom ${img_id}: decoding ${depth} frame(s) via cornerstone ` +
+                    `(${width}x${height}, modality=${meta.x00080060}, transferSyntax=${transferSyntax})`,
+            );
             const volume = new Uint8Array(width * height * depth);
             for (let i = 0; i < depth; i++) {
                 const frameImageId = `wadouri:${url}?frame=${i}`;
@@ -255,8 +304,8 @@ export class ImageLoader {
                     i * width * height,
                 );
             }
-            return this.returnImage3D(
-                new Image3D(
+            return this.returnLoadedVolume(
+                createVolumeImage(
                     instance,
                     this.webgl,
                     img_id,
@@ -271,6 +320,10 @@ export class ImageLoader {
             photometricInterpretation === "RGB" ||
             photometricInterpretation === "MONOCHROME2"
         ) {
+            console.info(
+                `[imageLoader] dicom ${img_id}: single-frame 2D via cornerstone ` +
+                    `(${width}x${height}, photometric=${photometricInterpretation}, transferSyntax=${transferSyntax})`,
+            );
             const pixelData = new Uint8Array(image.getPixelData());
             return [
                 Image2D.fromPixelData(
@@ -309,8 +362,8 @@ export class ImageLoader {
                 ),
             ];
         }
-        return this.returnImage3D(
-            new Image3D(
+        return this.returnLoadedVolume(
+            createVolumeImage(
                 instance,
                 this.webgl,
                 img_id,
