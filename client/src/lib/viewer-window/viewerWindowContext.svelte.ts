@@ -116,6 +116,11 @@ export class ViewerWindowContext {
 
     async setInstanceIDs(ids: string[]) {
         this.viewState?.prune(ids);
+        this.mainPanels = this.mainPanels.filter((panel) => {
+            const image = panel.props?.image as AbstractImage | undefined;
+            if (!image) return true;
+            return ids.includes(instanceIdFromImageId(image.image_id));
+        });
 
         // ensure metadata of all instances is loaded
         const fetchOptions = {
@@ -298,7 +303,7 @@ export class ViewerWindowContext {
     async restoreMainViewersFromViewState() {
         const pending = this.viewState?.getViewers() ?? [];
         if (pending.length) {
-            const images = await Promise.all(
+            const results = await Promise.allSettled(
                 pending.map(async (entry) => {
                     const instanceId = instanceIdFromImageId(entry.id);
                     const loaded = await this.getImages(instanceId);
@@ -308,17 +313,25 @@ export class ViewerWindowContext {
                     );
                 }),
             );
-            const panels = images.flatMap((image) =>
-                image ? [{ component: MainViewer, props: { image } }] : [],
+            const panels = results.flatMap((result) =>
+                result.status === "fulfilled" && result.value
+                    ? [
+                          {
+                              component: MainViewer,
+                              props: { image: result.value },
+                          },
+                      ]
+                    : [],
             );
-            if (!panels.length) return;
             if (panels.length === 1) {
                 this.setPanel(panels[0]);
-            } else {
+                return;
+            }
+            if (panels.length > 1) {
                 this.mainPanels = panels;
                 this.syncMainPanelsToViewState();
+                return;
             }
-            return;
         }
 
         if (!this.instanceIds.length) return;

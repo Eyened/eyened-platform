@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
     parseViewersParam,
     serializeViewersParam,
@@ -80,6 +80,11 @@ describe("parseStoredState / serializeStoredState", () => {
         expect(parseStoredState("{")).toBeNull();
         expect(
             parseStoredState(JSON.stringify({ version: 1, frames: {} })),
+        ).toBeNull();
+        expect(
+            parseStoredState(
+                JSON.stringify({ version: 1, viewers: [{ id: "a" }] }),
+            ),
         ).toBeNull();
         expect(parseStoredState(JSON.stringify({ version: 2 }))).toBeNull();
     });
@@ -194,5 +199,48 @@ describe("createViewerViewStateController", () => {
         c.enableRecording();
         c.prune(["bbb", "ccc"]);
         expect(params.get("v")).toBe("bbb.2,ccc_proj");
+    });
+
+    it("debounces rapid recordIndex into one persist", () => {
+        vi.useFakeTimers();
+        let params = new URLSearchParams();
+        let replaceCount = 0;
+        const c = createViewerViewStateController({
+            scope: "view",
+            getSearchParams: () => params,
+            replaceUrl: (p) => {
+                replaceCount += 1;
+                params = new URLSearchParams(p);
+            },
+        });
+        c.hydrate();
+        c.setOpenViewers([{ id: "aaa" }]);
+        c.enableRecording();
+        expect(replaceCount).toBe(1);
+        c.recordIndex("aaa", 1, 10);
+        c.recordIndex("aaa", 2, 10);
+        c.recordIndex("aaa", 3, 10);
+        expect(replaceCount).toBe(1);
+        vi.advanceTimersByTime(250);
+        expect(replaceCount).toBe(2);
+        expect(params.get("v")).toBe("aaa.3");
+        vi.useRealTimers();
+    });
+
+    it("does not throw when replaceUrl fails", () => {
+        const c = createViewerViewStateController({
+            scope: "view",
+            getSearchParams: () => new URLSearchParams(),
+            replaceUrl: () => {
+                throw new Error("SecurityError");
+            },
+        });
+        c.hydrate();
+        c.setOpenViewers([{ id: "aaa" }]);
+        expect(() => c.enableRecording()).not.toThrow();
+        expect(() => {
+            c.recordIndex("aaa", 1, 10);
+            c.flush();
+        }).not.toThrow();
     });
 });

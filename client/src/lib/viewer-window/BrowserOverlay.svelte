@@ -79,7 +79,10 @@
             if (updateImageLinks) {
                 updateSubTaskImageLinks(currentInstanceIds);
             }
-        } else {
+        }
+        // Prune/persist before goto so the snapshot includes the updated v=.
+        viewerWindowContext.setInstanceIDs(currentInstanceIds);
+        if (!subTask) {
             // history.replaceState (view-state) is not mirrored into page.url.
             // eslint-disable-next-line svelte/prefer-svelte-reactivity -- one-shot close() rewrite
             const searchParams = new URLSearchParams(window.location.search);
@@ -87,7 +90,6 @@
             // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
             goto(`?${searchParams.toString()}`.replaceAll("%2C", ","));
         }
-        viewerWindowContext.setInstanceIDs(currentInstanceIds);
     }
     onDestroy(close);
 </script>
