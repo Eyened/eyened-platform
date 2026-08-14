@@ -74,9 +74,9 @@ describe("EnfaceProjectionOverlay", () => {
         );
 
         expect(compileShaderTemplate).toHaveBeenCalledTimes(2);
-        expect(
-            compileShaderTemplate.mock.calls.map((call) => call[2]),
-        ).toEqual([{ mapping: "first" }, { mapping: "second" }]);
+        expect(compileShaderTemplate.mock.calls.map((call) => call[2])).toEqual(
+            [{ mapping: "first" }, { mapping: "second" }],
+        );
 
         const viewerContext = {
             image: { webgl },

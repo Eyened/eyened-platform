@@ -97,7 +97,10 @@ function classifyLines(lines: LinePhotoLocator[]): "raster" | "radial" {
     let maxSpan = 0;
     for (let i = 0; i < angles.length; i++) {
         for (let j = i + 1; j < angles.length; j++) {
-            maxSpan = Math.max(maxSpan, Math.abs(wrapPi(angles[i] - angles[j])));
+            maxSpan = Math.max(
+                maxSpan,
+                Math.abs(wrapPi(angles[i] - angles[j])),
+            );
         }
     }
     const wideFan = maxSpan > (25 * Math.PI) / 180;
@@ -295,8 +298,7 @@ function circularMembers(circles: CirclePhotoLocator[]): CircularMember[] {
         .map((loc) => ({ loc, delta: 1 }));
     for (let i = 0; i < members.length; i++) {
         const gaps: number[] = [];
-        if (i > 0)
-            gaps.push(members[i].loc.radius - members[i - 1].loc.radius);
+        if (i > 0) gaps.push(members[i].loc.radius - members[i - 1].loc.radius);
         if (i < members.length - 1)
             gaps.push(members[i + 1].loc.radius - members[i].loc.radius);
         members[i].delta = gaps.length ? Math.min(...gaps) / 2 : 1;

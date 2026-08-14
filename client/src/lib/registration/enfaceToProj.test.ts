@@ -61,8 +61,24 @@ describe("resolveCircularMaxMatchDistPx", () => {
 
     it("uses half median radius gap for concentric rings", () => {
         const rings = [
-            new CirclePhotoLocator("ir", "oct", { x: 50, y: 50 }, 20, 0, 0, 100),
-            new CirclePhotoLocator("ir", "oct", { x: 50, y: 50 }, 30, 0, 1, 100),
+            new CirclePhotoLocator(
+                "ir",
+                "oct",
+                { x: 50, y: 50 },
+                20,
+                0,
+                0,
+                100,
+            ),
+            new CirclePhotoLocator(
+                "ir",
+                "oct",
+                { x: 50, y: 50 },
+                30,
+                0,
+                1,
+                100,
+            ),
         ];
         expect(resolveCircularMaxMatchDistPx(rings, null, null)).toBeCloseTo(5);
     });

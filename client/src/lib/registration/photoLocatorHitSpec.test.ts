@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { CirclePhotoLocator, LinePhotoLocator } from "./photoLocators";
-import { buildPhotoLocatorHitSpec, medianRasterLineSpacingPx } from "./photoLocatorHitSpec";
+import {
+    buildPhotoLocatorHitSpec,
+    medianRasterLineSpacingPx,
+} from "./photoLocatorHitSpec";
 
 function horiz(y: number, index: number) {
     return new LinePhotoLocator(
@@ -53,12 +56,7 @@ describe("buildPhotoLocatorHitSpec raster", () => {
     });
 });
 
-function ray(
-    angle: number,
-    index: number,
-    hub = { x: 50, y: 50 },
-    len = 40,
-) {
+function ray(angle: number, index: number, hub = { x: 50, y: 50 }, len = 40) {
     return new LinePhotoLocator(
         "ir",
         "oct",
