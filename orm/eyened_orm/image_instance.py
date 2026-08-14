@@ -562,58 +562,28 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             arr = sitk.GetArrayFromImage(img)
         return arr
 
-    @property
-    def pixel_array(self) -> np.ndarray:
-        array = None
+    def load_pixel_array(self) -> np.ndarray:
+        """Load pixel data without validating or mutating DB dimensions."""
         format = self.primary_storage.Format
         if format == "dicom":
-            array = self._load_dicom_array()
-        elif format == "binary":
-            array = self._load_binary_array()
-        elif format == "png_series":
-            array = self._load_png_series_array()
-        elif format == "mhd":
-            array = self._load_mhd_array()
-        else:
-            # assuming image format that PIL can handle
-            array = self._load_single_image_array()
-        self._update_image_dimensions(array)
-        return array
+            return self._load_dicom_array()
+        if format == "binary":
+            return self._load_binary_array()
+        if format == "png_series":
+            return self._load_png_series_array()
+        if format == "mhd":
+            return self._load_mhd_array()
+        # assuming image format that PIL can handle
+        return self._load_single_image_array()
 
-    def _update_image_dimensions(self, array: np.ndarray):
-        shape = array.shape
-        h = None
-        w = None
-        n_frames = None
-        if len(shape) == 2:
-            h, w = shape
-        elif len(shape) == 3:
-            if shape[2] > 4:
-                n_frames, h, w = shape
-            else:
-                h, w, _ = shape
-        else:
-            print(f"Invalid shape: {shape}")
-        if self.Rows_y is None:
-            self.Rows_y = h
-        else:
-            if self.Rows_y != h:
-                print(f"Rows_y mismatch: {self.Rows_y} != {h}")
-        if self.Columns_x is None:
-            self.Columns_x = w
-        else:
-            if self.Columns_x != w:
-                print(f"Columns_x mismatch: {self.Columns_x} != {w}")
-        if self.NrOfFrames is None:
-            self.NrOfFrames = n_frames
-        else:
-            if self.NrOfFrames != n_frames:
-                if n_frames is None and self.NrOfFrames == 1:
-                    # we don't really have a convention for how to set NrOfFrames for single-frame images 
-                    # e.g. for CFI or other 2D images, both None and 1 seem valid
-                    pass
-                else:
-                    print(f"NrOfFrames mismatch: {self.NrOfFrames} != {n_frames}")
+    @property
+    def pixel_array(self) -> np.ndarray:
+        """Load pixels and assert DB dimensions match. Never writes to the session."""
+        from eyened_orm.image_dimensions import assert_dimensions_match
+
+        array = self.load_pixel_array()
+        assert_dimensions_match(self, array)
+        return array
 
     @property
     def bounds(self) -> Optional[CFIBounds]:
