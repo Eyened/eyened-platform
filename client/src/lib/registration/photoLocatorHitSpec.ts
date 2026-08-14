@@ -338,7 +338,7 @@ function buildCircularFamily(
             for (const m of members) {
                 const d = Math.abs(rr - m.loc.radius);
                 if (d > m.delta) continue;
-                let angle = Math.atan2(dy, dx) - m.loc.start_angle;
+                const angle = Math.atan2(dy, dx) - m.loc.start_angle;
                 let t = angle / (2 * Math.PI);
                 t = t - Math.floor(t); // fract → [0,1)
                 const score = d / m.delta;
