@@ -9,7 +9,7 @@ EyeNED is a web platform for browsing, annotating, and managing ophthalmic image
 
 ![Platform Architecture](../../assets/eyened_platform.png)
 
-**Request flow:** the browser talks to **fileserver** (nginx) on `HTTP_PORT` (set in `deploy/.env`, default `8080`). Nginx proxies `/` to the **client** (viewer UI) and `/api/` to the **server** (FastAPI). Image bytes and thumbnails are served via nginx internal redirects — the API validates access, then tells nginx which file to send.
+**Request flow:** the browser talks to **fileserver** (nginx) on `HTTP_PORT` (set in `deploy/.env`, default `8080`). It proxies `/api/` to the **server** (FastAPI) in both stacks. How `/` is served differs: in production nginx serves the built viewer straight off disk from its own image — there is no client container and no proxy hop; in development the `compose.dev.yaml` layer adds a **client** container running vite, and nginx proxies `/` to it for hot reload. Image bytes and thumbnails are served via nginx internal redirects — the API validates access, then tells nginx which file to send.
 
 ## Runtime services
 
@@ -17,10 +17,11 @@ These run from `deploy/compose.yaml`:
 
 | Service | Role |
 |---------|------|
-| **Fileserver** | nginx reverse proxy; single entry point for UI, API, thumbnails, and image datasets |
-| **Client** | SvelteKit viewer with WebGL2 rendering for images and segmentations |
+| **Fileserver** | nginx reverse proxy; single entry point for UI, API, thumbnails, and image datasets. In production it also *serves* the built viewer off disk |
 | **Server** | FastAPI backend — authentication, database access, business logic; enqueues long jobs to Redis |
 | **Redis** | Job broker for async work (`EYENED_REDIS_HOST`, `EYENED_REDIS_PORT`, `EYENED_REDIS_PASSWORD`) |
+
+**Client** — the SvelteKit viewer, with WebGL2 rendering for images and segmentations — is a **development-only service**, added by the `compose.dev.yaml` layer to run vite with hot reload. Production has no client container: the same app is built with `@sveltejs/adapter-static` and the resulting static SPA is baked into the fileserver image by `deploy/Dockerfile.fileserver`.
 
 The server also needs `EYENED_API_SECRET_KEY` and the `EYENED_DATABASE_*` variables (see below).
 
@@ -48,14 +49,14 @@ Two distinct layers:
 
 The API itself does **not** read image bytes from disk: `GET /api/images/{image_id}/data` in `server/routes/instances.py` resolves a `StorageRef` and returns an nginx internal redirect (`X-Accel-Redirect`) — nginx reads the file, not the server process. `EYENED_STORAGE_MOUNTS` matters for **ORM-side processes** — GPU workers, notebooks, the thumbnail CLI — that read source pixels directly instead of going through the API.
 
-**Platform storage** — writable data under `EYENED_STORAGE_ROOT` (default `/storage`):
+**Platform storage** — writable data under `EYENED_STORAGE_ROOT`, which is **always** `/storage` inside the containers. It is set there by `deploy/compose.yaml` and is not a `deploy/.env` knob. What *backs* that path is the knob: leave `PLATFORM_STORAGE_PATH` unset and it is this stack's own named volume; set it to an absolute host path and it is a bind mount onto storage you control.
 
 | Path | Contents |
 |------|----------|
 | `thumbnails/` | JPEG previews (`_144.jpg`, `_540.jpg`); served by nginx at `/thumbnails/` |
 | `segmentations.zarr` | Zarr store for user-drawn and model segmentations |
 
-The server container mounts `EYENED_STORAGE_ROOT` read-write; the fileserver mounts `{EYENED_STORAGE_ROOT}/thumbnails` read-only.
+The server container mounts platform storage at `/storage` read-write; the fileserver mounts the *same* storage, also at `/storage`, read-only. It is the nginx configuration, not the mount, that narrows what is reachable: the only location over it is `/thumbnails/`, and that location is `internal`, so it is served solely in response to an `X-Accel-Redirect` from the API.
 
 ## Loading data
 

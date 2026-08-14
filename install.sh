@@ -1,7 +1,7 @@
 #!/bin/sh
 # The client entry point for the Eyened platform.
 #
-#   git clone --branch <tag> https://github.com/Eyened/eyened-platform.git
+#   git clone https://github.com/Eyened/eyened-platform.git
 #   cd eyened-platform
 #   ./install.sh
 #

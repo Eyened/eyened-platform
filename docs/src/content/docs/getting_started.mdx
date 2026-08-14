@@ -24,10 +24,10 @@ Docker stack.
 Desktop or Docker Engine install already satisfies it, and `./install.sh` checks before it builds
 anything. Supported platforms are Linux and macOS natively, and Windows via WSL2.
 
-1. Clone a release tag. Images are built from your checkout, so the tag *is* the version:
+1. Clone the repository. Images are built from your checkout, so the checkout *is* the version:
 
     ```bash
-    git clone --branch v2026.07.0 https://github.com/Eyened/eyened-platform.git
+    git clone https://github.com/Eyened/eyened-platform.git
     cd eyened-platform
     ```
 
@@ -66,29 +66,71 @@ If your Docker installation has the standalone binary rather than the plugin, us
 
 ### Upgrading and rolling back
 
-Images are built from your checkout, so moving between versions is a checkout plus a rebuild:
+Images are built from your checkout, so moving between versions is a checkout plus a rebuild.
+Two things that rebuild does **not** do: it does not migrate an existing database, and it is not
+reversible on its own. The steps below handle both.
+
+First record where you are — this is what a rollback returns to, so note it before anything
+moves:
 
 ```bash
-git fetch --tags
-git tag -l                  # the available releases
-git checkout <tag>          # the release you are moving to
-./install.sh                # rebuilds the images and restarts the stack
+git rev-parse --short HEAD
 ```
+
+Then work through all four steps, in order.
+
+1. **Snapshot the database.** Nothing further down does this for you, and a migration cannot be
+   reliably undone once it has run:
+
+    ```bash
+    make db-snapshot NAME=before-upgrade
+    # or: deploy/scripts/db-snapshot.sh before-upgrade
+    ```
+
+    The archive is written to `deploy/snapshots/` — inside the checkout you are about to move.
+    It is not tracked by git, so step 2 leaves it where it is.
+
+2. **Move the checkout and rebuild:**
+
+    ```bash
+    git pull                    # or: git checkout <branch-or-commit>
+    ./install.sh                # rebuilds the images and restarts the stack
+    ```
+
+3. **Apply migrations yourself.** `./install.sh` deliberately does not migrate a database that
+   already has a schema. It only *reports* which revision that schema is at and, when it is
+   behind, prints the command to run — nothing is changed until you run it:
+
+    ```bash
+    make migrate
+    # or: deploy/scripts/dc.sh exec -it server sh -c 'cd orm/migrations && alembic upgrade head'
+    ```
+
+    Skipping this is the failure this list exists to prevent: new code running against the old
+    schema, with nothing saying so.
+
+4. **Verify the schema is where the new code expects it.** The two revision ids must match:
+
+    ```bash
+    deploy/scripts/dc.sh exec -T server sh -c 'cd orm/migrations && alembic current && alembic heads'
+    ```
+
+    Then open the viewer and sign in.
 
 :::caution
 `docker compose up -d` on its own does **not** pick up a new version — it restarts the images you
-already built. After changing tags, always go through `./install.sh` (or
+already built. After moving the checkout, always go through `./install.sh` (or
 `docker compose up -d --build`).
 :::
 
-To roll back, check out the previous tag and run `./install.sh` again. **A rollback of the code is
-not a rollback of the database:** MySQL commits each schema change as it is applied, so if the
-upgrade ran `make migrate`, returning to the old tag leaves the new schema in place. Take a
-snapshot before migrating, and restore it if you roll back:
+To roll back, check out the commit-ish you recorded above and run `./install.sh` again. **A
+rollback of the code is not a rollback of the database:** MySQL commits each schema change as it
+is applied, so if the upgrade ran `make migrate`, returning to the old code leaves the new schema
+in place. That is what the step-1 snapshot is for — restore it as well:
 
 ```bash
-make db-snapshot NAME=before-upgrade
-make db-restore  NAME=before-upgrade
+make db-restore NAME=before-upgrade
+# or: deploy/scripts/db-restore.sh before-upgrade
 ```
 
 ### Adding your first dataset
@@ -122,7 +164,8 @@ For local development with hot reload, see
 
 :::caution
 Set up regular backups for both the database and the storage directories. `make db-snapshot NAME=x`
-takes a cold snapshot of the bundled database; see `deploy/README.md`.
+(or `deploy/scripts/db-snapshot.sh x`) takes a cold snapshot of the bundled database into
+`deploy/snapshots/`; see `deploy/README.md`.
 :::
 
 :::tip
