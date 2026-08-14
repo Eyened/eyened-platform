@@ -9,27 +9,29 @@ type TypedArray =
     | Float64Array;
 
 // Map TypedArray constructor to numpy dtype string
-const DTYPE_MAP = new Map<Function, string>([
-    [Uint8Array, '|u1'],
-    [Int8Array, '|i1'],
-    [Uint16Array, '<u2'],
-    [Int16Array, '<i2'],
-    [Uint32Array, '<u4'],
-    [Int32Array, '<i4'],
-    [Float32Array, '<f4'],
-    [Float64Array, '<f8'],
+type TypedArrayCtor = new (...args: unknown[]) => TypedArray;
+
+const DTYPE_MAP = new Map<TypedArrayCtor, string>([
+    [Uint8Array, "|u1"],
+    [Int8Array, "|i1"],
+    [Uint16Array, "<u2"],
+    [Int16Array, "<i2"],
+    [Uint32Array, "<u4"],
+    [Int32Array, "<i4"],
+    [Float32Array, "<f4"],
+    [Float64Array, "<f8"],
 ]);
 
 // Reverse map from dtype string to TypedArray constructor
 const DTYPE_REVERSE_MAP = new Map<string, any>([
-    ['|u1', Uint8Array],
-    ['|i1', Int8Array],
-    ['<u2', Uint16Array],
-    ['<i2', Int16Array],
-    ['<u4', Uint32Array],
-    ['<i4', Int32Array],
-    ['<f4', Float32Array],
-    ['<f8', Float64Array],
+    ["|u1", Uint8Array],
+    ["|i1", Int8Array],
+    ["<u2", Uint16Array],
+    ["<i2", Int16Array],
+    ["<u4", Uint32Array],
+    ["<i4", Int32Array],
+    ["<f4", Float32Array],
+    ["<f8", Float64Array],
 ]);
 
 // Encode TypedArray + shape into .npy ArrayBuffer
@@ -37,16 +39,17 @@ export function encodeNpy(
     data: TypedArray,
     shape: number[],
     version: 1 | 2 = 1,
-    fortranOrder = false
+    fortranOrder = false,
 ): ArrayBuffer {
-    if (!DTYPE_MAP.has(data.constructor)) {
-        throw new Error('Unsupported TypedArray type for encoding');
+    const ctor = data.constructor as TypedArrayCtor;
+    if (!DTYPE_MAP.has(ctor)) {
+        throw new Error("Unsupported TypedArray type for encoding");
     }
-    const descr = DTYPE_MAP.get(data.constructor)!;
+    const descr = DTYPE_MAP.get(ctor)!;
 
     // Construct header dict string, note trailing comma required by numpy
-    const shapeStr = `(${shape.length === 1 ? shape[0] + ',' : shape.join(', ')})`;
-    let header = `{'descr': '${descr}', 'fortran_order': ${fortranOrder ? 'True' : 'False'}, 'shape': ${shapeStr}}`;
+    const shapeStr = `(${shape.length === 1 ? shape[0] + "," : shape.join(", ")})`;
+    const header = `{'descr': '${descr}', 'fortran_order': ${fortranOrder ? "True" : "False"}, 'shape': ${shapeStr}}`;
 
     // Encode header as ASCII
     const encoder = new TextEncoder();
@@ -74,7 +77,11 @@ export function encodeNpy(
 
     // Allocate buffer for full npy file
     const buffer = new ArrayBuffer(
-        magicLen + versionLen + headerLenSize + finalHeaderLen + data.byteLength
+        magicLen +
+            versionLen +
+            headerLenSize +
+            finalHeaderLen +
+            data.byteLength,
     );
     const view = new DataView(buffer);
 
@@ -82,7 +89,7 @@ export function encodeNpy(
 
     // Write magic string \x93NUMPY
     view.setUint8(offset++, 0x93);
-    'NUMPY'.split('').forEach((c) => view.setUint8(offset++, c.charCodeAt(0)));
+    "NUMPY".split("").forEach((c) => view.setUint8(offset++, c.charCodeAt(0)));
 
     // Write version
     view.setUint8(offset++, version);
@@ -103,7 +110,7 @@ export function encodeNpy(
 
     // Write data bytes
     new Uint8Array(buffer, offset, data.byteLength).set(
-        new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+        new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
     );
 
     return buffer;
@@ -112,19 +119,19 @@ export class NPYArray {
     constructor(
         public data: TypedArray,
         public shape: number[],
-        public fortranOrder: boolean
-    ) { }
+        public fortranOrder: boolean,
+    ) {}
 
     async toBlob(gzip: boolean = false): Promise<Blob> {
         const buffer = encodeNpy(this.data, this.shape, 1, this.fortranOrder);
         if (gzip) {
             const inputStream = new Response(buffer).body!;
-            const cs = new CompressionStream('gzip');
+            const cs = new CompressionStream("gzip");
             const compressedStream = inputStream.pipeThrough(cs);
             const compressedResponse = new Response(compressedStream);
             return compressedResponse.blob();
         }
-        return new Blob([buffer], { type: 'application/octet-stream' });
+        return new Blob([buffer], { type: "application/octet-stream" });
     }
 }
 // Decode .npy ArrayBuffer into { data: TypedArray, shape: number[], fortranOrder: boolean }
@@ -133,8 +140,11 @@ export function decodeNpy(buffer: ArrayBuffer): NPYArray {
 
     // Check magic string
     const magic = new Uint8Array(buffer, 0, 6);
-    if (magic[0] !== 0x93 || String.fromCharCode(...magic.slice(1)) !== 'NUMPY') {
-        throw new Error('Invalid .npy file (missing magic string)');
+    if (
+        magic[0] !== 0x93 ||
+        String.fromCharCode(...magic.slice(1)) !== "NUMPY"
+    ) {
+        throw new Error("Invalid .npy file (missing magic string)");
     }
 
     // Version
@@ -158,7 +168,7 @@ export function decodeNpy(buffer: ArrayBuffer): NPYArray {
     const headerBytes = new Uint8Array(buffer, offset, headerLen);
     offset += headerLen;
 
-    const decoder = new TextDecoder('ascii');
+    const decoder = new TextDecoder("ascii");
     const headerText = decoder.decode(headerBytes).trim();
 
     // Parse header dictionary (Python-like dict literal)
@@ -169,20 +179,20 @@ export function decodeNpy(buffer: ArrayBuffer): NPYArray {
     const shapeMatch = headerText.match(/'shape':\s*\(([^)]*)\)/);
 
     if (!descrMatch || !fortranMatch || !shapeMatch) {
-        throw new Error('Failed to parse .npy header');
+        throw new Error("Failed to parse .npy header");
     }
 
     const descr = descrMatch[1];
-    const fortranOrder = fortranMatch[1].toLowerCase() === 'true';
+    const fortranOrder = fortranMatch[1].toLowerCase() === "true";
     const shapeStr = shapeMatch[1].trim();
 
     // Parse shape tuple (numbers separated by commas)
     let shape: number[];
-    if (shapeStr === '') {
+    if (shapeStr === "") {
         shape = [];
     } else {
         shape = shapeStr
-            .split(',')
+            .split(",")
             .map((s) => s.trim())
             .filter((s) => s.length > 0)
             .map((s) => parseInt(s, 10));
@@ -202,19 +212,20 @@ export function decodeNpy(buffer: ArrayBuffer): NPYArray {
     const byteLength = size * TypedArrayConstructor.BYTES_PER_ELEMENT;
 
     if (byteOffset + byteLength > buffer.byteLength) {
-        throw new Error('Data buffer is too short');
+        throw new Error("Data buffer is too short");
     }
 
     const bytesPerElement = TypedArrayConstructor.BYTES_PER_ELEMENT;
+    let data: TypedArray;
     if (byteOffset % bytesPerElement === 0) {
         // Safe to create a view directly
-        var data = new TypedArrayConstructor(buffer, byteOffset, size);
+        data = new TypedArrayConstructor(buffer, byteOffset, size);
     } else {
         // Not aligned: copy to a new buffer
         const src = new Uint8Array(buffer, byteOffset, byteLength);
         const tmp = new ArrayBuffer(byteLength);
         new Uint8Array(tmp).set(src);
-        var data = new TypedArrayConstructor(tmp, 0, size);
+        data = new TypedArrayConstructor(tmp, 0, size);
     }
 
     return new NPYArray(data, shape, fortranOrder);

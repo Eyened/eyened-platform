@@ -4,10 +4,9 @@ import type { RenderTarget } from "$lib/webgl/types";
 import type { ViewerContext } from "../viewerContext.svelte";
 
 export class OCTLinesOverlay implements Overlay {
+    constructor(readonly photolocators: PhotoLocator[]) {}
 
-    constructor(readonly photolocators: PhotoLocator[]) { }
-
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         const { context2D, image } = viewerContext;
 
         // const pointer = viewerContext.registration.pointer;
@@ -16,15 +15,20 @@ export class OCTLinesOverlay implements Overlay {
             // console.log(locator.enfaceImageId, image.image_id, locator.enfaceImageId == image.image_id);
             if (locator.enfaceImageId == image.image_id) {
                 // const octPosition = pointer[locator.octImageId];
-                const octPosition = viewerContext.registration.getPosition(locator.octImageId);
+                const octPosition = viewerContext.registration.getPosition(
+                    locator.octImageId,
+                );
                 if (octPosition?.index == locator.index) {
-                    context2D.strokeStyle = 'rgba(255,255,255,1)';
+                    context2D.strokeStyle = "rgba(255,255,255,1)";
                 } else {
-                    context2D.strokeStyle = 'rgba(0,255,0,0.2)';
+                    context2D.strokeStyle = "rgba(0,255,0,0.2)";
                 }
-                locator.paint(context2D, viewerContext);
+                try {
+                    locator.paint(context2D, viewerContext);
+                } catch (error) {
+                    console.warn("PhotoLocator overlay paint failed", error);
+                }
             }
         }
-
     }
 }

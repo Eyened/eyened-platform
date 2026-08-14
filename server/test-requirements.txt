@@ -1,1 +1,4 @@
-pytest
+-r requirements.txt
+pytest==8.*
+# Required by fastapi.testclient.TestClient (route-level tests).
+httpx==0.28.*

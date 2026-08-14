@@ -1,0 +1,58 @@
+---
+title: PhotoLocators
+description: OCT-to-enface registration locators stored as image attributes
+sidebar:
+  order: 6
+---
+
+`PhotoLocators` is a JSON attribute on `ImageInstance` that links OCT B-scans to positions on an enface image (color fundus, IR, etc.).
+
+## Storage
+
+- **Attribute name:** `PhotoLocators`
+- **Data type:** JSON array
+- **Entity:** `ImageInstance` (typically on the OCT volume)
+
+## Schema
+
+Each array item is a discriminated union keyed by `type`.
+
+### LinePhotoLocator
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"LinePhotoLocator"` | Discriminator |
+| `image_id` | string | Enface image public ID |
+| `index` | int | B-scan index |
+| `start` | `{ x, y }` | Line start in enface pixel coordinates |
+| `end` | `{ x, y }` | Line end in enface pixel coordinates |
+
+### CirclePhotoLocator
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"CirclePhotoLocator"` | Discriminator |
+| `image_id` | string | Enface image public ID |
+| `index` | int | B-scan index (0 for circle scans) |
+| `center` | `{ x, y }` | Circle center in enface pixel coordinates |
+| `radius` | number | Circle radius in pixels |
+| `start_angle` | number | Start angle in radians |
+
+## Example
+
+```json
+[
+  {
+    "type": "CirclePhotoLocator",
+    "index": 0,
+    "center": { "x": 1197, "y": 917 },
+    "radius": 216,
+    "image_id": "50a52xx4",
+    "start_angle": 3.141592653589793
+  }
+]
+```
+
+## Heidelberg Private Eye meta
+
+Heidelberg `.meta` files may embed locators at `meta.images.images[].contents[].photo_locations[]`. Those objects use the same point field names (`center`). They omit `type`, `image_id`, and `index`; the viewer infers them at load time.

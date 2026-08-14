@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { ComponentDef } from "$lib/data/globalContext.svelte"
-    import Close from "$lib/viewer-window/icons/Close.svelte"
-    import MainIcon from "$lib/viewer-window/icons/MainIcon.svelte"
+    import type { ComponentDef } from "$lib/data/globalContext.svelte";
+    import Close from "$lib/viewer-window/icons/Close.svelte";
+    import MainIcon from "$lib/viewer-window/icons/MainIcon.svelte";
 
     interface Props {
         componentDef: ComponentDef;
@@ -25,7 +25,7 @@
     onpointerenter={(e) => e.target.focus()}
 >
     <div class="popup-content">
-        <div class="popup-header">            
+        <div class="popup-header">
             <MainIcon onclick={close} Icon={Close} theme="light" />
         </div>
         <div class="popup-body">

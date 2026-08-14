@@ -1,33 +1,43 @@
-import type { ViewerEvent, ViewerEventListener, RenderMode } from "../viewer-utils";
+import type {
+    ViewerEvent,
+    ViewerEventListener,
+    RenderMode,
+} from "../viewer-utils";
+import { isRenderModeAvailable } from "../viewer-utils";
 
 export class HotKeys implements ViewerEventListener {
     codes: { [key: string]: RenderMode } = {
-        'KeyR': 'Original',
-        'KeyL': 'Luminance',
-        'KeyE': 'Contrast enhanced',
-        'KeyB': 'Color balanced',
-        'KeyH': 'CLAHE',
-        'KeyS': 'Sharpened',
-        'KeyM': 'Histogram matched',
+        KeyR: "Original",
+        KeyL: "Luminance",
+        KeyE: "Contrast enhanced",
+        KeyB: "Color balanced",
+        KeyH: "CLAHE",
+        KeyS: "Sharpened",
+        KeyM: "Histogram matched",
     };
-    constructor() { }
+    constructor() {}
 
     keydown(e: ViewerEvent<KeyboardEvent>) {
-        let {
+        const {
             event: { code, repeat },
-            viewerContext: { hideOverlays },
-            viewerContext
-
+            viewerContext,
         } = e;
         if (repeat) return;
 
-        hideOverlays = code === 'Space';
+        const hideOverlays = code === "Space";
         viewerContext.hideOverlays = hideOverlays;
 
         if (code in this.codes) {
-            viewerContext.renderMode = this.codes[code];
+            const mode = this.codes[code];
+            if (
+                isRenderModeAvailable(
+                    viewerContext.image.supportsColorRenderModes,
+                    mode,
+                )
+            ) {
+                viewerContext.renderMode = mode;
+            }
         }
-
     }
 
     keyup(e: ViewerEvent<KeyboardEvent>) {

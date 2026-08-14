@@ -68,7 +68,7 @@ Fovea and optic-disc landmarks appear in different places depending on how they 
 ```mermaid
 flowchart LR
     subgraph ai [AI pipeline]
-        CFK["ImageInstance.CFKeypoints"]
+        CFK["CFI_Keypoints / CFKeypoints"]
         CFK -->|"fovea_xy tuple"| Auto["Automatic ETDRS overlay"]
     end
     subgraph manual [User annotation]
@@ -79,7 +79,7 @@ flowchart LR
 
 | Storage | Column / table | JSON shape | Written by |
 |---------|----------------|------------|------------|
-| AI keypoints | `ImageInstance.CFKeypoints` | `{ "fovea_xy": [x,y], "disc_edge_xy": [x,y], … }` | `eorm run-models` / CFI import |
+| AI keypoints | `CFI_Keypoints` (`AttributeValue`), or legacy `ImageInstance.CFKeypoints` | `{ "fovea_xy": [x,y], "disc_edge_xy": [x,y], … }` | `eorm run-cfi-models` / CFI import |
 | Manual ETDRS grid | `FormAnnotation.FormData` | `{ "fovea": {x,y}, "disc_edge": {x,y} }` | ETDRS edit tool → `PUT /form-annotations/{id}/value` |
 
 Both use **full-resolution image pixel coordinates**. See **[ETDRS Grid Panel](/eyened-platform/client/panels/etdrs)** for the viewer workflow.

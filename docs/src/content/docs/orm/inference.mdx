@@ -7,17 +7,55 @@ sidebar:
 
 The ORM runs inference through `eorm` commands that write results to the database (`AttributeValue`, `ModelSegmentation`, or patient-level registration JSON). All image-scoped commands share the same **[targeting flags](/eyened-platform/orm/cli#targeting)**.
 
-## Attribute models (`run-models`)
+## Attribute models (`run-cfi-models`)
 
 Runs **AttributesModel** pipelines — CFI ROI, keypoints, quality scores, etc. Each model:
 - Registers as a `Model` row (`ModelName` + `Version`)
 - Writes typed values to `AttributeValue`
-- Skips images that already have output (use `--overwrite` to reprocess)
+- Skips images that already have output from **any** version of that model (default)
+- Use `--upgrade` to add output for the current model version when only older versions exist (older rows kept; reads prefer the highest `ModelID`)
+- Use `--overwrite` to reprocess images that already have a row for the **current** version
+
+Examples:
+```bash
+eorm run-cfi-models
+eorm run-cfi-models --project "My Study"
+eorm run-cfi-models --path ids.txt
+eorm run-cfi-models -m cfi-keypoints --upgrade
+```
+
+With no targeting flags, processes all active images. 
+
+`run-models` is a deprecated alias for `run-cfi-models`.
+
+### Model versions
+
+Version strings are derived automatically from installed packages or HuggingFace artifact paths. When the version changes, pipeline init creates a new `AttributesModel`.
+
+| Model | Version source | Example |
+|-------|----------------|---------|
+| `CFI_ROI` | `retinalysis-fundusprep` package version | `1.1.0` |
+| `CFI_Keypoints` | sorted HF artifact paths joined with `+` | `Eyened/vascx/discedge/discedge_july24+Eyened/vascx/fovea/fovea_july24` |
+| `CFI_ODFD` | HF artifact path (`repo/subdir/stem`) | `Eyened/vascx/odfd/odfd_march25` |
+| `CFI_Quality` | HF artifact path (`repo/subdir/stem`) | `Eyened/vascx/quality/quality` |
+
+Attribute names `CFI_ROI`, `CFI_Keypoints`, `CFI_ODFD`, and `CFI_Quality` are platform-defined — see **[Attributes — reserved names](/eyened-platform/orm/data_model/attributes#reserved-attribute-names-platform-defined)** for API and client consumers.
+
+### Skip and re-run behaviour
+
+| Mode | When an image is processed |
+|------|----------------------------|
+| **Default** | No `AttributeValue` row exists for this model (any version) |
+| **`--upgrade`** | The **current** pipeline version has no row yet; older versions may already exist. New output is stored alongside older rows; reads prefer the newest registration (`ModelID`). |
+| **`--failed`** | Within the selected target, only images with a **failed** row for this model (null value columns). Failed rows are retried; succeeded images are skipped. |
+| **`--overwrite`** | Always (replaces the current version's row only) |
 
 ```bash
-eorm run-models --project "My Study" --modality ColorFundus
-eorm run-models --path ids.txt
+eorm run-cfi-models --project "My Study" --failed
+eorm run-cfi-models -m cfi-roi --path ids.txt --failed
 ```
+
+Dependent models (`cfi-keypoints`, `cfi-odfd`, `cfi-quality`) declare `CFI_ROI` as input and resolve it via `resolve_input_attribute_value` — see **[Attributes — selecting which AttributeValue to use](/eyened-platform/orm/data_model/attributes#selecting-which-attributevalue-to-use)**.
 
 Implementation uses optional preprocess → batch → postprocess stages; see `orm/eyened_orm/commands/` in the repository for extending with custom models.
 
@@ -37,8 +75,10 @@ Pairwise enface registration via `eorm run-registration`. Writes transforms to p
 
 Computes ETDRS subfield areas from segmentations and keypoint/attribute data — not directly from manual FormAnnotation coordinates unless also present in attributes.
 
+Keypoints (`CFI_Keypoints`) and ODFD (`CFI_ODFD`) inputs are resolved with the same `ModelInputSpec` / highest-`ModelID` selection as CFI attribute pipelines (no manual `--keypoints-model-version` flags).
+
 ```bash
-eorm run-etdrs-model --project "My Study"
+eorm run-etdrs-model --project "My Study" -s <segmentation-model-id>
 ```
 
 See also **[ETDRS Panel](/eyened-platform/client/panels/etdrs)** and **[CLI](/eyened-platform/orm/cli)**.

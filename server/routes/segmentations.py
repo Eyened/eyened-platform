@@ -1,20 +1,8 @@
-from datetime import datetime
 import gzip
 import io
 from typing import Annotated, Optional
 
 import numpy as np
-from eyened_orm import (
-    Segmentation,
-    ImageInstance,
-    Segmentation,
-    Datatype,
-    DataRepresentation,
-    ModelSegmentation,
-    Tag,
-    SegmentationTagLink,
-)
-from eyened_orm.tag import TagType
 from fastapi import (
     APIRouter,
     Depends,
@@ -25,252 +13,102 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session, selectinload
 
-from ..db import get_db
-from ..utils.db_logging import get_db_logger
-from eyened_orm.segmentation_storage import read_segmentation_data, write_segmentation_data
-from .auth import CurrentUser, get_current_user
-from ..dtos.dtos_main import SegmentationGET, SegmentationPOST, SegmentationPATCH
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
+from ..dtos.dtos_main import SegmentationGET, SegmentationPATCH, SegmentationPOST
+from ..services.acting_user import ActingUser
+from ..services.segmentation_service import (
+    ModelSegmentationService,
+    SegmentationService,
+    get_model_segmentation_service,
+    get_segmentation_service,
+)
+from .auth import CurrentUser, get_current_user
 
 router = APIRouter()
 
-dtypes = {
-    Datatype.R8: np.uint8,
-    Datatype.R8UI: np.uint8,
-    Datatype.R16UI: np.uint16,
-    Datatype.R32UI: np.uint32,
-    Datatype.R32F: np.float32,
-}
-
-
-def _resolve_image_instance_id(db: Session, image_id: str) -> int:
-    item = (
-        db.query(ImageInstance)
-        .filter(ImageInstance.PublicID == image_id)
-        .first()
-    )
-    if item:
-        return item.ImageInstanceID
-    raise HTTPException(status_code=404, detail="ImageInstance not found")
-
 
 async def load_array(np_array: Optional[UploadFile]) -> Optional[np.ndarray]:
-    # Read and load numpy array
-    if np_array is not None:
-        data_content = await np_array.read()
-        if np_array.filename.endswith(".gz"):
-            with gzip.GzipFile(fileobj=io.BytesIO(data_content)) as f:
-                data_content = f.read()
-                print("uncompressed data_content", len(data_content))
-
-        data_buffer = io.BytesIO(data_content)
-        array = np.load(data_buffer)
-        # check that the data is 3D
-        if len(array.shape) != 3:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Segmentation is not 3D, got shape {array.shape}",
-            )
-        return array
+    """Read an uploaded (optionally gzipped) .npy into a 3D array, or None."""
+    if np_array is None:
+        return None
+    data_content = await np_array.read()
+    if np_array.filename.endswith(".gz"):
+        with gzip.GzipFile(fileobj=io.BytesIO(data_content)) as f:
+            data_content = f.read()
+    array = np.load(io.BytesIO(data_content))
+    if len(array.shape) != 3:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Segmentation is not 3D, got shape {array.shape}",
+        )
+    return array
 
 
-def create_empty_array(segmentation: Segmentation, image: ImageInstance) -> np.ndarray:
-    s_d, s_h, s_w = segmentation.shape
-    im_d, im_h, im_w = image.shape
-    shape = (s_d or im_d, s_h or im_h, s_w or im_w)
-    segmentation.Depth, segmentation.Height, segmentation.Width = shape
-    return np.zeros(shape, dtype=dtypes[segmentation.DataType])
+def _segmentation_data_response(arr: Optional[np.ndarray], filename: str) -> Response:
+    if arr is None:
+        return Response(status_code=204)
+    np_buf = io.BytesIO()
+    np.save(np_buf, arr)
+    gz = gzip.compress(np_buf.getvalue())
+    headers = {
+        "Content-Encoding": "gzip",
+        "Content-Disposition": f'inline; filename="{filename}"',
+        "Content-Length": str(len(gz)),
+    }
+    return Response(content=gz, media_type="application/octet-stream", headers=headers)
 
 
-
-
-# this endpoint uses multipart/form-data
-# to create an annotation and upload its data at the same time
-# it was implemented this way to ensure that the annotation data and metadata are consistent
-# if the annotation data (np_array) is not provided, an empty (zeros) annotation is created
-# once the annotation is created, its data can be updated using the PUT endpoint
-# but only by data with the same shape as the original annotation
 @router.post("/segmentations", response_model=SegmentationGET)
 async def create_segmentation(
     metadata: Annotated[str, Form()],
     np_array: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db),
+    service: SegmentationService = Depends(get_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    # create a new segmentation
     dto = SegmentationPOST.model_validate_json(metadata)
-    image_instance_id = _resolve_image_instance_id(db, dto.image_id)
-
-    segmentation = Segmentation(
-        ImageInstanceID=image_instance_id,
-        FeatureID=dto.feature_id,
-        CreatorID=current_user.id,
-        SubTaskID=dto.subtask_id,
-        DataType=dto.data_type,
-        DataRepresentation=dto.data_representation,
-        Depth=dto.depth,
-        Height=dto.height,
-        Width=dto.width,
-        SparseAxis=dto.sparse_axis,
-        ImageProjectionMatrix=dto.image_projection_matrix,
-        ScanIndices=dto.scan_indices,
-        Threshold=dto.threshold,
-        ReferenceSegmentationID=dto.reference_segmentation_id,
-        DateInserted=datetime.now()
-    )
-
-    # creator can be different from the current_user and is passed in the params
-    # segmentation.CreatorID = current_user.id
-
-    image = ImageInstance.by_id(db, segmentation.ImageInstanceID)
-    if image is None:
-        raise HTTPException(
-            status_code=400, detail="Segmentation has no associated image"
-        )
-
     array = await load_array(np_array)
-    if array is None:
-        data = create_empty_array(segmentation, image)
-    else:
-        if segmentation.ScanIndices is None:
-            # full volume
-            data = array
-            if segmentation.shape != array.shape:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Segmentation shape {segmentation.shape} does not match array shape {array.shape}",
-                )
-        else:
-            # sparse volume
-            if segmentation.SparseAxis is None:
-                raise HTTPException(
-                    status_code=400, detail=f"SparseAxis is not set for sparse volume"
-                )
-
-            if len(segmentation.ScanIndices) != array.shape[segmentation.SparseAxis]:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"ScanIndices length {len(segmentation.ScanIndices)} does not match array sparse axis length {array.shape[segmentation.SparseAxis]}",
-                )
-
-            data = np.zeros(segmentation.shape, dtype=dtypes[segmentation.DataType])
-            for i, scan_index in enumerate(segmentation.ScanIndices):
-                data[scan_index] = array[i]
-
-    for dim, attr in zip(data.shape, ["Depth", "Height", "Width"]):
-        val = getattr(segmentation, attr)
-        if val is None:
-            # if the dimension is not set on the segmentation, set it to the array dimension
-            setattr(segmentation, attr, dim)
-        elif val != dim:
-            # if the dimension is set on the segmentation, it must match the array dimension
-            raise HTTPException(
-                status_code=400,
-                detail=f"Segmentation {attr} ({val}) does not match array {attr} ({dim})",
-            )
-
-    db.add(segmentation)
-    db.flush()
-
-    try:
-        write_segmentation_data(segmentation, data)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-    db.commit()
-    db.refresh(segmentation)
-    
-    # Log segmentation creation
-    logger = get_db_logger()
-    if logger:
-        logger.log_insert(
-            user=current_user.username,
-            user_id=current_user.id,
-            endpoint="POST /api/segmentations",
-            entity="Segmentation",
-            entity_id=segmentation.SegmentationID,
-            fields={
-                "image_instance_id": segmentation.ImageInstanceID,
-                "feature_id": segmentation.FeatureID,
-                "subtask_id": segmentation.SubTaskID,
-                "creator_id": segmentation.CreatorID,
-                "data_type": str(segmentation.DataType),
-                "data_representation": str(segmentation.DataRepresentation),
-                "shape": segmentation.shape,
-                "sparse_axis": segmentation.SparseAxis,
-                "threshold": segmentation.Threshold,
-                "reference_segmentation_id": segmentation.ReferenceSegmentationID,
-            },
-        )
-    
+    segmentation = service.create(
+        image_id=dto.image_id,
+        feature_id=dto.feature_id,
+        subtask_id=dto.subtask_id,
+        data_type=dto.data_type,
+        data_representation=dto.data_representation,
+        depth=dto.depth,
+        height=dto.height,
+        width=dto.width,
+        sparse_axis=dto.sparse_axis,
+        image_projection_matrix=dto.image_projection_matrix,
+        scan_indices=dto.scan_indices,
+        threshold=dto.threshold,
+        reference_segmentation_id=dto.reference_segmentation_id,
+        array=array,
+        actor=ActingUser(id=current_user.id, username=current_user.username),
+    )
     return DTOConverter.segmentation_to_get(segmentation)
 
 
 @router.get("/segmentations/{segmentation_id}", response_model=SegmentationGET)
 async def get_segmentation(
     segmentation_id: int,
-    db: Session = Depends(get_db),
+    service: SegmentationService = Depends(get_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    item = db.get(
-        Segmentation,
-        segmentation_id,
-        options=(
-            selectinload(Segmentation.SegmentationTagLinks)
-                .selectinload(SegmentationTagLink.Tag),
-            selectinload(Segmentation.SegmentationTagLinks)
-                .selectinload(SegmentationTagLink.Creator),
-        ),
-    )
-    if item is None:
-        raise HTTPException(status_code=404, detail="Segmentation not found")
+    item = service.get_segmentation(segmentation_id)
     return DTOConverter.segmentation_to_get(item)
 
 
 @router.delete("/segmentations/{segmentation_id}", status_code=204)
 async def delete_segmentation(
     segmentation_id: int,
-    db: Session = Depends(get_db),
+    service: SegmentationService = Depends(get_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    segmentation = Segmentation.by_id(db, segmentation_id)
-    if segmentation is None:
-        raise HTTPException(status_code=404, detail="Segmentation not found")
-
-    # Save segmentation data for logging before soft delete
-    deleted_data = {
-        "image_instance_id": segmentation.ImageInstanceID,
-        "feature_id": segmentation.FeatureID,
-        "subtask_id": segmentation.SubTaskID,
-        "creator_id": segmentation.CreatorID,
-        "data_type": str(segmentation.DataType),
-        "data_representation": str(segmentation.DataRepresentation),
-        "shape": segmentation.shape,
-        "sparse_axis": segmentation.SparseAxis,
-        "threshold": segmentation.Threshold,
-        "reference_segmentation_id": segmentation.ReferenceSegmentationID,
-    }
-    
-    # db.delete(segmentation)
-    segmentation.Inactive = True
-    db.commit()
-    
-    # Log segmentation deletion (soft delete)
-    logger = get_db_logger()
-    if logger:
-        logger.log_delete(
-            user=current_user.username,
-            user_id=current_user.id,
-            endpoint=f"DELETE /api/segmentations/{segmentation_id}",
-            entity="Segmentation",
-            entity_id=segmentation_id,
-            deleted_data=deleted_data,
-        )
-    
+    service.soft_delete(
+        segmentation_id,
+        ActingUser(id=current_user.id, username=current_user.username),
+    )
     return Response(status_code=204)
 
 
@@ -280,50 +118,22 @@ async def update_segmentation_data(
     request: Request,
     axis: Optional[int] = None,
     scan_nr: Optional[int] = None,
-    db: Session = Depends(get_db),
+    service: SegmentationService = Depends(get_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    segmentation = Segmentation.by_id(db, segmentation_id)
-    if segmentation is None:
-        raise HTTPException(status_code=404, detail="Segmentation data not found")
-
     content_type = request.headers.get("Content-Type", "").lower()
     if content_type != "application/octet-stream":
         raise HTTPException(
             status_code=400, detail=f"Unsupported media type: {content_type}"
         )
-
-    data = await request.body()
-    np_image = np.load(io.BytesIO(data))
-
-    try:
-        write_segmentation_data(segmentation, np_image, axis=axis, slice_index=scan_nr)
-    except IndexError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-    db.add(segmentation)
-    db.commit()
-
-    # return Response(status_code=204)
-
-    # return the updated segmentation
-    db.refresh(segmentation)
-    
-    # Log segmentation data update (simple one-line format for high-frequency operations)
-    logger = get_db_logger()
-    if logger:
-        logger.log_simple(
-            user=current_user.username,
-            user_id=current_user.id,
-            endpoint=f"PUT /api/segmentations/{segmentation_id}/data",
-            operation="UPDATE",
-            entity="Segmentation",
-            entity_id=segmentation_id,
-        )
-    
-    return segmentation
+    np_image = np.load(io.BytesIO(await request.body()))
+    return service.write_data(
+        segmentation_id,
+        np_image,
+        axis=axis,
+        scan_nr=scan_nr,
+        actor=ActingUser(id=current_user.id, username=current_user.username),
+    )
 
 
 @router.get("/segmentations/{segmentation_id}/data")
@@ -331,193 +141,59 @@ async def get_segmentation_data(
     segmentation_id: int,
     axis: Optional[int] = None,
     scan_nr: Optional[int] = None,
-    db: Session = Depends(get_db),
+    service: SegmentationService = Depends(get_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    segmentation = Segmentation.by_id(db, segmentation_id)
-    if segmentation is None:
-        raise HTTPException(status_code=404, detail="Segmentation data not found")
-
-    try:
-        arr = read_segmentation_data(segmentation, axis=axis, slice_index=scan_nr)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-    if arr is None:
-        return Response(status_code=204)
-
-    np_buf = io.BytesIO()
-    np.save(np_buf, arr)
-    raw = np_buf.getvalue()
-    gz = gzip.compress(raw)
-
-    headers = {
-        "Content-Encoding": "gzip",
-        "Content-Disposition": 'inline; filename="segmentation.npy.gz"',
-        "Content-Length": str(len(gz)),
-    }
-    return Response(content=gz, media_type="application/octet-stream", headers=headers)
-
-
+    arr = service.read_data(segmentation_id, axis=axis, scan_nr=scan_nr)
+    return _segmentation_data_response(arr, "segmentation.npy.gz")
 
 
 @router.patch("/segmentations/{segmentation_id}", response_model=SegmentationGET)
 async def patch_segmentation(
     segmentation_id: int,
     dto: SegmentationPATCH,
-    db: Session = Depends(get_db),
+    service: SegmentationService = Depends(get_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    segmentation = Segmentation.by_id(db, segmentation_id)
-    if segmentation is None:
-        raise HTTPException(status_code=404, detail="Segmentation not found")
-
-    if dto.reference_segmentation_id is not None:
-        segmentation.ReferenceSegmentationID = dto.reference_segmentation_id
-    if dto.feature_id is not None:
-        segmentation.FeatureID = dto.feature_id
-    changes = {}
-    if dto.reference_segmentation_id is not None:
-        changes["reference_segmentation_id"] = f"{segmentation.ReferenceSegmentationID} -> {dto.reference_segmentation_id}"
-        segmentation.ReferenceSegmentationID = dto.reference_segmentation_id
-    if dto.feature_id is not None:
-        changes["feature_id"] = f"{segmentation.FeatureID} -> {dto.feature_id}"
-        segmentation.FeatureID = dto.feature_id
-    if dto.threshold is not None:
-        changes["threshold"] = f"{segmentation.Threshold} -> {dto.threshold}"
-        segmentation.Threshold = dto.threshold
-
-    db.commit()
-    db.refresh(segmentation)
-    
-    # Log segmentation update
-    logger = get_db_logger()
-    if logger:
-        logger.log_update(
-            user=current_user.username,
-            user_id=current_user.id,
-            endpoint=f"PATCH /api/segmentations/{segmentation_id}",
-            entity="Segmentation",
-            entity_id=segmentation_id,
-            changes=changes if changes else None,
-        )
-    
+    segmentation = service.patch(
+        segmentation_id,
+        reference_segmentation_id=dto.reference_segmentation_id,
+        feature_id=dto.feature_id,
+        threshold=dto.threshold,
+        actor=ActingUser(id=current_user.id, username=current_user.username),
+    )
     return DTOConverter.segmentation_to_get(segmentation)
 
 
-#### CONSISTENCY CHECKS ####
-"""
-if image.is_2d and annotation.is_2d:
-    # one one-dimension should match
-    if image.l1_axis != annotation.l1_axis:
-        raise HTTPException(status_code=400, detail=f"Image length 1 axis {image.length_1_axis} does not match annotation length 1 axis {annotation.l1_axis}")
-    
-    if image.shape != annotation.shape and annotation.ImageProjectionMatrix is None:
-        raise HTTPException(status_code=400, detail=f"Image shape {image.shape} does not match annotation shape {annotation.shape} and ImageProjectionMatrix is not provided")
-    
-    annotation.ScanIndices = None
-    annotation.SparseAxis = None
-    
-elif image.is_3d and annotation.is_2d:
-    if annotation.ScanIndices is None or not isinstance(annotation.ScanIndices, int):
-        raise HTTPException(status_code=400, detail=f"ScanIndices must be an int for 2D annotations on 3D images")
-    
-    # scan index must be within the image shape
-    if annotation.ScanIndices >= image.shape[annotation.l1_axis]:
-        raise HTTPException(status_code=400, detail=f"ScanIndices {annotation.ScanIndices} is out of bounds for image shape {image.shape} along dimension {annotation.l1_axis}")
-    
-    # check if image and annotation match along dimensions other than the length 1 axis
-    if not annotation.shape_matches_image_shape and annotation.ImageProjectionMatrix is None:
-        raise HTTPException(status_code=400, detail=f"Annotation shape {annotation.shape} does not match image shape {image.shape} and ImageProjectionMatrix is not provided")
-    annotation.SparseAxis = None
-    
-elif image.is_3d and annotation.is_3d:
-    if image.shape != annotation.shape:
-        raise HTTPException(status_code=400, detail=f"3D annotation shape {annotation.shape} does not match image shape {image.shape}")
-    
-    # SparseAxis and ScanIndices can either be both present or both absent
-    if annotation.SparseAxis is not None and annotation.ScanIndices is None:
-        raise HTTPException(status_code=400, detail=f"SparseAxis is provided but ScanIndices is not")
-    if annotation.SparseAxis is None and annotation.ScanIndices is not None:
-        raise HTTPException(status_code=400, detail=f"ScanIndices is provided but SparseAxis is not")
-    
-    if annotation.ScanIndices is not None:
-        if not isinstance(annotation.ScanIndices, list):
-            raise HTTPException(status_code=400, detail=f"ScanIndices must be a list for sparse annotations")
-        
-        # scan indices must be unique and within the image bounds
-        for i in annotation.ScanIndices:
-            if i >= image.shape[annotation.SparseAxis]:
-                raise HTTPException(status_code=400, detail=f"Scan index {i} is out of bounds for image shape {image.shape} along dimension {annotation.SparseAxis}")
-        
-else:
-    raise HTTPException(status_code=400, detail=f"Image and annotation shapes are not compatible")
-"""
-
-
 @router.post("/segmentations/{segmentation_id}/tags", response_model=TagMeta)
-async def tag_segmentation(segmentation_id: int, body: ObjectTagPOST, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)) -> TagMeta:
+async def tag_segmentation(
+    segmentation_id: int,
+    body: ObjectTagPOST,
+    service: SegmentationService = Depends(get_segmentation_service),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> TagMeta:
     """Attach a Tag to a Segmentation by tag ID (idempotent)."""
-    seg = db.get(Segmentation, segmentation_id)
-    if not seg:
-        raise HTTPException(404, "Segmentation not found")
-    tag = db.get(Tag, body.tag_id)
-    if not tag:
-        raise HTTPException(404, "Tag not found")
-    if tag.TagType != TagType.Segmentation:
-        raise HTTPException(400, "Tag type must be Segmentation")
-
-    link = db.get(SegmentationTagLink, {"TagID": tag.TagID, "SegmentationID": segmentation_id})
-    if not link:
-        link = SegmentationTagLink(TagID=tag.TagID, SegmentationID=segmentation_id, CreatorID=current_user.id)
-        db.add(link); db.commit(); db.refresh(link)
-        link.Tag = tag
-        
-        # Log tag link creation
-        logger = get_db_logger()
-        if logger:
-            logger.log_insert(
-                user=current_user.username,
-                user_id=current_user.id,
-                endpoint=f"POST /api/segmentations/{segmentation_id}/tags",
-                entity="SegmentationTagLink",
-                fields={
-                    "tag_id": tag.TagID,
-                    "segmentation_id": segmentation_id,
-                },
-            )
-
+    link = service.tag(
+        segmentation_id,
+        body.tag_id,
+        ActingUser(id=current_user.id, username=current_user.username),
+    )
     return DTOConverter.link_to_tag_metadata(link)
 
+
 @router.delete("/segmentations/{segmentation_id}/tags/{tag_id}", status_code=204)
-async def untag_segmentation(segmentation_id: int, tag_id: int, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+async def untag_segmentation(
+    segmentation_id: int,
+    tag_id: int,
+    service: SegmentationService = Depends(get_segmentation_service),
+    current_user: CurrentUser = Depends(get_current_user),
+):
     """Remove a Tag from a Segmentation (idempotent)."""
-    seg = db.get(Segmentation, segmentation_id)
-    if not seg:
-        raise HTTPException(404, "Segmentation not found")
-    link = db.get(SegmentationTagLink, {"TagID": tag_id, "SegmentationID": segmentation_id})
-    if link:
-        # Save link data for logging before deletion
-        deleted_data = {
-            "tag_id": tag_id,
-            "segmentation_id": segmentation_id,
-            "creator_id": link.CreatorID,
-        }
-        
-        db.delete(link); db.commit()
-        
-        # Log tag link deletion
-        logger = get_db_logger()
-        if logger:
-            logger.log_delete(
-                user=current_user.username,
-                user_id=current_user.id,
-                endpoint=f"DELETE /api/segmentations/{segmentation_id}/tags/{tag_id}",
-                entity="SegmentationTagLink",
-                fields={"tag_id": tag_id, "segmentation_id": segmentation_id},
-                deleted_data=deleted_data,
-            )
-    
+    service.untag(
+        segmentation_id,
+        tag_id,
+        ActingUser(id=current_user.id, username=current_user.username),
+    )
     return Response(status_code=204)
 
 
@@ -526,32 +202,11 @@ async def get_model_segmentation_data(
     model_segmentation_id: int,
     axis: Optional[int] = None,
     scan_nr: Optional[int] = None,
-    db: Session = Depends(get_db),
+    service: ModelSegmentationService = Depends(get_model_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    model_segmentation = ModelSegmentation.by_id(db, model_segmentation_id)
-    if model_segmentation is None:
-        raise HTTPException(status_code=404, detail="ModelSegmentation data not found")
-
-    try:
-        arr = read_segmentation_data(model_segmentation, axis=axis, slice_index=scan_nr)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-    if arr is None:
-        return Response(status_code=204)
-
-    np_buf = io.BytesIO()
-    np.save(np_buf, arr)
-    raw = np_buf.getvalue()
-    gz = gzip.compress(raw)
-
-    headers = {
-        "Content-Encoding": "gzip",
-        "Content-Disposition": 'inline; filename="model_segmentation.npy.gz"',
-        "Content-Length": str(len(gz)),
-    }
-    return Response(content=gz, media_type="application/octet-stream", headers=headers)
+    arr = service.read_data(model_segmentation_id, axis=axis, scan_nr=scan_nr)
+    return _segmentation_data_response(arr, "model_segmentation.npy.gz")
 
 
 @router.put("/model-segmentations/{model_segmentation_id}/data")
@@ -560,35 +215,15 @@ async def update_model_segmentation_data(
     request: Request,
     axis: Optional[int] = None,
     scan_nr: Optional[int] = None,
-    db: Session = Depends(get_db),
+    service: ModelSegmentationService = Depends(get_model_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    model_segmentation = ModelSegmentation.by_id(db, model_segmentation_id)
-    if model_segmentation is None:
-        raise HTTPException(status_code=404, detail="ModelSegmentation data not found")
-
     content_type = request.headers.get("Content-Type", "").lower()
     if content_type != "application/octet-stream":
         raise HTTPException(
             status_code=400, detail=f"Unsupported media type: {content_type}"
         )
-
-    data = await request.body()
-    np_image = np.load(io.BytesIO(data))
-
-    try:
-        write_segmentation_data(
-            model_segmentation,
-            np_image,
-            axis=axis,
-            slice_index=scan_nr,
-        )
-    except IndexError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-    db.add(model_segmentation)
-    db.commit()
-    db.refresh(model_segmentation)
-    return model_segmentation
+    np_image = np.load(io.BytesIO(await request.body()))
+    return service.write_data(
+        model_segmentation_id, np_image, axis=axis, scan_nr=scan_nr
+    )

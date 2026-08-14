@@ -11,7 +11,8 @@
 
     let { measureTool }: Props = $props();
 
-    const { segmentationContext } = getContext<MainViewerContext>("mainViewerContext");
+    const { segmentationContext } =
+        getContext<MainViewerContext>("mainViewerContext");
 
     const segmentations = $derived([
         ...segmentationContext.graderSegmentations,

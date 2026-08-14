@@ -1,85 +1,88 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap } from "svelte/reactivity";
 import type {
-	ImageGET,
-	StudyGET,
-	TagGET,
-	FeatureGET,
-	FormSchemaGET,
-	SegmentationGET,
-	ModelSegmentationGET,
-	FormAnnotationGET,
-	TaskGET,
-	SubTaskWithImagesGET,
-    PatientDetailGET
-} from '../../types/openapi_types';
+    ImageGET,
+    StudyGET,
+    TagGET,
+    FeatureGET,
+    FormSchemaGET,
+    SegmentationGET,
+    ModelSegmentationGET,
+    FormAnnotationGET,
+    TaskGET,
+    SubTaskWithImagesGET,
+    PatientDetailGET,
+} from "../../types/openapi_types";
 
 // ReactiveMap extends SvelteMap with array-like iteration methods
 class ReactiveMap<K, V> extends SvelteMap<K, V> {
-	// Returns array of filtered values
-	filter(predicate: (value: V, key: K, map: this) => boolean): V[] {
-		const result: V[] = [];
-		for (const [key, value] of this.entries()) {
-			if (predicate(value, key, this)) {
-				result.push(value);
-			}
-		}
-		return result;
-	}
+    // Returns array of filtered values
+    filter(predicate: (value: V, key: K, map: this) => boolean): V[] {
+        const result: V[] = [];
+        for (const [key, value] of this.entries()) {
+            if (predicate(value, key, this)) {
+                result.push(value);
+            }
+        }
+        return result;
+    }
 
-	// Returns array of mapped values
-	map<U>(callback: (value: V, key: K, map: this) => U): U[] {
-		const result: U[] = [];
-		for (const [key, value] of this.entries()) {
-			result.push(callback(value, key, this));
-		}
-		return result;
-	}
+    // Returns array of mapped values
+    map<U>(callback: (value: V, key: K, map: this) => U): U[] {
+        const result: U[] = [];
+        for (const [key, value] of this.entries()) {
+            result.push(callback(value, key, this));
+        }
+        return result;
+    }
 
-	// Returns first matching value or undefined
-	find(predicate: (value: V, key: K, map: this) => boolean): V | undefined {
-		for (const [key, value] of this.entries()) {
-			if (predicate(value, key, this)) {
-				return value;
-			}
-		}
-		return undefined;
-	}
+    // Returns first matching value or undefined
+    find(predicate: (value: V, key: K, map: this) => boolean): V | undefined {
+        for (const [key, value] of this.entries()) {
+            if (predicate(value, key, this)) {
+                return value;
+            }
+        }
+        return undefined;
+    }
 
-	// Returns true if any value matches
-	some(predicate: (value: V, key: K, map: this) => boolean): boolean {
-		for (const [key, value] of this.entries()) {
-			if (predicate(value, key, this)) {
-				return true;
-			}
-		}
-		return false;
-	}
+    // Returns true if any value matches
+    some(predicate: (value: V, key: K, map: this) => boolean): boolean {
+        for (const [key, value] of this.entries()) {
+            if (predicate(value, key, this)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-	// Returns true if all values match
-	every(predicate: (value: V, key: K, map: this) => boolean): boolean {
-		for (const [key, value] of this.entries()) {
-			if (!predicate(value, key, this)) {
-				return false;
-			}
-		}
-		return true;
-	}
+    // Returns true if all values match
+    every(predicate: (value: V, key: K, map: this) => boolean): boolean {
+        for (const [key, value] of this.entries()) {
+            if (!predicate(value, key, this)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
-	// Reduce over values
-	reduce<U>(callback: (acc: U, value: V, key: K, map: this) => U, initial: U): U {
-		let acc = initial;
-		for (const [key, value] of this.entries()) {
-			acc = callback(acc, value, key, this);
-		}
-		return acc;
-	}
+    // Reduce over values
+    reduce<U>(
+        callback: (acc: U, value: V, key: K, map: this) => U,
+        initial: U,
+    ): U {
+        let acc = initial;
+        for (const [key, value] of this.entries()) {
+            acc = callback(acc, value, key, this);
+        }
+        return acc;
+    }
 
-	// Execute function for each value
-	forEach(callback: (value: V, key: K, map: this) => void): void {
-		for (const [key, value] of this.entries()) {
-			callback(value, key, this);
-		}
-	}
+    // Execute function for each value
+    forEach(callback: (value: V, key: K, map: this) => void): void {
+        for (const [key, value] of this.entries()) {
+            callback(value, key, this);
+        }
+    }
 }
 
 // Simple stores - just maps of plain data by ID
@@ -89,7 +92,10 @@ export const tags = new ReactiveMap<number, TagGET>();
 export const features = new ReactiveMap<number, FeatureGET>();
 export const formSchemas = new ReactiveMap<number, FormSchemaGET>();
 export const segmentations = new ReactiveMap<number, SegmentationGET>();
-export const modelSegmentations = new ReactiveMap<number, ModelSegmentationGET>();
+export const modelSegmentations = new ReactiveMap<
+    number,
+    ModelSegmentationGET
+>();
 export const formAnnotations = new ReactiveMap<number, FormAnnotationGET>();
 export const tasks = new ReactiveMap<number, TaskGET>();
 export const subtasks = new ReactiveMap<number, SubTaskWithImagesGET>();
@@ -102,83 +108,83 @@ export const tagsByName = new ReactiveMap<string, TagGET>();
 
 // Ingest functions handle embedded data extraction
 export function ingestPatients(patientsData: PatientDetailGET[]) {
-	for (const patient of patientsData) {
-		patients.set(patient.id, patient);
-	}
+    for (const patient of patientsData) {
+        patients.set(patient.id, patient);
+    }
 }
 
 export function ingestStudies(studiesData: StudyGET[]) {
-	for (const study of studiesData) {
-		studies.set(study.id, study);
-	}
+    for (const study of studiesData) {
+        studies.set(study.id, study);
+    }
 }
 
 export function ingestInstances(instancesData: ImageGET[]) {
-	for (const inst of instancesData) {
-		instances.set(inst.id, inst);
-	}
+    for (const inst of instancesData) {
+        instances.set(inst.id, inst);
+    }
 }
 
 export function ingestTags(tagsData: TagGET[]) {
-	for (const tag of tagsData) {
-		tags.set(tag.id, tag);
-		tagsByName.set(tag.name, tag);
-	}
+    for (const tag of tagsData) {
+        tags.set(tag.id, tag);
+        tagsByName.set(tag.name, tag);
+    }
 }
 
 export function ingestFeatures(featuresData: FeatureGET[]) {
-	for (const feature of featuresData) {
-		features.set(feature.id, feature);
-		featuresByName.set(feature.name, feature);
-	}
+    for (const feature of featuresData) {
+        features.set(feature.id, feature);
+        featuresByName.set(feature.name, feature);
+    }
 }
 
 export function ingestFormSchemas(schemasData: FormSchemaGET[]) {
-	for (const schema of schemasData) {
-		formSchemas.set(schema.id, schema);
-		if (schema.name) {
-			formSchemasByName.set(schema.name, schema);
-		}
-	}
+    for (const schema of schemasData) {
+        formSchemas.set(schema.id, schema);
+        if (schema.name) {
+            formSchemasByName.set(schema.name, schema);
+        }
+    }
 }
 
 export function ingestSegmentations(segsData: SegmentationGET[]) {
-	for (const seg of segsData) {
-		segmentations.set(seg.id, seg);
-	}
+    for (const seg of segsData) {
+        segmentations.set(seg.id, seg);
+    }
 }
 
 export function ingestModelSegmentations(segsData: ModelSegmentationGET[]) {
-	for (const seg of segsData) {
-		modelSegmentations.set(seg.id, seg);
-	}
+    for (const seg of segsData) {
+        modelSegmentations.set(seg.id, seg);
+    }
 }
 
 export function ingestFormAnnotations(annotationsData: FormAnnotationGET[]) {
-	for (const annotation of annotationsData) {
-		formAnnotations.set(annotation.id, annotation);
-	}
+    for (const annotation of annotationsData) {
+        formAnnotations.set(annotation.id, annotation);
+    }
 }
 
 export function ingestTasks(tasksData: TaskGET[]) {
-	for (const task of tasksData) {
-		tasks.set(task.id, task);
-	}
+    for (const task of tasksData) {
+        tasks.set(task.id, task);
+    }
 }
 
 export function ingestSubTasks(subtasksData: SubTaskWithImagesGET[]) {
-	for (const subtask of subtasksData) {
-		const existing = subtasks.get(subtask.id);
-		if (existing) {
-			// Merge so partial payloads (e.g. the image add/remove and comment
-			// endpoints) don't wipe fields they don't return, such as `index`.
-			const merged = { ...existing, ...subtask };
-			if (subtask.index == null && existing.index != null) {
-				merged.index = existing.index;
-			}
-			subtasks.set(subtask.id, merged);
-		} else {
-			subtasks.set(subtask.id, subtask);
-		}
-	}
+    for (const subtask of subtasksData) {
+        const existing = subtasks.get(subtask.id);
+        if (existing) {
+            // Merge so partial payloads (e.g. the image add/remove and comment
+            // endpoints) don't wipe fields they don't return, such as `index`.
+            const merged = { ...existing, ...subtask };
+            if (subtask.index == null && existing.index != null) {
+                merged.index = existing.index;
+            }
+            subtasks.set(subtask.id, merged);
+        } else {
+            subtasks.set(subtask.id, subtask);
+        }
+    }
 }
