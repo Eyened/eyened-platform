@@ -24,6 +24,13 @@ description: EyeNED Platform v2026.07.0 release notes
   directory. Clients install with `./install.sh` (Docker is the only prerequisite); developers
   use `make up`; site deployments against an external database use `make prod`. The database is
   part of the stack rather than a second compose project.
+- **Upgrading: bring the old stacks down before you pull.** Deleting those directories takes their
+  compose files with them, so afterwards `cd dev && docker compose down` fails with "no
+  configuration file" and the legacy volumes — `db_data` from the `database` stack,
+  `client_node_modules` from the `dev` one — have nothing left to remove them. Nothing in `deploy/`
+  touches either. If you have already pulled, Compose can still address a project by name with no
+  file present (`docker compose -p <project> ps` lists it), or recover the file itself with
+  `git show <ref-before-this-release>:dev/docker-compose.yml`.
 - **Breaking: Docker Compose 2.26 or newer is now required.** The server's dependency on the
   bundled database uses `depends_on: required: false`, which is what lets the same stack run
   with a bundled or an external database. Older Compose either rejects it or silently drops the

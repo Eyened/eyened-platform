@@ -22,6 +22,12 @@ def project_root() -> Path:
     on sys.path to import `server.main`, and `default_output_dir` resolves the
     docs tree against it. Move this file and both break silently — the import
     fails, or the schema is written under the wrong directory.
+
+    A third thing depends on this file's location without coming through here:
+    `load_fastapi_app` calls `load_dotenv()`, which walks up from *this file's*
+    directory rather than from the root. From `deploy/scripts/` that resolves
+    `deploy/.env` — the file `bootstrap.sh` writes. With no `.env` anywhere up
+    the tree the import fails in pydantic on required settings.
     """
     return Path(__file__).resolve().parents[2]
 

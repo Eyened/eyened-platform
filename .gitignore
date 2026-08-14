@@ -21,6 +21,14 @@ venv
 trash
 scratch.txt
 
+# Retired stacks. dev/, docker/ and database/ are gone from the repo, but a
+# checkout that predates that still holds untracked leftovers in them — a venv,
+# and .env.* files that root's `*.env` does not match. Their own .gitignore
+# files went with them, so cover the directories wholesale.
+dev/
+docker/
+database/
+
 # Graphify (Claude Code) - regenerable knowledge graph, rebuild with `graphify update .`
 graphify-out/
 
