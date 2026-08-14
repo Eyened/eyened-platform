@@ -109,9 +109,9 @@ Generic image attributes also appear in API `attrs` (flat, no producing model) a
 
 ### Legacy `ImageInstance` columns 
 
-Older databases may still populate `CFROI`, `CFKeypoints`, and `CFQuality` columns. 
+Older databases may still populate `CFROI`, `CFKeypoints`, and `CFQuality` columns.
 These are deprecated and will be removed in a future release.
-ORM accessors and API `cf_*` fields prefer these columns when set, then fall back to the matching `CFI_*` attributes. New inference should use `eorm run-cfi-models` so values live in `AttributeValue` rows with model provenance.
+`keypoints` / API `cf_keypoints` and `quality` / API `cf_quality` prefer those columns when set, then fall back to `CFI_Keypoints` / `CFI_Quality`. `roi` / API `cf_roi` reads `CFI_ROI` only (not `CFROI`). New inference should use `eorm run-cfi-models` so values live in `AttributeValue` rows with model provenance.
 
 Search still filters **Color Fundus Quality** against the `ImageInstance.CFQuality` column, not the `CFI_Quality` attribute directly.
 

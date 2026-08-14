@@ -17,7 +17,6 @@ The following commands are available:
 - run-cfi-models: Run CFI attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality).
 - run-models: Deprecated alias for run-cfi-models.
 - run-etdrs-model: Run ETDRS model processing on segmentations.
-- run-cfi-amd: Run CFI AMD segmentation models.
 - run-registration: Pairwise CFI/AF/IR registration per patient; scope with --patient or --project.
 - seed-form-schemas: Insert builtin viewer FormSchema rows (ETDRS grid, registration).
 - validate-forms: Validate form annotations and schemas in the database.
