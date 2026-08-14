@@ -97,7 +97,7 @@ help:
 	@awk 'BEGIN { FS = ": " } /^## / { sub(/^## /, ""); printf "  %s\n", $$0 }' $(MAKEFILE_LIST)
 
 gen-openapi:
-	$(PY) $(REPO_ROOT)/dev/generate_openapi.py $(OPENAPI_DIR)
+	$(PY) $(DEPLOY)/scripts/generate_openapi.py $(OPENAPI_DIR)
 
 gen-types: gen-openapi
 	npx --yes openapi-typescript@7 $(OPENAPI_JSON) -o $(OPENAPI_TS)

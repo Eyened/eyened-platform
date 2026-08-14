@@ -23,10 +23,6 @@ See our [Documentation](https://eyened.github.io/eyened-platform/).
 ***deploy:*** The one Docker stack — database, Redis, server, client, and file server — plus
 `install.sh` (client installs) and the `Makefile` targets developers use. Start here.
 
-***dev:*** Superseded by `deploy/`. Still present, no longer the way to run the platform.
-
-***docker:*** Superseded by `deploy/`. Still present, no longer the way to run the platform.
-
 ***docs:*** Astro-based documentation. Contains project documentation, API references, and user guides.
 
 ***orm:*** SQLAlchemy-based Object-Relational Mapping library for database interactions. Includes migration management with Alembic, data models, and utilities for data scientists to work with the database.

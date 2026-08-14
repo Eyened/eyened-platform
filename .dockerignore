@@ -14,9 +14,6 @@ docs
 graphify-out
 notebooks
 worker
-dev
-docker
-database
 deploy
 !deploy/entrypoint-client.sh
 *.zip

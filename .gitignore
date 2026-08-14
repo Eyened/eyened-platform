@@ -20,7 +20,6 @@ client/src/lib/extensions.ts
 venv
 trash
 scratch.txt
-dev/.venv
 
 # Graphify (Claude Code) - regenerable knowledge graph, rebuild with `graphify update .`
 graphify-out/

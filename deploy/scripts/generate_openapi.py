@@ -15,13 +15,20 @@ from dotenv import load_dotenv
 
 
 def project_root() -> Path:
-    """Return repository root (parent of `eyened_platform`)."""
-    return Path(__file__).resolve().parents[1]
+    """Return the repository root.
+
+    This file lives at <repo>/deploy/scripts/, so the root is two levels up.
+    Both callers below depend on that depth: `load_fastapi_app` puts the root
+    on sys.path to import `server.main`, and `default_output_dir` resolves the
+    docs tree against it. Move this file and both break silently — the import
+    fails, or the schema is written under the wrong directory.
+    """
+    return Path(__file__).resolve().parents[2]
 
 
 def default_output_dir() -> Path:
     """Return default docs output directory."""
-    return Path(__file__).resolve().parents[1] / "docs/src/content/docs/api"
+    return project_root() / "docs/src/content/docs/api"
 
 
 def load_fastapi_app() -> FastAPI:
