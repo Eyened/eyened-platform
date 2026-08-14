@@ -515,6 +515,14 @@ def run_models(
     default=True,
     help="Skip existing segmentations (filters out complete images)",
 )
+@click.option(
+    "--upscale/--no-upscale",
+    default=False,
+    help=(
+        "Upscale segmentation to original image size (legacy). "
+        "Default stores native model output with image_projection_matrix."
+    ),
+)
 def run_segmentation(
     model,
     path,
@@ -528,6 +536,7 @@ def run_segmentation(
     batch_size,
     n_workers,
     skip_existing,
+    upscale,
 ):
     """Run segmentation inference models on a set of images.
 
@@ -578,6 +587,7 @@ def run_segmentation(
                     batch_size=batch_size,
                     n_workers=n_workers,
                     overwrite=not skip_existing,
+                    upscale=upscale,
                 )
             elif slug == "layer-segmentation":
                 from eyened_orm.inference.layer_segmentation import run_for_image_ids
