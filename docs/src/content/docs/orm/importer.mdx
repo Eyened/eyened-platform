@@ -72,7 +72,7 @@ session.commit()
 
 ## Row preparation
 
-Before planning, `plan_image_import` / `build_image_import_rows` call `prepare_rows` to fill missing fields. Control this with `PreparationOptions` (pass as `options=` to those helpers).
+Before planning, `plan_image_import` / `build_image_import_rows` call `prepare_rows` to fill missing fields. Control this with `PreparationOptions` (pass as `options=` to those helpers). To inspect inferred fields in a spreadsheet before planning, see [Export prepared / inferred metadata to CSV](#export-prepared--inferred-metadata-to-csv).
 
 | Option | Default | Effect |
 |--------|---------|--------|
@@ -161,6 +161,41 @@ run.display_summary()
 run.apply()
 session.commit()
 ```
+
+### Export prepared / inferred metadata to CSV
+
+`plan_image_import` runs preparation internally and returns only an `ImportRun` — it does **not** expose the enriched `ImportRow`s. To verify inferred DICOM / default metadata, prepare first, write a CSV, then plan:
+
+```python
+from pathlib import Path
+
+from eyened_orm.importer import PreparationOptions, build_image_import_rows, plan_import
+from eyened_orm.importer.import_csv import read_import_rows_csv, write_import_rows_csv
+
+opts = PreparationOptions(
+    defaults=defaults,
+    infer_metadata_from_dicom_header=True,
+    link_oct_enface_series=True,
+)
+
+# 1. Same preparation plan_image_import would run
+prepared = build_image_import_rows(rows, options=opts)
+
+# 2. Inspect (and optionally edit) inferred fields
+write_import_rows_csv(prepared, Path("inferred_metadata.csv"))
+
+# 3. After verifying — plan without preparing again
+#    (use plan_import, not plan_image_import, so DICOM infer is not re-applied)
+prepared = read_import_rows_csv(Path("inferred_metadata.csv"))  # if you edited the file
+run = plan_import(session, prepared)
+run.display_summary()
+```
+
+`build_image_import_rows` and `prepare_rows` are equivalent for this purpose when you pass the same `PreparationOptions`.
+
+If you already called `plan_image_import`, re-run `build_image_import_rows` / `prepare_rows` on the same inputs to produce the CSV — the prepared rows are not available from `ImportRun`.
+
+`write_import_rows_csv` writes only columns that have at least one non-empty value (pass `include_empty=True` or `columns=[...]` to control the header). The file is readable by `read_import_rows_csv`.
 
 ## Attaching to existing objects
 
