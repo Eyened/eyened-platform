@@ -2,18 +2,87 @@
 
 ## Cutover
 
-Every step before the last is invisible to users. Memberships are inert rows
-until enforcement reads them, and the CLI is a trusted path that works
-regardless of enforcement state -- so the grants happen while the system is
-still open, and the flip lands with everyone already granted.
+Memberships are inert rows until enforcement reads them, and the CLI is a
+trusted path that works regardless of enforcement state -- so the grants happen
+while the system is still open, and the flip lands with everyone already
+granted. Every step before the last is invisible to users except one tag-delete
+status code, noted at step 1.
 
-1. Deploy the migration alone (`ProjectMember`, `Creator.IsAdmin`,
-   `Creator.Inactive` exist; nothing reads them).
-2. `eorm init-admin --username <the EYENED_API_ADMIN_USERNAME value>`
-3. `eorm grant-all` -- grader in all 44 projects for every creator that can
-   authenticate.
-4. Review the grant; announce the cutover.
-5. Deploy the enforcing server.
+`eorm` and `alembic` both ship inside the server image, so every command below
+runs after `docker compose exec -it server bash` from `docker/`. `-e` /
+`--env-file` is a **group** option on `eorm`: it goes *before* the subcommand,
+and with no `-e` the CLI uses the ambient environment rather than searching for
+a file.
+
+### 1. Deploy the two migrations, alone
+
+`c3f5a2b81d94` (tag deletes become RESTRICT) then `b2e2800000b2`
+(`ProjectMember`, `Creator.IsAdmin`, `Creator.Inactive` exist; nothing reads
+them). The server container runs as `eyened_wr`, which holds no DDL rights, so
+alembic needs the `eyened_ddl` credentials rather than the ambient environment:
+
+```bash
+cd /app/orm/migrations
+alembic -x env_file=<ddl.env> current        # expect a1d1700000a1
+alembic -x env_file=<ddl.env> upgrade head   # c3f5a2b81d94, then b2e2800000b2
+```
+
+`upgrade` prompts `Target database: ... Proceed? [y/N]`
+(`orm/migrations/alembic/env.py`), so it does not run unattended as written --
+only `revision`, `history`, `current`, `heads`, `branches`, `show`, `check`,
+`list_templates` and `stamp` skip the prompt.
+
+**The one visible change before step 5.** `c3f5a2b81d94` flips five `TagID`
+foreign keys from CASCADE to RESTRICT. The pre-cutover server has
+`DELETE /tags/{id}` and no `IntegrityError` handling, so deleting a tag that is
+still applied returns **500** during this window; the enforcing server turns the
+same violation into a 409. The annotation data is protected either way -- only
+the status code is wrong, and only until step 5.
+
+### 2. Create the administrator
+
+Nothing else does. `public_auth_disabled` is false in production, so no request
+path promotes anyone -- the dev bypass that calls `ensure_admin` is not running.
+
+```bash
+EYENED_API_ADMIN_PASSWORD='...' eorm init-admin --username <the EYENED_API_ADMIN_USERNAME value>
+```
+
+**Set the password.** Omitting it stores `'!'` -- a valid hash that verifies
+nothing -- and the result is an administrator that cannot log in. Without the
+env var the command prompts for the username, then the password twice without
+echo. Idempotent: re-running it without a password leaves an existing one alone
+rather than clearing it.
+
+### 3. Grant everyone
+
+```bash
+eorm grant-all          # --yes skips the confirmation; anything else aborts
+```
+
+`grader` in all 44 projects for every creator matching `IsHuman AND NOT Inactive
+AND PasswordHash IS NOT NULL` -- 32 today, so 1,408 rows. The totals print after
+the commit, which is why the review is step 4 and not the prompt.
+
+### 4. Review the grant, then announce
+
+A query, not a prompt -- see the `grant-all` accepted risk below. Newest first,
+because an account that self-registered before cutover sorts to the top:
+
+```sql
+SELECT c.CreatorID, c.CreatorName, c.IsAdmin, c.DateInserted, COUNT(pm.ProjectID) AS projects
+FROM Creator c LEFT JOIN ProjectMember pm ON pm.CreatorID = c.CreatorID
+WHERE c.IsHuman = 1 AND c.Inactive = 0 AND c.PasswordHash IS NOT NULL
+GROUP BY c.CreatorID ORDER BY c.DateInserted DESC;
+```
+
+`eorm revoke --user <U> --all` removes anyone who should not be there.
+
+### 5. Deploy the enforcing server
+
+```bash
+cd docker && docker compose up -d --build
+```
 
 **Rollback is redeploying the previous server.** The membership rows stay and
 do nothing. There is no feature flag: a flag means two code paths where the
@@ -112,7 +181,7 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
 
 | Command | Purpose |
 |---|---|
-| `eorm init-admin --username U [--password P]` | Create or promote the administrator (idempotent) |
+| `eorm init-admin --username U [--password P]` | Create or promote the administrator (idempotent). Without a password the account is an administrator that cannot log in -- see cutover step 2 |
 | `eorm create-user --username U --password P` | Create a new, non-administrator user account |
 | `eorm grant --user U --project P --role R` | Grant or change a role |
 | `eorm revoke --user U --project P` | Remove a membership |
