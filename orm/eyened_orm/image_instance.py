@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import re
 import secrets
 import tempfile
@@ -26,6 +27,8 @@ from eyened_orm.data_access import get_data_access_adapter
 from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
 from .types import OptionalEnum
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from eyened_orm import Annotation, Creator, ImageInstanceTagLink, Series, Tag
@@ -481,13 +484,84 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         raw = adapter.read_thumbnail(self, size=size)
         return Image.open(io.BytesIO(raw))
 
+    def _cfi_attribute_value(self, spec) -> Any | None:
+        """Latest available value for a ``run-cfi-models`` attribute (version-aware)."""
+        return self.get_attribute_value(
+            attribute_name=spec.attribute_name,
+            producing_model_name=spec.model_name,
+        )
+
+    @property
+    def cfi_roi(self) -> Optional[Dict[str, Any]]:
+        from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
+
+        return self._cfi_attribute_value(CFI_ROI_INPUT)
+
+    @property
+    def cfi_keypoints(self) -> Optional[Dict[str, Any]]:
+        from eyened_orm.inference.model_inputs import CFI_KEYPOINTS_INPUT
+
+        return self._cfi_attribute_value(CFI_KEYPOINTS_INPUT)
+
+    @property
+    def cfi_odfd(self) -> Optional[float]:
+        from eyened_orm.inference.model_inputs import CFI_ODFD_INPUT
+
+        return self._cfi_attribute_value(CFI_ODFD_INPUT)
+
+    @property
+    def cfi_quality(self) -> Optional[float]:
+        from eyened_orm.inference.model_inputs import CFI_QUALITY_INPUT
+
+        return self._cfi_attribute_value(CFI_QUALITY_INPUT)
+
+    @property
+    def odfd(self) -> Optional[float]:
+        return self.cfi_odfd
+
     @property
     def roi(self) -> Optional[Dict[str, Any]]:
-        roi = self.get_attribute_value(attribute_name="CFI_ROI")
-        if roi is not None:
-            # this may be missing in the database for older images
-            if "hw" not in roi:
-                roi["hw"] = (self.Rows_y, self.Columns_x)
+        from eyened_orm.inference.attribute_value_outcome import (
+            AttributeValueOutcome,
+            attribute_value_outcome,
+        )
+        from eyened_orm.inference.model_inputs import (
+            attribute_value_data,
+            select_attribute_value,
+        )
+
+        av = self.find_attribute_value(
+            attribute_name="CFI_ROI",
+            producing_model_name="CFI_ROI",
+        )
+        if av is None:
+            failed_av = select_attribute_value(
+                self.AttributeValues,
+                attribute_name="CFI_ROI",
+                producing_model_name="CFI_ROI",
+                require_available=False,
+            )
+            if (
+                failed_av is not None
+                and attribute_value_outcome(failed_av) == AttributeValueOutcome.FAILED
+            ):
+                logger.warning(
+                    "Image %s: CFI_ROI computation failed (attribute value is empty)",
+                    self.ImageInstanceID,
+                )
+            else:
+                logger.warning(
+                    "Image %s: CFI_ROI attribute not found (model has not run)",
+                    self.ImageInstanceID,
+                )
+            return None
+
+        roi = attribute_value_data(av)
+        if not isinstance(roi, dict):
+            return None
+        # this may be missing in the database for older images
+        if "hw" not in roi:
+            roi["hw"] = (self.Rows_y, self.Columns_x)
         return roi
 
     @property
@@ -598,12 +672,12 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             self.Rows_y = h
         else:
             if self.Rows_y != h:
-                print(f"Rows_y mismatch: {self.Rows_y} != {h}")
+                print(f"Rows_y mismatch: {self.Rows_y} != {h} for {self.ImageInstanceID}")
         if self.Columns_x is None:
             self.Columns_x = w
         else:
             if self.Columns_x != w:
-                print(f"Columns_x mismatch: {self.Columns_x} != {w}")
+                print(f"Columns_x mismatch: {self.Columns_x} != {w} for {self.ImageInstanceID}")
         if self.NrOfFrames is None:
             self.NrOfFrames = n_frames
         else:
@@ -613,46 +687,42 @@ class ImageInstance(AttributeValueLookupMixin, Base):
                     # e.g. for CFI or other 2D images, both None and 1 seem valid
                     pass
                 else:
-                    print(f"NrOfFrames mismatch: {self.NrOfFrames} != {n_frames}")
+                    print(f"NrOfFrames mismatch: {self.NrOfFrames} != {n_frames} for {self.ImageInstanceID}")
 
     @property
     def bounds(self) -> Optional[CFIBounds]:
         if self.roi is None:
             return None
-        else:
-            if "success" in self.roi and self.roi["success"] is False:
-                return None
-            # use bounds from database
-            return CFIBounds(**self.roi)
+        return CFIBounds(**self.roi)
 
     @property
     def bounds_with_image(self) -> Optional[CFIBounds]:
         if self.roi is None:
             return None
-        else:
-            if "success" in self.roi and self.roi["success"] is False:
-                return None
-            # use bounds from database
-            return CFIBounds(**self.roi, image=self.pixel_array)
+        return CFIBounds(**self.roi, image=self.pixel_array)
 
     @property
     def _attrs_keypoints(self):
-        _, attrs = self.attrs
-        if "CFI_Keypoints" in attrs:
-            kps = attrs["CFI_Keypoints"]["CFI_Keypoints"]
-            bounds = self.bounds
-            kps["prep_fovea_xy"] = (
-                bounds.get_cropping_transform(1024)
-                .apply([[kps["fovea_xy"][0], kps["fovea_xy"][1]]])[0]
-                .tolist()
-            )
-            kps["prep_disc_edge_xy"] = (
-                bounds.get_cropping_transform(1024)
-                .apply([[kps["disc_edge_xy"][0], kps["disc_edge_xy"][1]]])[0]
-                .tolist()
-            )
+        from eyened_orm.inference.model_inputs import CFI_KEYPOINTS_INPUT
+
+        kps = self._cfi_attribute_value(CFI_KEYPOINTS_INPUT)
+        if kps is None:
+            return None
+        bounds = self.bounds
+        if bounds is None:
             return kps
-        return None
+        kps = dict(kps)
+        kps["prep_fovea_xy"] = (
+            bounds.get_cropping_transform(1024)
+            .apply([[kps["fovea_xy"][0], kps["fovea_xy"][1]]])[0]
+            .tolist()
+        )
+        kps["prep_disc_edge_xy"] = (
+            bounds.get_cropping_transform(1024)
+            .apply([[kps["disc_edge_xy"][0], kps["disc_edge_xy"][1]]])[0]
+            .tolist()
+        )
+        return kps
 
     @property
     def keypoints(self):
@@ -664,10 +734,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     def quality(self):
         if self.CFQuality is not None:
             return self.CFQuality
-        _, attrs = self.attrs
-        if "CFI_Quality" in attrs:
-            return attrs["CFI_Quality"]["CFI_Quality"]
-        return None
+        return self.cfi_quality
 
     def make_cropped_image(self, diameter: int = 1024) -> np.ndarray:
         if self.bounds is None:
@@ -872,36 +939,47 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
     @property
     def attrs(self) -> Dict[str, Any]:
-        attrs_by_model: dict[str, dict[str, object]] = {}
-        attrs_flat: dict[str, object] = {}
+        """Attribute values for API payloads, using version-aware selection.
 
+        Returns ``(attrs_flat, attrs_by_model)`` where each attribute appears
+        at most once per scope, selected by
+        :func:`~eyened_orm.inference.model_inputs.select_attribute_value`
+        (highest producing-model version among available rows).
+        """
+        from collections import defaultdict
+
+        from eyened_orm.inference.model_inputs import (
+            attribute_value_data,
+            select_attribute_value,
+        )
+
+        grouped: dict[tuple[str | None, str], list] = defaultdict(list)
         for av in getattr(self, "AttributeValues", []) or []:
             attr_def = getattr(av, "AttributeDefinition", None)
             if not attr_def:
                 continue
-
             producing_model = getattr(av, "ProducingModel", None)
+            model_name = producing_model.ModelName if producing_model else None
+            grouped[(model_name, attr_def.AttributeName)].append(av)
 
-            value = None
-            if av.ValueInt is not None:
-                value = av.ValueInt
-            elif av.ValueFloat is not None:
-                value = av.ValueFloat
-            elif av.ValueText is not None:
-                value = av.ValueText
-            elif av.ValueJSON is not None:
-                value = av.ValueJSON
+        attrs_by_model: dict[str, dict[str, object]] = {}
+        attrs_flat: dict[str, object] = {}
 
+        for (model_name, attr_name), candidates in grouped.items():
+            av = select_attribute_value(
+                candidates,
+                attribute_name=attr_name,
+                producing_model_name=model_name,
+            )
+            if av is None:
+                continue
+            value = attribute_value_data(av)
             if value is None:
                 continue
-
-            if producing_model:
-                model_name = producing_model.ModelName
-                if model_name not in attrs_by_model:
-                    attrs_by_model[model_name] = {}
-                attrs_by_model[model_name][attr_def.AttributeName] = value
+            if model_name:
+                attrs_by_model.setdefault(model_name, {})[attr_name] = value
             else:
-                attrs_flat[attr_def.AttributeName] = value
+                attrs_flat[attr_name] = value
 
         return attrs_flat, attrs_by_model
 

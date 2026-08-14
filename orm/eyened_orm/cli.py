@@ -13,9 +13,10 @@ Command utilities for the eyened ORM.
 
 The following commands are available:
 - update-thumbnails: Update thumbnails for all images in the database.
-- run-models: Run attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality) on a set of image IDs.
+- clean-thumbnails: Remove dangling thumbnail files and report broken ThumbnailPath refs.
+- run-cfi-models: Run CFI attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality).
+- run-models: Deprecated alias for run-cfi-models.
 - run-etdrs-model: Run ETDRS model processing on segmentations.
-- run-cfi-amd: Run CFI AMD segmentation models.
 - run-registration: Pairwise CFI/AF/IR registration per patient; scope with --patient or --project.
 - seed-form-schemas: Insert builtin viewer FormSchema rows (ETDRS grid, registration).
 - validate-forms: Validate form annotations and schemas in the database.
@@ -221,6 +222,39 @@ def update_thumbnails(
         run_update_thumbnails_job(
             database, include_failed=failed, print_errors=print_errors
         )
+
+
+@eorm.command("clean-thumbnails")
+@click.option(
+    "--apply",
+    is_flag=True,
+    default=False,
+    help="Delete dangling thumbnail files (default is dry-run / report only)",
+)
+@click.option(
+    "--print-limit",
+    type=int,
+    default=50,
+    show_default=True,
+    help="Max dangling files / broken refs to print",
+)
+def clean_thumbnails_cmd(apply: bool, print_limit: int):
+    """Remove dangling thumbnail files and report broken ThumbnailPath refs.
+
+    Compares ``{EYENED_STORAGE_ROOT}/thumbnails/`` to non-empty
+    ``ImageInstance.ThumbnailPath`` values:
+
+    - Deletes (with ``--apply``) on-disk ``_144.jpg`` / ``_540.jpg`` files that
+      are not indexed in the database.
+    - Lists ImageInstance rows whose ThumbnailPath is set but at least one size
+      file is missing.
+
+    Default is dry-run: report only, no deletions.
+    """
+    from eyened_orm.importer.thumbnails import run_clean_thumbnails_job
+
+    database = get_database(confirmation=apply)
+    run_clean_thumbnails_job(database, apply=apply, print_limit=print_limit)
 
 
 @eorm.command()
