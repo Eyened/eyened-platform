@@ -13,7 +13,33 @@ server {
     client_max_body_size 120M;
     sendfile on;
     gzip on;
-    gzip_types text/plain application/json application/octet-stream;
+    # TWO audiences share this list, which is why it looks over-long.
+    #
+    # The API and file path need text/plain, application/json and
+    # application/octet-stream. The SPA needs everything on the second and
+    # third lines: in production THIS nginx is the ORIGIN for the built
+    # frontend (Dockerfile.fileserver bakes the SPA into the image — there is
+    # no vite and no client container in front of it), and nginx's implicit
+    # default adds only text/html. With the list at its original API-only
+    # value every .js, .css and .svg shipped uncompressed: measured on this
+    # repo's real build output, 3,022,027 B -> 894,789 B gzipped, i.e. ~2 MiB
+    # of extra transfer on every cold page load. Do NOT trim this back to the
+    # API set. Both javascript spellings are listed on purpose: the pinned
+    # nginx:1.27-alpine maps .js to application/javascript in its own
+    # mime.types (checked in the image), while newer nginx and other origins
+    # send text/javascript — matching only one spelling makes the fix silently
+    # depend on the base image tag.
+    gzip_types text/plain application/json application/octet-stream
+               text/css application/javascript text/javascript
+               image/svg+xml application/manifest+json;
+    # Under ~1 KB the gzip header and the CPU cost more than the saving.
+    gzip_min_length 1024;
+    # nginx defaults this to `off`, which means "no compression for any
+    # request carrying a Via header" — i.e. for EVERY request as soon as a
+    # TLS-terminating front proxy is put in front of this stack (SURF Research
+    # Cloud, any ingress). That would silently undo the two lines above in
+    # exactly the deployment that needs them most.
+    gzip_proxied any;
     gzip_vary on;
     gunzip on;
 
