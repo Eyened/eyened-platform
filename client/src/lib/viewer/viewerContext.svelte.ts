@@ -179,6 +179,19 @@ export class ViewerContext {
         this.addOverlay(new ZoomPan());
         this.addOverlay(new CursorOverlay());
         this.addOverlay(new HotKeys());
+
+        if (image.is3D && image.depth > 1) {
+            const pending = this.viewerWindowContext.viewState?.peekIndex(
+                this.image.image_id,
+                image.depth,
+            );
+            // Apply pending on viewer.index only. setIndex() writes the global
+            // registration pointer, which cannot hold per-viewer frames
+            // (known limitation for multiple open volumes).
+            this.index = pending ?? Math.round(image.depth / 2);
+        } else if (image.is3D) {
+            this.index = 0;
+        }
     }
 
     setIndex(i: number) {
@@ -197,6 +210,13 @@ export class ViewerContext {
             index: i,
         });
         this.index = i;
+        if (this.image.is3D && this.image.depth > 1) {
+            this.viewerWindowContext.viewState?.recordIndex(
+                this.image.image_id,
+                i,
+                this.image.depth,
+            );
+        }
     }
 
     cycleEnfaceProjectionModeForOct(octPublicId: string): void {
@@ -352,11 +372,8 @@ export class ViewerContext {
         );
         if (p) {
             this.index = p.index;
-        } else {
-            // this.index = Math.round(this.image.depth / 2);
-            this.index =
-                this.image.depth === 1 ? 0 : Math.round(this.image.depth / 2);
         }
+        // else keep this.index (mid-slice / restored pending / last setIndex)
 
         const renderTarget = { ...renderBounds, framebuffer: null };
 

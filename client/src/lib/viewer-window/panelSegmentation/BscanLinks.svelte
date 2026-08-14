@@ -13,8 +13,6 @@
     const scanIndices = $derived(segmentationContext.scan_indices);
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
-    const image = viewerContext.image;
-    const registration = viewerContext.registration;
 
     const displayItems = $derived(
         buildBscanDisplayItems(scanIndices, viewerContext.index),
@@ -25,7 +23,7 @@
         e.stopPropagation();
         const lock = viewerContext.lockScroll;
         viewerContext.lockScroll = false;
-        registration.setPosition(image.image_id, { x: 0, y: 0, index: scanNr });
+        viewerContext.setIndex(scanNr);
         setTimeout(() => (viewerContext.lockScroll = lock), 0);
     }
 </script>
