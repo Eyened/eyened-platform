@@ -1,0 +1,354 @@
+name: Deploy stack
+
+on:
+  pull_request:
+    branches: [main, development]
+    paths:
+      - 'deploy/**'
+      - 'install.sh'
+      - 'Makefile'
+      - '.dockerignore'
+      - '.github/workflows/deploy-validate.yml'
+      # The published quick start tells people to clone and run ./install.sh.
+      # A step below checks that whatever ref it pins actually carries that
+      # installer, so an edit to the quick start alone has to run this job —
+      # otherwise that check never sees the change it exists to catch.
+      - 'docs/src/content/docs/getting_started.mdx'
+  push:
+    branches: [main, development]
+    paths:
+      - 'deploy/**'
+      - 'install.sh'
+      - 'Makefile'
+      - '.dockerignore'
+      - '.github/workflows/deploy-validate.yml'
+      - 'docs/src/content/docs/getting_started.mdx'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # The floor this design depends on. GitHub's runners are well above it,
+      # but asserting it here means a runner image downgrade shows up as a
+      # clear failure rather than as `required: false` quietly not working.
+      - name: Assert the compose version floor
+        run: |
+          version=$(docker compose version --short | tr -d 'v ')
+          echo "compose $version"
+          major=${version%%.*}; rest=${version#*.}; minor=${rest%%.*}
+          # Fail CLOSED on a version that is not a pair of numbers. Without
+          # this the `-lt` tests below abort with "integer expression
+          # expected" — and because they sit in an `if` CONDITION, `set -e`
+          # is suppressed there, so the `if` simply evaluates false and the
+          # step goes GREEN. An empty string (a failed `docker compose
+          # version`, whose status this pipeline discards to `tr`), a
+          # `2.x.y`, or any non-numeric build string all took that path.
+          # Same guard, same shape as deploy/scripts/doctor.sh, which is the
+          # other copy of this rule.
+          case "$major$minor" in
+            ''|*[!0-9]*)
+              echo "::error::could not read a compose version from 'docker compose version --short' (got '$version')"
+              exit 1 ;;
+          esac
+          if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 26 ]; }; then
+            echo "::error::compose $version is below the required 2.26"
+            exit 1
+          fi
+
+      - name: Shell syntax
+        run: |
+          set -e
+          # Every shell script that ships, FOUND rather than listed. A glob of
+          # deploy/scripts/*.sh silently excluded deploy/entrypoint-client.sh
+          # and deploy/keycloak/entrypoint.sh — both container ENTRYPOINTS,
+          # where a syntax error is invisible until the container crash-loops
+          # with no useful message.
+          #
+          # The interpreter is chosen from the SHEBANG, not from the file
+          # name. Keying it on a list of names means the next bash script
+          # added here is parsed as POSIX sh and its bashisms are reported as
+          # syntax errors, and — worse — a POSIX sh script whose name happens
+          # to match is parsed by bash, where its bashisms are NOT reported at
+          # all. deploy/scripts/lib.sh is sourced and carries no shebang; it
+          # is POSIX sh, which is the default branch here.
+          checked=0
+          for f in install.sh $(find deploy -name '*.sh' | sort); do
+            case "$(head -n 1 "$f")" in
+              '#!'*bash*) echo "bash -n $f"; bash -n "$f" ;;
+              *)          echo "sh   -n $f"; sh -n "$f" ;;
+            esac
+            checked=$((checked + 1))
+          done
+          # An empty file list is a broken check, not a clean bill of health:
+          # move or rename deploy/ and the `find` above matches nothing, the
+          # loop runs once for install.sh, and this step goes green having
+          # parsed almost nothing.
+          if [ "$checked" -le 1 ]; then
+            echo "::error::found $checked shell script(s) — the find above matched nothing under deploy/, so this step validated almost nothing"
+            exit 1
+          fi
+          echo "ok: $checked shell script(s) parse"
+
+      # The published quick start is the first thing a new operator runs, so
+      # a `--branch <ref>` in it must not point at a ref that predates the
+      # installer: v2026.07.0, the tag it pinned until this branch, contains
+      # neither install.sh nor deploy/, so the very next line of the quick
+      # start (`./install.sh`) could not work from it. Pinning nothing — the
+      # quick start following the default branch — is a pass.
+      - name: The quick start does not pin a ref without the installer
+        run: |
+          set -e
+          doc=docs/src/content/docs/getting_started.mdx
+          # Both anchors, because "found no --branch" is only good news if
+          # this file exists and still contains the clone command at all.
+          [ -f "$doc" ] || { echo "::error::$doc not found — this guard is no longer reading the published quick start"; exit 1; }
+          command grep -q 'git clone' "$doc" \
+            || { echo "::error::$doc has no 'git clone' line — the quick start moved or changed shape, so this guard is reading the wrong thing"; exit 1; }
+
+          refs=$(command grep -oE -e '--branch[= ][^ ]+' "$doc" | command sed 's/^--branch[= ]//' | sort -u)
+          if [ -z "$refs" ]; then
+            echo "ok: the quick start pins no --branch, so it follows the default branch"
+            exit 0
+          fi
+
+          for ref in $refs; do
+            echo "--- quick start pins --branch $ref ---"
+            # actions/checkout defaults to fetch-depth 1 and fetches no tags,
+            # so without this the ls-tree below fails for the WRONG reason.
+            # A ref that genuinely does not exist fails both fetches and is
+            # then caught by rev-parse with an accurate message.
+            git fetch --no-tags --depth=1 origin "+refs/tags/$ref:refs/tags/$ref" 2>/dev/null \
+              || git fetch --no-tags --depth=1 origin "+refs/heads/$ref:refs/remotes/origin/$ref" 2>/dev/null \
+              || true
+            git rev-parse --verify --quiet "$ref^{commit}" >/dev/null \
+              || { echo "::error::$doc pins --branch $ref, which does not resolve in this repository"; exit 1; }
+            git ls-tree -r --name-only "$ref" | command grep -qx 'install.sh' \
+              || { echo "::error::$doc pins --branch $ref, which does not contain install.sh — the quick start's own './install.sh' cannot work from that ref"; exit 1; }
+            echo "ok: $ref resolves and carries install.sh"
+          done
+
+      # `Makefile` is a trigger path for this job but nothing above reads it.
+      # The Makefile deliberately has no `$(shell …)` (its own comments explain
+      # why: it would run at parse time, including on `make help`, and expand
+      # to the empty string when a tool is missing) so dry-running every
+      # .PHONY target is safe here. That precondition is ASSERTED below, not
+      # assumed: `make -n` expands and RUNS `$(shell …)`, so a future one
+      # would quietly turn this dry run into an execution on a CI runner.
+      # It catches parse errors (e.g. a space-indented recipe) and references
+      # to undefined targets, not just a syntax check of one target.
+      - name: Makefile parses and every target dry-runs
+        run: |
+          set -e
+          # Comment lines are stripped first: the Makefile's own header
+          # explains the hazard in prose and quotes `$(shell …)` twice, so a
+          # bare grep matches its documentation and reds every build.
+          ! command grep -vE '^[[:space:]]*#' Makefile | command grep -n '\$(shell' \
+            || { echo "::error::Makefile gained a \$(shell …) — see its header comment; make -n RUNS it, so this step would stop being a dry run"; exit 1; }
+
+          targets=$(awk '/^\.PHONY:/{sub(/^\.PHONY:[ \t]*/,""); line=$0; while (line ~ /\\$/) { sub(/\\$/,"",line); getline cont; line = line " " cont }; print line }' Makefile)
+
+          # An extraction that finds nothing is a broken check, not a clean
+          # bill of health: reformat, indent, or rename `.PHONY` and the awk
+          # above stops matching, `targets` comes back empty, the loop below
+          # runs zero times, and this step goes green having dry-run nothing.
+          if [ -z "$targets" ]; then
+            echo "::error::no .PHONY targets extracted from Makefile — the awk pattern found no match, so this step would validate nothing"
+            exit 1
+          fi
+
+          # Coverage: every rule the Makefile declares must appear in the
+          # extracted .PHONY list, or that rule dry-runs unchecked (e.g. a
+          # target added without a matching .PHONY entry). Strictly stronger
+          # than the empty-extraction guard above.
+          rules=$(command grep -oE '^[a-zA-Z][a-zA-Z0-9_-]*:' Makefile | tr -d ':' | sort -u)
+          missing=""
+          for r in $rules; do
+            covered=0
+            for t in $targets; do
+              [ "$r" = "$t" ] && { covered=1; break; }
+            done
+            [ "$covered" = "1" ] || missing="$missing $r"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Makefile rule(s) not covered by .PHONY dry-run:$missing"
+            exit 1
+          fi
+
+          # And the reverse. `.PHONY: foo` DEFINES foo as a target, so an
+          # entry whose rule was renamed or deleted does not fail: `make foo`
+          # prints "Nothing to be done for 'foo'" and exits 0, which reads as
+          # success to a person and to a script. No file named foo is
+          # involved — .PHONY alone is enough. Without this, the dry-run loop
+          # below would happily "pass" such a ghost.
+          #
+          # `rules` above only recognises `name:` at the start of a line, so a
+          # multi-target rule (`alpha beta:`) or a pattern rule is invisible
+          # to it and this check reports its .PHONY names as ghosts. That is
+          # a false RED, not a false green: it is loud, it names the targets,
+          # and the fix is to widen the extraction — not to delete this.
+          ghosts=""
+          for t in $targets; do
+            defined=0
+            for r in $rules; do
+              [ "$t" = "$r" ] && { defined=1; break; }
+            done
+            [ "$defined" = "1" ] || ghosts="$ghosts $t"
+          done
+          if [ -n "$ghosts" ]; then
+            echo "::error::.PHONY names target(s) with no rule:$ghosts — 'make' on these prints \"Nothing to be done\" and exits 0, which looks like success"
+            exit 1
+          fi
+
+          for t in $targets; do
+            echo "--- make -n $t ---"
+            make -n "$t" >/dev/null
+          done
+
+      - name: Generate the storage layer
+        run: |
+          set -e
+          cp deploy/.env.example deploy/.env
+          # AMENDMENT (f): .env.example ships EYENED_API_SECRET_KEY empty on
+          # purpose — only first_run_env() generates it, and a plain `cp` never
+          # calls that. compose.yaml:125 requires it with `${...:?}`, which
+          # rejects empty as well as unset, so without this line EVERY
+          # `docker compose config` below fails and the job is red on every PR.
+          # Config-only validation never starts the stack, so a fixed
+          # placeholder is correct and keeps the run deterministic.
+          sed 's/^EYENED_API_SECRET_KEY=$/EYENED_API_SECRET_KEY=ci-config-validation-only-not-a-secret/' \
+              deploy/.env > deploy/.env.ci && mv deploy/.env.ci deploy/.env
+          # storage-mounts.conf.example is COMMENT-ONLY by design, so copying
+          # it alone makes gen-storage.sh take its no-mounts branch: a
+          # storage.conf of two header lines and a compose.storage.yaml of
+          # `services: {}`. Every check downstream — the layer combinations,
+          # the invariants, and `nginx -t` — would then only ever exercise
+          # the EMPTY branch, and the `location`/`alias` blocks and the
+          # PATH:PATH:ro bind overlay this design's whole data path rests on
+          # would never be parsed by anything. Add two real mounts.
+          mkdir -p /tmp/eyened-ci-storage-a /tmp/eyened-ci-storage-b
+          cp deploy/storage-mounts.conf.example deploy/storage-mounts.conf
+          printf '%s\n' 'ci_a /tmp/eyened-ci-storage-a' 'ci_b /tmp/eyened-ci-storage-b' \
+            >> deploy/storage-mounts.conf
+          deploy/scripts/gen-storage.sh
+
+          # …and the fixture must be visible in BOTH generated artifacts, or
+          # a change to the generator could silently put us back on the empty
+          # branch with every check below still green.
+          n=$(command grep -c '^location /' deploy/nginx/storage.d/storage.conf || true)
+          [ "$n" = "2" ] || { echo "::error::storage.d/storage.conf has $n 'location /' block(s), want 2 — the storage fixture did not reach nginx, so nginx -t below would validate nothing storage-related"; exit 1; }
+          n=$(command grep -c ':/tmp/eyened-ci-storage-[ab]:ro$' deploy/compose.storage.yaml || true)
+          [ "$n" = "4" ] || { echo "::error::compose.storage.yaml has $n storage bind mount(s), want 4 (server + fileserver x 2) — the storage fixture did not reach compose"; exit 1; }
+          echo "ok: storage fixture generated 2 nginx locations and 4 bind mounts"
+
+      - name: Every layer combination resolves
+        working-directory: deploy
+        run: |
+          set -e
+          fail=0
+          check() {
+            echo "--- $1 ($2) ---"
+            if ! COMPOSE_FILE="$1" COMPOSE_PROFILES="$2" docker compose config -q; then
+              echo "::error::layer combination failed: COMPOSE_FILE=$1 COMPOSE_PROFILES=$2"
+              fail=1
+            fi
+          }
+          check "compose.yaml:compose.dev.yaml:compose.storage.yaml" "local-db"
+          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db"
+          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     ""
+          check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.host-ports.yaml" "local-db"
+          check "compose.yaml:compose.dev.yaml:compose.storage.yaml" "local-db,oidc"
+          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db,tools"
+          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db,backup"
+          exit $fail
+
+      # The two invariants that are cheap to check and expensive to discover.
+      - name: Invariants
+        working-directory: deploy
+        run: |
+          set -e
+          # pipefail, because every assertion below reads a `docker compose
+          # config` through a pipe. Without it the pipeline's status is the
+          # LAST stage's — `tr` and `sort` succeed happily on no input — so a
+          # failing `config` left `$svc` empty, `set -e` never fired, and the
+          # `case` patterns simply did not match: two invariants that passed
+          # precisely when they could not be evaluated. Today that is masked
+          # only because an earlier step happens to resolve the same combos,
+          # an accident of ordering with nothing enforcing it.
+          set -o pipefail
+          dev="compose.yaml:compose.dev.yaml:compose.storage.yaml"
+          prod="compose.yaml:compose.storage.yaml:compose.prod.yaml"
+
+          # Exactly one `location /` snippet reaches nginx in each mode.
+          for mode in "$dev" "$prod"; do
+            n=$(COMPOSE_FILE=$mode COMPOSE_PROFILES=local-db docker compose config \
+                  | command grep -c 'client.d/client.conf' || true)
+            [ "$n" = "1" ] || { echo "::error::$mode mounts $n client.d snippets, want 1"; exit 1; }
+          done
+
+          # The prod fileserver build must not be tagged as the official nginx.
+          # `grep -c … >/dev/null` rather than `grep -q`: -q exits on the
+          # first match, which under pipefail turns the producer's SIGPIPE
+          # into a rc of 141 and a false RED once the config outgrows the
+          # pipe buffer. -c drains its input, so the pipeline status is the
+          # config's when it fails and the grep's when it does not.
+          COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config \
+            | command grep -c 'eyened-fileserver:local' >/dev/null \
+            || { echo "::error::prod fileserver is not tagged eyened-fileserver:local"; exit 1; }
+
+          # An external-database stack must resolve with no database service.
+          svc=$(COMPOSE_FILE=$prod COMPOSE_PROFILES= docker compose config --services | sort | tr '\n' ' ')
+          echo "external-db services: $svc"
+          case "$svc" in *database*) echo "::error::database present with no local-db profile"; exit 1 ;; esac
+
+          # adminer is opt-in. A client install runs with local-db, so if
+          # adminer ever drifts back onto that profile every installation
+          # starts publishing a database admin UI.
+          svc=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config --services | sort | tr '\n' ' ')
+          case "$svc" in *adminer*) echo "::error::adminer is reachable from the local-db profile alone"; exit 1 ;; esac
+          svc=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db,tools docker compose config --services | sort | tr '\n' ' ')
+          case "$svc" in *adminer*) ;; *) echo "::error::adminer missing from the tools profile"; exit 1 ;; esac
+
+          # No container but `database` may be handed the MySQL root password.
+          # This is what dropping env_file: bought; without a check it silently
+          # comes back the first time someone adds `env_file: .env` to a service.
+          n=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config \
+                | command grep -c 'MYSQL_ROOT_PASSWORD' || true)
+          if [ "$n" = "1" ]; then
+            echo "ok: MYSQL_ROOT_PASSWORD appears once"
+          else
+            echo "::error::MYSQL_ROOT_PASSWORD appears $n times, want 1 (database only)"; exit 1
+          fi
+
+      - name: nginx config is valid in both modes
+        run: |
+          set -e
+          # Assert the inputs FIRST. `docker run -v <host path>:…` creates an
+          # empty directory at a source that does not exist, it does not
+          # fail: move or rename deploy/nginx/ and the entrypoint finds no
+          # template, so nginx validates the base image's own stock
+          # /etc/nginx/conf.d/default.conf and reports "syntax is ok" having
+          # read nothing from this repository. Nothing else here would notice.
+          for variant in dev prod; do
+            [ -f deploy/nginx/default.conf.template ] \
+              && [ -f "deploy/nginx/client.d/$variant.conf" ] \
+              && [ -d deploy/nginx/storage.d ] \
+              || { echo "::error::missing nginx input for '$variant' — expected deploy/nginx/default.conf.template, deploy/nginx/client.d/$variant.conf and deploy/nginx/storage.d/; docker would silently mount empty directories and validate the base image's stock config instead"; exit 1; }
+          done
+
+          for variant in dev prod; do
+            docker run --rm \
+              -v "$PWD/deploy/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro" \
+              -v "$PWD/deploy/nginx/client.d/$variant.conf:/etc/nginx/client.d/client.conf:ro" \
+              -v "$PWD/deploy/nginx/storage.d:/etc/nginx/storage.d:ro" \
+              nginx:1.27-alpine nginx -t
+          done

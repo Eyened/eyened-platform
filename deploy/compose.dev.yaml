@@ -1,0 +1,66 @@
+# Development layer. Reached only by being named in COMPOSE_FILE. It is
+# called compose.dev.yaml and not compose.override.yaml, so nobody has to be
+# told the file is not auto-loaded: it never had the magic name to begin with.
+
+services:
+
+  server:
+    # Replaces the image's gunicorn CMD.
+    command: >
+      uvicorn server.main:app --host 0.0.0.0 --port 8000
+      --reload --reload-dir /app/server --reload-dir /app/orm
+    volumes:
+      - ../server:/app/server
+      - ../orm:/app/orm
+    environment:
+      EYENED_API_DEBUG: "true"
+    extra_hosts:
+      # Lets the server reach a Keycloak published on the host (oidc profile).
+      - "${PUBLIC_HOST:-localhost}:host-gateway"
+    # Many developers share one machine; keep one stack from starving the rest.
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8G
+
+  # Development-only service: production has no client container at all.
+  client:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.client
+    volumes:
+      - ../client:/app/client
+      - client_node_modules:/app/client/node_modules
+    # YAML anchors do not cross files: compose.yaml's x-logging/x-restart
+    # only reach the services defined in compose.yaml, so a service a layer
+    # introduces inherits neither and must restate them itself. Without this,
+    # vite/HMR/npm-install stdout is an UNCAPPED json-file log on a host
+    # several stacks share — exactly what compose.yaml's log cap exists to
+    # prevent. Literal values, matching the base's, not a re-declared anchor.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  fileserver:
+    volumes:
+      # The dev `location /`: proxy to vite. A SINGLE FILE onto a fixed name —
+      # mounting the whole client.d/ directory would give nginx both this and
+      # prod.conf, i.e. a duplicate `location /` and a startup failure.
+      - ./nginx/client.d/dev.conf:/etc/nginx/client.d/client.conf:ro
+    depends_on:
+      client:
+        condition: service_started
+
+  database:
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+
+volumes:
+  client_node_modules:

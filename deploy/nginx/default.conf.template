@@ -1,0 +1,102 @@
+# The scheme the CLIENT used. Behind a TLS-terminating proxy that is https
+# even though our own connection is http; with nothing in front, the header is
+# absent and $scheme is correct.
+map $http_x_forwarded_proto $client_scheme {
+    default $scheme;
+    https   https;
+    http    http;
+}
+
+server {
+    listen 80;
+    resolver 127.0.0.11 valid=10s;
+    client_max_body_size 120M;
+    sendfile on;
+    gzip on;
+    # TWO audiences share this list, which is why it looks over-long.
+    #
+    # The API and file path need text/plain, application/json and
+    # application/octet-stream. The SPA needs everything on the second and
+    # third lines: in production THIS nginx is the ORIGIN for the built
+    # frontend (Dockerfile.fileserver bakes the SPA into the image — there is
+    # no vite and no client container in front of it), and nginx's implicit
+    # default adds only text/html. With the list at its original API-only
+    # value every .js, .css and .svg shipped uncompressed: measured on this
+    # repo's real build output, 3,022,027 B -> 894,789 B gzipped, i.e. ~2 MiB
+    # of extra transfer on every cold page load. Do NOT trim this back to the
+    # API set. Both javascript spellings are listed on purpose: the pinned
+    # nginx:1.27-alpine maps .js to application/javascript in its own
+    # mime.types (checked in the image), while newer nginx and other origins
+    # send text/javascript — matching only one spelling makes the fix silently
+    # depend on the base image tag.
+    gzip_types text/plain application/json application/octet-stream
+               text/css application/javascript text/javascript
+               image/svg+xml application/manifest+json;
+    # Under ~1 KB the gzip header and the CPU cost more than the saving.
+    gzip_min_length 1024;
+    # nginx defaults this to `off`, which means "no compression for any
+    # request carrying a Via header" — i.e. for EVERY request as soon as a
+    # TLS-terminating front proxy is put in front of this stack (SURF Research
+    # Cloud, any ingress). That would silently undo the two lines above in
+    # exactly the deployment that needs them most.
+    gzip_proxied any;
+    gzip_vary on;
+    gunzip on;
+
+    # Access logging is deliberately ON. This is the only component that sees
+    # SPA, thumbnail and image-data requests: the API writes its own gunicorn
+    # access log, which covers /api/ and nothing else, so with logging off here
+    # the entire file-serving path — the bulk of the bytes this platform moves —
+    # is invisible. It also matters because the upstream indirection below turns
+    # a wrong or recreated upstream into a runtime 502 rather than a startup
+    # error, and an unlogged 502 storm leaves no trace at the edge at all.
+    # /var/log/nginx/access.log is a symlink to stdout in the base image, so
+    # this goes to the container log and is rotated by the log driver.
+    access_log /var/log/nginx/access.log main;
+
+    # API
+    location /api/ {
+        # The upstream host is built from a variable so the `resolver`
+        # directive above actually takes effect: nginx re-resolves it
+        # lazily, on every request, instead of once at config-load time.
+        # This location used to proxy straight to a bare hostname on this
+        # port; nginx resolves a bare hostname once, at startup, and
+        # caches that IP for the life of the process. That meant
+        # recreating the server container (a plain backend-only
+        # redeploy) handed it a new IP nginx never learned about, so
+        # every /api/ request would 502 until nginx was bounced, with
+        # nothing in the logs naming the cause. Do not collapse this
+        # back to a bare hostname — that silently reintroduces the same
+        # stale-IP failure mode. No URI path is appended to
+        # $api_upstream, so the request URI passes through unchanged,
+        # exactly as it did before this indirection existed.
+        set $api_upstream server;
+        proxy_pass http://$api_upstream:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $client_scheme;
+    }
+
+    # Frontend. The ONE location that differs between environments: dev
+    # proxies to the vite dev server, prod serves the built SPA off disk.
+    # Exactly one file is mounted here as client.conf — mounting the whole
+    # client.d/ directory would give nginx two `location /` blocks and fail
+    # at startup.
+    include /etc/nginx/client.d/*.conf;
+
+    # Platform thumbnails. EYENED_STORAGE_ROOT is always /storage inside the
+    # container; the API sends X-Accel-Redirect: /thumbnails/<path>.
+    location /thumbnails/ {
+        internal;
+        # the trailing slash on alias matters
+        alias /storage/thumbnails/;
+    }
+
+    # Per-StorageBackend locations, generated from storage-mounts.conf by
+    # deploy/scripts/gen-storage.sh. Deliberately NOT in conf.d/, which the
+    # base image includes inside http{} where a location block is illegal.
+    # A glob that matches nothing is valid nginx, so a clean clone with no
+    # datasets still passes `nginx -t`.
+    include /etc/nginx/storage.d/*.conf;
+}

@@ -1,0 +1,11 @@
+# Image datasets this host can read directly from disk.
+#
+# One pair per line:   <StorageBackend.Key>  <absolute path on this host>
+# Blank lines and lines starting with # are ignored. Paths may not contain
+# spaces. Each key must match a StorageBackend row in the database.
+#
+# Everything else is generated from this file by deploy/scripts/gen-storage.sh:
+# the container bind mounts, the nginx locations, and EYENED_STORAGE_MOUNTS.
+#
+# oogergo  /mnt/oogergo
+# genr     /mnt/genr

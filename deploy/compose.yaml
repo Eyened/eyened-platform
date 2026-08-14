@@ -1,0 +1,340 @@
+# Base stack: the whole service graph with production-ready defaults.
+#
+# No `name:` — the project name comes from COMPOSE_PROJECT_NAME in .env, which
+# is what lets several developers run isolated stacks on one machine.
+#
+# Layers on top of this: compose.dev.yaml (dev), compose.prod.yaml
+# (deployments), compose.storage.yaml (generated). COMPOSE_FILE in .env names
+# the ones in play.
+
+# Logs are capped everywhere, development included: several stacks share one
+# host, doctor's disk check runs only at install time, and a client install
+# runs unattended for months. 10 MB x 3 files per service.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# `unless-stopped`, not `always`: a client install runs unattended for months
+# and must come back after a host reboot or a dockerd restart, but an
+# operator's deliberate `docker compose stop` must stay stopped.
+x-restart: &default-restart unless-stopped
+
+services:
+
+  database:
+    profiles: ["local-db"]
+    # Exact pin, and NOT 8.0.27: that tag is amd64-only (arm64 starts at
+    # 8.0.29), which would make the published "macOS natively" claim false on
+    # Apple Silicon.
+    image: mysql:8.0.46
+    logging: *default-logging
+    restart: *default-restart
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in deploy/.env}
+      MYSQL_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
+      MYSQL_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
+      MYSQL_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
+    volumes:
+      # Unset -> the named volume db_data (this stack's own disk). Set to an
+      # absolute host path -> a bind mount, which is what puts MySQL on storage
+      # that outlives the machine. On SURF Research Cloud the workspace disk is
+      # deleted with the workspace and an external volume is not, so a durable
+      # deployment there MUST set this to a path under ~/data/<volume>.
+      - ${DB_DATA_PATH:-db_data}:/var/lib/mysql
+    # Liveness only: mysqladmin ping answers even when credentials are
+    # rejected, and a password on the command line would show up in `ps`.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    # No host port by default — see compose.host-ports.yaml.
+
+  adminer:
+    # A SEPARATE profile from local-db, not the same one. ./install.sh runs
+    # with local-db, so gating adminer on it would publish a database admin UI
+    # on every client installation by default — a bigger surface than "the
+    # bundled database is in use" is asking for. Opt in with:
+    #   COMPOSE_PROFILES=local-db,tools
+    profiles: ["tools"]
+    image: adminer:4.8.1
+    logging: *default-logging
+    restart: *default-restart
+    # Loopback by default, the same policy compose.host-ports.yaml applies to
+    # MySQL and Redis: this is a database admin UI, and a host shared with
+    # other people should not get one reachable from the network because
+    # somebody added 'tools' to COMPOSE_PROFILES. Nothing inside the stack
+    # connects IN to adminer (it dials `database` on the compose network), so
+    # loopback costs a local developer nothing. On a remote box, reach it over
+    # an SSH tunnel, or set ADMINER_BIND=0.0.0.0 in .env and own that choice.
+    ports:
+      - "${ADMINER_BIND:-127.0.0.1}:${ADMINER_PORT:-8081}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: database
+
+  # Used only by deploy/scripts/{load,save}_dump.sh. Must mount the SAME
+  # source as the database service above — a bare `db_data` here would attach
+  # to an unrelated, empty named volume whenever DB_DATA_PATH is set (a
+  # durable deployment's bind mount), so load_dump.sh would wipe and restore
+  # into nothing while reporting success and the live database sat untouched.
+  xtrabackup:
+    profiles: ["backup"]
+    image: percona/percona-xtrabackup:8.0
+    volumes:
+      - ${DB_DATA_PATH:-db_data}:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    logging: *default-logging
+    restart: *default-restart
+    environment:
+      REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?set EYENED_REDIS_PASSWORD in deploy/.env}
+    command: >
+      sh -c 'exec redis-server --requirepass "$$REDIS_PASSWORD"'
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    # No host port by default — see compose.host-ports.yaml.
+
+  server:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    logging: *default-logging
+    restart: *default-restart
+    # Deliberately NO `env_file: .env`, for the same reason the fileserver has
+    # none: .env holds MYSQL_ROOT_PASSWORD, which this container never needs
+    # and which `docker inspect` would hand to anyone who can reach the daemon.
+    # Listing the environment explicitly also means a variable added to .env
+    # later reaches the app only when someone decides it should.
+    #
+    # EYENED_API_URL / _USERNAME / _PASSWORD are intentionally absent: they
+    # configure the ORM's API adapter for OTHER hosts, and passing them as the
+    # empty string would satisfy pydantic and then fail as a connection error
+    # instead of the clear "url missing" that an unset value raises.
+    environment:
+      # Redis and MySQL are both addressed by variable, so pointing either at a
+      # managed service (ElastiCache, Azure Cache, RDS, Azure Database) is a
+      # one-line .env change and needs no compose edit.
+      EYENED_REDIS_HOST: ${EYENED_REDIS_HOST:-redis}
+      EYENED_REDIS_PORT: ${EYENED_REDIS_PORT:-6379}
+      EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?set EYENED_REDIS_PASSWORD in deploy/.env}
+      EYENED_DATABASE_HOST: ${EYENED_DATABASE_HOST:-database}
+      EYENED_DATABASE_PORT: ${EYENED_DATABASE_PORT:-3306}
+      EYENED_DATABASE_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
+      EYENED_DATABASE_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
+      EYENED_DATABASE_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
+      EYENED_API_SECRET_KEY: ${EYENED_API_SECRET_KEY:?generated on first run; see deploy/.env}
+      EYENED_API_PUBLIC_AUTH_DISABLED: ${EYENED_API_PUBLIC_AUTH_DISABLED:-false}
+      EYENED_API_DEBUG: ${EYENED_API_DEBUG:-false}
+      # Whether the login page offers username/password at all. Documented as
+      # the thing you turn off once OIDC works, so it has to reach a container:
+      # `server` has no env_file, and compose reads .env for INTERPOLATION
+      # only. The default is restated as `true` and NOT written `${X:-}`,
+      # because that form sets the EMPTY STRING and an empty string overrides
+      # the pydantic default (server/config.py) — same trap as
+      # EYENED_OIDC_PROVIDER_NAME below.
+      EYENED_API_AUTH_PASSWORD_ENABLED: ${EYENED_API_AUTH_PASSWORD_ENABLED:-true}
+      # Always /storage inside the container; what backs it is decided below.
+      EYENED_STORAGE_ROOT: /storage
+      # The three below are DERIVED from the bundled Keycloak, but each is also
+      # overridable from .env — `${X:-<derivation>}`, not a bare derivation.
+      # That override is not decoration: deploy/keycloak/README.md tells an
+      # operator pointing at an external IdP (SURFconext, Entra) to set
+      # EYENED_OIDC_* in .env, and because `server` has no env_file (see the
+      # note above this block) a bare derivation would have silently discarded
+      # all three while the four operator-valued ones beside them applied —
+      # config that looks like it took and did not.
+      #
+      # They must move TOGETHER. A metadata URL at an external IdP with a
+      # redirect URL still pointing at this stack, or an iss= still naming the
+      # dev realm, fails token validation with nothing in the log to say why.
+      #
+      # The redirect URL is browser-facing, so its DEFAULT follows PUBLIC_URL:
+      # behind a TLS-terminating proxy (SURF Research Cloud, any ingress) that
+      # is the public https:// origin with no port — not this stack's host and
+      # port.
+      #
+      # The metadata URL is different: the SERVER fetches it directly
+      # (server/config.py), not the browser, so it must name an address the
+      # server container can reach — with the bundled Keycloak that is its own
+      # host:KEYCLOAK_PORT. Defaulting it to PUBLIC_URL would make the server
+      # fetch back out through the TLS proxy it's behind (egress, split-DNS,
+      # cert trust — no thanks), and it is NOT needed for the metadata
+      # document's issuer to match the token's iss= below: both come from
+      # Keycloak's own KC_HOSTNAME, not from the URL we fetch it at. Move the
+      # metadata URL and iss= only together, and only alongside an nginx
+      # route for /realms/ plus a matching KC_HOSTNAME.
+      # Inert unless EYENED_API_AUTH_OIDC_ENABLED is true (see the oidc profile).
+      EYENED_OIDC_METADATA_URL: ${EYENED_OIDC_METADATA_URL:-http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}/realms/eyened-dev/.well-known/openid-configuration}
+      EYENED_OIDC_REDIRECT_URL: ${EYENED_OIDC_REDIRECT_URL:-${PUBLIC_URL:-http://${PUBLIC_HOST:-localhost}:${HTTP_PORT:-8080}}/users/oidc-callback}
+      EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS: ${EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS:-iss=http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}/realms/eyened-dev}
+      # The switch the three URLs above are inert without. Unlike them these
+      # carry no derivation — they are the operator's own values — and they
+      # must be named HERE: `server` has no env_file (see the note above this
+      # block), and compose reads .env for INTERPOLATION only, so a name that
+      # exists only in .env reaches no container. Without these five lines the
+      # oidc profile starts a working Keycloak behind a switch wired to
+      # nothing, and nothing is logged to say so.
+      EYENED_API_AUTH_OIDC_ENABLED: ${EYENED_API_AUTH_OIDC_ENABLED:-false}
+      EYENED_OIDC_CLIENT_ID: ${EYENED_OIDC_CLIENT_ID:-}
+      EYENED_OIDC_CLIENT_SECRET: ${EYENED_OIDC_CLIENT_SECRET:-}
+      # NOT `:-`, and do not "tidy" it to match the four around it: `X: ${X:-}`
+      # sets X to the EMPTY STRING in the container, it does not leave X unset,
+      # and an empty string overrides a pydantic default. That is harmless for
+      # the two above (server/config.py defaults both to "") and for the two
+      # booleans, but provider_name defaults to "OpenID Connect" and
+      # /auth/options hands it straight to the login page — so `:-` would blank
+      # the provider label on every stack that never set it. Restating the
+      # default here is the same convention EYENED_API_PUBLIC_AUTH_DISABLED and
+      # EYENED_API_DEBUG already follow.
+      EYENED_OIDC_PROVIDER_NAME: "${EYENED_OIDC_PROVIDER_NAME:-OpenID Connect}"
+      EYENED_OIDC_CREATE_NEW_ACCOUNTS: ${EYENED_OIDC_CREATE_NEW_ACCOUNTS:-false}
+    volumes:
+      # Unset PLATFORM_STORAGE_PATH -> the named volume below (a clean clone
+      # writes nothing outside its own stack). Set to an absolute host path ->
+      # a bind mount onto shared or production platform storage.
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
+    depends_on:
+      redis:
+        condition: service_healthy
+      # `required: false` is the whole external-database toggle. With the
+      # local-db profile ON, the server waits for MySQL to report healthy (no
+      # first-boot crash-loop). With it OFF, `database` does not exist and
+      # compose starts the server anyway instead of refusing.
+      #
+      # This is why there is no compose.local-db.yaml and why "use the bundled
+      # database" is ONE setting rather than a profile and a layer that must
+      # agree. It needs compose >= 2.24 to work at all; the 2.26 floor also
+      # makes the mistake of omitting `required: false` a loud error rather
+      # than a silent first-boot crash-loop. See Global Constraints.
+      database:
+        condition: service_healthy
+        required: false
+    healthcheck:
+      # 127.0.0.1, not localhost: the dev layer adds an extra_hosts entry
+      # that can alias `localhost` itself to the docker gateway (so the
+      # server can reach a host-published Keycloak). An IP literal bypasses
+      # /etc/hosts entirely and can never be shadowed by that alias, now or
+      # later — do not "tidy" this back to localhost.
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  # There is no `client` service here. In development the dev layer adds one
+  # (vite, hot reload); in production the frontend is a static SPA baked into
+  # the fileserver image by Dockerfile.fileserver, so no client container and
+  # no proxy hop exist at all.
+
+  fileserver:
+    image: nginx:1.27-alpine
+    logging: *default-logging
+    restart: *default-restart
+    # Deliberately NO `env_file: .env`. nginx has no use for
+    # MYSQL_ROOT_PASSWORD, EYENED_API_SECRET_KEY or the redis password, and
+    # anything in a container's environment is one `docker inspect` away from
+    # being read. Nothing in the template needs a variable any more either —
+    # CLIENT_UPSTREAM_PORT went away with the client.d/ split.
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      # Always mounted: an empty directory is valid, and the include globs in
+      # the template tolerate matching nothing.
+      - ./nginx/storage.d:/etc/nginx/storage.d:ro
+      # Thumbnails are served straight off platform storage.
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    # The `location /` include (client.d/client.conf) is mounted by whichever
+    # layer is in play — the dev override or compose.prod.yaml. The base alone
+    # serves the API and thumbnails but has no frontend route, which is fine:
+    # it is never run without a layer.
+
+  # Development/testing OIDC provider. Off by default: add 'oidc' to
+  # COMPOSE_PROFILES to enable. The realm template is a dev realm — this is
+  # not a production identity provider.
+  keycloak:
+    profiles: ["oidc"]
+    image: quay.io/keycloak/keycloak:26.0
+    # Every other service in THIS file carries both, and the header comment
+    # says logs are capped everywhere — a service here that omits them is an
+    # uncapped json-file log on a shared host. Anchors reach it because it is
+    # defined in the same file that declares them.
+    logging: *default-logging
+    restart: *default-restart
+    # No `env_file: .env` — every variable Keycloak needs is listed below, and
+    # the file also holds the MySQL root password and the API signing key.
+    #
+    # No `depends_on: keycloak` on the server either, and do not add one: the
+    # server carries no profile, and on compose >= 2.26 a depends_on pointing
+    # at a profile-disabled service is a hard error — it would break the
+    # DEFAULT stack for everyone not running OIDC. The server discovers the
+    # provider lazily over HTTP, so start order does not matter here.
+    entrypoint: ["/bin/bash", "/opt/keycloak/entrypoint.sh"]
+    environment:
+      # Hostname v2 (the default since Keycloak 25): ONE absolute URL, and no
+      # hostname-port / hostname-strict-https — those are v1 options. Keycloak
+      # 26.0.8 does not abort on them, it logs an ERROR at every startup and
+      # ignores them, which is worse. The old value here was a BARE hostname,
+      # and v2 takes scheme and port from the request for one of those: probed
+      # with `Host: elsewhere.example:9999`, KC_HOSTNAME_PORT was inert and the
+      # issuer's PORT came from the request (the host stayed pinned — only the
+      # port moved). An absolute URL pins all of it. It has to be pinned,
+      # because EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS above compares against
+      # the issuer by exact string, so a port that follows the Host header
+      # fails token validation with nothing in the log to say why.
+      #
+      # KC_HOSTNAME_STRICT was dropped too, and that is deliberate. Note it is
+      # NOT a v1 option — it survives into v2, which is why it is missing from
+      # the ERROR above — it is simply inert next to an absolute hostname, and
+      # Keycloak says so itself at every boot: "If hostanme is specified,
+      # hostname-strict is effectively ignored" (its typo). Re-adding "false"
+      # therefore changes nothing WHILE this line stands; it only matters if
+      # KC_HOSTNAME is ever removed, and then it is what re-enables the
+      # request-header inference this line exists to prevent.
+      KC_HOSTNAME: http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}
+      # KC_BOOTSTRAP_ADMIN_*, not KEYCLOAK_ADMIN/KEYCLOAK_ADMIN_PASSWORD: the
+      # old pair still works in 26 but logs KC-SERVICES0110 deprecation
+      # warnings, and this is a first-boot bootstrap credential either way.
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Read by entrypoint.sh INSIDE the container, not by compose. Dropping
+      # `env_file: .env` (above) is what makes listing them here mandatory:
+      # entrypoint.sh runs `set -u` with `${PUBLIC_HOST:?}`, so if these are
+      # absent it exits before kc.sh and the profile silently starts nothing.
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+      HTTP_PORT: ${HTTP_PORT:-8080}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+    # KEYCLOAK_BIND exists so this admin console can be confined, but its
+    # default is NOT 127.0.0.1 the way adminer's and compose.host-ports.yaml's
+    # are — loopback provably breaks the only flow this profile supports. The
+    # server fetches EYENED_OIDC_METADATA_URL at ${PUBLIC_HOST}:${KEYCLOAK_PORT}
+    # and compose.dev.yaml aliases PUBLIC_HOST to `host-gateway`, i.e. the
+    # docker0 bridge address. Measured on this host: with a listener bound to
+    # 127.0.0.1 a connection to 172.17.0.1 is refused, and with the same
+    # listener on 0.0.0.0 it succeeds. So KEYCLOAK_BIND=127.0.0.1 would leave
+    # the OIDC login failing at metadata fetch with the container up and
+    # healthy. Confine it instead with KEYCLOAK_ADMIN_PASSWORD (.env), and
+    # remember the realm here is a DEV realm either way.
+    ports:
+      - "${KEYCLOAK_BIND:-0.0.0.0}:${KEYCLOAK_PORT:-8180}:8080"
+    volumes:
+      - ./keycloak/entrypoint.sh:/opt/keycloak/entrypoint.sh:ro
+      - ./keycloak/realm-eyened-dev.json.template:/opt/keycloak/import-template/realm-eyened-dev.json:ro
+
+volumes:
+  db_data:
+  platform_storage:

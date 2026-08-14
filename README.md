@@ -20,9 +20,8 @@ See our [Documentation](https://eyened.github.io/eyened-platform/).
 
 ***client:*** SvelteKit-based frontend application with DICOM image viewing capabilities using Cornerstone.js. Features include image annotation tools, drawing tools for 2D segmentation, and real-time image enhancements.
 
-***dev:*** Development environment setup with Docker Compose configuration, environment variables, and scripts for starting development servers. Includes database mirroring tools and migration management.
-
-***docker:*** Production Docker configuration with multi-stage builds for server, worker, and fileserver components. Includes nginx configuration and deployment scripts.
+***deploy:*** The one Docker stack — database, Redis, server, client, and file server — plus
+`install.sh` (client installs) and the `Makefile` targets developers use. Start here.
 
 ***docs:*** Astro-based documentation. Contains project documentation, API references, and user guides.
 
