@@ -63,6 +63,22 @@ set +a
 }
 
 mkdir -p "$(dirname "$DEST")"
+
+# $DEST is an operator-supplied path and the next line is a recursive delete of
+# it, so `./save_dump.sh /home/user` used to wipe a home directory without
+# asking. Confirm before destroying anything — and only when there IS something
+# to destroy, so the ordinary "write a new dump" case stays a single command.
+#
+# `|| answer=""` makes every read that does not complete a line — a piped or
+# cron run with nothing on stdin, a closed terminal, an answer truncated by
+# EOF — fall into the cancel branch with a message, rather than abort under
+# `set -e` with no output. It can only ever refuse.
+if [ -e "$DEST" ]; then
+  printf "DELETE %s and everything under it, then write the dump there? [y/N] " "$DEST"
+  read -r answer || answer=""
+  case "$answer" in y|Y|yes|YES) ;; *) echo "cancelled — nothing was removed." >&2; exit 1 ;; esac
+fi
+
 rm -rf "$DEST"
 mkdir -p "$DEST"
 

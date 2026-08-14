@@ -166,8 +166,59 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       Fix: set PUBLIC_HOST in deploy/.env to this machine's hostname or LAN
            IP — the same value you type in the browser." ;;
                 *) ok "PUBLIC_HOST '$public_host' is usable for OIDC" ;;
+            esac
+            # KEYCLOAK_BIND looks like a hardening knob and behaves like a trap.
+            # The server does not reach Keycloak over the compose network: its
+            # metadata URL is the BROWSER-facing one (compose.yaml), so the call
+            # leaves the container and comes back in through the published port
+            # via the dev layer's host-gateway alias. Measured on the docker0
+            # bridge: with the listener on 127.0.0.1 a connection from
+            # 172.17.0.1 is REFUSED; on 0.0.0.0 it succeeds. So confining the
+            # port to loopback leaves every container healthy, the login page
+            # reachable in the browser, and token exchange failing with nothing
+            # naming the cause. Scoped to the dev layer because that is the only
+            # one that adds the host-gateway alias.
+            kc_bind=$(norm "$(env_get KEYCLOAK_BIND)")
+            case "$compose_file:$kc_bind" in
+                *compose.dev.yaml*:127.0.0.1|*compose.dev.yaml*:::1|*compose.dev.yaml*:localhost)
+                    problem "KEYCLOAK_BIND is '$kc_bind', which confines the bundled Keycloak to
+      loopback — but the server container reaches it through the host gateway,
+      not over the compose network, so token exchange will fail while every
+      container still reports healthy.
+      Fix: leave KEYCLOAK_BIND unset (0.0.0.0) and restrict the console with
+           KEYCLOAK_ADMIN_PASSWORD instead, which install.sh generates." ;;
+                *) ok "KEYCLOAK_BIND '${kc_bind:-0.0.0.0}' leaves Keycloak reachable from the server" ;;
             esac ;;
-        *) ok "oidc profile is off (PUBLIC_HOST not checked)" ;;
+        *)
+            # The profile and the switch are independent, and this branch used
+            # to report only the profile — printing a green "oidc profile is
+            # off" over a server configured to do OIDC with no provider to do
+            # it against. Running OIDC against an EXTERNAL IdP with the
+            # bundled Keycloak switched off is a SUPPORTED configuration, so
+            # what separates the two is not the switch on its own but
+            # EYENED_OIDC_METADATA_URL: compose.yaml defaults it to the
+            # BUNDLED Keycloak's realm URL, so leaving it empty while the
+            # profile is off points the server at a Keycloak nothing started.
+            # An external IdP always names its own metadata URL, so it never
+            # lands in the failing branch.
+            oidc_switch=$(norm "$(env_get EYENED_API_AUTH_OIDC_ENABLED)" | tr 'A-Z' 'a-z')
+            case "$oidc_switch" in
+                true|1|yes|on)
+                    if [ -n "$(norm "$(env_get EYENED_OIDC_METADATA_URL)")" ]; then
+                        ok "oidc profile is off and EYENED_OIDC_METADATA_URL names an external provider"
+                    else
+                        problem "EYENED_API_AUTH_OIDC_ENABLED is '$oidc_switch', so the server will do OIDC —
+      but 'oidc' is not in COMPOSE_PROFILES, so the bundled Keycloak is not
+      started, and EYENED_OIDC_METADATA_URL is empty, so the server falls back
+      to the bundled Keycloak's own URL. Nothing will be listening on it and
+      every login will fail at the metadata fetch.
+      Fix: add 'oidc' to COMPOSE_PROFILES to run the bundled Keycloak, or set
+           EYENED_OIDC_METADATA_URL to your own provider's
+           .well-known/openid-configuration, or set
+           EYENED_API_AUTH_OIDC_ENABLED=false."
+                    fi ;;
+                *) ok "oidc profile is off and OIDC is not enabled (PUBLIC_HOST not checked)" ;;
+            esac ;;
     esac
 
     # A COMPOSE_FILE naming both layers is accepted silently by compose itself
@@ -229,6 +280,34 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       Fix: remove deploy/.env and re-run so real secrets are generated, or set
            each one by hand to a long random value."
     fi
+
+    # KEYCLOAK_ADMIN_PASSWORD cannot join the change_me loop above, because
+    # its published default is not the string 'change_me': compose.yaml has
+    # ${KEYCLOAK_ADMIN_PASSWORD:-admin}, so ABSENT and EMPTY are just as much
+    # "runs on admin/admin" as the literal value is. All four values are tested
+    # so this holds however .env was produced: first_run_env now generates one,
+    # .env.example ships 'change_me' as the placeholder it replaces, and a
+    # hand-written or pre-generation .env may carry any of the rest. This is
+    # the backstop for those, not the primary mechanism.
+    #
+    # Gated on the profile: the bundled Keycloak only exists when 'oidc' is in
+    # COMPOSE_PROFILES, and the majority who never enable it should not get a
+    # line about a container they do not run.
+    case "$profiles" in
+        *oidc*)
+            case "$(norm "$(env_get KEYCLOAK_ADMIN_PASSWORD)")" in
+                ''|admin|change_me)
+                    problem "COMPOSE_PROFILES enables 'oidc', which starts the bundled Keycloak, but
+      KEYCLOAK_ADMIN_PASSWORD is not set to a real value in deploy/.env.
+      Compose defaults it to 'admin', so the Keycloak admin console comes up
+      on admin/admin — and that console is the identity provider for every
+      account on this platform.
+      Fix: set KEYCLOAK_ADMIN_PASSWORD in deploy/.env to a long random value.
+           ./install.sh generates one on a first run; a .env written by hand,
+           or created before that was added, has to be given one." ;;
+                *) ok "KEYCLOAK_ADMIN_PASSWORD is not the published default" ;;
+            esac ;;
+    esac
   fi
 else
     ok "no deploy/.env yet — it will be created from .env.example"
@@ -250,13 +329,35 @@ fi
 port_probe() {
     # 0 = in use, 1 = free, 2 = cannot tell. Neither nc nor python3 is
     # guaranteed on a stock macOS or WSL host, so "cannot tell" is a real case
-    # and must not be reported as "free". `-w 2` on nc: a busybox build
-    # without NC_EXTRA has no `-z` and would otherwise block reading stdin
-    # instead of returning promptly — not observed on this host's busybox,
-    # but cheap portability insurance.
+    # and must not be reported as "free".
+    #
+    # The nc branch is chosen on CAPABILITY, not on `command -v nc` succeeding.
+    # busybox nc has no `-z` at all, so it exits non-zero whatever the port's
+    # state; `nc -z ... && return 0 || return 1` then collapsed "nc errored"
+    # into "free" AND — because `command -v nc` had already succeeded — never
+    # reached the python3 branch that would have answered correctly. Measured
+    # against port 22, confirmed listening with `ss -ltn`: busybox nc 1.30.1
+    # gave "ok port 22 is free", the real nc gave "FAIL Port 22 is already in
+    # use". A wrong answer, not a missing one, which is why the earlier `-w 2`
+    # (added against a hang) did not touch it.
+    #
+    # Exit status alone cannot tell the two apart — measured, busybox's
+    # bad-option exit and a real nc's "connection refused" are BOTH 1. What
+    # separates them is that a capable nc says nothing at all: probing port 1
+    # (nothing listens there; a capable nc answers 0 or 1 in silence) gave 0
+    # bytes on both streams from the real nc, and 441 bytes of "nc: invalid
+    # option -- 'z'" plus usage from busybox. So the test is "silent and
+    # <= 1", and anything else falls through to python3 below rather than
+    # being trusted. stdin comes from /dev/null so a build without -z cannot
+    # block reading it instead of returning.
     if command -v nc >/dev/null 2>&1; then
-        nc -z -w 2 127.0.0.1 "$1" >/dev/null 2>&1 && return 0 || return 1
-    elif command -v python3 >/dev/null 2>&1; then
+        _nc_rc=0
+        _nc_out=$(nc -z -w 1 127.0.0.1 1 </dev/null 2>&1) || _nc_rc=$?
+        if [ -z "$_nc_out" ] && [ "$_nc_rc" -le 1 ]; then
+            nc -z -w 2 127.0.0.1 "$1" >/dev/null 2>&1 && return 0 || return 1
+        fi
+    fi
+    if command -v python3 >/dev/null 2>&1; then
         python3 -c 'import socket, sys
 s = socket.socket(); s.settimeout(1)
 sys.exit(0 if s.connect_ex(("127.0.0.1", int(sys.argv[1]))) == 0 else 1)' "$1" && return 0 || return 1

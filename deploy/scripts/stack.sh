@@ -57,6 +57,16 @@ case "$MODE" in
         # like compose.host-ports.yaml is most likely to already be present
         # — and a bare env_set here would silently drop it.
         _set_compose_file "$COMPOSE_FILE_CLIENT"
+
+        # dev and install reach this through first_run_env, which ends in the
+        # same call; prod bypasses first_run_env entirely, so without this it
+        # is the one .env-writing path with no chown back. env_set's `mv`
+        # replaces .env with a fresh copy owned by the current euid, so
+        # `sudo make prod` otherwise left it root-owned at mode 600 and the
+        # invoking user's own later `make down` or `make logs` could not read
+        # it. Last in this branch for the reason its header gives: anything
+        # that writes .env after it would re-own the file as root again.
+        chown_back_to_invoker
         ;;
 esac
 

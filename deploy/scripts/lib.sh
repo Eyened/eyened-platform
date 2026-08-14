@@ -208,6 +208,57 @@ _set_compose_file() {
     fi
 }
 
+# Give deploy/.env (and storage-mounts.conf) back to the invoking user after a
+# run under sudo.
+#
+# Its own function because TWO paths write .env, not one. install.sh is the
+# published client door, and some operators will run it under sudo. Docker
+# itself does not need that (the daemon socket is what needs root, not this
+# script), but nothing here stops them. Under sudo this process is root, so
+# anything it writes ends up root-owned — unreadable, or in
+# storage-mounts.conf's case merely un-editable, by the invoking user's own
+# later `make up` or plain `docker compose`, which is a worse failure than the
+# file being briefly group-readable.
+#
+# This lived inside first_run_env until it was measured that stack.sh's `prod`
+# branch deliberately bypasses first_run_env and calls _set_compose_file (i.e.
+# env_set) directly — so `sudo make prod` wrote .env through the same `mv` and
+# then never reached the chown, leaving exactly the root-owned mode-600 file
+# described above. The reasoning had been done for one .env-writing path and
+# not carried to the second. Every path that writes .env must end here.
+#
+# CALL IT LAST, after every write to those files, never right after .env is
+# created: env_set's `mv` (and the storage-mounts.conf `cp`) replace the file
+# with a fresh copy owned by the current euid, re-owning it as root and
+# undoing an earlier chown. Measured: chowning before _set_compose_file's
+# env_set call left .env back at 0:0 after that call ran.
+#
+# Safe to call on EVERY run and more than once: chowning an already-correct
+# owner to itself is a no-op, so this costs nothing on the common case where
+# the invoking user was never root to begin with (SUDO_UID unset, block
+# skipped entirely). That also means a second sudo run against an
+# already-chowned .env must not skip it — the file could have been touched by
+# a root run in between.
+#
+# `sudo` sets SUDO_UID/SUDO_GID to the invoking user, so chown back to that
+# rather than leave secrets only root can read.
+chown_back_to_invoker() {
+    if [ "$(id -u)" = 0 ] && [ -n "${SUDO_UID:-}" ]; then
+        chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$DEPLOY_DIR/.env" ||
+            die "error: could not chown $DEPLOY_DIR/.env back to the invoking user
+      (uid $SUDO_UID). It was written root-owned at mode 600 and a later
+      non-sudo 'make up' or 'docker compose' would not be able to read it.
+      Fix: chown $SUDO_UID:${SUDO_GID:-$SUDO_UID} $DEPLOY_DIR/.env by hand."
+        if [ -f "$DEPLOY_DIR/storage-mounts.conf" ]; then
+            chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$DEPLOY_DIR/storage-mounts.conf" ||
+                die "error: could not chown $DEPLOY_DIR/storage-mounts.conf back to the
+      invoking user (uid $SUDO_UID). It was written root-owned and the
+      invoking user would not be able to edit their own mount list.
+      Fix: chown $SUDO_UID:${SUDO_GID:-$SUDO_UID} $DEPLOY_DIR/storage-mounts.conf by hand."
+        fi
+    fi
+}
+
 # First-run setup for the dev and install modes of stack.sh. MODE is dev or
 # client and decides which layer list is recorded — that one line is what lets
 # every later command be a bare `docker compose ...` with no -f flags.
@@ -236,6 +287,12 @@ first_run_env() {
         _redis_pw=$(gen_secret) || die "error: could not generate a Redis password; see above."
         _root_pw=$(gen_password) || die "error: could not generate a database root password; see above."
         _db_pw=$(gen_password) || die "error: could not generate a database password; see above."
+        # The bundled Keycloak's bootstrap admin. Generated for the same reason
+        # as the four above: .env.example cannot ship a credential, and this
+        # console is published (see KEYCLOAK_BIND). Generated even when the
+        # oidc profile is off — it costs nothing, and it means enabling the
+        # profile later does not need a second trip through this function.
+        _kc_pw=$(gen_password) || die "error: could not generate a Keycloak admin password; see above."
         cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env" ||
             die "error: could not create $DEPLOY_DIR/.env from .env.example; see above."
         # Restrict it before the first secret goes in, not after.
@@ -245,6 +302,7 @@ first_run_env() {
         env_set EYENED_REDIS_PASSWORD "$_redis_pw"
         env_set MYSQL_ROOT_PASSWORD "$_root_pw"
         env_set EYENED_DATABASE_PASSWORD "$_db_pw"
+        env_set KEYCLOAK_ADMIN_PASSWORD "$_kc_pw"
 
         echo "==> created deploy/.env with generated secrets"
         echo "    On a shared machine, set COMPOSE_PROJECT_NAME and HTTP_PORT"
@@ -262,45 +320,10 @@ first_run_env() {
             die "error: could not create $DEPLOY_DIR/storage-mounts.conf from its .example; see above."
     fi
 
-    # install.sh is the published client door, and some operators will run it
-    # under sudo. Docker itself does not need that (the daemon socket is what
-    # needs root, not this script), but nothing here stops them. Under sudo
-    # this process is root, so anything it writes ends up root-owned —
-    # unreadable, or in storage-mounts.conf's case merely un-editable, by the
-    # invoking user's own later `make up` or plain `docker compose`, which is
-    # a worse failure than the file being briefly group-readable.
-    #
-    # This MUST run last, after _set_compose_file and the storage-mounts.conf
-    # cp above, not right after .env is created: both of those write via
-    # env_set's mv (or cp), which replaces the file with a fresh copy owned
-    # by the current euid — re-owning it as root and undoing an earlier
-    # chown. Measured: chowning before _set_compose_file's env_set call left
-    # .env back at 0:0 after that call ran.
-    #
-    # It also has to run on EVERY call, not just first-run: first_run_env
-    # itself runs on every stack.sh invocation, so a second sudo run against
-    # an already-chowned .env must not skip this — the file could have been
-    # touched by a root run in between. Chowning an already-correct owner to
-    # itself is a no-op, so this costs nothing on the common case where the
-    # invoking user was never root to begin with (SUDO_UID unset, block
-    # skipped entirely).
-    #
-    # `sudo` sets SUDO_UID/SUDO_GID to the invoking user, so chown back to
-    # that rather than leave secrets only root can read.
-    if [ "$(id -u)" = 0 ] && [ -n "${SUDO_UID:-}" ]; then
-        chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$DEPLOY_DIR/.env" ||
-            die "error: could not chown $DEPLOY_DIR/.env back to the invoking user
-      (uid $SUDO_UID). It was written root-owned at mode 600 and a later
-      non-sudo 'make up' or 'docker compose' would not be able to read it.
-      Fix: chown $SUDO_UID:${SUDO_GID:-$SUDO_UID} $DEPLOY_DIR/.env by hand."
-        if [ -f "$DEPLOY_DIR/storage-mounts.conf" ]; then
-            chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$DEPLOY_DIR/storage-mounts.conf" ||
-                die "error: could not chown $DEPLOY_DIR/storage-mounts.conf back to the
-      invoking user (uid $SUDO_UID). It was written root-owned and the
-      invoking user would not be able to edit their own mount list.
-      Fix: chown $SUDO_UID:${SUDO_GID:-$SUDO_UID} $DEPLOY_DIR/storage-mounts.conf by hand."
-        fi
-    fi
+    # Last, after _set_compose_file and the storage-mounts.conf cp above — see
+    # chown_back_to_invoker's own header for why the order matters and why
+    # this runs on every call rather than only on first run.
+    chown_back_to_invoker
 }
 
 # The day-2 commands, printed with the binary THIS host actually has. Naming
