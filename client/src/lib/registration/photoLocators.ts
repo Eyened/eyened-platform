@@ -177,10 +177,13 @@ export class CirclePhotoLocator implements PhotoLocator {
         const vec = vec2(p).sub(center);
         const distance = Math.abs(vec.length() - radius);
         const angle = vec.angle() - start_angle;
-        const r = angle / (2 * Math.PI);
+        // Match GPU bake (`fract(angle / TWO_PI)`): Heidelberg start_angle=π
+        // yields negative r for half the ring without wrap.
+        let t = angle / (2 * Math.PI);
+        t = t - Math.floor(t);
         const position = {
             index: this.index,
-            x: this.width * r,
+            x: this.width * t,
             y: 0,
         };
         return { position, distance };

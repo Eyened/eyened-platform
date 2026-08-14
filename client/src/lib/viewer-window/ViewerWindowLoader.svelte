@@ -5,7 +5,7 @@ Used to create the viewerwindow context.
 -->
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { Registration } from "$lib/registration/registration";
+    import { Registration } from "$lib/registration/registration.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import { Deferred } from "$lib/utils";
     import { WebGL } from "$lib/webgl/webgl";

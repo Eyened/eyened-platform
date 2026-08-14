@@ -236,15 +236,16 @@ export class CFImageProcessing {
             instance: { cfROI },
         } = input;
 
-        // CLAHE tile size
-        // adapted to the image size
+        // CLAHE tile size adapted to the image size
         let tileSize = Math.floor(Math.min(width, height) / 64);
         if (cfROI) {
-            tileSize = Math.floor(cfROI.radius / 32);
+            const roiTile = Math.floor(cfROI.radius / 32);
+            if (roiTile > 0) {
+                tileSize = roiTile;
+            }
         }
-        if (tileSize == 0) {
-            return undefined;
-        }
+        // Avoid silently skipping CLAHE when ROI-derived size rounds to 0
+        tileSize = Math.max(1, tileSize);
 
         // convert image to LAB
         const uniforms = {

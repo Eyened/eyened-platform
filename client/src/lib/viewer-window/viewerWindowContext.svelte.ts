@@ -9,7 +9,7 @@ import {
     loadPhotoLocators,
     type PhotoLocator,
 } from "$lib/registration/photoLocators";
-import type { Registration } from "$lib/registration/registration";
+import type { Registration } from "$lib/registration/registration.svelte";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { Image3D } from "$lib/webgl/image3D";
