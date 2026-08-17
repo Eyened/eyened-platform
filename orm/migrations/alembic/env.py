@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+import os
 import sys
 
 from sqlalchemy import engine_from_config
@@ -9,7 +10,7 @@ from alembic import context
 from eyened_orm import *
 from eyened_orm.base import Base
 from eyened_orm.config import load_database_settings
-from eyened_orm.utils.env import load_env_file
+from eyened_orm.utils.env import env_flag_enabled, load_env_file
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
@@ -24,6 +25,11 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
+
+# Read before load_env_file() below. That call is load_dotenv(override=True), which
+# writes a file's contents into os.environ — so a read placed after it would let any
+# .env file switch off the confirmation guard. Read order is the whole protection.
+assume_yes = env_flag_enabled(os.environ.get("EYENED_ALEMBIC_ASSUME_YES"))
 
 x_args = context.get_x_argument(as_dictionary=True)
 env_file = x_args.get("env_file")
@@ -57,12 +63,18 @@ if cmd not in no_prompt_cmds:
     confirm_target = (
         f"{db_settings.user}@{db_settings.host}:{db_settings.port}/{db_settings.database}"
     )
-    response = input(
-        f"Target database: {confirm_target}. Proceed? [y/N] "
-    ).strip().lower()
-    if response not in {"y", "yes"}:
-        print("Aborted by user.")
-        sys.exit(1)
+    if assume_yes:
+        print(
+            f"Target database: {confirm_target}. "
+            "Proceeding without confirmation (EYENED_ALEMBIC_ASSUME_YES)."
+        )
+    else:
+        response = input(
+            f"Target database: {confirm_target}. Proceed? [y/N] "
+        ).strip().lower()
+        if response not in {"y", "yes"}:
+            print("Aborted by user.")
+            sys.exit(1)
 config.set_main_option("sqlalchemy.url", db_url)
 
 
@@ -105,7 +117,9 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
         )
 
         with context.begin_transaction():
