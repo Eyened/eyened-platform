@@ -4,3 +4,24 @@ testpaths = [
     "server",
     "orm",
 ]
+
+[tool.coverage.run]
+source = ["server", "orm/eyened_orm"]
+omit = [
+    "*/tests/*",
+    "*/conftest.py",
+    # These six cannot be imported without torch, which CI deliberately does not
+    # install. Five import it at module scope; docker_runner.py fails
+    # transitively, through cfi_amd_segmentation and layer_segmentation -- its
+    # own "import torch" is a string it runs inside a container, not an import.
+    # Their siblings under inference/ import
+    # cleanly and are therefore NOT omitted -- the criterion is "fails to
+    # import because an external package is absent", enforced by
+    # server/tests/test_coverage_omissions.py.
+    "orm/eyened_orm/inference/cfi_amd_segmentation.py",
+    "orm/eyened_orm/inference/cfi_keypoints.py",
+    "orm/eyened_orm/inference/cfi_odfd.py",
+    "orm/eyened_orm/inference/cfi_quality.py",
+    "orm/eyened_orm/inference/docker_runner.py",
+    "orm/eyened_orm/inference/layer_segmentation.py",
+]

@@ -33,3 +33,7 @@ graphify-out/
 .superpowers/
 CLAUDE.md
 docs/superpowers/
+.coverage
+coverage.xml
+htmlcov/
+client/coverage/
