@@ -6,7 +6,18 @@ testpaths = [
 ]
 
 [tool.coverage.run]
-source = ["server", "orm/eyened_orm"]
+# "orm", NOT "orm/eyened_orm" -- do not narrow this, however much it looks like
+# an imprecision. The XML report names each file relative to whichever `source`
+# root contains it, so with "orm/eyened_orm" both server/db.py and
+# orm/eyened_orm/db.py are written as "db.py". Cobertura keeps one of the pair,
+# and diff-cover then registers that single entry under BOTH source-joined
+# paths -- so it answers questions about the ORM file with the server file's
+# coverage. Measured: a change to orm/eyened_orm/db.py reported "No lines with
+# coverage information in this diff" and passed, while an identical change to a
+# uniquely-named ORM file was correctly failed. Six paths collide this way,
+# including db.py and config.py. Rooting at "orm" keeps the eyened_orm/ prefix
+# and makes every name unique. Cost: orm/setup.py enters the denominator.
+source = ["server", "orm"]
 omit = [
     "*/tests/*",
     "*/conftest.py",
