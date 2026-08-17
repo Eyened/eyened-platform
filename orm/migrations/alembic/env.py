@@ -66,7 +66,8 @@ if cmd not in no_prompt_cmds:
     if assume_yes:
         print(
             f"Target database: {confirm_target}. "
-            "Proceeding without confirmation (EYENED_ALEMBIC_ASSUME_YES)."
+            "Proceeding without confirmation (EYENED_ALEMBIC_ASSUME_YES).",
+            flush=True,
         )
     else:
         response = input(
