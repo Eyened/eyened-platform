@@ -1,4 +1,5 @@
 import { toggleInSet, type Color } from "$lib/utils";
+import { getImageUiPref, setImageUiPref } from "$lib/viewer/imageUiPrefs";
 import {
     getSegmentationKey,
     SegmentationContext,
@@ -23,7 +24,8 @@ export class MainViewerContext implements Overlay {
 
     public readonly applyConnectedComponents =
         new SvelteSet<SegmentationItem>();
-    public readonly applyMasking = new SvelteSet<SegmentationItem>();
+    /** Segmentation keys for which reference-masking is turned off (default: on). */
+    public readonly skipMasking = new SvelteSet<string>();
     public active = $state(false);
     public renderOutline = $state(false);
     public alpha = $state(1.0);
@@ -44,10 +46,31 @@ export class MainViewerContext implements Overlay {
             viewerWindowContext,
             image,
         );
+        for (const key of this.loadSkipMaskingKeys()) {
+            this.skipMasking.add(key);
+        }
+    }
+
+    isMaskingApplied(segmentation: Segmentation): boolean {
+        return !this.skipMasking.has(getSegmentationKey(segmentation));
     }
 
     toggleMasking(segmentation: SegmentationItem) {
-        toggleInSet(this.applyMasking, segmentation);
+        toggleInSet(
+            this.skipMasking,
+            getSegmentationKey(segmentation.segmentation),
+        );
+        setImageUiPref(this.instanceId, "skipMasking", [...this.skipMasking]);
+    }
+
+    private loadSkipMaskingKeys(): string[] {
+        const stored = getImageUiPref<unknown>(
+            this.instanceId,
+            "skipMasking",
+            [],
+        );
+        if (!Array.isArray(stored)) return [];
+        return stored.filter((key): key is string => typeof key === "string");
     }
 
     toggleConnectedComponents(segmentationItem: SegmentationItem) {
@@ -100,7 +123,7 @@ export class MainViewerContext implements Overlay {
         uniforms.u_has_mask = false;
         uniforms.u_mask = null;
         uniforms.u_mask_bitmask = 0;
-        const applyMask = this.applyMasking.has(segmentationItem);
+        const applyMask = this.isMaskingApplied(segmentation);
         if (
             applyMask &&
             segmentation.annotation_type === "grader_segmentation" &&
