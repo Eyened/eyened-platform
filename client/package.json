@@ -15,6 +15,7 @@
         "verify:runes": "if grep -rEn '^[[:space:]]*export[[:space:]]+let[[:space:]]' src --include='*.svelte'; then echo 'Found legacy export let declarations above (Svelte 5 uses runes props); expected 0'; exit 1; fi",
         "check:unused": "unimported",
         "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
         "test:watch": "vitest",
         "lint": "eslint . && prettier --check .",
         "lint:fix": "eslint . --fix && prettier --write ."
@@ -32,6 +33,7 @@
         "@tanstack/table-core": "^8.21.3",
         "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/svelte": "^5.4.2",
+        "@vitest/coverage-v8": "^4.1.10",
         "autoprefixer": "^10.4.21",
         "bits-ui": "^2.14.4",
         "eslint": "^10.7.0",
