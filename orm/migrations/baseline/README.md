@@ -208,7 +208,7 @@ tr '\n' ' ' < /var/tmp/basetable-names.txt > /var/tmp/tables-oneline.txt
 TABLES=$(cat /var/tmp/tables-oneline.txt)
 docker exec eyened-baseline-tmp mysqldump -uroot \
   --no-data --skip-comments --skip-routines --skip-triggers \
-  --no-tablespaces --set-gtid-purged=OFF \
+  --skip-add-drop-table --no-tablespaces --set-gtid-purged=OFF \
   eyened_database $TABLES > /var/tmp/baseline-schema.sql
 
 docker exec eyened-baseline-tmp mysqldump -uroot \
@@ -222,6 +222,13 @@ Flag notes — do not drop or "simplify" any of these:
 - Naming the tables explicitly (rather than dumping the whole database) is what
   excludes the six views: `mysqldump` has no `--no-views` flag, and an explicit
   table list is the supported way to exclude them.
+- `--skip-add-drop-table` keeps `DROP TABLE IF EXISTS` out of the schema dump.
+  Without it, every `CREATE TABLE` in `baseline.sql` is preceded by a `DROP
+  TABLE IF EXISTS` for the same name, and with `FOREIGN_KEY_CHECKS=0` in
+  effect nothing stops the file from being loaded straight into a real
+  database and dropping all 44 tables. The artifact must not be able to
+  destroy a database it is accidentally pointed at — CI loads this into an
+  always-empty database, so the drops were never doing anything there.
 - `--skip-routines` keeps out stored procedures (`BenchmarkQuery`) that neither
   the ORM nor Alembic manages.
 - `--skip-triggers` does the same for triggers — which `mysqldump` emits **by
@@ -239,11 +246,27 @@ Flag notes — do not drop or "simplify" any of these:
 - `--set-gtid-purged=OFF` keeps a `SET @@GLOBAL.GTID_PURGED` statement out of a
   file that gets loaded into a fresh CI server. Both of these are no-ops in the
   happy path but are cheap insurance.
+- After dumping, strip the *table-option* `AUTO_INCREMENT=<n>` value from each
+  `) ENGINE=InnoDB ...` trailer:
+  `command sed -i 's/ AUTO_INCREMENT=[0-9]*//g' /var/tmp/baseline-schema.sql`.
+  These counters (Erasmus production had 29 of them at the 2026-08-17 freeze,
+  values up to seven digits) are a row-count proxy for production and have no
+  reason to be published in a public repository; Alembic ignores them
+  entirely, so stripping them changes nothing the gate checks. Do **not** run
+  this against the *column attribute* form —
+  `` `ImageInstanceID` int NOT NULL AUTO_INCREMENT,`` — which has no `=` and
+  defines the primary key; the regex above only ever matches the table-option
+  form because it requires the leading `=`. Verify afterwards with
+  `command grep -c "AUTO_INCREMENT=" /var/tmp/baseline-schema.sql` (expect 0)
+  and `command grep -c "NOT NULL AUTO_INCREMENT" /var/tmp/baseline-schema.sql`
+  (expect unchanged from before the strip).
 
 ### Step 5: Verify the dumps are complete before assembling
 
 ```bash
 command grep -c "^CREATE TABLE" /var/tmp/baseline-schema.sql || true          # expect 44
+command grep -c "^DROP TABLE" /var/tmp/baseline-schema.sql || true            # expect 0 — --skip-add-drop-table
+command grep -c "AUTO_INCREMENT=" /var/tmp/baseline-schema.sql || true        # expect 0 — stripped, see above
 command grep -c "^INSERT INTO \`alembic_version\`" /var/tmp/baseline-version.sql || true   # expect 1
 command grep -c "^CREATE TABLE" /var/tmp/baseline-version.sql || true         # expect 0 — --no-create-info
 tail -c 300 /var/tmp/baseline-schema.sql                       # expect the /*!40xxx SET ... */ restore block
@@ -281,6 +304,9 @@ freeze.
 
 ```bash
 command grep -c "^CREATE TABLE" orm/migrations/baseline/baseline.sql || true         # expect 44
+command grep -c "^DROP TABLE" orm/migrations/baseline/baseline.sql || true           # expect 0
+command grep -c "AUTO_INCREMENT=" orm/migrations/baseline/baseline.sql || true       # expect 0
+command grep -c "NOT NULL AUTO_INCREMENT" orm/migrations/baseline/baseline.sql || true  # expect >0 — PKs intact
 command grep -c "^INSERT INTO \`alembic_version\`" orm/migrations/baseline/baseline.sql || true  # expect 1
 wc -c orm/migrations/baseline/baseline.sql
 ```
@@ -314,8 +340,44 @@ git add orm/migrations/baseline/baseline.sql orm/migrations/baseline/README.md
 git commit -m "ci(orm): freeze Erasmus schema baseline for the schema-sync gate"
 ```
 
+## What this gate does not catch
+
+A green `schema-sync` run is a claim about specific things, not a general
+guarantee that the schema is correct. What it does not cover:
+
+- **Views, routines and triggers.** Alembic reflects base tables only
+  (SQLAlchemy's MySQL dialect filters `SHOW FULL TABLES` down to `BASE
+  TABLE`), so nothing here asserts anything about Erasmus's six views, its
+  stored routine, or its triggers. Concretely: four of the six views read
+  `ImageInstance` columns the ORM has already deprecated —
+  `DatasetIdentifier`, `ThumbnailPath`, `OldPath`, `FDAIdentifier` (see the
+  deprecated-attribute table in `orm/eyened_orm/image_instance.py`). A
+  migration that drops those columns breaks the views while this gate stays
+  green.
+- **FK-implicit index heuristic.** Alembic's MySQL dialect discards reflected
+  non-unique indexes that are named after one of their own columns, on the
+  assumption that they exist only to satisfy a foreign key. That makes index
+  drift on `ImageInstance.DatasetIdentifier` and `Study.StudyRound`
+  permanently invisible to a gate of this shape.
+- **Server defaults.** `compare_type=True` is on; `compare_server_default` is
+  deliberately off. Turning it on produces 28 false diffs, all
+  `CURRENT_TIMESTAMP` (MySQL's reflected form) versus `func.now()` (the ORM's
+  form) on `DateInserted`/`DateModified` columns.
+- **Charset and collation** are not compared.
+- **One site.** The baseline is Erasmus production. Radboud's and
+  Moorfields' schemas are not asserted by this gate.
+- **Not a from-scratch check.** This gate asserts that *Erasmus schema as of
+  2026-07-28, plus the revisions applied since*, equals `Base.metadata`. It
+  does **not** assert that replaying all 24 revisions onto an empty database
+  reproduces `Base.metadata` — that path is red today (one revision's
+  `upgrade()` is `pass`), and fixing it is exactly what #186 does. This
+  distinction is the reason the baseline exists at all.
+
 ## Retirement
 
-This directory is deleted when the #186 baseline squash lands (spec §8). At that
-point Alembic's own migration history becomes the baseline and this frozen SQL
-snapshot, and the CI gate that loads it, are no longer needed.
+This directory is deleted when the #186 baseline squash lands. At that point
+Alembic's own migration history becomes sufficient by itself: `baseline.sql`,
+this runbook, and the CI job's **baseline-load step** are no longer needed.
+The `schema-sync` job itself does not go away — it keeps running, upgrading a
+fresh empty database instead of a loaded snapshot, and still asserting that
+`alembic check` reports no operations. See issue #186 for the squash itself.
