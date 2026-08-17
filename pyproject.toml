@@ -17,6 +17,10 @@ testpaths = [
 # uniquely-named ORM file was correctly failed. Six paths collide this way,
 # including db.py and config.py. Rooting at "orm" keeps the eyened_orm/ prefix
 # and makes every name unique. Cost: orm/setup.py enters the denominator.
+# orm/migrations/ and orm/notebooks/ do NOT, but only because neither has an
+# __init__.py and coverage's directory walk skips such directories -- adding one
+# to migrations/ would silently admit 24 never-executed alembic files and redden
+# every migration PR.
 source = ["server", "orm"]
 omit = [
     "*/tests/*",

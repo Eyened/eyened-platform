@@ -37,3 +37,6 @@ docs/superpowers/
 coverage.xml
 htmlcov/
 client/coverage/
+# diff-cover writes its markdown report to the cwd, not into coverage/.
+diff-cover.md
+client/diff-cover-client.md
