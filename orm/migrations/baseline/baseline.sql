@@ -32,7 +32,6 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-DROP TABLE IF EXISTS `Annotation`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Annotation` (
@@ -64,9 +63,8 @@ CREATE TABLE `Annotation` (
   CONSTRAINT `fk_Annotation_Patient1` FOREIGN KEY (`PatientID`) REFERENCES `Patient` (`PatientID`),
   CONSTRAINT `fk_Annotation_Series1` FOREIGN KEY (`SeriesID`) REFERENCES `Series` (`SeriesID`),
   CONSTRAINT `fk_Annotation_Study1` FOREIGN KEY (`StudyID`) REFERENCES `Study` (`StudyID`)
-) ENGINE=InnoDB AUTO_INCREMENT=1972390 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `AnnotationData`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `AnnotationData` (
@@ -84,7 +82,6 @@ CREATE TABLE `AnnotationData` (
   CONSTRAINT `fk_AnnotationData_Annotation1` FOREIGN KEY (`AnnotationID`) REFERENCES `Annotation` (`AnnotationID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `AnnotationTag`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `AnnotationTag` (
@@ -102,7 +99,6 @@ CREATE TABLE `AnnotationTag` (
   CONSTRAINT `AnnotationTag_ibfk_4` FOREIGN KEY (`AnnotationID`) REFERENCES `Annotation` (`AnnotationID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `AnnotationType`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `AnnotationType` (
@@ -111,9 +107,8 @@ CREATE TABLE `AnnotationType` (
   `Interpretation` varchar(45) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
   PRIMARY KEY (`AnnotationTypeID`),
   UNIQUE KEY `AnnotationTypeNameInterpretation_UNIQUE` (`AnnotationTypeName`,`Interpretation`)
-) ENGINE=InnoDB AUTO_INCREMENT=30 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `AttributeDefinition`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `AttributeDefinition` (
@@ -122,9 +117,8 @@ CREATE TABLE `AttributeDefinition` (
   `AttributeDataType` enum('String','Float','Int','JSON') NOT NULL,
   PRIMARY KEY (`AttributeID`),
   UNIQUE KEY `uq_AttributeDefinition_AttributeName` (`AttributeName`)
-) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `AttributeValue`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `AttributeValue` (
@@ -167,9 +161,8 @@ CREATE TABLE `AttributeValue` (
   CONSTRAINT `AttributeValue_ibfk_6` FOREIGN KEY (`StudyID`) REFERENCES `Study` (`StudyID`),
   CONSTRAINT `AttributeValue_ibfk_7` FOREIGN KEY (`PatientID`) REFERENCES `Patient` (`PatientID`),
   CONSTRAINT `ck_AttributeValue_exactly_one_entity` CHECK ((((`ImageInstanceID` is not null) and (`SegmentationID` is null) and (`ModelSegmentationID` is null) and (`PatientID` is null) and (`StudyID` is null)) or ((`ImageInstanceID` is null) and (`SegmentationID` is not null) and (`ModelSegmentationID` is null) and (`PatientID` is null) and (`StudyID` is null)) or ((`ImageInstanceID` is null) and (`SegmentationID` is null) and (`ModelSegmentationID` is not null) and (`PatientID` is null) and (`StudyID` is null)) or ((`ImageInstanceID` is null) and (`SegmentationID` is null) and (`ModelSegmentationID` is null) and (`PatientID` is not null) and (`StudyID` is null)) or ((`ImageInstanceID` is null) and (`SegmentationID` is null) and (`ModelSegmentationID` is null) and (`PatientID` is null) and (`StudyID` is not null))))
-) ENGINE=InnoDB AUTO_INCREMENT=4348931 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `AttributeValueInput`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `AttributeValueInput` (
@@ -181,7 +174,6 @@ CREATE TABLE `AttributeValueInput` (
   CONSTRAINT `AttributeValueInput_ibfk_2` FOREIGN KEY (`OutputAttributeValueID`) REFERENCES `AttributeValue` (`AttributeValueID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `AttributesModel`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `AttributesModel` (
@@ -190,7 +182,6 @@ CREATE TABLE `AttributesModel` (
   CONSTRAINT `AttributesModel_ibfk_1` FOREIGN KEY (`ModelID`) REFERENCES `Model` (`ModelID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `AttributesModelOutput`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `AttributesModelOutput` (
@@ -202,7 +193,6 @@ CREATE TABLE `AttributesModelOutput` (
   CONSTRAINT `AttributesModelOutput_ibfk_2` FOREIGN KEY (`ModelID`) REFERENCES `AttributesModel` (`ModelID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `AuditLog`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `AuditLog` (
@@ -218,9 +208,8 @@ CREATE TABLE `AuditLog` (
   PRIMARY KEY (`AuditLogID`),
   KEY `ix_AuditLog_ActorID` (`ActorID`),
   KEY `ix_AuditLog_Timestamp` (`Timestamp`)
-) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `CompositeFeature`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `CompositeFeature` (
@@ -234,7 +223,6 @@ CREATE TABLE `CompositeFeature` (
   CONSTRAINT `CompositeFeature_ibfk_2` FOREIGN KEY (`ParentFeatureID`) REFERENCES `Feature` (`FeatureID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Contact`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Contact` (
@@ -245,9 +233,8 @@ CREATE TABLE `Contact` (
   `Orcid` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`ContactID`),
   UNIQUE KEY `NameEmailInstitute_UNIQUE` (`Name`,`Email`,`Institute`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Creator`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Creator` (
@@ -264,9 +251,8 @@ CREATE TABLE `Creator` (
   `PasswordHash` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`CreatorID`),
   UNIQUE KEY `CreatorName_UNIQUE` (`CreatorName`)
-) ENGINE=InnoDB AUTO_INCREMENT=84 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `CreatorTag`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `CreatorTag` (
@@ -280,7 +266,6 @@ CREATE TABLE `CreatorTag` (
   CONSTRAINT `CreatorTag_ibfk_2` FOREIGN KEY (`TagID`) REFERENCES `Tag` (`TagID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `DeviceInstance`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `DeviceInstance` (
@@ -291,9 +276,8 @@ CREATE TABLE `DeviceInstance` (
   PRIMARY KEY (`DeviceInstanceID`),
   UNIQUE KEY `DeviceModelIDDescription_UNIQUE` (`DeviceModelID`,`Description`),
   CONSTRAINT `fk_DeviceInstance_DeviceModel1` FOREIGN KEY (`DeviceModelID`) REFERENCES `DeviceModel` (`DeviceModelID`)
-) ENGINE=InnoDB AUTO_INCREMENT=88 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `DeviceModel`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `DeviceModel` (
@@ -302,9 +286,8 @@ CREATE TABLE `DeviceModel` (
   `ManufacturerModelName` varchar(45) NOT NULL,
   PRIMARY KEY (`DeviceModelID`),
   UNIQUE KEY `ManufacturerManufacturerModelName_UNIQUE` (`Manufacturer`,`ManufacturerModelName`)
-) ENGINE=InnoDB AUTO_INCREMENT=78 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Feature`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Feature` (
@@ -313,9 +296,8 @@ CREATE TABLE `Feature` (
   `DateInserted` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`FeatureID`),
   UNIQUE KEY `FeatureName_UNIQUE` (`FeatureName`)
-) ENGINE=InnoDB AUTO_INCREMENT=174 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `FormAnnotation`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `FormAnnotation` (
@@ -352,9 +334,8 @@ CREATE TABLE `FormAnnotation` (
   CONSTRAINT `FormAnnotation_ibfk_1` FOREIGN KEY (`SubTaskID`) REFERENCES `SubTask` (`SubTaskID`) ON DELETE SET NULL,
   CONSTRAINT `FormAnnotation_ibfk_2` FOREIGN KEY (`ImageInstanceID`) REFERENCES `ImageInstance` (`ImageInstanceID`) ON DELETE CASCADE,
   CONSTRAINT `FormAnnotation_ibfk_3` FOREIGN KEY (`SubTaskID`) REFERENCES `SubTask` (`SubTaskID`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=95915 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `FormAnnotationTag`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `FormAnnotationTag` (
@@ -373,7 +354,6 @@ CREATE TABLE `FormAnnotationTag` (
   CONSTRAINT `FormAnnotationTag_ibfk_5` FOREIGN KEY (`TagID`) REFERENCES `Tag` (`TagID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `FormSchema`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `FormSchema` (
@@ -383,9 +363,8 @@ CREATE TABLE `FormSchema` (
   `EntityType` enum('Patient','Study','Eye','StudyEye','ImageInstance') DEFAULT NULL,
   PRIMARY KEY (`FormSchemaID`),
   UNIQUE KEY `SchemaName_UNIQUE` (`SchemaName`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `ImageInstance`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ImageInstance` (
@@ -445,9 +424,8 @@ CREATE TABLE `ImageInstance` (
   CONSTRAINT `fk_ImageInstance_Scan1` FOREIGN KEY (`ScanID`) REFERENCES `Scan` (`ScanID`),
   CONSTRAINT `fk_ImageInstance_Series1` FOREIGN KEY (`SeriesID`) REFERENCES `Series` (`SeriesID`) ON DELETE CASCADE,
   CONSTRAINT `fk_ImageInstance_Sources1` FOREIGN KEY (`SourceInfoID`) REFERENCES `SourceInfo` (`SourceInfoID`)
-) ENGINE=InnoDB AUTO_INCREMENT=3058097 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `ImageInstanceTag`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ImageInstanceTag` (
@@ -466,7 +444,6 @@ CREATE TABLE `ImageInstanceTag` (
   CONSTRAINT `ImageInstanceTag_ibfk_3` FOREIGN KEY (`TagID`) REFERENCES `Tag` (`TagID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `ImageStorage`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ImageStorage` (
@@ -486,9 +463,8 @@ CREATE TABLE `ImageStorage` (
   KEY `ix_ImageStorage_ImageInstanceID_IsPrimary` (`ImageInstanceID`,`IsPrimary`),
   CONSTRAINT `ImageStorage_ibfk_1` FOREIGN KEY (`ImageInstanceID`) REFERENCES `ImageInstance` (`ImageInstanceID`),
   CONSTRAINT `ImageStorage_ibfk_2` FOREIGN KEY (`StorageBackendID`) REFERENCES `StorageBackend` (`StorageBackendID`)
-) ENGINE=InnoDB AUTO_INCREMENT=1848366 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Modality`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Modality` (
@@ -496,9 +472,8 @@ CREATE TABLE `Modality` (
   `ModalityTag` varchar(40) NOT NULL,
   PRIMARY KEY (`ModalityID`),
   UNIQUE KEY `ModalityTag_UNIQUE` (`ModalityTag`)
-) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Model`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Model` (
@@ -510,9 +485,8 @@ CREATE TABLE `Model` (
   `ModelType` enum('segmentation','attributes') NOT NULL,
   PRIMARY KEY (`ModelID`),
   UNIQUE KEY `ModelName_2` (`ModelName`,`Version`)
-) ENGINE=InnoDB AUTO_INCREMENT=58 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `ModelInput`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ModelInput` (
@@ -528,7 +502,6 @@ CREATE TABLE `ModelInput` (
   CONSTRAINT `ModelInput_ibfk_2` FOREIGN KEY (`ModelID`) REFERENCES `AttributesModel` (`ModelID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `ModelSegmentation`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ModelSegmentation` (
@@ -551,9 +524,8 @@ CREATE TABLE `ModelSegmentation` (
   KEY `ix_ModelSegmentation_Model_Image` (`ModelID`,`ImageInstanceID`),
   CONSTRAINT `ModelSegmentation_ibfk_1` FOREIGN KEY (`ImageInstanceID`) REFERENCES `ImageInstance` (`ImageInstanceID`) ON DELETE CASCADE,
   CONSTRAINT `ModelSegmentation_ibfk_2` FOREIGN KEY (`ModelID`) REFERENCES `Model` (`ModelID`)
-) ENGINE=InnoDB AUTO_INCREMENT=1490891 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Patient`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Patient` (
@@ -569,9 +541,8 @@ CREATE TABLE `Patient` (
   KEY `ix_Patient_Project_Sex_BirthDate` (`ProjectID`,`Sex`,`BirthDate`),
   KEY `ix_Patient_PatientIdentifier` (`PatientIdentifier`),
   CONSTRAINT `Patient_ibfk_1` FOREIGN KEY (`ProjectID`) REFERENCES `Project` (`ProjectID`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=1818147 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Project`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Project` (
@@ -586,9 +557,8 @@ CREATE TABLE `Project` (
   UNIQUE KEY `ProjectName_UNIQUE` (`ProjectName`),
   KEY `fk_Project_Contact1_idx` (`ContactID`),
   CONSTRAINT `fk_Project_Contact1` FOREIGN KEY (`ContactID`) REFERENCES `Contact` (`ContactID`)
-) ENGINE=InnoDB AUTO_INCREMENT=12054 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Scan`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Scan` (
@@ -596,9 +566,8 @@ CREATE TABLE `Scan` (
   `ScanMode` varchar(40) NOT NULL,
   PRIMARY KEY (`ScanID`),
   UNIQUE KEY `ScanMode_UNIQUE` (`ScanMode`)
-) ENGINE=InnoDB AUTO_INCREMENT=25234 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Segmentation`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Segmentation` (
@@ -632,9 +601,8 @@ CREATE TABLE `Segmentation` (
   CONSTRAINT `Segmentation_ibfk_3` FOREIGN KEY (`FeatureID`) REFERENCES `Feature` (`FeatureID`),
   CONSTRAINT `Segmentation_ibfk_4` FOREIGN KEY (`ReferenceSegmentationID`) REFERENCES `Segmentation` (`SegmentationID`),
   CONSTRAINT `Segmentation_ibfk_5` FOREIGN KEY (`SubTaskID`) REFERENCES `SubTask` (`SubTaskID`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=46985 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `SegmentationModel`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `SegmentationModel` (
@@ -646,7 +614,6 @@ CREATE TABLE `SegmentationModel` (
   CONSTRAINT `SegmentationModel_ibfk_2` FOREIGN KEY (`ModelID`) REFERENCES `Model` (`ModelID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `SegmentationTag`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `SegmentationTag` (
@@ -665,7 +632,6 @@ CREATE TABLE `SegmentationTag` (
   CONSTRAINT `SegmentationTag_ibfk_5` FOREIGN KEY (`SegmentationID`) REFERENCES `Segmentation` (`SegmentationID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Series`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Series` (
@@ -681,9 +647,8 @@ CREATE TABLE `Series` (
   KEY `ix_Series_StudyID_SeriesNumber` (`StudyID`,`SeriesNumber`),
   KEY `ix_Series_StudyID_StudyInstanceUid` (`StudyID`,`StudyInstanceUid`),
   CONSTRAINT `Series_ibfk_1` FOREIGN KEY (`StudyID`) REFERENCES `Study` (`StudyID`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=2339425 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `SourceInfo`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `SourceInfo` (
@@ -695,9 +660,8 @@ CREATE TABLE `SourceInfo` (
   UNIQUE KEY `SourceName_UNIQUE` (`SourceName`),
   UNIQUE KEY `SourcePath_UNIQUE` (`SourcePath`),
   UNIQUE KEY `ThumbnailPath_UNIQUE` (`ThumbnailPath`)
-) ENGINE=InnoDB AUTO_INCREMENT=77 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `StorageBackend`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `StorageBackend` (
@@ -707,9 +671,8 @@ CREATE TABLE `StorageBackend` (
   `Config` json DEFAULT NULL,
   PRIMARY KEY (`StorageBackendID`),
   UNIQUE KEY `uq_StorageBackend_Key` (`Key`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Study`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Study` (
@@ -727,9 +690,8 @@ CREATE TABLE `Study` (
   KEY `ix_Study_PatientID_StudyRound` (`PatientID`,`StudyRound`),
   KEY `ix_Study_StudyRound_StudyDate` (`StudyRound`,`StudyDate`),
   CONSTRAINT `Study_ibfk_1` FOREIGN KEY (`PatientID`) REFERENCES `Patient` (`PatientID`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=1859858 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `StudyTag`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `StudyTag` (
@@ -748,7 +710,6 @@ CREATE TABLE `StudyTag` (
   CONSTRAINT `StudyTag_ibfk_3` FOREIGN KEY (`StudyID`) REFERENCES `Study` (`StudyID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `SubTask`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `SubTask` (
@@ -763,9 +724,8 @@ CREATE TABLE `SubTask` (
   KEY `ix_SubTask_TaskState_Creator` (`TaskState`,`CreatorID`),
   CONSTRAINT `fk_SubTask_Creator1` FOREIGN KEY (`CreatorID`) REFERENCES `Creator` (`CreatorID`),
   CONSTRAINT `SubTask_ibfk_1` FOREIGN KEY (`TaskID`) REFERENCES `Task` (`TaskID`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=26197 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `SubTaskImageLink`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `SubTaskImageLink` (
@@ -780,7 +740,6 @@ CREATE TABLE `SubTaskImageLink` (
   CONSTRAINT `SubTaskImageLink_ibfk_2` FOREIGN KEY (`SubTaskID`) REFERENCES `SubTask` (`SubTaskID`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Tag`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Tag` (
@@ -794,9 +753,8 @@ CREATE TABLE `Tag` (
   UNIQUE KEY `Tag` (`TagName`,`TagType`),
   KEY `fk_Tag_Creator1_idx` (`CreatorID`),
   CONSTRAINT `Tag_ibfk_1` FOREIGN KEY (`CreatorID`) REFERENCES `Creator` (`CreatorID`)
-) ENGINE=InnoDB AUTO_INCREMENT=50 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `Task`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Task` (
@@ -815,9 +773,8 @@ CREATE TABLE `Task` (
   CONSTRAINT `fk_Task_Contact1` FOREIGN KEY (`ContactID`) REFERENCES `Contact` (`ContactID`),
   CONSTRAINT `fk_Task_TaskDefinition1` FOREIGN KEY (`TaskDefinitionID`) REFERENCES `TaskDefinition` (`TaskDefinitionID`),
   CONSTRAINT `Task_ibfk_1` FOREIGN KEY (`CreatorID`) REFERENCES `Creator` (`CreatorID`)
-) ENGINE=InnoDB AUTO_INCREMENT=71 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `TaskDefinition`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `TaskDefinition` (
@@ -826,9 +783,8 @@ CREATE TABLE `TaskDefinition` (
   `DateInserted` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `TaskConfig` json DEFAULT NULL,
   PRIMARY KEY (`TaskDefinitionID`)
-) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `alembic_version`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `alembic_version` (
