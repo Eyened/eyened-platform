@@ -299,6 +299,14 @@ rmdir /var/tmp/eyened-baseline-datadir
 ls -la "$MAIN/database/tmp/eyened_dump" | head -3   # confirm the backup itself is untouched
 ```
 
+`rmdir` fails with `Operation not permitted` here, because Step 1's
+`chown -R 999:999 /dst` re-owned the mount point itself and your user no longer
+owns it. Remove it through a container instead:
+
+```bash
+docker run --rm -v /var/tmp:/varTmp alpine:latest rm -rf /varTmp/eyened-baseline-datadir
+```
+
 ### Step 8: Commit
 
 ```bash
