@@ -109,7 +109,6 @@ class StorageBackend(Base):
     Kind: Mapped[str] = mapped_column(String(256))
     # placeholder for future configuration
     Config: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True, default=None)
-    GateProbe: Mapped[Optional[str]] = mapped_column(String(8), nullable=True, default=None)
 
     ImageStorages: Mapped[List["ImageStorage"]] = relationship(
         "eyened_orm.image_instance.ImageStorage",
