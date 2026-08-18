@@ -43,6 +43,19 @@ We use Alembic for managing database migrations. This section explains our proce
 - [Developing migrations](#developing-migrations)
 - [Testing migrations](#testing-migrations)
 
+:::caution
+**Alembic cannot create a database from nothing.** The migration chain only alters
+a schema that is already there — 25 of the 44 tables in `Base.metadata` are created
+by no migration. Running `alembic upgrade head` against an empty database fails with
+`(1146, "Table 'eyened_database.Contact' doesn't exist")`.
+
+A fresh database is therefore two stages: `eorm initialize-database` to create the
+schema from the models and stamp it at head, and `alembic upgrade head` from then on.
+See the [CLI reference](/eyened-platform/orm/cli) and
+[Development setup](/eyened-platform/guides/development_setup). Issue
+[#186](https://github.com/Eyened/eyened-platform/issues/186) removes the first stage.
+:::
+
 ## Setting up Alembic
 
 ### Development Repository
@@ -128,7 +141,7 @@ This documentation overlaps with the README: https://github.com/Eyened/eyened-pl
    ```
    :::
 
-   This should always succeed. If there are issues with running the migration, it could be a bug or that other migrations have been applied in between. In this case, changing the `down_revision` might be necessary. Be careful!
+   This should succeed on a database that already carries the schema. (It will not succeed on an empty one — see the caution above.) If there are issues with running the migration, it could be a bug or that other migrations have been applied in between. In this case, changing the `down_revision` might be necessary. Be careful!
 
 ### What to Test
 

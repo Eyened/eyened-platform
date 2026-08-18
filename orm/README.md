@@ -24,7 +24,7 @@
 
 We use Alembic for database migrations.
 
-Preferred way to apply migrations:
+On a database that already has the schema, apply migrations with:
 
 ```bash
 alembic upgrade head
@@ -35,6 +35,45 @@ Optional: pass an env file (see `migrations/alembic/env.py`):
 ```bash
 alembic -x env_file=/path/to/.env upgrade head
 ```
+
+## A fresh database needs two stages
+
+`alembic upgrade head` cannot build a database from nothing. Point it at an
+empty schema and it fails on the second revision:
+
+```
+sqlalchemy.exc.ProgrammingError: (1146, "Table 'eyened_database.Contact' doesn't exist")
+[SQL: ALTER TABLE `Contact` ADD COLUMN `Orcid` VARCHAR(255)]
+```
+
+That is expected, not a broken checkout. The chain's root revision is a stub
+whose declared parent no longer exists, and the chain as a whole only ever
+alters a schema that is already there: it contains 21 `create_table` calls, two
+of them for tables the model dropped long ago, against 44 tables in
+`Base.metadata`. **25 tables are created by no migration.** They exist at every
+site because every database descends physically from the original one, which
+was built outside Alembic.
+
+So bringing up a new installation is two stages:
+
+```bash
+# 1. create the schema from the ORM models, then stamp it at the current head
+eorm initialize-database
+
+# 2. from here on, apply new revisions the normal way
+alembic upgrade head
+```
+
+Stage 1 runs `Base.metadata.create_all()` and writes the head revision into
+`alembic_version`, so the database starts life already at head and stage 2 is a
+no-op until the next revision lands. Skipping stage 1 is what produces the error
+above.
+
+The consequence worth knowing: a fresh database gets its schema from the models,
+an existing one from the migrations, and nothing proves the two agree. Issue
+[#186](https://github.com/Eyened/eyened-platform/issues/186) replaces this with a
+squashed baseline revision, after which `alembic upgrade head` works from empty
+and stage 1 goes away.
 
 ## Setup
 

@@ -1,4 +1,4 @@
-` # Alembic migrations
+# Alembic migrations
 
 Alembic reads database settings from the environment. You can pass a specific
 env file like this:
@@ -63,6 +63,22 @@ proceeds silently.
 Accepted values are `1`, `true` and `yes` (case-insensitive). Anything else —
 including `false` and `0` — leaves the prompt on.
 
+## Fresh databases
+
+`alembic upgrade head` only alters a schema that already exists; it cannot
+build one. Against an empty database it fails on the second revision with
+`(1146, "Table 'eyened_database.Contact' doesn't exist")`, because 25 of the
+44 tables in `Base.metadata` are created by no migration.
+
+Create the schema first, then migrate:
+
+```bash
+eorm initialize-database   # create_all() + stamp at head
+alembic upgrade head       # no-op until the next revision lands
+```
+
+See `orm/README.md` for the background and for what issue #186 changes.
+
 ## Common commands
 
 Create a migration:
@@ -73,7 +89,7 @@ alembic revision --autogenerate -m "message"
 
 - Review the generated migration file and adjust it as needed.
 
-Apply migrations:
+Apply migrations (existing database):
 
 ```bash
 alembic upgrade head

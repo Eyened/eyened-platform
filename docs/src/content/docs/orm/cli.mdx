@@ -21,6 +21,11 @@ Creates tables on an empty database and stamps the current Alembic revision.
 eorm initialize-database [--seed-form-schemas] [--recreate]
 ```
 
+This is stage 1 of two for a fresh database, and it is not optional: the Alembic
+chain only alters an existing schema, so `alembic upgrade head` on an empty
+database fails. Run this first, then `alembic upgrade head` for every revision
+after. See [ORM development](/eyened-platform/orm/development#migrations).
+
 ### seed-form-schemas
 
 Inserts builtin viewer FormSchemas (ETDRS, registration). See **[Form schemas](/eyened-platform/orm/form_schemas)**; registration semantics: **[Registration](/eyened-platform/orm/registration)**.
