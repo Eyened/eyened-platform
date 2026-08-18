@@ -951,6 +951,11 @@ export interface paths {
         /**
          * List Tasks
          * @description List all tasks (no pagination).
+         *
+         *     ``include_projects`` is off by default: resolving the projects each task
+         *     spans walks every image link of every task, and no client renders the
+         *     field today. Omitted, ``projects`` is ``null`` rather than ``[]`` --
+         *     "not requested", not "spans nothing".
          */
         get: operations["list_tasks_task_get"];
         put?: never;
@@ -2422,11 +2427,8 @@ export interface components {
             creator?: components["schemas"]["CreatorMeta"] | null;
             task_state?: components["schemas"]["TaskState"] | null;
             task_definition: components["schemas"]["TaskDefinitionGET"];
-            /**
-             * Projects
-             * @default []
-             */
-            projects: components["schemas"]["ProjectMeta"][];
+            /** Projects */
+            projects?: components["schemas"]["ProjectMeta"][] | null;
         };
         /** TaskPATCH */
         TaskPATCH: {
@@ -4878,7 +4880,9 @@ export interface operations {
     };
     list_tasks_task_get: {
         parameters: {
-            query?: never;
+            query?: {
+                include_projects?: boolean;
+            };
             header?: {
                 authorization?: string;
             };

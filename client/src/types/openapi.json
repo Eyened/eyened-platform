@@ -4241,9 +4241,19 @@
       },
       "get": {
         "summary": "List Tasks",
-        "description": "List all tasks (no pagination).",
+        "description": "List all tasks (no pagination).\n\n``include_projects`` is off by default: resolving the projects each task\nspans walks every image link of every task, and no client renders the\nfield today. Omitted, ``projects`` is ``null`` rather than ``[]`` --\n\"not requested\", not \"spans nothing\".",
         "operationId": "list_tasks_task_get",
         "parameters": [
+          {
+            "name": "include_projects",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Projects"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -9299,12 +9309,18 @@
             "$ref": "#/components/schemas/TaskDefinitionGET"
           },
           "projects": {
-            "items": {
-              "$ref": "#/components/schemas/ProjectMeta"
-            },
-            "type": "array",
-            "title": "Projects",
-            "default": []
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ProjectMeta"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projects"
           }
         },
         "type": "object",

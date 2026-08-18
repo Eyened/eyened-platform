@@ -39,17 +39,24 @@ async def create_task(
 
 @router.get("/task", response_model=List[TaskGET])
 async def list_tasks(
+    include_projects: bool = False,
     service: TaskService = Depends(get_task_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """List all tasks (no pagination)."""
-    tasks, counts, projects = service.list_tasks()
+    """List all tasks (no pagination).
+
+    ``include_projects`` is off by default: resolving the projects each task
+    spans walks every image link of every task, and no client renders the
+    field today. Omitted, ``projects`` is ``null`` rather than ``[]`` --
+    "not requested", not "spans nothing".
+    """
+    tasks, counts, projects = service.list_tasks(include_projects=include_projects)
     return [
         DTOConverter.task_to_get(
             t,
             num_tasks=counts[t.TaskID][0],
             num_tasks_ready=counts[t.TaskID][1],
-            projects=projects[t.TaskID],
+            projects=None if projects is None else projects[t.TaskID],
         )
         for t in tasks
     ]
