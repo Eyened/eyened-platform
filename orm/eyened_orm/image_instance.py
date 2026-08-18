@@ -229,6 +229,16 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     SeriesID: Mapped[int] = mapped_column(
         ForeignKey("Series.SeriesID", ondelete="CASCADE")
     )
+    # The project that the image belongs to, denormalized from Patient.ProjectID
+    # so that authorization scoping is an indexed lookup rather than a five-hop
+    # join. Populated on insert by the before_flush listener in
+    # authz/denormalization.py.
+    #
+    # Deliberately no ForeignKey to Project here: the value is meant to be held
+    # equal to the parent Series' own copy by a composite foreign key, and a
+    # second single-column FK straight to Project would let the two disagree
+    # about which project this image is in.
+    ProjectID: Mapped[int]
     # The source that the image belongs to (optional, not used by platform)
     SourceInfoID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("SourceInfo.SourceInfoID"), nullable=True
