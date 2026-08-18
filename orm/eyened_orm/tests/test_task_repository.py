@@ -1,7 +1,7 @@
 from eyened_orm import Creator, SubTask, Task, TaskDefinition
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import TaskRepository, SubTaskRepository
-from eyened_orm.utils.factories import admin_scope
+from eyened_orm.utils.factories import admin_scope, scope_for
 
 
 def _creator(session, name: str = "tester") -> Creator:
@@ -343,3 +343,24 @@ def test_next_image_index_starts_at_zero_then_increments(session):
     session.flush()
 
     assert repo.next_image_index(st.SubTaskID) == 4
+
+
+def test_project_names_are_joined_outside_the_scoped_walk(session, spanning):
+    """Plan shape, not behaviour: Project inside apply_scope's correlated
+    antijoin makes MySQL cross-join it (12.2s vs 2.2s), and SQLite won't
+    reproduce the plan."""
+    repo = TaskRepository(session, scope=scope_for(spanning["projects"]["A"]))
+    walk = str(repo._project_pairs_select([spanning["task"]]))
+    named = str(repo._names_for(repo._project_pairs_select([spanning["task"]]).subquery()))
+
+    # Control: SQLAlchemy quotes mixed-case identifiers, so without this an
+    # identifier-quoting change makes the next assertion unmatchable and the
+    # test passes while checking nothing.
+    assert 'JOIN "Project"' in named
+    # Absence of the *table*, not of the JOIN keyword. An implicit comma-join
+    # renders `FROM "SubTask", "Project"` -- which is precisely the cross-join
+    # shape this test exists to prevent, and which a `JOIN "Project"` check
+    # would wave through. `"Project"` cannot match `"Patient"."ProjectID"`:
+    # that has no closing quote after `Project`.
+    assert '"Project"' not in walk
+    assert "SELECT DISTINCT" in walk  # blocks MySQL's derived-table merge
