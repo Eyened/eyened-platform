@@ -67,16 +67,26 @@ class TaskService:
         return task
 
     def list_tasks(
-        self,
+        self, *, include_projects: bool = False
     ) -> tuple[
-        list[Task], dict[int, tuple[int, int]], dict[int, list[tuple[int, str]]]
+        list[Task],
+        dict[int, tuple[int, int]],
+        dict[int, list[tuple[int, str]]] | None,
     ]:
         """Return all tasks (TaskID order), their {id: (total, ready)} counts
-        and the projects each one spans."""
+        and, when asked, the projects each one spans.
+
+        Spans are opt-in because resolving them walks every image link of every
+        task in the result, which dominates the request. ``None`` means "not
+        requested" and is passed through to the DTO as such -- see
+        ``DTOConverter.task_to_get``.
+        """
         tasks = self.tasks.list_all()
         task_ids = [t.TaskID for t in tasks]
         counts = self.tasks.subtask_counts(task_ids)
-        projects = self.tasks.projects_for_tasks(task_ids)
+        projects = (
+            self.tasks.projects_for_tasks(task_ids) if include_projects else None
+        )
         return tasks, counts, projects
 
     def get_task(

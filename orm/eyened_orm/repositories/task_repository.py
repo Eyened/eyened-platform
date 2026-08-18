@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import case, func, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import (
@@ -119,6 +119,49 @@ class TaskRepository:
         counts = {int(tid): (int(n), int(r)) for tid, n, r in rows}
         return {tid: counts.get(tid, (0, 0)) for tid in task_ids}
 
+    def _project_pairs_select(self, task_ids: list[int]) -> Select:
+        """The walk to ``(task_id, project_id)`` pairs, de-duplicated, unscoped.
+
+        ``Project`` is deliberately absent: joining it here puts a 44-row table
+        in the same SELECT as ``apply_scope``'s correlated antijoin, and MySQL
+        answers that by cross-joining the two and deferring the join condition
+        to the last filter in the plan -- 933,108 driving rows instead of
+        21,207, and every hop below it 44x wide. Measured at 12.2s versus 2.2s
+        for the identical result. Names are joined to this subquery instead.
+
+        Unscoped on purpose: the caller applies the scope, so that the call
+        stays inside the public read method where the AST guard in
+        ``server/tests/test_repository_reads_are_scoped.py`` can see it.
+
+        ``.distinct()`` is load-bearing beyond de-duplication: it stops MySQL
+        merging the derived table into the outer query, which would restore the
+        plan this function exists to avoid.
+        """
+        return (
+            select(
+                SubTask.TaskID.label("task_id"),
+                Patient.ProjectID.label("project_id"),
+            )
+            .select_from(SubTask)
+            .join(SubTaskImageLink, SubTaskImageLink.SubTaskID == SubTask.SubTaskID)
+            .join(
+                ImageInstance,
+                ImageInstance.ImageInstanceID == SubTaskImageLink.ImageInstanceID,
+            )
+            .join(Series, Series.SeriesID == ImageInstance.SeriesID)
+            .join(Study, Study.StudyID == Series.StudyID)
+            .join(Patient, Patient.PatientID == Study.PatientID)
+            .where(SubTask.TaskID.in_(task_ids))
+            .distinct()
+        )
+
+    @staticmethod
+    def _names_for(pairs) -> Select:
+        """Project names joined to an already-scoped pairs subquery."""
+        return select(
+            pairs.c.task_id, pairs.c.project_id, Project.ProjectName
+        ).join(Project, Project.ProjectID == pairs.c.project_id)
+
     def projects_for_tasks(
         self, task_ids: list[int]
     ) -> dict[int, list[tuple[int, str]]]:
@@ -130,33 +173,22 @@ class TaskRepository:
         drift -- grant-for-task and this endpoint are the two sides of one
         promise -- so a test pins them to the same answer.
 
-        One grouped query. Every requested id is present in the result, and an
-        empty list means one of *two* things: the task genuinely has no images,
-        or the caller's scope cannot see the subtasks that carry them. Callers
-        must not read ``[]`` as "spans nothing" on its own; the routes are safe
-        because they 404 an invisible task before the field is read.
+        Every requested id is present in the result, and an empty list means
+        one of *two* things: the task genuinely has no images, or the caller's
+        scope cannot see the subtasks that carry them. Callers must not read
+        ``[]`` as "spans nothing" on its own; the routes are safe because they
+        404 an invisible task before the field is read.
+
+        ``apply_scope`` is called here rather than inside ``_project_pairs_select``
+        so that the repository read guard, which inspects this method's own body
+        and does not follow calls, can see it.
         """
         if not task_ids:
             return {}
-        rows = self._session.execute(
-            apply_scope(
-                select(SubTask.TaskID, Patient.ProjectID, Project.ProjectName)
-                .select_from(SubTask)
-                .join(SubTaskImageLink, SubTaskImageLink.SubTaskID == SubTask.SubTaskID)
-                .join(
-                    ImageInstance,
-                    ImageInstance.ImageInstanceID == SubTaskImageLink.ImageInstanceID,
-                )
-                .join(Series, Series.SeriesID == ImageInstance.SeriesID)
-                .join(Study, Study.StudyID == Series.StudyID)
-                .join(Patient, Patient.PatientID == Study.PatientID)
-                .join(Project, Project.ProjectID == Patient.ProjectID)
-                .where(SubTask.TaskID.in_(task_ids))
-                .distinct(),
-                SubTask,
-                self._scope,
-            )
-        ).all()
+        pairs = apply_scope(
+            self._project_pairs_select(task_ids), SubTask, self._scope
+        ).subquery()
+        rows = self._session.execute(self._names_for(pairs)).all()
         found: dict[int, list[tuple[int, str]]] = {}
         for task_id, project_id, project_name in rows:
             found.setdefault(int(task_id), []).append((int(project_id), project_name))

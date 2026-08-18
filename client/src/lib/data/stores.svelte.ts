@@ -168,7 +168,21 @@ export function ingestFormAnnotations(annotationsData: FormAnnotationGET[]) {
 
 export function ingestTasks(tasksData: TaskGET[]) {
     for (const task of tasksData) {
-        tasks.set(task.id, task);
+        const existing = tasks.get(task.id);
+        if (existing) {
+            // Merge so partial payloads don't wipe fields they don't return.
+            // GET /task omits project spans unless ?include_projects=true, and
+            // a null there means "not requested" -- not "spans nothing". A
+            // straight replace would turn a detail fetch's populated projects
+            // into null on the next list refresh.
+            const merged = { ...existing, ...task };
+            if (task.projects == null && existing.projects != null) {
+                merged.projects = existing.projects;
+            }
+            tasks.set(task.id, merged);
+        } else {
+            tasks.set(task.id, task);
+        }
     }
 }
 

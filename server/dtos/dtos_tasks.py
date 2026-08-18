@@ -56,7 +56,7 @@ class TaskGET(TaskBase):
     creator: Optional[CreatorMeta] = None
     task_state: Optional[TaskState] = None
     task_definition: TaskDefinitionGET
-    projects: List[ProjectMeta] = []
+    projects: Optional[List[ProjectMeta]] = None
 
 
 # === SUB TASK ===
