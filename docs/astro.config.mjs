@@ -42,6 +42,7 @@ export default defineConfig({
                             autogenerate: { directory: 'orm/data_model' },
                         },
                         { slug: 'orm/importer' },
+                        { slug: 'orm/dicom_export' },
                         { slug: 'orm/cli' },
                         { slug: 'orm/inference' },
                         { slug: 'orm/form_schemas' },
