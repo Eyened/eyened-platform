@@ -1,42 +1,54 @@
-
 import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
+import type {
+    ModelSegmentationGET,
+    SegmentationGET,
+} from "../../../types/openapi_types";
 import type { ImageBox } from "./segmentationRegion";
 import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
+import { subfeatureBit } from "./subfeatureBits";
 
 export type Segmentation = SegmentationGET | ModelSegmentationGET;
-
 
 export function getSegmentationKey(segmentation: Segmentation): string {
     return `${segmentation.annotation_type}_${segmentation.id}`;
 }
 function matchesAxis(segmentation: Segmentation, axis: number): boolean {
-    return segmentation.sparse_axis == null || segmentation.sparse_axis == undefined || segmentation.sparse_axis == axis;
+    return (
+        segmentation.sparse_axis == null ||
+        segmentation.sparse_axis == undefined ||
+        segmentation.sparse_axis == axis
+    );
 }
 export class SegmentationContext {
-
     public graderSegmentations: SegmentationGET[] = $derived(
-        segmentations.filter((s) => s.image_id == this.instanceId && matchesAxis(s, this.axis))
+        segmentations.filter(
+            (s) => s.image_id == this.instanceId && matchesAxis(s, this.axis),
+        ),
     );
 
     public modelSegmentations: ModelSegmentationGET[] = $derived(
-        modelSegmentations.filter((s) => s.image_id == this.instanceId && matchesAxis(s, this.axis))
+        modelSegmentations.filter(
+            (s) => s.image_id == this.instanceId && matchesAxis(s, this.axis),
+        ),
     );
 
     public creatorVisible = new SvelteSet<number>();
     public modelVisible = $state(true);
     public shownSegmentations = new SvelteSet<string>();
 
-
     public visibleGraderSegmentations: SegmentationGET[] = $derived(
-        this.graderSegmentations.filter(s => this.shownSegmentations.has(getSegmentationKey(s)))
+        this.graderSegmentations.filter((s) =>
+            this.shownSegmentations.has(getSegmentationKey(s)),
+        ),
     );
 
     public visibleModelSegmentations: ModelSegmentationGET[] = $derived(
-        this.modelSegmentations.filter(s => this.shownSegmentations.has(getSegmentationKey(s)))
+        this.modelSegmentations.filter((s) =>
+            this.shownSegmentations.has(getSegmentationKey(s)),
+        ),
     );
 
     public flipDrawErase = $state(false);
@@ -47,10 +59,12 @@ export class SegmentationContext {
     public multiClassActiveAlpha = $state(1);
     public multiClassInactiveAlpha = $state(0.2);
     public segmentationItem: SegmentationItem | undefined = $state(undefined);
-    public scan_indices: number[] = $derived(this.segmentationItem?.savedScanIndices ?? []);
-    
+    public scan_indices: number[] = $derived(
+        this.segmentationItem?.savedScanIndices ?? [],
+    );
+
     // active mask indices for multi-label / multi-class segmentations
-    public activeIndices: number | number[] = $state([]); 
+    public activeIndices: number | number[] = $state([]);
     /** True while a segmentation stroke is in progress (pointer/keyboard). Used by multi-label overlay. */
     public isDrawing = $state(false);
 
@@ -59,25 +73,32 @@ export class SegmentationContext {
     public pendingRegionBox: ImageBox | undefined = $state(undefined);
 
     /** Per-segmentation bitmask: bit (i-1) = 1 means subfeature i is shown in multi-class / multi-label shaders. */
-    private visibleFeatureMaskBySegmentationKey = new SvelteMap<string, number>();
+    private visibleFeatureMaskBySegmentationKey = new SvelteMap<
+        string,
+        number
+    >();
 
     constructor(
         public readonly instanceId: string,
         public readonly axis: number,
         public readonly viewerWindowContext: ViewerWindowContext,
         public readonly image: AbstractImage,
-    ) {
-    }
+    ) {}
 
     getSegmentationItem(segmentation: Segmentation): SegmentationItem {
         return this.image.getOrCreateSegmentationItem(segmentation);
     }
 
-    getSegmentationItemById(segmentationId: number): SegmentationItem | undefined {
-        const segmentation = this.graderSegmentations.find(s => s.id === segmentationId)
-            || this.modelSegmentations.find(s => s.id === segmentationId);
+    getSegmentationItemById(
+        segmentationId: number,
+    ): SegmentationItem | undefined {
+        const segmentation =
+            this.graderSegmentations.find((s) => s.id === segmentationId) ||
+            this.modelSegmentations.find((s) => s.id === segmentationId);
 
-        return segmentation ? this.image.getOrCreateSegmentationItem(segmentation) : undefined;
+        return segmentation
+            ? this.image.getOrCreateSegmentationItem(segmentation)
+            : undefined;
     }
 
     toggleShowCreator(creatorId: number) {
@@ -144,7 +165,9 @@ export class SegmentationContext {
     }
 
     isActiveSegmentation(segmentation: Segmentation): boolean {
-        return this.activeSegmentationKey() === getSegmentationKey(segmentation);
+        return (
+            this.activeSegmentationKey() === getSegmentationKey(segmentation)
+        );
     }
 
     /** Select a segmentation for editing (pipette / panel); does not toggle off if already active. */
@@ -154,7 +177,7 @@ export class SegmentationContext {
         this.shownSegmentations.add(key);
 
         const rep = segmentationItem.segmentation.data_representation;
-        if (rep === 'MultiClass' || rep === 'MultiLabel') {
+        if (rep === "MultiClass" || rep === "MultiLabel") {
             this.activeIndices = 1;
         } else {
             this.activeIndices = [];
@@ -181,19 +204,26 @@ export class SegmentationContext {
     getVisibleFeatureMask(segmentation: Segmentation): number {
         const key = getSegmentationKey(segmentation);
         const v = this.visibleFeatureMaskBySegmentationKey.get(key);
-        return v === undefined ? SegmentationContext.ALL_FEATURES_VISIBLE : v >>> 0;
+        return v === undefined
+            ? SegmentationContext.ALL_FEATURES_VISIBLE
+            : v >>> 0;
     }
 
-    isFeatureLayerVisible(segmentation: Segmentation, featureIndex: number): boolean {
-        const bit = (1 << (featureIndex - 1)) >>> 0;
+    isFeatureLayerVisible(
+        segmentation: Segmentation,
+        featureIndex: number,
+    ): boolean {
+        const bit = subfeatureBit(featureIndex);
         return (this.getVisibleFeatureMask(segmentation) & bit) !== 0;
     }
 
-    toggleFeatureLayerVisibility(segmentation: Segmentation, featureIndex: number): void {
+    toggleFeatureLayerVisibility(
+        segmentation: Segmentation,
+        featureIndex: number,
+    ): void {
         const key = getSegmentationKey(segmentation);
         const cur = this.getVisibleFeatureMask(segmentation) >>> 0;
-        const bit = (1 << (featureIndex - 1)) >>> 0;
+        const bit = subfeatureBit(featureIndex);
         this.visibleFeatureMaskBySegmentationKey.set(key, (cur ^ bit) >>> 0);
     }
 }
-

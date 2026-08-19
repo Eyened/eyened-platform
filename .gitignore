@@ -22,3 +22,21 @@ segmentations.zarr/
 client/src/lib/extensions.ts
 venv
 trash
+scratch.txt
+dev/.venv
+
+# Graphify (Claude Code) - regenerable knowledge graph, rebuild with `graphify update .`
+graphify-out/
+
+# Claude Code local config and agent working files
+.claude/
+.superpowers/
+CLAUDE.md
+docs/superpowers/
+.coverage
+coverage.xml
+htmlcov/
+client/coverage/
+# diff-cover writes its markdown report to the cwd, not into coverage/.
+diff-cover.md
+client/diff-cover-client.md

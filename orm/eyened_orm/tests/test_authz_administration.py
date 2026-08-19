@@ -1,0 +1,519 @@
+"""Membership operations: idempotent, audited, and never silently lossy."""
+from __future__ import annotations
+
+import pytest
+from sqlalchemy import select
+
+from eyened_orm import AuditLog, Project
+from eyened_orm.authz.administration import deactivate, grant, parse_role, reactivate, revoke
+from eyened_orm.authz.roles import ProjectRole
+from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
+from eyened_orm.utils.factories import make_creator, make_project
+
+
+def _audit(session, command):
+    return session.scalars(
+        select(AuditLog).where(AuditLog.TrustedPath == f"eorm {command}")
+    ).all()
+
+
+def test_parse_role_accepts_every_role_name():
+    """All three, not a sample: the CLI's vocabulary is the enum's."""
+    assert {name: parse_role(name) for name in ("read_only", "grader", "project_admin")} == {
+        "read_only": ProjectRole.read_only,
+        "grader": ProjectRole.grader,
+        "project_admin": ProjectRole.project_admin,
+    }
+
+
+def test_parse_role_names_the_valid_roles_on_a_bad_value():
+    """Fails at the CLI boundary rather than surfacing a bare ValueError.
+
+    Everything past the parse deals in the enum, so no downstream code
+    compares role strings.
+    """
+    with pytest.raises(ValueError) as exc:
+        parse_role("admin")
+    for name in ("read_only", "grader", "project_admin"):
+        assert name in str(exc.value)
+
+
+def test_grant_creates_a_membership_and_audits_it(session):
+    make_creator(session, "alice")
+    make_project(session, "A")
+    session.commit()
+
+    result = grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    session.commit()
+
+    assert result.changed is True and result.previous is None
+    rows = session.scalars(
+        select(AuditLog).where(AuditLog.Entity == "ProjectMember")
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].TrustedPath == "eorm grant"
+    assert rows[0].ActorID is None
+    assert rows[0].Action == "INSERT"
+    assert rows[0].EntityID is None
+    # AuditLog has no single integer id for a membership, so the pair rides in Changes.
+    assert rows[0].Changes["project_name"] == "A"
+    assert rows[0].Changes["role"] == "grader"
+
+
+def test_an_unchanged_grant_writes_no_audit_row(session):
+    make_creator(session, "alice")
+    make_project(session, "A")
+    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    session.commit()
+
+    result = grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    session.commit()
+
+    assert result.changed is False
+    assert len(session.scalars(select(AuditLog)).all()) == 1
+
+
+def test_changing_a_role_records_old_and_new(session):
+    make_creator(session, "alice")
+    make_project(session, "A")
+    grant(session, username="alice", project_name="A", role=ProjectRole.read_only)
+    session.commit()
+
+    result = grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    session.commit()
+
+    assert result.previous is ProjectRole.read_only
+    latest = session.scalars(select(AuditLog).order_by(AuditLog.AuditLogID.desc())).first()
+    assert latest.Action == "UPDATE"
+    assert latest.Changes["role"] == {"old": "read_only", "new": "grader"}
+
+
+def test_revoke_removes_the_membership_and_audits_it(session):
+    alice = make_creator(session, "alice")
+    make_project(session, "A")
+    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    session.commit()
+
+    assert revoke(session, username="alice", project_name="A") is True
+    session.commit()
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
+
+    removal = session.scalars(select(AuditLog).where(AuditLog.Action == "DELETE")).all()
+    assert len(removal) == 1
+    assert removal[0].TrustedPath == "eorm revoke"
+    assert removal[0].Entity == "ProjectMember"
+    assert removal[0].ActorID is None
+    assert removal[0].EntityID is None
+    assert removal[0].Changes["role"] == "grader"
+
+
+def test_revoking_a_membership_that_does_not_exist_is_a_no_op(session):
+    make_creator(session, "alice")
+    make_project(session, "A")
+    session.commit()
+    assert revoke(session, username="alice", project_name="A") is False
+
+
+def test_an_unknown_username_names_itself(session):
+    make_project(session, "A")
+    session.commit()
+    with pytest.raises(LookupError, match="nosuchuser"):
+        grant(session, username="nosuchuser", project_name="A", role=ProjectRole.grader)
+
+
+def test_an_unknown_project_names_itself(session):
+    """resolve_project's message is unpinned otherwise; only the creator's was."""
+    make_creator(session, "alice")
+    session.commit()
+    with pytest.raises(LookupError, match="nosuchproject"):
+        grant(session, username="alice", project_name="nosuchproject", role=ProjectRole.grader)
+
+
+def test_a_plan_lists_what_will_be_granted_and_what_is_already_held(session, spanning):
+    """Review before apply. "Grant Alice access to task 70" may resolve to eight
+    projects, each handing over every patient, image and task in it --
+    permanently, until revoked. An administrator who reads the command name and
+    not the effect will over-grant."""
+    from eyened_orm.authz.administration import plan_grant_for_tasks
+
+    make_creator(session, "alice")
+    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    session.commit()
+
+    plan = plan_grant_for_tasks(
+        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    )
+    assert [name for _, name, _ in plan.to_grant] == ["B"]
+    assert [name for _, name, _ in plan.already_held] == ["A"]
+
+
+def test_a_plan_writes_nothing(session, spanning):
+    from eyened_orm.authz.administration import plan_grant_for_tasks
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+
+    alice = make_creator(session, "alice")
+    session.commit()
+    plan_grant_for_tasks(
+        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    )
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
+
+
+def test_applying_a_plan_never_lowers_an_existing_role(session, spanning):
+    """A user who is already project_admin in one of the task's projects keeps it."""
+    from eyened_orm.authz.administration import apply_grant_plan, plan_grant_for_tasks
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+
+    alice = make_creator(session, "alice")
+    grant(session, username="alice", project_name="A", role=ProjectRole.project_admin)
+    session.commit()
+
+    plan = plan_grant_for_tasks(
+        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    )
+    apply_grant_plan(session, plan=plan)
+    session.commit()
+
+    roles = ProjectMemberRepository(session).roles_for(alice.CreatorID)
+    assert roles[spanning["projects"]["A"]] is ProjectRole.project_admin
+    assert roles[spanning["projects"]["B"]] is ProjectRole.grader
+
+
+def test_a_lower_existing_role_is_upgraded_not_reported_as_already_held(
+    session, spanning
+):
+    """`>= role` is the whole comparison: dropping the level check and keeping
+    only 'has a membership' silently refuses the upgrade, and the administrator
+    reads 'already holds read_only in A' as success."""
+    from eyened_orm.authz.administration import plan_grant_for_tasks
+
+    make_creator(session, "alice")
+    grant(session, username="alice", project_name="A", role=ProjectRole.read_only)
+    session.commit()
+
+    plan = plan_grant_for_tasks(
+        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    )
+    assert [name for _, name, _ in plan.to_grant] == ["A", "B"]
+    assert plan.already_held == ()
+
+
+def test_a_task_touching_no_projects_grants_nothing(session, spanning):
+    """Rather than reporting success for a no-op that, under vacuity, is a task
+    everyone can already see."""
+    from eyened_orm.authz.administration import plan_grant_for_tasks
+
+    make_creator(session, "alice")
+    session.commit()
+    plan = plan_grant_for_tasks(
+        session, username="alice", task_ids=[spanning["empty"]], role=ProjectRole.grader
+    )
+    assert plan.to_grant == () and plan.already_held == ()
+
+
+def test_an_unknown_task_id_among_valid_ones_is_an_error_not_a_silent_drop(
+    session, spanning
+):
+    """The MIXED case, deliberately, rather than an all-unknown one: a weaker
+    guard written `if not found:` passes an all-unknown test while still
+    happily granting the valid half, leaving the operator believing alice can
+    work every task they typed when she can only work some of them. Only a bad
+    id *among good ones* distinguishes the two guards. The message names only
+    what the operator got wrong."""
+    from eyened_orm.authz.administration import plan_grant_for_tasks
+
+    make_creator(session, "alice")
+    session.commit()
+    with pytest.raises(LookupError) as excinfo:
+        plan_grant_for_tasks(
+            session,
+            username="alice",
+            task_ids=[spanning["task"], 999999],
+            role=ProjectRole.grader,
+        )
+    assert str(excinfo.value) == "no task with id 999999"
+
+
+def test_the_plan_uses_the_same_definition_enforcement_uses(session, spanning):
+    """Two implementations of "which projects does this task touch" will drift,
+    and the failure mode is an administrator granting a set that does not match
+    what the API requires."""
+    from eyened_orm import Task
+    from eyened_orm.authz.administration import plan_grant_for_tasks
+    from eyened_orm.authz.scoping import projects_of
+
+    make_creator(session, "alice")
+    session.commit()
+    plan = plan_grant_for_tasks(
+        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    )
+    assert {pid for pid, _, _ in plan.to_grant} == projects_of(
+        session, Task, spanning["task"]
+    )
+
+
+def test_applying_a_plan_audits_every_grant(session, spanning):
+    """apply_grant_plan goes through `grant`, so each membership carries the
+    trusted-path attribution. A loop that upserts directly would write the same
+    rows with no audit trail at all."""
+    from eyened_orm.authz.administration import apply_grant_plan, plan_grant_for_tasks
+
+    make_creator(session, "alice")
+    session.commit()
+    plan = plan_grant_for_tasks(
+        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    )
+    apply_grant_plan(session, plan=plan)
+    session.commit()
+
+    rows = session.scalars(
+        select(AuditLog).where(AuditLog.Entity == "ProjectMember")
+    ).all()
+    assert {r.Changes["project_name"] for r in rows} == {"A", "B"}
+    assert {(r.ActorID, r.TrustedPath) for r in rows} == {(None, "eorm grant")}
+
+
+def test_grant_all_skips_creators_that_cannot_authenticate(session):
+    """AI models and attribution-only rows would get memberships that can never
+    be used, inflating the list somebody later has to prune."""
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.db_users import create_user
+
+    human = create_user(session, "alice", "pw")
+    model = make_creator(session, "cfi-quality-v3", is_human=False)
+    attribution_only = make_creator(session, "Consensus")
+    make_project(session, "A")
+    make_project(session, "B")
+    session.commit()
+
+    creators, projects, written = grant_all(session)
+    session.commit()
+
+    assert (creators, projects, written) == (1, 2, 2)
+    repo = ProjectMemberRepository(session)
+    assert len(repo.roles_for(human.CreatorID)) == 2
+    assert repo.roles_for(model.CreatorID) == {}
+    assert repo.roles_for(attribution_only.CreatorID) == {}
+
+
+def test_grant_all_writes_one_summary_audit_row(session):
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.utils.db_users import create_user
+
+    create_user(session, "alice", "pw")
+    make_project(session, "A")
+    make_project(session, "B")
+    session.commit()
+
+    grant_all(session)
+    session.commit()
+
+    rows = session.scalars(
+        select(AuditLog).where(AuditLog.TrustedPath == "eorm grant-all")
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].Action == "INSERT"
+    assert rows[0].Entity == "ProjectMember"
+    assert rows[0].EntityID is None
+    assert rows[0].Changes == {
+        "role": "grader",
+        "creators": 1,
+        "projects": 2,
+        "memberships_written": 2,
+    }
+
+
+def test_grant_all_is_idempotent(session):
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.utils.db_users import create_user
+
+    create_user(session, "alice", "pw")
+    make_project(session, "A")
+    session.commit()
+
+    grant_all(session)
+    session.commit()
+    _, _, written = grant_all(session)
+    assert written == 0
+
+
+def test_grant_all_skips_a_model_that_has_a_password_hash(session):
+    """The plan's own test cannot see the IsHuman filter: its model has a NULL
+    PasswordHash too, so the password filter alone still passes it."""
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.db_users import create_user
+
+    model = create_user(session, "cfi-quality-v3", "pw", is_human=False)
+    make_project(session, "A")
+    session.commit()
+
+    creators, _, written = grant_all(session)
+    session.commit()
+
+    assert (creators, written) == (0, 0)
+    assert ProjectMemberRepository(session).roles_for(model.CreatorID) == {}
+
+
+def test_grant_all_skips_a_deactivated_creator(session):
+    """Otherwise the cutover re-grants everyone an administrator deactivated."""
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.db_users import create_user
+
+    bob = create_user(session, "bob", "pw")
+    bob.Inactive = True
+    make_project(session, "A")
+    session.commit()
+
+    creators, _, written = grant_all(session)
+    session.commit()
+
+    assert (creators, written) == (0, 0)
+    assert ProjectMemberRepository(session).roles_for(bob.CreatorID) == {}
+
+
+def test_grant_all_honours_the_role_it_is_given(session):
+    """`role` is a parameter, not decoration: nothing else pins it."""
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.db_users import create_user
+
+    alice = create_user(session, "alice", "pw")
+    make_project(session, "A")
+    session.commit()
+
+    grant_all(session, role=ProjectRole.project_admin)
+    session.commit()
+
+    roles = ProjectMemberRepository(session).roles_for(alice.CreatorID)
+    assert set(roles.values()) == {ProjectRole.project_admin}
+
+
+def test_grant_all_never_changes_a_role_already_held(session):
+    """A cutover re-run must not quietly lower a project_admin to grader --
+    and `written == 0` is not evidence of that: a mutation that re-upserts
+    without counting reports 0 while rewriting every role it touches."""
+    from eyened_orm.authz.administration import grant_all
+    from eyened_orm.repositories.project_member_repository import (
+        ProjectMemberRepository,
+    )
+    from eyened_orm.utils.db_users import create_user
+
+    alice = create_user(session, "alice", "pw")
+    for name in ("A", "B", "C"):
+        make_project(session, name)
+    session.commit()
+    grant(session, username="alice", project_name="A", role=ProjectRole.project_admin)
+    grant(session, username="alice", project_name="B", role=ProjectRole.read_only)
+    session.commit()
+
+    _, _, written = grant_all(session)
+    session.commit()
+
+    roles = ProjectMemberRepository(session).roles_for(alice.CreatorID)
+    names = dict(session.execute(select(Project.ProjectID, Project.ProjectName)).all())
+    by_name = {names[pid]: role for pid, role in roles.items()}
+    assert by_name["A"] is ProjectRole.project_admin   # not lowered
+    assert by_name["B"] is ProjectRole.read_only       # not raised either
+    assert by_name["C"] is ProjectRole.grader
+    assert written == 1
+
+
+def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(session):
+    """Reactivation should restore the state that existed rather than require
+    it to be rebuilt from memory."""
+    alice = make_creator(session, "alice")
+    make_project(session, "A")
+    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    session.commit()
+    creator_id = alice.CreatorID
+
+    assert deactivate(session, username="alice") is True
+    session.commit()
+    assert alice.Inactive is True
+    assert len(ProjectMemberRepository(session).roles_for(alice.CreatorID)) == 1
+
+    rows = _audit(session, "deactivate")
+    assert len(rows) == 1
+    assert rows[0].ActorID is None
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Entity == "Creator"
+    assert rows[0].EntityID == str(creator_id)
+    assert rows[0].Changes == {
+        "username": "alice",
+        "inactive": {"old": False, "new": True},
+    }
+
+
+def test_deactivating_the_only_administrator_is_allowed(session):
+    """No last-admin guard in this pass: the operator running `eorm` already has
+    the database access that recovery needs."""
+    from eyened_orm.authz.bootstrap import count_admins, ensure_admin
+
+    root, _ = ensure_admin(session, "root", None)
+    session.commit()
+
+    assert deactivate(session, username="root") is True
+    session.commit()
+    assert root.Inactive is True
+    assert count_admins(session) == 0
+
+
+def test_reactivate_clears_the_flag_and_audits(session):
+    alice = make_creator(session, "alice")
+    session.commit()
+    creator_id = alice.CreatorID
+    deactivate(session, username="alice")
+    session.commit()
+
+    assert reactivate(session, username="alice") is True
+    session.commit()
+    assert alice.Inactive is False
+
+    rows = _audit(session, "reactivate")
+    assert len(rows) == 1
+    assert rows[0].ActorID is None
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Entity == "Creator"
+    assert rows[0].EntityID == str(creator_id)
+    assert rows[0].Changes == {
+        "username": "alice",
+        "inactive": {"old": True, "new": False},
+    }
+
+
+def test_deactivating_an_already_inactive_user_is_a_no_op(session):
+    make_creator(session, "alice")
+    session.commit()
+    deactivate(session, username="alice")
+    session.commit()
+    assert deactivate(session, username="alice") is False
+    assert len(_audit(session, "deactivate")) == 1
+
+
+def test_reactivating_an_already_active_user_is_a_no_op(session):
+    """The symmetric guard: the plan tests it for `deactivate` only."""
+    make_creator(session, "alice")
+    session.commit()
+    assert reactivate(session, username="alice") is False
+    assert _audit(session, "reactivate") == []
+
+
+@pytest.mark.parametrize("command", (deactivate, reactivate))
+def test_an_unknown_username_names_itself_for_deactivate_and_reactivate(session, command):
+    with pytest.raises(LookupError, match="nosuchuser"):
+        command(session, username="nosuchuser")

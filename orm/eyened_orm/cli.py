@@ -13,9 +13,10 @@ Command utilities for the eyened ORM.
 
 The following commands are available:
 - update-thumbnails: Update thumbnails for all images in the database.
-- run-models: Run attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality) on a set of image IDs.
+- clean-thumbnails: Remove dangling thumbnail files and report broken ThumbnailPath refs.
+- run-cfi-models: Run CFI attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality).
+- run-models: Deprecated alias for run-cfi-models.
 - run-etdrs-model: Run ETDRS model processing on segmentations.
-- run-cfi-amd: Run CFI AMD segmentation models.
 - run-registration: Pairwise CFI/AF/IR registration per patient; scope with --patient or --project.
 - seed-form-schemas: Insert builtin viewer FormSchema rows (ETDRS grid, registration).
 - validate-forms: Validate form annotations and schemas in the database.
@@ -23,6 +24,15 @@ The following commands are available:
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
 - update-hashes: Update FileChecksum and DataHash for ImageInstances where they are NULL.
 - load-dump: Load a database dump file, replacing the entire database.
+- init-admin: Create or promote the administrator account (idempotent).
+- grant: Grant or change a project role for a user.
+- revoke: Remove a user's membership from a project, or from every project with --all.
+- grant-for-task: Grant every project a set of tasks touch, after review.
+- grant-all: Cutover step 3 -- grant every authenticating creator a role in every project.
+- set-admin: Set or clear administrator status on an existing account.
+- set-password: Set an existing user's password.
+- deactivate: Revoke all of a user's memberships.
+- reactivate: Restore a deactivated user's memberships.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """
@@ -68,6 +78,16 @@ def _register_model_commands():
 
 
 _register_model_commands()
+
+
+def _register_rbac_commands():
+    from .commands.rbac import rbac_commands
+
+    for command in rbac_commands:
+        eorm.add_command(command)
+
+
+_register_rbac_commands()
 
 
 @eorm.command()
@@ -165,9 +185,10 @@ def create_user(username: str, password: str, is_human: bool, description: str |
                 is_human=is_human,
                 description=description,
             )
-            print(f"User created successfully")
         except ValueError as e:
-            print(f"Error creating user: {e}")
+            raise click.ClickException(str(e)) from e
+        session.commit()
+    click.echo("User created successfully")
 
 
 @eorm.command()
@@ -220,6 +241,39 @@ def update_thumbnails(
         run_update_thumbnails_job(
             database, include_failed=failed, print_errors=print_errors
         )
+
+
+@eorm.command("clean-thumbnails")
+@click.option(
+    "--apply",
+    is_flag=True,
+    default=False,
+    help="Delete dangling thumbnail files (default is dry-run / report only)",
+)
+@click.option(
+    "--print-limit",
+    type=int,
+    default=50,
+    show_default=True,
+    help="Max dangling files / broken refs to print",
+)
+def clean_thumbnails_cmd(apply: bool, print_limit: int):
+    """Remove dangling thumbnail files and report broken ThumbnailPath refs.
+
+    Compares ``{EYENED_STORAGE_ROOT}/thumbnails/`` to non-empty
+    ``ImageInstance.ThumbnailPath`` values:
+
+    - Deletes (with ``--apply``) on-disk ``_144.jpg`` / ``_540.jpg`` files that
+      are not indexed in the database.
+    - Lists ImageInstance rows whose ThumbnailPath is set but at least one size
+      file is missing.
+
+    Default is dry-run: report only, no deletions.
+    """
+    from eyened_orm.importer.thumbnails import run_clean_thumbnails_job
+
+    database = get_database(confirmation=apply)
+    run_clean_thumbnails_job(database, apply=apply, print_limit=print_limit)
 
 
 @eorm.command()

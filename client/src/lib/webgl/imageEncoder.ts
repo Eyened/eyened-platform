@@ -1,7 +1,6 @@
 import type { Serializer } from "./drawingHistory.svelte";
 import type { DrawingArray } from "./mask.svelte";
 
-
 /**
  * Serialises a single-channel image (R8/R16/R32) into a lossless PNG data-URL
  * and deserialises it back again.
@@ -18,7 +17,7 @@ export class Base64Serializer implements Serializer<string> {
     constructor(
         private readonly dataType: "R8" | "R8UI" | "R16UI" | "R32UI" | "R32F",
         private readonly width: number,
-        private readonly height: number
+        private readonly height: number,
     ) {
         this.canvas = document.createElement("canvas");
         this.canvas.width = width;
@@ -30,7 +29,7 @@ export class Base64Serializer implements Serializer<string> {
             R8UI: 1,
             R16UI: 2,
             R32UI: 4,
-            R32F: 4
+            R32F: 4,
         }[this.dataType];
     }
 
@@ -71,8 +70,15 @@ export class Base64Serializer implements Serializer<string> {
 
             img.onload = () => {
                 this.ctx.drawImage(img, 0, 0);
-                const rgba = this.ctx.getImageData(0, 0, this.width, this.height).data;
-                const buffer = new ArrayBuffer(this.width * this.height * this.nBytes);
+                const rgba = this.ctx.getImageData(
+                    0,
+                    0,
+                    this.width,
+                    this.height,
+                ).data;
+                const buffer = new ArrayBuffer(
+                    this.width * this.height * this.nBytes,
+                );
                 const byteView = new Uint8Array(buffer);
 
                 const pixels = this.width * this.height;

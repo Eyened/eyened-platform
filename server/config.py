@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from datetime import date
 from functools import lru_cache
 from json import JSONDecodeError
-from pathlib import Path
 
 import httpxyz
 from eyened_orm.utils.pretty_settings import pretty_settings
@@ -16,25 +15,13 @@ class DbLogSettings(BaseSettings):
     model_config = SettingsConfigDict(
         frozen=True, extra="forbid", env_prefix="EYENED_DBLOG_"
     )
-    file_path: Path | None = Field(
-        default=None,
-        description=(
-            "Optional output path for DB modification logs. "
-            "Set EYENED_DBLOG_FILE_PATH to enable file logging; "
-            "if omitted, DB logging is disabled."
-        ),
+    enabled: bool = Field(
+        default=True,
+        description="Emit audit events (AuditLog rows + eyened.audit stdout JSON).",
     )
     level: int = Field(
         default=logging.INFO,
-        description="Log level used when DB logging is enabled.",
-    )
-    max_bytes: int = Field(
-        default=10 * 1024 * 1024,
-        description="Maximum log file size before rotation when enabled.",
-    )
-    backup_count: int = Field(
-        default=5,
-        description="Number of rotated DB log files to keep when enabled.",
+        description="Level for the eyened.audit logger.",
     )
 
 
@@ -139,6 +126,13 @@ class Settings(BaseSettings):
     )
     debug: bool = False
     public_auth_disabled: bool = False
+    # Names the account the dev-auth bypass logs in as, and the account
+    # `eorm init-admin` bootstraps. Two places naming the same account that
+    # disagree is the failure dev/sample.env's note exists to prevent. The
+    # account's password is not configured here: the dev bypass never posts
+    # credentials, so the server has no use for it. `eorm init-admin` reads
+    # it directly from EYENED_API_ADMIN_PASSWORD instead.
+    admin_username: str = Field(default="admin", min_length=1)
     auth_password_enabled: bool = True
     auth_oidc_enabled: bool = False
     secret_key: SecretStr = ""

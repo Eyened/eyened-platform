@@ -7,17 +7,16 @@ import { getFdsRegistration } from "./fdsRegistration";
 import { getPrivateEyeRegistrationHeidelberg } from "./privateEyeRegistrationHeidelberg";
 import type { RegistrationItem } from "./registrationItem";
 
-type Point = { x: number, y: number };
+type Point = { x: number; y: number };
 
 export class OCTToEnfacePhotolocations implements RegistrationItem {
-
     _photoLocators: PhotoLocator[] = [];
     glslMapping: string = ""; // meant for 2D mapping in same plane
 
     constructor(
         public readonly source: string,
         public readonly target: string,
-        public readonly photoLocators: PhotoLocator[]
+        public readonly photoLocators: PhotoLocator[],
     ) {
         for (const locator of this.photoLocators) {
             if (this._photoLocators.length <= locator.index) {
@@ -32,26 +31,28 @@ export class OCTToEnfacePhotolocations implements RegistrationItem {
     }
 
     get inverse(): RegistrationItem {
-        return new EnfaceToOCTPhotolocations(this.target, this.source, this.photoLocators);
+        return new EnfaceToOCTPhotolocations(
+            this.target,
+            this.source,
+            this.photoLocators,
+        );
     }
 }
 
 export class EnfaceToOCTPhotolocations implements RegistrationItem {
-
     glslMapping: string = ""; // meant for 2D mapping in same plane
 
     constructor(
         public readonly source: string,
         public readonly target: string,
-        public readonly photoLocators: PhotoLocator[]
-    ) { }
+        public readonly photoLocators: PhotoLocator[],
+    ) {}
 
     mapping(p: Position): Position | undefined {
         let minDistance = Infinity;
         let closestPosition: Position | undefined;
 
         for (const locator of this.photoLocators) {
-
             const { distance, position } = locator.enfaceToOCT(p);
             if (distance < minDistance) {
                 minDistance = distance;
@@ -62,7 +63,11 @@ export class EnfaceToOCTPhotolocations implements RegistrationItem {
     }
 
     get inverse(): RegistrationItem {
-        return new OCTToEnfacePhotolocations(this.target, this.source, this.photoLocators);
+        return new OCTToEnfacePhotolocations(
+            this.target,
+            this.source,
+            this.photoLocators,
+        );
     }
 }
 
@@ -70,13 +75,12 @@ export interface PhotoLocator {
     readonly enfaceImageId: string;
     readonly octImageId: string;
     readonly index: number;
-    enfaceToOCT(p: Position): { position: Position, distance: number };
+    enfaceToOCT(p: Position): { position: Position; distance: number };
     OCTToEnface(p: Position): Position;
     paint(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void;
 }
 
 export class LinePhotoLocator implements PhotoLocator {
-
     public readonly length: number;
 
     constructor(
@@ -85,9 +89,11 @@ export class LinePhotoLocator implements PhotoLocator {
         public readonly start: Point,
         public readonly end: Point,
         public readonly index: number,
-        public readonly width: number
+        public readonly width: number,
     ) {
-        this.length = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
+        this.length = Math.sqrt(
+            (end.x - start.x) ** 2 + (end.y - start.y) ** 2,
+        );
     }
 
     OCTToEnface(p: Position): Position {
@@ -96,19 +102,18 @@ export class LinePhotoLocator implements PhotoLocator {
         return {
             x: start.x + r * (end.x - start.x),
             y: start.y + r * (end.y - start.y),
-            index: 0
+            index: 0,
         };
     }
 
-    enfaceToOCT(p: Position): { position: Position, distance: number } {
-
+    enfaceToOCT(p: Position): { position: Position; distance: number } {
         const s = vec2(this.start);
         const e = vec2(this.end);
         const lineVec = e.sub(s);
         // length of the line on the enface
         const l = lineVec.length();
 
-        // vector from start to cursor        
+        // vector from start to cursor
         const ptVec = vec2(p).sub(s);
         // project cursor on the line
         // dist is the distance from the start of the line to the projected point
@@ -119,22 +124,31 @@ export class LinePhotoLocator implements PhotoLocator {
 
         const position = {
             index: this.index,
-            x: this.width * parallel / l,
-            y: 0
+            x: (this.width * parallel) / l,
+            y: 0,
         };
         return { position, distance };
     }
 
     paint(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void {
-        const s = viewerContext.imageToViewerCoordinates(this.start);
-        const e = viewerContext.imageToViewerCoordinates(this.end);
+        const { start, end } = this;
+        if (
+            !start ||
+            !end ||
+            !Number.isFinite(start.x) ||
+            !Number.isFinite(start.y) ||
+            !Number.isFinite(end.x) ||
+            !Number.isFinite(end.y)
+        ) {
+            return;
+        }
+        const s = viewerContext.imageToViewerCoordinates(start);
+        const e = viewerContext.imageToViewerCoordinates(end);
 
         ctx.beginPath();
         ctx.moveTo(s.x, s.y);
         ctx.lineTo(e.x, e.y);
         ctx.stroke();
-
-
     }
 }
 
@@ -142,48 +156,64 @@ export class CirclePhotoLocator implements PhotoLocator {
     constructor(
         public readonly enfaceImageId: string,
         public readonly octImageId: string,
-        public readonly centre: Point,
+        public readonly center: Point,
         public readonly radius: number,
         public readonly start_angle: number,
         public readonly index: number,
-        public readonly width: number
-    ) { }
+        public readonly width: number,
+    ) {}
 
     OCTToEnface(p: Position): Position {
         const r = p.x / this.width;
-        const { centre, radius, start_angle } = this;
+        const { center, radius, start_angle } = this;
         const angle = start_angle + 2 * r * Math.PI;
-        const x = centre.x + radius * Math.cos(angle);
-        const y = centre.y + radius * Math.sin(angle);
+        const x = center.x + radius * Math.cos(angle);
+        const y = center.y + radius * Math.sin(angle);
         return { x, y, index: 0 };
     }
 
-    enfaceToOCT(p: Position): { position: Position, distance: number } {
-        const { centre, radius, start_angle } = this;
-        const vec = vec2(p).sub(centre);
+    enfaceToOCT(p: Position): { position: Position; distance: number } {
+        const { center, radius, start_angle } = this;
+        const vec = vec2(p).sub(center);
         const distance = Math.abs(vec.length() - radius);
         const angle = vec.angle() - start_angle;
-        const r = angle / (2 * Math.PI);
+        // Match GPU bake (`fract(angle / TWO_PI)`): Heidelberg start_angle=π
+        // yields negative r for half the ring without wrap.
+        let t = angle / (2 * Math.PI);
+        t = t - Math.floor(t);
         const position = {
             index: this.index,
-            x: this.width * r,
-            y: 0
+            x: this.width * t,
+            y: 0,
         };
         return { position, distance };
-
     }
 
     paint(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void {
-        const { centre, radius } = this;
-        const c = viewerContext.imageToViewerCoordinates(centre);
+        const { center, radius } = this;
+        if (
+            !center ||
+            !Number.isFinite(center.x) ||
+            !Number.isFinite(center.y) ||
+            !Number.isFinite(radius)
+        ) {
+            return;
+        }
+        const c = viewerContext.imageToViewerCoordinates(center);
 
-        const crx = viewerContext.imageToViewerCoordinates({ x: centre.x + radius, y: centre.y });
-        const cry = viewerContext.imageToViewerCoordinates({ x: centre.x, y: centre.y + radius });
+        const crx = viewerContext.imageToViewerCoordinates({
+            x: center.x + radius,
+            y: center.y,
+        });
+        const cry = viewerContext.imageToViewerCoordinates({
+            x: center.x,
+            y: center.y + radius,
+        });
         const radiusX = crx.x - c.x;
         const radiusY = cry.y - c.y;
         const { x, y } = c;
         ctx.beginPath();
-        ctx.ellipse(x, y, radiusX, radiusY, 0, 0, 2 * Math.PI)
+        ctx.ellipse(x, y, radiusX, radiusY, 0, 0, 2 * Math.PI);
         ctx.stroke();
     }
 }
@@ -192,25 +222,35 @@ export function loadPhotoLocators(image: AbstractImage) {
     const functions = [
         getDicomRegistration,
         getPrivateEyeRegistrationHeidelberg,
-        getFdsRegistration
+        getFdsRegistration,
     ];
-    return functions.flatMap(func => func(image));
+    return functions.flatMap((func) => func(image));
 }
 
-
-export function photoLocatorsToRegistrationItems(photoLocators: PhotoLocator[]): RegistrationItem[] {
+export function photoLocatorsToRegistrationItems(
+    photoLocators: PhotoLocator[],
+): RegistrationItem[] {
     // normally a list of photoLocators should link one enface image to one OCT image
     // However, theoretically a list of photoLocators can link multiple enface images to multiple OCT images
     // In this case, we create a registration item for each pair of enface and OCT images
-    const enface_image_ids = new Set(photoLocators.map(loc => loc.enfaceImageId));
-    const oct_image_ids = new Set(photoLocators.map(loc => loc.octImageId));
+    const enface_image_ids = new Set(
+        photoLocators.map((loc) => loc.enfaceImageId),
+    );
+    const oct_image_ids = new Set(photoLocators.map((loc) => loc.octImageId));
     const result: RegistrationItem[] = [];
     for (const enfaceID of enface_image_ids) {
         for (const octID of oct_image_ids) {
-            const locators = photoLocators.filter(loc => loc.enfaceImageId === enfaceID && loc.octImageId === octID);
+            const locators = photoLocators.filter(
+                (loc) =>
+                    loc.enfaceImageId === enfaceID && loc.octImageId === octID,
+            );
             if (locators.length > 0) {
-                result.push(new OCTToEnfacePhotolocations(octID, enfaceID, locators));
-                result.push(new EnfaceToOCTPhotolocations(enfaceID, octID, locators));
+                result.push(
+                    new OCTToEnfacePhotolocations(octID, enfaceID, locators),
+                );
+                result.push(
+                    new EnfaceToOCTPhotolocations(enfaceID, octID, locators),
+                );
             }
         }
     }

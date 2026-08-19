@@ -1,41 +1,49 @@
-import { browser } from '$app/environment';
-import { goto } from '$app/navigation';
+import { browser } from "$app/environment";
+import { goto } from "$app/navigation";
 
 import {
     getInstancesSignature,
     getStudiesSignature,
     searchInstances,
-    searchStudies
-} from '$lib/data/api';
-import { instances, studies } from '$lib/data/stores.svelte';
-import type { ImageGET, SearchCondition as SearchConditionT, SearchQuery, SignatureField as SignatureFieldT, StudyGET, StudySearchCondition, StudySearchQuery } from '../../types/openapi_types';
+    searchStudies,
+} from "$lib/data/api";
+import { instances, studies } from "$lib/data/stores.svelte";
+import type {
+    ImageGET,
+    SearchCondition as SearchConditionT,
+    SearchQuery,
+    SignatureField as SignatureFieldT,
+    StudyGET,
+    StudySearchCondition,
+    StudySearchQuery,
+} from "../../types/openapi_types";
 
-export type QueryMode = 'studies' | 'instances';
-export type DisplayMode = 'instance' | 'study';
-export type FilterMode = 'basic' | 'advanced';
+export type QueryMode = "studies" | "instances";
+export type DisplayMode = "instance" | "study";
+export type FilterMode = "basic" | "advanced";
 
 export type Condition = SearchConditionT;
 export type SignatureField = SignatureFieldT;
-export type InstancesSortBy = SearchQuery['order_by'];
-export type StudiesSortBy = StudySearchQuery['order_by'];
-export type SortDirection = 'ASC' | 'DESC';
-
+export type InstancesSortBy = SearchQuery["order_by"];
+export type StudiesSortBy = StudySearchQuery["order_by"];
+export type SortDirection = "ASC" | "DESC";
 
 export class BrowserContext {
-
     // Default smallest per current mode
     getDefaultLimit(): number {
-        return (this.queryMode === 'instances' && this.displayMode === 'instance') ? 100 : 10;
+        return this.queryMode === "instances" && this.displayMode === "instance"
+            ? 100
+            : 10;
     }
 
     limitOptionsStudies = [10, 20, 30, 40, 50];
     limitOptionsInstances = [100, 200, 500, 1000];
 
     selectedIds: string[] = $state([]);
-    queryMode: QueryMode = $state('studies');
-    displayMode: DisplayMode = $state('study');
+    queryMode: QueryMode = $state("studies");
+    displayMode: DisplayMode = $state("study");
     loading: boolean = $state(false);
-    filterMode: FilterMode = $state('basic');
+    filterMode: FilterMode = $state("basic");
 
     // When false, searches/pagination will not push state to the URL.
     // Used when the browser is embedded as a widget (e.g. overlays).
@@ -44,15 +52,14 @@ export class BrowserContext {
     page: number = $state(0);
     limit: number = $state(10);
     count: number = $state(0);
-    sortBy: InstancesSortBy | StudiesSortBy = $state('Study Date');
-    sortDirection: SortDirection = $state('ASC');
+    sortBy: InstancesSortBy | StudiesSortBy = $state("Study Date");
+    sortDirection: SortDirection = $state("ASC");
 
     resultIds: Set<number> = $state(new Set());
 
     // NEW: ordered arrays for rendering
     orderedInstanceIds: string[] = $state([]);
     orderedStudyIds: number[] = $state([]);
-
 
     // renamed
     advancedConditions: Condition[] = $state([]);
@@ -64,11 +71,13 @@ export class BrowserContext {
     instancesSignature: SignatureField[] = $state([]);
     studiesSignature: SignatureField[] = $state([]);
 
-    thumbnailSize: string = $state('8em');
+    thumbnailSize: string = $state("8em");
 
     // Derived: depends on queryMode + signatures
     activeSignature: SignatureField[] = $derived(
-        this.queryMode === 'instances' ? this.instancesSignature : this.studiesSignature
+        this.queryMode === "instances"
+            ? this.instancesSignature
+            : this.studiesSignature,
     );
 
     private getInstance(id: string): ImageGET | undefined {
@@ -77,110 +86,120 @@ export class BrowserContext {
 
     selectedInstances = $derived(
         this.selectedIds
-            .map(id => this.getInstance(id))
-            .filter((x): x is ImageGET => x !== undefined)
+            .map((id) => this.getInstance(id))
+            .filter((x): x is ImageGET => x !== undefined),
     );
 
     // Derived: ordered instances for rendering
     orderedInstances = $derived(
         this.orderedInstanceIds
-            .map(id => this.getInstance(id))
-            .filter((x): x is ImageGET => x !== undefined)
+            .map((id) => this.getInstance(id))
+            .filter((x): x is ImageGET => x !== undefined),
     );
 
     // Derived: ordered studies for rendering
     orderedStudies = $derived(
         this.orderedStudyIds
-            .map(id => studies.get(id))
-            .filter((x): x is StudyGET => x !== undefined)
+            .map((id) => studies.get(id))
+            .filter((x): x is StudyGET => x !== undefined),
     );
 
     toggleFilterMode() {
-        this.filterMode = this.filterMode === 'basic' ? 'advanced' : 'basic';
-    };
+        this.filterMode = this.filterMode === "basic" ? "advanced" : "basic";
+    }
 
     // Helper to get allowed values (returns [] if type marker)
     getValueOptions(fieldName: string): string[] {
-        const f = this.activeSignature.find(s => s.name === fieldName);
+        const f = this.activeSignature.find((s) => s.name === fieldName);
         return Array.isArray(f?.values) ? (f!.values as string[]) : [];
     }
 
     // Get signature field by variable name (handles attribute encoding)
     private getFieldSignature(fieldValue: string): SignatureField | undefined {
-        if (fieldValue.includes('__')) {
-            const parts = fieldValue.split('__');
+        if (fieldValue.includes("__")) {
+            const parts = fieldValue.split("__");
             if (parts.length === 3) {
                 const [model, feature, name] = parts;
-                return this.activeSignature.find(s =>
-                    s.name === name &&
-                    s.model === model &&
-                    (feature === 'none' ? !s.feature : s.feature === feature)
+                return this.activeSignature.find(
+                    (s) =>
+                        s.name === name &&
+                        s.model === model &&
+                        (feature === "none"
+                            ? !s.feature
+                            : s.feature === feature),
                 );
             }
         }
-        return this.activeSignature.find(s => s.name === fieldValue);
+        return this.activeSignature.find((s) => s.name === fieldValue);
     }
 
     // Get operator options for a field based on its signature
-    private getOperatorOptions(fieldName: string): Condition['operator'][] {
+    private getOperatorOptions(fieldName: string): Condition["operator"][] {
         const sig = this.getFieldSignature(fieldName);
         if (!sig) return [];
 
-        const ops: Condition['operator'][] = [];
+        const ops: Condition["operator"][] = [];
 
         if (Array.isArray(sig.values)) {
-            ops.push('IN');
+            ops.push("IN");
         } else {
             switch (sig.values) {
-                case 'string':
-                    ops.push('==');
+                case "string":
+                    ops.push("==");
                     // Free-text fields flagged as multi (e.g. Patient Identifier)
                     // additionally support matching several values at once.
-                    if ((sig as any).multi) ops.push('IN');
+                    if ((sig as any).multi) ops.push("IN");
                     break;
-                case 'int':
-                case 'float':
-                case 'date':
-                    ops.push('>', '<', '==');
+                case "int":
+                case "float":
+                case "date":
+                    ops.push(">", "<", "==");
                     break;
                 default:
-                    ops.push('==');
+                    ops.push("==");
             }
         }
 
         if ((sig as any).nullable) {
-            ops.push('IS NULL' as Condition['operator']);
+            ops.push("IS NULL" as Condition["operator"]);
         }
 
         return ops;
     }
 
     // Get default operator for a field
-    private getDefaultOperator(fieldName: string): Condition['operator'] {
+    private getDefaultOperator(fieldName: string): Condition["operator"] {
         const sig = this.getFieldSignature(fieldName);
-        if (!sig) return '==';
-        return Array.isArray(sig.values) ? 'IN' : '==';
+        if (!sig) return "==";
+        return Array.isArray(sig.values) ? "IN" : "==";
     }
 
     // Coerce value based on field type
-    private coerceValue(value: any, fieldType: string | string[]): Condition['value'] {
+    private coerceValue(
+        value: any,
+        fieldType: string | string[],
+    ): Condition["value"] {
         if (Array.isArray(fieldType)) {
             if (Array.isArray(value)) {
                 return value.map(String);
             }
-            if (value == null || value === '') {
+            if (value == null || value === "") {
                 return [];
             }
             return [String(value)];
         }
 
         switch (fieldType) {
-            case 'int':
-                return typeof value === 'string' ? parseInt(value, 10) || 0 : value;
-            case 'float':
-                return typeof value === 'string' ? parseFloat(value) || 0 : value;
-            case 'date':
-            case 'string':
+            case "int":
+                return typeof value === "string"
+                    ? parseInt(value, 10) || 0
+                    : value;
+            case "float":
+                return typeof value === "string"
+                    ? parseFloat(value) || 0
+                    : value;
+            case "date":
+            case "string":
             default:
                 return value;
         }
@@ -197,30 +216,30 @@ export class BrowserContext {
             : this.getDefaultOperator(condition.variable);
 
         let value = condition.value;
-        if (operator !== 'IS NULL') {
+        if (operator !== "IS NULL") {
             value = this.coerceValue(condition.value, sig.values);
             // IN always operates on a list of values, even for free-text fields
             // whose signature type is a scalar (e.g. Patient Identifier).
-            if (operator === 'IN' && !Array.isArray(value)) {
-                value = value == null || value === '' ? [] : [String(value)];
+            if (operator === "IN" && !Array.isArray(value)) {
+                value = value == null || value === "" ? [] : [String(value)];
             }
         }
 
-        if ((condition as any).type === 'attribute') {
+        if ((condition as any).type === "attribute") {
             return {
-                type: 'attribute',
-                model: (condition as any).model || '',
+                type: "attribute",
+                model: (condition as any).model || "",
                 variable: condition.variable as any,
                 operator: operator as any,
                 value,
-                feature: (condition as any).feature ?? undefined
+                feature: (condition as any).feature ?? undefined,
             } as any;
         } else {
             return {
-                type: 'default',
+                type: "default",
                 variable: condition.variable as any,
                 operator: operator as any,
-                value
+                value,
             } as any;
         }
     }
@@ -228,7 +247,7 @@ export class BrowserContext {
     // Normalize conditions array against current signature (public for use in components)
     normalizeConditions(conditions: Condition[]): Condition[] {
         return conditions
-            .map(c => this.normalizeCondition(c))
+            .map((c) => this.normalizeCondition(c))
             .filter((c): c is Condition => c !== null);
     }
 
@@ -239,9 +258,11 @@ export class BrowserContext {
 
     /** Active filter conditions for the current filter mode. */
     getActiveConditions(): Condition[] {
-        return this.filterMode === 'advanced'
+        return this.filterMode === "advanced"
             ? this.advancedConditions
-            : (this.basicCondition ? [this.basicCondition] : []);
+            : this.basicCondition
+              ? [this.basicCondition]
+              : [];
     }
 
     private async loadSignatureFields() {
@@ -267,7 +288,6 @@ export class BrowserContext {
         return this.loadSignatureFields();
     }
 
-
     // Reset state when queryMode changes
     async resetForQueryModeChange(queryMode: QueryMode) {
         const currentConditions = this.getActiveConditions();
@@ -276,19 +296,19 @@ export class BrowserContext {
         this.limit = this.getDefaultLimit();
         this.count = 0;
 
-        this.sortBy = 'Study Date';
-        this.sortDirection = 'ASC';
+        this.sortBy = "Study Date";
+        this.sortDirection = "ASC";
 
         this.resultIds = new Set();
         this.orderedInstanceIds = [];
         this.orderedStudyIds = [];
         this.selectedIds = [];
 
-        if (queryMode == 'instances') {
-            this.displayMode = 'instance';
+        if (queryMode == "instances") {
+            this.displayMode = "instance";
             this.limit = this.limitOptionsInstances[0];
         } else {
-            this.displayMode = 'study';
+            this.displayMode = "study";
             this.limit = this.limitOptionsStudies[0];
         }
 
@@ -308,14 +328,18 @@ export class BrowserContext {
     // in the active filter slot so a subsequent search() picks them up.
     applyInitialConditions(
         conds: Condition[],
-        opts: { queryMode?: QueryMode; displayMode?: DisplayMode; filterMode?: FilterMode } = {}
+        opts: {
+            queryMode?: QueryMode;
+            displayMode?: DisplayMode;
+            filterMode?: FilterMode;
+        } = {},
     ) {
         if (opts.queryMode) this.queryMode = opts.queryMode;
         if (opts.displayMode) this.displayMode = opts.displayMode;
-        this.filterMode = opts.filterMode ?? 'advanced';
+        this.filterMode = opts.filterMode ?? "advanced";
 
         const normalized = this.normalizeConditions(conds ?? []);
-        if (this.filterMode === 'advanced') {
+        if (this.filterMode === "advanced") {
             this.advancedConditions = normalized;
         } else {
             this.basicCondition = normalized[0] ?? null;
@@ -328,7 +352,8 @@ export class BrowserContext {
         // Normalize conditions when loading from external source
         this.advancedConditions = this.normalizeConditions(conds ?? []);
         // If it looks like a single basic condition, also set basic
-        this.basicCondition = conds?.length === 1 ? conds[0] : this.basicCondition;
+        this.basicCondition =
+            conds?.length === 1 ? conds[0] : this.basicCondition;
     }
 
     toggleInstance(instance: ImageGET) {
@@ -345,12 +370,14 @@ export class BrowserContext {
         return this.runSearch({ conditions: query, updateUrl });
     }
 
-    private async runSearch(options: {
-        conditions?: Condition[];
-        updateUrl?: boolean;
-    } = {}) {
+    private async runSearch(
+        options: {
+            conditions?: Condition[];
+            updateUrl?: boolean;
+        } = {},
+    ) {
         const query = this.normalizeConditions(
-            options.conditions ?? this.getActiveConditions()
+            options.conditions ?? this.getActiveConditions(),
         );
         if (!query.length) {
             return;
@@ -381,14 +408,15 @@ export class BrowserContext {
     private updateURL(query: Condition[]) {
         if (!this.urlSync) return;
         const params = new URLSearchParams();
-        params.set('page', this.page.toString());
-        params.set('limit', this.limit.toString());
-        params.set('conditions', encodeConditions(query));
-        params.set('order_by', String(this.sortBy));
-        params.set('order', this.sortDirection);
-        params.set('queryMode', this.queryMode);
-        params.set('displayMode', this.displayMode);
-        params.set('filterMode', this.filterMode);
+        params.set("page", this.page.toString());
+        params.set("limit", this.limit.toString());
+        params.set("conditions", encodeConditions(query));
+        params.set("order_by", String(this.sortBy));
+        params.set("order", this.sortDirection);
+        params.set("queryMode", this.queryMode);
+        params.set("displayMode", this.displayMode);
+        params.set("filterMode", this.filterMode);
+        // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
         goto(`?${params.toString()}`);
     }
 
@@ -398,14 +426,14 @@ export class BrowserContext {
             limit: this.limit,
             page: this.page,
             order_by: this.sortBy,
-            order: this.sortDirection ?? 'ASC',
-            include_count: true
+            order: this.sortDirection ?? "ASC",
+            include_count: true,
         };
     }
 
     private executeSearch(query: Condition[]) {
         const body = this.buildSearchBody(query);
-        return this.queryMode === 'instances'
+        return this.queryMode === "instances"
             ? searchInstances(body as SearchQuery)
             : searchStudies({
                   ...body,
@@ -420,8 +448,10 @@ export class BrowserContext {
 
         // Set ordered IDs based on query mode
         let studyIds;
-        if (this.queryMode === 'instances') {
-            this.orderedInstanceIds = (res.result_ids ?? []).map((id: number) => String(id));
+        if (this.queryMode === "instances") {
+            this.orderedInstanceIds = (res.result_ids ?? []).map((id: number) =>
+                String(id),
+            );
             studyIds = (res.studies ?? []).map((s: any) => s.id);
         } else {
             studyIds = res.result_ids ?? [];
@@ -432,14 +462,16 @@ export class BrowserContext {
         const get_date = (studyId: number) => {
             const study = studies.get(studyId);
             return study ? new Date(study.date).getTime() : 0;
-        }
-        this.orderedStudyIds = studyIds.sort((a: number, b: number) => get_date(b) - get_date(a));
+        };
+        this.orderedStudyIds = studyIds.sort(
+            (a: number, b: number) => get_date(b) - get_date(a),
+        );
     }
 
     openTab(imageIds: string[]) {
-        const suffix_string = `?instances=${imageIds.join(',')}`;
+        const suffix_string = `?instances=${imageIds.join(",")}`;
         const url = `${window.location.origin}/view${suffix_string}`;
-        window.open(url, '_blank')?.focus();
+        window.open(url, "_blank")?.focus();
     }
 }
 
@@ -453,56 +485,79 @@ function deserializeValue(encoded: string): string | number | string[] | null {
     // First-level decode of the whole JSON payload
     const raw = decodeURIComponent(encoded);
     return JSON.parse(raw);
-
 }
 
 export function encodeConditions(conditions: Condition[]): string {
-    return conditions.map((condition) => {
-        const encodedVariable = encodeURIComponent((condition as any).variable);
-        const encodedOperator = encodeURIComponent((condition as any).operator);
-        const encodedValue = encodeURIComponent(serializeValue((condition as any).value ?? null));
-        const encodedType = encodeURIComponent((condition as any).type ?? 'default');
-        const encodedModel = encodeURIComponent(((condition as any).type === 'attribute' ? (condition as any).model ?? '' : ''));
-        const encodedFeature = encodeURIComponent(((condition as any).type === 'attribute' ? (condition as any).feature ?? '' : ''));
-        return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}:${encodedFeature}`;
-    }).join(';');
+    return conditions
+        .map((condition) => {
+            const encodedVariable = encodeURIComponent(
+                (condition as any).variable,
+            );
+            const encodedOperator = encodeURIComponent(
+                (condition as any).operator,
+            );
+            const encodedValue = encodeURIComponent(
+                serializeValue((condition as any).value ?? null),
+            );
+            const encodedType = encodeURIComponent(
+                (condition as any).type ?? "default",
+            );
+            const encodedModel = encodeURIComponent(
+                (condition as any).type === "attribute"
+                    ? ((condition as any).model ?? "")
+                    : "",
+            );
+            const encodedFeature = encodeURIComponent(
+                (condition as any).type === "attribute"
+                    ? ((condition as any).feature ?? "")
+                    : "",
+            );
+            return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}:${encodedFeature}`;
+        })
+        .join(";");
 }
 
 export function decodeConditions(urlString: string): Condition[] {
-    if (urlString === '') return [];
-    return urlString.split(';').map((conditionString) => {
-        const parts = conditionString.split(':');
-        const [v, o, val, t, m, f] = parts;  // Add 'f' for feature
+    if (urlString === "") return [];
+    return urlString.split(";").map((conditionString) => {
+        const parts = conditionString.split(":");
+        const [v, o, val, t, m, f] = parts; // Add 'f' for feature
         const variable = decodeURIComponent(v);
-        const operator = decodeURIComponent(o) as Condition['operator'];
+        const operator = decodeURIComponent(o) as Condition["operator"];
         const value = deserializeValue(val);
-        const type = t ? (decodeURIComponent(t) as any) : 'default';
+        const type = t ? (decodeURIComponent(t) as any) : "default";
         const model = m ? decodeURIComponent(m) : undefined;
-        const feature = f ? decodeURIComponent(f) : undefined;  // Decode feature
-        if (type === 'attribute') {
+        const feature = f ? decodeURIComponent(f) : undefined; // Decode feature
+        if (type === "attribute") {
             return {
-                type: 'attribute',
+                type: "attribute",
                 variable,
                 operator: operator as any,
                 value,
                 model,
-                feature: feature || undefined  // Include feature, convert empty string to undefined
+                feature: feature || undefined, // Include feature, convert empty string to undefined
             } as any;
         }
-        return { type: 'default', variable: variable as any, operator: operator as any, value } as any;
+        return {
+            type: "default",
+            variable: variable as any,
+            operator: operator as any,
+            value,
+        } as any;
     });
 }
 
 // URL param helpers for component compatibility
 export function getSearchParams(): URLSearchParams {
-    const src = browser ? window.location.search : '';
+    const src = browser ? window.location.search : "";
     return new URLSearchParams(src);
 }
 
 export async function setParam(key: string, value: string | null) {
     const params = getSearchParams();
     params.delete(key);
-    if (value !== null && value !== '') params.set(key, value);
+    if (value !== null && value !== "") params.set(key, value);
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
     await goto(`?${params.toString()}`);
 }
 
@@ -515,6 +570,7 @@ export async function removeParam(key: string, value?: string) {
         params.delete(key);
         values.forEach((v) => params.append(key, v));
     }
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
     await goto(`?${params.toString()}`);
 }
 
@@ -528,5 +584,6 @@ export async function toggleParam(key: string, value: string) {
     }
     params.delete(key);
     Array.from(values).forEach((v) => params.append(key, v));
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
     await goto(`?${params.toString()}`);
 }

@@ -2,9 +2,9 @@ export const ssr = false;
 export const prerender = false;
 
 /** @type {import('./$types').PageLoad} */
-export async function load({ fetch, params, url }) {
-	return {
-		taskid: parseInt(params.taskid),
-		subTaskIndex: parseInt(params.setid),
-	};
+export async function load({ params }) {
+    return {
+        taskid: parseInt(params.taskid),
+        subTaskIndex: parseInt(params.setid),
+    };
 }

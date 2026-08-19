@@ -1,0 +1,59 @@
+name: Server CI
+on:
+  push:
+    branches: [development, main]
+    paths:
+      - 'server/**'
+      - 'orm/**'
+      - 'pyproject.toml'
+      - '.github/workflows/server-ci.yml'
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'server/**'
+      - 'orm/**'
+      - 'pyproject.toml'
+      - '.github/workflows/server-ci.yml'
+
+concurrency:
+  group: server-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # diff-cover diffs against origin/<base>, which checkout's default
+          # depth of 1 never fetches. Measured against diff-cover 10.5.1: an
+          # absent compare branch raises ValueError and exits 1, so without this
+          # the gate would fail on every PR -- a permanently red check that
+          # measures nothing, rather than a silent green one.
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            server/requirements.txt
+            server/test-requirements.txt
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e ./orm
+          pip install -r server/test-requirements.txt
+      - run: pytest --cov --cov-report=xml --cov-report=term
+
+      - name: Patch coverage (80% floor on changed lines)
+        # base_ref is empty on push events, which would make --compare-branch
+        # origin/ and fail every push to development.
+        if: github.event_name == 'pull_request'
+        run: |
+          status=0
+          diff-cover coverage.xml \
+            --compare-branch=origin/${{ github.base_ref }} \
+            --fail-under=80 \
+            --format "markdown:diff-cover.md" || status=$?
+          cat diff-cover.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status

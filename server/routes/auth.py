@@ -13,6 +13,8 @@ from hashlib import pbkdf2_hmac
 from jwt.algorithms import AllowedRSAKeys, RSAAlgorithm
 
 from eyened_orm import Creator, CreatorTagLink
+from eyened_orm.authz.scope import AccessScope
+from eyened_orm.repositories.creator_repository import CreatorRepository
 from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
 from fastapi.params import Query
@@ -22,7 +24,19 @@ from sqlalchemy.orm import Session
 
 from ..config import get_oidc_metadata, settings
 from ..db import get_db
-from ..utils.db_logging import get_db_logger
+from ..services.acting_user import ActingUser
+from ..services.audit_service import AuditService, get_audit_service
+
+# Re-exported, not redefined. These moved to server/services/current_user.py to
+# delete the services -> routes import edge (see that module's docstring); this
+# import keeps every existing ``from .auth import CurrentUser, get_current_user``
+# working against the SAME function objects, which is what FastAPI's
+# ``dependency_overrides`` keys on.
+from ..services.current_user import (  # noqa: F401
+    CurrentUser,
+    get_current_user,
+    verify_token,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,16 +83,6 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
-class CurrentUser:
-    def __init__(self, creator_id: int, username: str, role: str | None = None):
-        self.id = creator_id
-        self.username = username
-        self.role = role
-
-    def get_creator(self, session: Session) -> Creator:
-        return session.query(Creator).where(Creator.CreatorID == self.id).first()
-
-
 class AuthOptionsResponse(BaseModel):
     password_enabled: bool
     oidc_enabled: bool
@@ -97,12 +101,11 @@ class OIDCAuthenticationRequest(BaseModel):
 
 
 # JWT utilities
-def create_access_token(user_id: int, username: str, role: str | None = None) -> str:
+def create_access_token(user_id: int, username: str) -> str:
     """Create a JWT access token."""
     payload = {
         "sub": str(user_id),  # Convert to string
         "username": username,
-        "role": role,
         "type": "access",
         "exp": datetime.now(timezone.utc)
         + timedelta(minutes=settings.access_token_expire_minutes),
@@ -125,34 +128,6 @@ def create_refresh_token(user_id: int) -> str:
     return jwt.encode(
         payload, settings.secret_key_value, algorithm=settings.jwt_algorithm
     )
-
-
-def _decode_token_or_401(token: str, *, detail: str | None = None) -> dict:
-    """Decode JWT; raise 401 when invalid."""
-    try:
-        return jwt.decode(
-            token, settings.secret_key_value, algorithms=[settings.jwt_algorithm]
-        )
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
-        )
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
-        )
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
-        )
-
-
-def verify_token(token: str) -> dict:
-    """Verify and decode a JWT token."""
-    return _decode_token_or_401(token)
 
 
 def _try_decode_token(token: str) -> dict | None:
@@ -189,72 +164,6 @@ async def is_authenticated(
     )
 
 
-# Replace the existing get_current_user function with this merged version
-async def get_current_user(
-    authorization: str = Header(None),
-    jwt_token: str = Cookie(None),
-    refresh_token: str = Cookie(None),
-    session: Session = Depends(get_db),
-) -> CurrentUser:
-    """Get the current authenticated user from either Authorization header or cookies."""
-    # Bypass authentication if disabled (development mode)
-    if settings.public_auth_disabled:
-        creator = (
-            session.query(Creator)
-            .where(Creator.CreatorName == settings.admin_username)
-            .first()
-        )
-        if not creator:
-            # Should not happen if init_admin ran; ensure dev usability
-            creator = create_user(
-                session, settings.admin_username, settings.admin_password
-            )
-        return CurrentUser(
-            creator_id=creator.CreatorID,
-            username=creator.CreatorName,
-            role=creator.Role,
-        )
-
-    # Try Authorization header first (for API clients)
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.replace("Bearer ", "")
-        payload = verify_token(token)
-        if payload.get("type") == "access":
-            return CurrentUser(
-                creator_id=int(payload["sub"]),
-                username=payload["username"],
-                role=payload.get("role"),
-            )
-
-    # Try access token cookie (for web clients)
-    if jwt_token:
-        try:
-            payload = verify_token(jwt_token)
-            if payload.get("type") == "access":
-                return CurrentUser(
-                    creator_id=int(payload["sub"]),
-                    username=payload["username"],
-                    role=payload.get("role"),
-                )
-        except:
-            pass  # Access token failed, try refresh
-
-    # Try refresh token
-    if refresh_token:
-        try:
-            payload = verify_token(refresh_token)
-            if payload.get("type") == "refresh":
-                # This will be handled by the refresh endpoint
-                # For now, we'll let the client handle the 401 and call refresh
-                pass
-        except:
-            pass
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-    )
-
-
 # User utilities
 def creator_to_response(
     creator: Creator, session: Session | None = None
@@ -279,7 +188,13 @@ def creator_to_response(
 def check_login(username: str, password: str, db: Session) -> Creator:
     """Verify user credentials and return the user."""
     creator = db.query(Creator).where(Creator.CreatorName == username).first()
-    if creator is None:
+    if creator is None or creator.Inactive:
+        # v0.3: a deactivated user *cannot authenticate* and holds no access.
+        # Checked before the password is verified, and answered with the same
+        # "Invalid credentials" as an unknown name, so the refusal does not
+        # tell a caller whether the account exists or whether the password was
+        # right. It also stops the legacy-hash migration below from writing to
+        # a revoked row.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
@@ -294,22 +209,17 @@ def check_login(username: str, password: str, db: Session) -> Creator:
             "sha256", password.encode(), "6f4b661212".encode(), 10000
         )
         if old_hash == creator.Password:
-            # Migrate to new hash
+            # Migrate to new hash. The mutation stays pending here; get_db commits
+            # it at the request boundary.
             creator.PasswordHash = hash_password(password)
             creator.Password = None
-            db.commit()
-            db.refresh(creator)
-            # Log password migration
-            logger = get_db_logger()
-            if logger:
-                logger.log_update(
-                    user=creator.CreatorName,
-                    user_id=creator.CreatorID,
-                    endpoint="POST /api/auth/login",
-                    entity="Creator",
-                    entity_id=creator.CreatorID,
-                    changes={"password_hash": "migrated from legacy"},
-                )
+            AuditService(db, enabled=settings.db_log.enabled).record(
+                action="UPDATE",
+                entity="Creator",
+                actor=ActingUser(id=creator.CreatorID, username=creator.CreatorName),
+                entity_id=creator.CreatorID,
+                changes={"password_hash": "migrated from legacy"},
+            )
             return creator
 
     raise HTTPException(
@@ -328,9 +238,7 @@ async def login(
     creator = check_login(user_data.username, user_data.password, session)
 
     # Create both tokens
-    access_token = create_access_token(
-        creator.CreatorID, creator.CreatorName, creator.Role
-    )
+    access_token = create_access_token(creator.CreatorID, creator.CreatorName)
     refresh_token = create_refresh_token(creator.CreatorID)
 
     # If API client, return token in response body
@@ -372,9 +280,7 @@ async def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
     """Get access token for API clients."""
     creator = check_login(user_data.username, user_data.password, session)
 
-    access_token = create_access_token(
-        creator.CreatorID, creator.CreatorName, creator.Role
-    )
+    access_token = create_access_token(creator.CreatorID, creator.CreatorName)
 
     return TokenResponse(
         access_token=access_token,
@@ -398,51 +304,55 @@ async def change_password(
     change_password_data: ChangePasswordRequest,
     session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
+    audit: AuditService = Depends(get_audit_service),
 ):
     """Change user password."""
     creator = check_login(
         current_user.username, change_password_data.old_password, session
     )
 
-    # Set new password using Argon2
+    # Set new password using Argon2. The mutation stays pending here; get_db
+    # commits it at the request boundary.
     creator.PasswordHash = hash_password(change_password_data.new_password)
     creator.Password = None  # Clear old hash if it exists
-    session.commit()
 
-    # Log password change
-    logger = get_db_logger()
-    if logger:
-        logger.log_update(
-            user=creator.CreatorName,
-            user_id=creator.CreatorID,
-            endpoint="POST /api/auth/change-password",
-            entity="Creator",
-            entity_id=creator.CreatorID,
-            changes={"password_hash": "updated"},
-        )
+    audit.record(
+        action="UPDATE",
+        entity="Creator",
+        actor=ActingUser(id=current_user.id, username=current_user.username),
+        entity_id=creator.CreatorID,
+        changes={"password_hash": "updated"},
+    )
 
     return creator_to_response(creator, session)
 
 
 @router.post("/auth/register", response_model=UserResponse)
-async def register_user(user_data: UserLogin, session: Session = Depends(get_db)):
+async def register_user(
+    user_data: UserLogin,
+    session: Session = Depends(get_db),
+    audit: AuditService = Depends(get_audit_service),
+):
     """Register a new user."""
-    new_user = create_user(session, user_data.username, user_data.password)
+    try:
+        new_user = create_user(session, user_data.username, user_data.password)
+    except ValueError as err:
+        # create_user only rejects an already-taken username. Uncaught, this
+        # reached main.py's blanket handler as a 500, which made an
+        # unauthenticated caller's 200-vs-500 a username-enumeration oracle.
+        # Answered the same way check_oidc_login answers the same ValueError.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this username already exists.",
+        ) from err
 
-    # Log user creation
-    logger = get_db_logger()
-    if logger:
-        logger.log_insert(
-            user="system",  # Registration doesn't require auth
-            user_id=0,
-            endpoint="POST /api/auth/register",
-            entity="Creator",
-            entity_id=new_user.CreatorID,
-            fields={
-                "username": new_user.CreatorName,
-                "is_human": new_user.IsHuman,
-            },
-        )
+    audit.record(
+        action="INSERT",
+        entity="Creator",
+        trusted_path="auth:register",
+        entity_id=new_user.CreatorID,
+        changes={"username": new_user.CreatorName, "is_human": new_user.IsHuman},
+    )
 
     return creator_to_response(new_user, session)
 
@@ -462,17 +372,22 @@ async def refresh_token(
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
 
-        # Get user from database
-        creator = (
-            session.query(Creator).where(Creator.CreatorID == payload["sub"]).first()
+        # Get user from database. int() mirrors get_current_user's handling of
+        # the same claim; a malformed sub can't arise from a token this process
+        # signed itself, and if it ever did, the ValueError falls through to the
+        # blanket `except Exception` below -- same 401 outcome as before.
+        creator = CreatorRepository(session, scope=AccessScope.trusted()).get_by_id(
+            int(payload["sub"])
         )
-        if not creator:
+        if not creator or creator.Inactive:
+            # A deactivated account must not be able to renew its session
+            # indefinitely off a refresh token minted while it was still
+            # active. Same 401 either way: whether the account was deleted or
+            # revoked is not the holder's business.
             raise HTTPException(status_code=401, detail="User not found")
 
         # Create new access token
-        new_access_token = create_access_token(
-            creator.CreatorID, creator.CreatorName, creator.Role
-        )
+        new_access_token = create_access_token(creator.CreatorID, creator.CreatorName)
 
         # Create NEW refresh token (extends session for active users)
         new_refresh_token = create_refresh_token(creator.CreatorID)
@@ -706,6 +621,17 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
                 break
 
     if creator:
+        if creator.Inactive:
+            # Same revocation as the password path, a different front door.
+            # Refused before the identifier-migration write below, so a
+            # deactivated account's row is not touched on a denied login.
+            logger.warning(
+                f"Denied OIDC access to deactivated account '{creator.CreatorName}'"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="OIDC account not authorized",
+            )
         if not creator.EmployeeIdentifier.startswith("oidc:sub:"):
             # The use of identification claims other than the 'Subject' claim is in general insecure, as claims
             # such as the email address or firstname-lastname combinations might change in the future,
@@ -715,8 +641,8 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
             identifier = f"oidc:sub:{id_claims['sub']}"
             logger.info(f"Replacing temporary OIDC authentication claim '{creator.EmployeeIdentifier}' with {identifier}")
             creator.EmployeeIdentifier = identifier
-            session.add(creator)
-            session.commit()
+            # flush only; the request boundary (get_db) commits.
+            CreatorRepository(session, scope=AccessScope.trusted()).add(creator)
 
     else:
         # No existing account was found
@@ -804,9 +730,7 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
     response.delete_cookie(key="oidc_csrf_token")
     response.delete_cookie(key="oidc_nonce")
 
-    access_token = create_access_token(
-        creator.CreatorID, creator.CreatorName, creator.Role
-    )
+    access_token = create_access_token(creator.CreatorID, creator.CreatorName)
     refresh_token = create_refresh_token(creator.CreatorID)
 
     response.set_cookie(

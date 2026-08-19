@@ -9,9 +9,8 @@
     }
     let { segmentationItem }: Props = $props();
 
-    const mainViewerContext = getContext<MainViewerContext>(
-        "mainViewerContext",
-    );
+    const mainViewerContext =
+        getContext<MainViewerContext>("mainViewerContext");
 
     let connectedComponentsActive = $derived(
         mainViewerContext.applyConnectedComponents.has(segmentationItem),
@@ -20,10 +19,15 @@
         mainViewerContext.toggleConnectedComponents(segmentationItem);
     }
 </script>
+
 <div class="main">
     <h3><ConnectedComponents size="1.5em" />Connected components</h3>
     <label>
-        <input type="checkbox" checked={connectedComponentsActive} onchange={toggleConnectedComponents} />
+        <input
+            type="checkbox"
+            checked={connectedComponentsActive}
+            onchange={toggleConnectedComponents}
+        />
         Show connected components
     </label>
 </div>
@@ -37,7 +41,7 @@
         margin-bottom: 0.2em;
         margin-top: 0.2em;
     }
-    h3 {    
+    h3 {
         font-size: small;
         font-weight: bold;
         margin: 0;

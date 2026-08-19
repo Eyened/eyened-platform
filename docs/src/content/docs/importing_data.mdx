@@ -20,12 +20,14 @@ The **ORM importer** is the primary way to load data. Use it from Python or the 
 Typical workflow:
 
 1. Build `ImportRow` objects (or load from CSV)
-2. `plan_image_import(session, rows, ...)` — preview what will be created or matched
-3. `run.display_summary()` — review the plan
-4. `run.apply()` then `session.commit()` — write to the database
-5. Optionally export the run to JSON for audit or undo
+2. Optionally enable [row preparation](/eyened-platform/orm/importer#row-preparation) (`PreparationOptions`) — e.g. `infer_metadata_from_dicom_header` for PatientID/StudyDate/modality/resolutions, or `link_oct_enface_series` to co-locate OCT–enface
+3. Optionally [export prepared rows to CSV](/eyened-platform/orm/importer#export-prepared--inferred-metadata-to-csv) to verify inferred metadata (`build_image_import_rows` → `write_import_rows_csv` → `plan_import`)
+4. `plan_image_import(session, rows, ...)` — or `plan_import` on already-prepared rows — preview what will be created or matched
+5. `run.display_summary()` — review the plan
+6. `run.apply()` then `session.commit()` — write to the database
+7. Optionally export the run to JSON for audit or undo
 
-Each row points to an image file via `storage_backend_key` and `object_key`. The file must already exist on that backend — import registers the path in the database; it does not copy or upload image bytes. Place files on the backend first (e.g. rsync to a local mount, or upload to S3 separately), then run the import.
+Each row points to an image file via `storage_backend_key` and **relative** `object_key` within that backend. The file must already exist — import registers the path in the database; it does not copy or upload image bytes. Place files on the backend first, then run the import. DICOM header reading uses `EYENED_STORAGE_MOUNTS[backend] / object_key` (or a custom `raw_loader`).
 
 Full guide: **[ORM Importer](/eyened-platform/orm/importer)** (requires **[ORM setup](/eyened-platform/orm/getting_started)**).
 

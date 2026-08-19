@@ -7,39 +7,51 @@ class _HasAttributeValues(Protocol):
 
 
 class AttributeValueLookupMixin:
+    """Version-aware attribute lookup shared by ORM objects and the API layer."""
+
+    def find_attribute_value(
+        self: _HasAttributeValues,
+        *,
+        producing_model_name: str | None = None,
+        producing_model_id: int | None = None,
+        attribute_name: str | None = None,
+        min_version: str | None = None,
+    ) -> Any | None:
+        """Return the selected ``AttributeValue`` row for this object.
+
+        Delegates to :func:`~eyened_orm.inference.model_inputs.select_attribute_value`
+        on ``self.AttributeValues``.
+
+        ``min_version``, when set, must equal an ``AttributesModel.Version`` value
+        exactly (same string as stored in the database). Selection uses ``ModelID``
+        ordering, not string comparison on ``Version``. Failed rows (null value
+        columns) are excluded.
+        """
+        from eyened_orm.inference.model_inputs import select_attribute_value
+
+        return select_attribute_value(
+            self.AttributeValues,
+            attribute_name=attribute_name,
+            producing_model_name=producing_model_name,
+            producing_model_id=producing_model_id,
+            min_version=min_version,
+        )
+
     def get_attribute_value(
         self: _HasAttributeValues,
         *,
         producing_model_name: str | None = None,
         producing_model_id: int | None = None,
         attribute_name: str | None = None,
+        min_version: str | None = None,
     ) -> Optional[Any]:
-        """
-        Get the first matching attribute value.
-
-        Matching uses OR semantics across the provided filters
-        """
-        for av in self.AttributeValues:
-            producing_model = av.ProducingModel
-
-            if (
-                producing_model_name is not None
-                and producing_model is not None
-                and producing_model.ModelName == producing_model_name
-            ):
-                return av.value
-
-            if (
-                producing_model_id is not None
-                and producing_model is not None
-                and producing_model.ModelID == producing_model_id
-            ):
-                return av.value
-
-            if (
-                attribute_name is not None
-                and av.AttributeDefinition.AttributeName == attribute_name
-            ):
-                return av.value
-
-        return None
+        """Return the stored value from the selected ``AttributeValue`` row."""
+        av = self.find_attribute_value(
+            producing_model_name=producing_model_name,
+            producing_model_id=producing_model_id,
+            attribute_name=attribute_name,
+            min_version=min_version,
+        )
+        if av is None:
+            return None
+        return av.value

@@ -6,29 +6,26 @@ import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 
-const paintKey = 'Q';
-const eraseKey = 'W';
+const paintKey = "Q";
+const eraseKey = "W";
 
-export type DrawingMode = 'erase' | 'paint';
+export type DrawingMode = "erase" | "paint";
 
 export interface DrawingExecutor {
     getCtx(): CanvasRenderingContext2D;
-    draw(ctx: CanvasRenderingContext2D, mode: 'paint' | 'erase'): Promise<void>;
+    draw(ctx: CanvasRenderingContext2D, mode: "paint" | "erase"): Promise<void>;
     undo(): void;
     redo(): void;
     canUndo(): boolean;
     canRedo(): boolean;
 }
 
-
 export abstract class SegmentationTool implements Overlay {
+    paintColor = "rgba(200, 255, 200, 0.5)";
+    eraseColor = "rgba(255, 200, 200, 0.5)";
+    fillColor = "rgba(255, 255, 255, 0.4)";
 
-    paintColor = 'rgba(200, 255, 200, 0.5)';
-    eraseColor = 'rgba(255, 200, 200, 0.5)';
-    fillColor = 'rgba(255, 255, 255, 0.4)';
-
-
-    drawingState: DrawingMode = 'paint';
+    drawingState: DrawingMode = "paint";
     currentPoints: Position2D[] | undefined;
     lastPosition: Position2D | undefined;
     syncing: boolean = false;
@@ -37,13 +34,16 @@ export abstract class SegmentationTool implements Overlay {
         protected readonly drawingExecutor: DrawingExecutor,
         protected readonly viewerContext: ViewerContext,
         protected readonly segmentationContext: SegmentationContext,
-    ) {
-    }
+    ) {}
 
-    abstract executeDraw(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void;
+    abstract executeDraw(
+        ctx: CanvasRenderingContext2D,
+        viewerContext: ViewerContext,
+    ): void;
 
     protected segToImageMatrix(): Matrix {
-        const segmentation = this.segmentationContext.segmentationItem?.segmentation;
+        const segmentation =
+            this.segmentationContext.segmentationItem?.segmentation;
         if (!segmentation) {
             return Matrix.identity;
         }
@@ -51,11 +51,15 @@ export abstract class SegmentationTool implements Overlay {
     }
 
     protected segmentationViewerTransform(): Matrix {
-        return this.viewerContext.imageViewerTransform.multiply(this.segToImageMatrix());
+        return this.viewerContext.imageViewerTransform.multiply(
+            this.segToImageMatrix(),
+        );
     }
 
     /** Viewer events carry image-space position; convert to segmentation pixels. */
-    protected eventToSegmentation(e: ViewerEvent<PointerEvent | KeyboardEvent | WheelEvent | MouseEvent>): Position2D {
+    protected eventToSegmentation(
+        e: ViewerEvent<PointerEvent | KeyboardEvent | WheelEvent | MouseEvent>,
+    ): Position2D {
         return this.segToImageMatrix().inverse.apply(e.position);
     }
 
@@ -67,14 +71,20 @@ export abstract class SegmentationTool implements Overlay {
      * Brush radius is defined in image pixels; convert to segmentation radii at centerSeg.
      * centerSeg must be in segmentation coordinates.
      */
-    protected imageBrushRadiiToSegmentation(centerSeg: Position2D): { rx: number; ry: number } {
+    protected imageBrushRadiiToSegmentation(centerSeg: Position2D): {
+        rx: number;
+        ry: number;
+    } {
         const segToImage = this.segToImageMatrix();
         const imageToSeg = segToImage.inverse;
         const imageCenter = segToImage.apply(centerSeg);
         const r = this.segmentationContext.brushRadius;
         const aspect = this.viewerContext.aspectRatio;
         const px = imageToSeg.apply({ x: imageCenter.x + r, y: imageCenter.y });
-        const py = imageToSeg.apply({ x: imageCenter.x, y: imageCenter.y + r * aspect });
+        const py = imageToSeg.apply({
+            x: imageCenter.x,
+            y: imageCenter.y + r * aspect,
+        });
         return {
             rx: Math.hypot(px.x - centerSeg.x, px.y - centerSeg.y),
             ry: Math.hypot(py.x - centerSeg.x, py.y - centerSeg.y),
@@ -82,33 +92,38 @@ export abstract class SegmentationTool implements Overlay {
     }
 
     get mode() {
-        return ((this.drawingState === 'paint') !== this.flipDrawErase) ? 'paint' : 'erase';
+        return (this.drawingState === "paint") !== this.flipDrawErase
+            ? "paint"
+            : "erase";
     }
     get flipDrawErase(): boolean {
         return this.segmentationContext.flipDrawErase;
     }
 
     get drawingColor(): string {
-        if (this.mode === 'paint') {
+        if (this.mode === "paint") {
             return this.flipDrawErase ? this.eraseColor : this.paintColor;
-        } else if (this.mode === 'erase') {
+        } else if (this.mode === "erase") {
             return this.flipDrawErase ? this.paintColor : this.eraseColor;
         }
         throw new Error(`Invalid drawing mode: ${this.mode}`);
     }
 
     keydown(e: ViewerEvent<KeyboardEvent>) {
-        const { event: { repeat, key, ctrlKey, shiftKey }, viewerContext } = e;
+        const {
+            event: { repeat, key, ctrlKey, shiftKey },
+            viewerContext,
+        } = e;
         if (repeat) return;
 
         if (ctrlKey) {
             const k = key.toLowerCase();
-            if (k === 'z' && !shiftKey && this.drawingExecutor.canUndo()) {
+            if (k === "z" && !shiftKey && this.drawingExecutor.canUndo()) {
                 this.drawingExecutor.undo();
                 e.event.preventDefault();
                 return;
             }
-            if (k === 'y' && this.drawingExecutor.canRedo()) {
+            if (k === "y" && this.drawingExecutor.canRedo()) {
                 this.drawingExecutor.redo();
                 e.event.preventDefault();
                 return;
@@ -116,8 +131,8 @@ export abstract class SegmentationTool implements Overlay {
         }
 
         const k = key.toUpperCase();
-        if (k == paintKey) this.drawingState = 'paint';
-        if (k == eraseKey) this.drawingState = 'erase';
+        if (k == paintKey) this.drawingState = "paint";
+        if (k == eraseKey) this.drawingState = "erase";
 
         if (k == paintKey || k == eraseKey) {
             this.startDraw(viewerContext);
@@ -125,14 +140,14 @@ export abstract class SegmentationTool implements Overlay {
     }
 
     keyup(e: ViewerEvent<KeyboardEvent>) {
-        const { event, viewerContext, } = e;
+        const { event, viewerContext } = e;
         const k = event.key.toUpperCase();
         if (k == paintKey || k == eraseKey) {
             this.endDraw(viewerContext);
         }
     }
 
-    startDraw(viewerContext: ViewerContext) {
+    startDraw(_viewerContext: ViewerContext) {
         this.currentPoints = [this.lastPosition!];
         this.segmentationContext.isDrawing = true;
     }
@@ -144,15 +159,16 @@ export abstract class SegmentationTool implements Overlay {
 
             const ctx = this.drawingExecutor.getCtx();
             this.executeDraw(ctx, viewerContext);
-            this.drawingExecutor.draw(ctx, this.mode).then(() => this.syncing = false);
+            this.drawingExecutor
+                .draw(ctx, this.mode)
+                .then(() => (this.syncing = false));
             this.currentPoints = undefined;
         }
     }
 
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
         if (this.syncing) {
-            viewerContext.cursorStyle = 'wait';            
+            viewerContext.cursorStyle = "wait";
         }
     }
-
 }

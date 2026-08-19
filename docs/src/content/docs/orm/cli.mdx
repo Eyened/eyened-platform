@@ -8,7 +8,7 @@ sidebar:
 The `eorm` CLI covers database setup, maintenance, and inference entry points. Use `eorm --help` and `eorm COMMAND --help` for current flags.
 
 :::note
-**Inference commands** (`run-models`, `run-segmentation`, `run-registration`, …) are summarized in **[Inference](/eyened-platform/orm/inference)**. **Thumbnails**: **[Thumbnails](/eyened-platform/thumbnails)**.
+**Inference commands** (`run-cfi-models`, `run-segmentation`, `run-registration`, …) are summarized in **[Inference](/eyened-platform/orm/inference)**. **Thumbnails**: **[Thumbnails](/eyened-platform/thumbnails)**.
 :::
 
 ## Database setup
@@ -41,16 +41,19 @@ eorm create-user
 
 | Command | Purpose |
 |---------|---------|
-| `run-models` | Attribute inference |
+| `run-cfi-models` | CFI attribute inference (`cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality`) |
+| `run-models` | Deprecated alias for `run-cfi-models` |
 | `run-segmentation` | Segmentation model inference |
 | `run-registration` | Enface image registration — see **[Registration](/eyened-platform/orm/registration)** |
 | `run-etdrs-model` | ETDRS subfield areas |
+
+`run-cfi-models` flags include `--overwrite` (reprocess current version), `--upgrade` (add current version output when only older versions exist), and `--failed` (retry failed rows within the target). Attribute read precedence: **[Attributes](/eyened-platform/orm/data_model/attributes#selecting-which-attributevalue-to-use)**.
 
 Details: **[Inference](/eyened-platform/orm/inference)**.
 
 ## Targeting
 
-Image- and patient-scoped commands share targeting flags. Provide **at least one** of:
+Image- and patient-scoped commands share targeting flags. For most inference commands, provide **at least one** of:
 
 | Flag | Description |
 |------|-------------|
@@ -59,14 +62,14 @@ Image- and patient-scoped commands share targeting flags. Provide **at least one
 | `--project` | Project ID or name |
 | `--patient` | Patient identifier (with `--project` if ambiguous) |
 | `--exclude` / `--skip` | IDs or PublicIDs to exclude |
-| `--modality` | Filter when expanding `--project` or `--patient` |
+| `--modality` | Filter by modality (also when targeting all images) |
 
 ```bash
-eorm run-models --project "AMD-Study" --modality ColorFundus
+eorm run-cfi-models --project "AMD-Study" --modality ColorFundus
 eorm update-thumbnails --path ids.txt
 ```
 
-`update-thumbnails` and `update-hashes` scan the whole database when no target flags are given.
+`run-cfi-models`, `update-thumbnails`, and `update-hashes` scan the whole database when no target flags are given.
 
 ## Maintenance
 

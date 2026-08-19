@@ -3,44 +3,83 @@ import type { Image2D } from "$lib/webgl/image2D";
 import type { AbstractImage } from "./abstractImage";
 import type { RenderTarget } from "./types";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-import fs_renderImage2D from './glsl/fs_render_image2D.frag';
-import fs_renderLuminance from './glsl/fs_render_luminance.frag';
-import fs_renderImage3D from './glsl/fs_render_image3D.frag';
+import {
+    isRenderModeAvailable,
+    type RenderMode,
+} from "$lib/viewer/viewer-utils";
+import fs_renderImage2D from "./glsl/fs_render_image2D.frag";
+import fs_renderLuminance from "./glsl/fs_render_luminance.frag";
+import fs_renderImage3D from "./glsl/fs_render_image3D.frag";
+import fs_renderSliceArray from "./glsl/fs_render_slice_array.frag";
 import type { Image3D } from "./image3D";
+import { ImageSliceStack } from "./imageSliceStack";
 
 export interface ImageRenderer {
     renderImage(viewerContext: ViewerContext, renderTarget: RenderTarget): void;
 }
 
 export class BaseImageRenderer implements ImageRenderer {
-
     private readonly shaderBase: TextureShaderProgram;
     private readonly shaderLuminance: TextureShaderProgram;
     private readonly shader3D: TextureShaderProgram;
+    private readonly shaderSliceArray: TextureShaderProgram;
 
     constructor(private readonly image: AbstractImage) {
         const { webgl } = image;
         this.shaderBase = new TextureShaderProgram(webgl, fs_renderImage2D);
-        this.shaderLuminance = new TextureShaderProgram(webgl, fs_renderLuminance);
+        this.shaderLuminance = new TextureShaderProgram(
+            webgl,
+            fs_renderLuminance,
+        );
         this.shader3D = new TextureShaderProgram(webgl, fs_renderImage3D);
+        this.shaderSliceArray = new TextureShaderProgram(
+            webgl,
+            fs_renderSliceArray,
+        );
     }
 
     renderImage(viewerContext: ViewerContext, renderTarget: RenderTarget) {
         const { image } = viewerContext;
 
         const uniforms = getBaseUniforms(viewerContext);
-        const { renderMode } = viewerContext;
+        const renderMode = resolveRenderMode(image, viewerContext.renderMode);
+
+        if (image instanceof ImageSliceStack) {
+            if (renderMode == "CLAHE") {
+                void image
+                    .getClaheSliceTexture(viewerContext.index)
+                    .catch((err) =>
+                        console.error("CLAHE slice processing failed", err),
+                    );
+                const claheTexture = image.getClaheSliceTextureSync(
+                    viewerContext.index,
+                );
+                if (claheTexture) {
+                    uniforms.u_image = claheTexture.texture;
+                    this.shaderBase.pass(renderTarget, uniforms);
+                } else {
+                    this.shaderSliceArray.pass(renderTarget, uniforms);
+                }
+            } else {
+                this.shaderSliceArray.pass(renderTarget, uniforms);
+            }
+
+            return;
+        }
 
         if (image.is3D) {
-            if (renderMode == 'CLAHE') {
+            if (renderMode == "CLAHE") {
                 const img3d = image as Image3D;
-                // initiate the CLAHE processing (async)
-                img3d.getClaheSliceTexture(viewerContext.index);
-                // check if the CLAHE processing is complete (sync)
-                const claheTexture = img3d.getClaheSliceTextureSync(viewerContext.index);
-                // use the CLAHE texture
+                void img3d
+                    .getClaheSliceTexture(viewerContext.index)
+                    .catch((err) =>
+                        console.error("CLAHE slice processing failed", err),
+                    );
+                const claheTexture = img3d.getClaheSliceTextureSync(
+                    viewerContext.index,
+                );
                 if (claheTexture) {
-                    uniforms.u_image = claheTexture?.texture;
+                    uniforms.u_image = claheTexture.texture;
                     this.shaderBase.pass(renderTarget, uniforms);
                 } else {
                     this.shader3D.pass(renderTarget, uniforms);
@@ -52,24 +91,36 @@ export class BaseImageRenderer implements ImageRenderer {
             return;
         }
 
-
         // image stores different textures for different render modes
         uniforms.u_image = (image as Image2D).selectTexture(renderMode);
 
-        if (renderMode == 'Luminance' || renderMode == 'Red' || renderMode == 'Green' || renderMode == 'Blue') {
+        if (
+            renderMode == "Luminance" ||
+            renderMode == "Red" ||
+            renderMode == "Green" ||
+            renderMode == "Blue"
+        ) {
             // luminance, red, green, blue are not stored in a separate texture, but calculated in the fragment shader
             uniforms.u_channel = {
-                'R': 0,
-                'G': 1,
-                'B': 2,
-                'L': -1,
+                R: 0,
+                G: 1,
+                B: 2,
+                L: -1,
             }[renderMode[0]];
             this.shaderLuminance.pass(renderTarget, uniforms);
         } else {
             this.shaderBase.pass(renderTarget, uniforms);
         }
     }
+}
 
+function resolveRenderMode(
+    image: AbstractImage,
+    renderMode: RenderMode,
+): RenderMode {
+    return isRenderModeAvailable(image.supportsColorRenderModes, renderMode)
+        ? renderMode
+        : "Original";
 }
 
 export function getBaseUniforms(viewerContext: ViewerContext): any {
@@ -80,8 +131,8 @@ export function getBaseUniforms(viewerContext: ViewerContext): any {
         u_image: image.texture,
         u_image_size: [image.width, image.height, image.depth],
         u_transform: webglTransform.asUniform,
-        u_window_level: [windowLevel.min, windowLevel.max]
+        u_window_level: [windowLevel.min, windowLevel.max],
     };
 }
 
-export { getSegmentationOverlayUniforms } from './segmentationProjection';
+export { getSegmentationOverlayUniforms } from "./segmentationProjection";

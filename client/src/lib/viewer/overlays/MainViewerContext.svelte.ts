@@ -1,6 +1,14 @@
 import { toggleInSet, type Color } from "$lib/utils";
-import { getSegmentationKey, SegmentationContext, type Segmentation } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
-import { getBaseUniforms, getSegmentationOverlayUniforms } from "$lib/webgl/imageRenderer";
+import { getImageUiPref, setImageUiPref } from "$lib/viewer/imageUiPrefs";
+import {
+    getSegmentationKey,
+    SegmentationContext,
+    type Segmentation,
+} from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
+import {
+    getBaseUniforms,
+    getSegmentationOverlayUniforms,
+} from "$lib/webgl/imageRenderer";
 import { BinaryMask } from "$lib/webgl/mask.svelte";
 import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
@@ -12,30 +20,57 @@ import type { ViewerContext } from "../viewerContext.svelte";
 import { colors } from "./colors";
 
 export class MainViewerContext implements Overlay {
-
     private featureColors = new SvelteMap<string, Color>();
 
-    public readonly applyConnectedComponents = new SvelteSet<SegmentationItem>();
-    public readonly applyMasking = new SvelteSet<SegmentationItem>();
+    public readonly applyConnectedComponents =
+        new SvelteSet<SegmentationItem>();
+    /** Segmentation keys for which reference-masking is turned off (default: on). */
+    public readonly skipMasking = new SvelteSet<string>();
     public active = $state(false);
     public renderOutline = $state(false);
     public alpha = $state(1.0);
     public highlightedFeatureIndex = $state<number | undefined>(undefined);
-    public highlightedSegmentationItem: SegmentationItem | undefined = $state(undefined);
-    public readonly segmentationContext: SegmentationContext
-
+    public highlightedSegmentationItem: SegmentationItem | undefined =
+        $state(undefined);
+    public readonly segmentationContext: SegmentationContext;
 
     constructor(
         public readonly instanceId: string,
         public readonly axis: number,
         public readonly viewerWindowContext: ViewerWindowContext,
-        public readonly image: AbstractImage
+        public readonly image: AbstractImage,
     ) {
-        this.segmentationContext = new SegmentationContext(instanceId, axis, viewerWindowContext, image);
+        this.segmentationContext = new SegmentationContext(
+            instanceId,
+            axis,
+            viewerWindowContext,
+            image,
+        );
+        for (const key of this.loadSkipMaskingKeys()) {
+            this.skipMasking.add(key);
+        }
+    }
+
+    isMaskingApplied(segmentation: Segmentation): boolean {
+        return !this.skipMasking.has(getSegmentationKey(segmentation));
     }
 
     toggleMasking(segmentation: SegmentationItem) {
-        toggleInSet(this.applyMasking, segmentation);
+        toggleInSet(
+            this.skipMasking,
+            getSegmentationKey(segmentation.segmentation),
+        );
+        setImageUiPref(this.instanceId, "skipMasking", [...this.skipMasking]);
+    }
+
+    private loadSkipMaskingKeys(): string[] {
+        const stored = getImageUiPref<unknown>(
+            this.instanceId,
+            "skipMasking",
+            [],
+        );
+        if (!Array.isArray(stored)) return [];
+        return stored.filter((key): key is string => typeof key === "string");
     }
 
     toggleConnectedComponents(segmentationItem: SegmentationItem) {
@@ -50,7 +85,7 @@ export class MainViewerContext implements Overlay {
     getFeatureColor(segmentation: Segmentation): Color {
         let color = this.featureColors.get(getSegmentationKey(segmentation));
         if (!color) {
-            color = colors[(this._colorIndex++) % colors.length];
+            color = colors[this._colorIndex++ % colors.length];
             this.setFeatureColor(segmentation, color);
         }
         return color;
@@ -61,43 +96,60 @@ export class MainViewerContext implements Overlay {
         index: number,
         renderTarget: RenderTarget,
         viewerContext: ViewerContext,
-        uniforms: any
+        uniforms: any,
     ) {
-        const segmentationItem = this.segmentationContext.getSegmentationItem(segmentation);
+        const segmentationItem =
+            this.segmentationContext.getSegmentationItem(segmentation);
         const mask = segmentationItem.getMask(index);
         if (!mask) return;
 
-        uniforms.u_color = this.getFeatureColor(segmentation).map(c => c / 255);
-        uniforms.u_threshold = segmentationItem.threshold ?? segmentation.threshold ?? 0.5;
+        uniforms.u_color = this.getFeatureColor(segmentation).map(
+            (c) => c / 255,
+        );
+        uniforms.u_threshold =
+            segmentationItem.threshold ?? segmentation.threshold ?? 0.5;
 
         if (this.highlightedSegmentationItem == segmentationItem) {
-            uniforms.u_highlighted_feature_index = this.highlightedFeatureIndex ?? 0;
+            uniforms.u_highlighted_feature_index =
+                this.highlightedFeatureIndex ?? 0;
         } else {
             uniforms.u_highlighted_feature_index = 0;
         }
 
-        uniforms.u_visible_feature_mask = this.segmentationContext.getVisibleFeatureMask(segmentation) >>> 0;
+        uniforms.u_visible_feature_mask =
+            this.segmentationContext.getVisibleFeatureMask(segmentation) >>> 0;
 
         // Apply masking if enabled for this segmentation item
         uniforms.u_has_mask = false;
         uniforms.u_mask = null;
         uniforms.u_mask_bitmask = 0;
-        const applyMask = this.applyMasking.has(segmentationItem);
-        if (applyMask && segmentation.annotation_type === "grader_segmentation" && segmentation.reference_segmentation_id) {
-            const referenceSegmentationItem = this.segmentationContext.getSegmentationItemById(segmentation.reference_segmentation_id);
+        const applyMask = this.isMaskingApplied(segmentation);
+        if (
+            applyMask &&
+            segmentation.annotation_type === "grader_segmentation" &&
+            segmentation.reference_segmentation_id
+        ) {
+            const referenceSegmentationItem =
+                this.segmentationContext.getSegmentationItemById(
+                    segmentation.reference_segmentation_id,
+                );
             if (referenceSegmentationItem) {
                 const referenceMask = referenceSegmentationItem.getMask(index);
                 if (referenceMask instanceof BinaryMask) {
                     uniforms.u_has_mask = true;
                     uniforms.u_mask = referenceMask.bitMaskTexture.texture;
-                    uniforms.u_mask_bitmask = referenceMask.bitMaskTexture.bitmask;
+                    uniforms.u_mask_bitmask =
+                        referenceMask.bitMaskTexture.bitmask;
                 }
             }
         }
 
-        const overlayUniforms = getSegmentationOverlayUniforms(viewerContext, segmentation);
+        const overlayUniforms = getSegmentationOverlayUniforms(
+            viewerContext,
+            segmentation,
+        );
         const multiClassOpacity =
-            segmentation.data_representation === 'MultiClass'
+            segmentation.data_representation === "MultiClass"
                 ? {
                       u_multi_active_alpha:
                           this.segmentationContext.multiClassActiveAlpha,
@@ -113,7 +165,10 @@ export class MainViewerContext implements Overlay {
         };
 
         if (this.applyConnectedComponents.has(segmentationItem)) {
-            (mask as BinaryMask).renderConnectedComponents(renderTarget, renderUniforms);
+            (mask as BinaryMask).renderConnectedComponents(
+                renderTarget,
+                renderUniforms,
+            );
         } else {
             mask.render(renderTarget, renderUniforms);
         }
@@ -139,13 +194,27 @@ export class MainViewerContext implements Overlay {
         };
 
         // Render grader segmentations
-        for (const segmentation of this.segmentationContext.visibleGraderSegmentations) {
-            this.renderSegmentation(segmentation, index, renderTarget, viewerContext, uniforms);
+        for (const segmentation of this.segmentationContext
+            .visibleGraderSegmentations) {
+            this.renderSegmentation(
+                segmentation,
+                index,
+                renderTarget,
+                viewerContext,
+                uniforms,
+            );
         }
 
         // Render model segmentations
-        for (const segmentation of this.segmentationContext.visibleModelSegmentations) {
-            this.renderSegmentation(segmentation, index, renderTarget, viewerContext, uniforms);
+        for (const segmentation of this.segmentationContext
+            .visibleModelSegmentations) {
+            this.renderSegmentation(
+                segmentation,
+                index,
+                renderTarget,
+                viewerContext,
+                uniforms,
+            );
         }
     }
 }

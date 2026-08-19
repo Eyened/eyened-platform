@@ -80,9 +80,12 @@ cd ../../dev
 
 ## Run unit tests
 
-First time only: install testing dependencies
+First time only: install testing dependencies. `test-requirements.txt` chains the
+server runtime deps and pins pytest; the editable `orm` install is what makes
+`eyened_orm` importable at test-collection time.
 
 ```shell
+pip install -e ../orm
 pip install -r ../server/test-requirements.txt
 ```
 

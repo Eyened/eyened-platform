@@ -12,8 +12,14 @@ export interface Segmentation {
     depth: number;
     draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void;
     clear(scanNr: number): void;
-    export(scanNr: number, ctx: CanvasRenderingContext2D, dataRepresentation?: SegmentationDataRepresentation): void;
-    getData(scanNr: number): Uint8Array | Uint16Array | Uint32Array | Float32Array;    
+    export(
+        scanNr: number,
+        ctx: CanvasRenderingContext2D,
+        dataRepresentation?: SegmentationDataRepresentation,
+    ): void;
+    getData(
+        scanNr: number,
+    ): Uint8Array | Uint16Array | Uint32Array | Float32Array;
     import(scanNr: number, canvas: HTMLCanvasElement): void;
     importOther(scanNr: number, other: Segmentation): void;
 }
@@ -28,8 +34,8 @@ export abstract class BaseSegmentation implements Segmentation {
     constructor(
         public readonly id: string,
         public readonly image: AbstractImage,
-        public readonly segmentation: Segmentation
-    ) {         
+        public readonly segmentation: Segmentation,
+    ) {
         this.width = image.width;
         this.height = image.height;
         this.depth = image.depth;
@@ -37,11 +43,21 @@ export abstract class BaseSegmentation implements Segmentation {
         this.shaders = this.webgl.shaders;
     }
 
-    abstract draw(scanNr: number, drawing: HTMLCanvasElement, settings: any): void;
+    abstract draw(
+        scanNr: number,
+        drawing: HTMLCanvasElement,
+        settings: any,
+    ): void;
     abstract clear(scanNr: number): void;
-    abstract export(scanNr: number, ctx: CanvasRenderingContext2D, dataRepresentation?: SegmentationDataRepresentation): void;
-    abstract getData(scanNr: number): Uint8Array | Uint16Array | Uint32Array | Float32Array;
+    abstract export(
+        scanNr: number,
+        ctx: CanvasRenderingContext2D,
+        dataRepresentation?: SegmentationDataRepresentation,
+    ): void;
+    abstract getData(
+        scanNr: number,
+    ): Uint8Array | Uint16Array | Uint32Array | Float32Array;
     abstract import(scanNr: number, canvas: HTMLCanvasElement): void;
     abstract importOther(scanNr: number, other: Segmentation): void;
     abstract dispose(): void;
-} 
+}

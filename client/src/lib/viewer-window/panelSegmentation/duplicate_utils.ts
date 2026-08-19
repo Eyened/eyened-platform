@@ -1,18 +1,23 @@
 import type { GlobalContext } from "$lib/data/globalContext.svelte";
-import type { SegmentationDataRepresentation, SegmentationDataType } from "../../../types/openapi_types";
+import type {
+    SegmentationDataRepresentation,
+    SegmentationDataType,
+} from "../../../types/openapi_types";
 import { NPYArray } from "$lib/utils/npy_loader";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { DrawingArray } from "$lib/webgl/mask.svelte";
 import { convert } from "$lib/webgl/segmentationConverter";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
-import type { ModelSegmentationGET, SegmentationGET } from "../../../types/openapi_types";
+import type {
+    ModelSegmentationGET,
+    SegmentationGET,
+} from "../../../types/openapi_types";
 import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
 import { createSegmentation } from "$lib/data/api";
 
 // SimpleDataRepresentation is a subset of SegmentationDataRepresentation
-type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
-type DataRepresentation = SegmentationDataRepresentation;
+type SimpleDataRepresentation = "Binary" | "DualBitMask" | "Probability";
 
 export const types: Record<"Q" | "B" | "P", SimpleDataRepresentation> = {
     Q: "DualBitMask",
@@ -46,7 +51,7 @@ function copyMaskData(
     dataRepresentation: SegmentationDataRepresentation,
     array: NPYArray,
     image: AbstractImage,
-    originalThreshold: number
+    originalThreshold: number,
 ) {
     for (let i = 0; i < indices.length; i++) {
         const mask = segmentationItem.getMask(indices[i]);
@@ -59,15 +64,13 @@ function copyMaskData(
                 dataRepresentation as SimpleDataRepresentation,
                 threshold,
             );
-            array.data.set(
-                dataConverted,
-                i * image.height * image.width,
-            );
+            array.data.set(dataConverted, i * image.height * image.width);
         }
     }
 }
 
-export async function duplicate(globalContext: GlobalContext,
+export async function duplicate(
+    globalContext: GlobalContext,
     segmentation: SegmentationGET | ModelSegmentationGET,
     segmentationItem: SegmentationItem,
     image: AbstractImage,
@@ -75,8 +78,9 @@ export async function duplicate(globalContext: GlobalContext,
     duplicateVolume: boolean,
     type: "Q" | "B" | "P",
     originalThreshold: number,
-    newThreshold: number, 
-    taskContext?: TaskContext) {
+    newThreshold: number,
+    taskContext?: TaskContext,
+) {
     globalContext.dialogue = `Duplicating segmentation ${segmentation.id}...`;
 
     let data_representation: SegmentationDataRepresentation;
@@ -98,7 +102,7 @@ export async function duplicate(globalContext: GlobalContext,
     const item = {
         ...segmentation,
         threshold: newThreshold,
-        feature_id: segmentation.feature.id,        
+        feature_id: segmentation.feature.id,
         data_representation,
         data_type,
         subtask_id: taskContext?.subTask.id ?? null,
@@ -137,7 +141,7 @@ export async function duplicate(globalContext: GlobalContext,
             data_representation,
             array,
             image,
-            originalThreshold
+            originalThreshold,
         );
     } else {
         // full volume
@@ -149,7 +153,7 @@ export async function duplicate(globalContext: GlobalContext,
             data_representation,
             array,
             image,
-            originalThreshold
+            originalThreshold,
         );
     }
     const newSegmentation = await createSegmentation(item, array);

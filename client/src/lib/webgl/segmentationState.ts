@@ -1,30 +1,52 @@
-import { getSegmentationData, getModelSegmentationData, updateSegmentationData } from "$lib/data/helpers";
+import {
+    getSegmentationData,
+    getModelSegmentationData,
+    updateSegmentationData,
+} from "$lib/data/helpers";
 import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
-import type { ModelSegmentationGET, SegmentationGET, SegmentationDataRepresentation } from "../../types/openapi_types";
+import type {
+    ModelSegmentationGET,
+    SegmentationGET,
+    SegmentationDataRepresentation,
+} from "../../types/openapi_types";
 // SimpleDataRepresentation is a subset of SegmentationDataRepresentation
-export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
+export type SimpleDataRepresentation = "Binary" | "DualBitMask" | "Probability";
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
-import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
+import {
+    BinaryMask,
+    MultiClassMask,
+    MultiLabelMask,
+    ProbabilityMask,
+    QuestionableMask,
+    type DrawingArray,
+    type Mask,
+    type PaintSettings,
+} from "./mask.svelte";
 import { convert } from "./segmentationConverter";
 import { segmentationPlaneSize } from "./segmentationProjection";
 import { writable, type Writable } from "svelte/store";
 
-type MaskConstructor = new (image: AbstractImage, segmentation: SegmentationGET) => Mask;
-export const constructors: Record<'Binary' | 'DualBitMask' | 'Probability' | 'MultiClass' | 'MultiLabel', MaskConstructor> = {
-    'Binary': BinaryMask,
-    'DualBitMask': QuestionableMask,
-    'Probability': ProbabilityMask,
-    'MultiClass': MultiClassMask,
-    'MultiLabel': MultiLabelMask,
-}
+type MaskConstructor = new (
+    image: AbstractImage,
+    segmentation: SegmentationGET,
+) => Mask;
+export const constructors: Record<
+    "Binary" | "DualBitMask" | "Probability" | "MultiClass" | "MultiLabel",
+    MaskConstructor
+> = {
+    Binary: BinaryMask,
+    DualBitMask: QuestionableMask,
+    Probability: ProbabilityMask,
+    MultiClass: MultiClassMask,
+    MultiLabel: MultiLabelMask,
+};
 
 // manages the segmentation state (history, mask) for a single scan
 export type SyncState = "synced" | "saving" | "error";
 
 export class SegmentationState {
-
     protected history: DrawingHistory<string>;
     public readonly mask: Mask;
 
@@ -32,7 +54,8 @@ export class SegmentationState {
     private hasInitialCheckpoint = false;
     private updateTimeout: ReturnType<typeof setTimeout> | null = null;
     private pendingUpdateResolve: (() => void) | null = null;
-    public readonly syncState: Writable<SyncState> = writable<SyncState>("synced");
+    public readonly syncState: Writable<SyncState> =
+        writable<SyncState>("synced");
 
     constructor(
         readonly image: AbstractImage,
@@ -40,9 +63,18 @@ export class SegmentationState {
         readonly scanNr: number,
         initialData?: DrawingArray,
     ) {
-        this.mask = new constructors[segmentation.data_representation](image, segmentation as SegmentationGET);
+        this.mask = new constructors[segmentation.data_representation](
+            image,
+            segmentation as SegmentationGET,
+        );
         const plane = segmentationPlaneSize(segmentation, image);
-        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, plane.width, plane.height));
+        this.history = new DrawingHistory<string>(
+            new Base64Serializer(
+                segmentation.data_type,
+                plane.width,
+                plane.height,
+            ),
+        );
         if (initialData) {
             this.mask.importData(initialData);
         } else {
@@ -61,12 +93,18 @@ export class SegmentationState {
         // Load a single slice from the server
         const sparse_axis = this.segmentation.sparse_axis ?? undefined;
         const scan_nr = this.scanNr;
-        
+
         let npyArray: NPYArray;
-        if (this.segmentation.annotation_type == 'model_segmentation') {
-            npyArray = await getModelSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
+        if (this.segmentation.annotation_type == "model_segmentation") {
+            npyArray = await getModelSegmentationData(this.segmentation.id, {
+                sparse_axis,
+                scan_nr,
+            });
         } else {
-            npyArray = await getSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
+            npyArray = await getSegmentationData(this.segmentation.id, {
+                sparse_axis,
+                scan_nr,
+            });
         }
         this.mask.importData(npyArray.data as DrawingArray);
     }
@@ -84,21 +122,33 @@ export class SegmentationState {
 
         const data = other.exportData();
 
-        const thisType = this.segmentation.data_representation as SegmentationDataRepresentation;
-        const otherType = other.segmentation.data_representation as SegmentationDataRepresentation;
-        const threshold = (255 * (other.segmentation.threshold ?? 0.5));
+        const thisType = this.segmentation
+            .data_representation as SegmentationDataRepresentation;
+        const otherType = other.segmentation
+            .data_representation as SegmentationDataRepresentation;
+        const threshold = 255 * (other.segmentation.threshold ?? 0.5);
 
-        function isSimpleRepresentation(t: SegmentationDataRepresentation): t is SimpleDataRepresentation {
-            return t === 'Binary' || t === 'DualBitMask' || t === 'Probability';
+        function isSimpleRepresentation(
+            t: SegmentationDataRepresentation,
+        ): t is SimpleDataRepresentation {
+            return t === "Binary" || t === "DualBitMask" || t === "Probability";
         }
 
-        if (isSimpleRepresentation(thisType) && isSimpleRepresentation(otherType)) {
+        if (
+            isSimpleRepresentation(thisType) &&
+            isSimpleRepresentation(otherType)
+        ) {
             const dataConverted = convert(data, otherType, thisType, threshold);
             this.mask.importData(dataConverted);
         } else if (thisType === otherType) {
             this.mask.importData(data);
         } else {
-            console.warn("SegmentationState.importOther: conversion not supported", otherType, "->", thisType);
+            console.warn(
+                "SegmentationState.importOther: conversion not supported",
+                otherType,
+                "->",
+                thisType,
+            );
         }
 
         this.isDrawing = this.checkpoint();
@@ -139,17 +189,17 @@ export class SegmentationState {
         if (this.updateTimeout) {
             clearTimeout(this.updateTimeout);
         }
-        
+
         // Resolve immediately for optimistic UI updates (don't block drawing)
         // The actual server call will be debounced and happen in the background
         const resolveImmediately = this.pendingUpdateResolve;
         if (resolveImmediately) {
             resolveImmediately();
         }
-        
+
         // Set sync state to "saving" when update is triggered
         this.syncState.set("saving");
-        
+
         // Debounce: wait 2 seconds after last update before sending to server
         // The last call wins - it will export the current mask state, so no data is lost
         this.updateTimeout = setTimeout(async () => {
@@ -158,8 +208,13 @@ export class SegmentationState {
                 const { planeHeight, planeWidth } = this.mask;
                 const buffer = encodeNpy(data, [planeHeight, planeWidth]);
                 const sparse_axis = this.segmentation.sparse_axis ?? undefined;
-                const scan_nr = this.image.image_id.endsWith('proj') ? undefined : this.scanNr;
-                await updateSegmentationData(this.segmentation.id, buffer, { sparse_axis, scan_nr });
+                const scan_nr = this.image.image_id.endsWith("proj")
+                    ? undefined
+                    : this.scanNr;
+                await updateSegmentationData(this.segmentation.id, buffer, {
+                    sparse_axis,
+                    scan_nr,
+                });
                 this.syncState.set("synced");
             } catch (error) {
                 this.syncState.set("error");
@@ -168,7 +223,7 @@ export class SegmentationState {
                 this.updateTimeout = null;
             }
         }, 2000);
-        
+
         // Return a Promise that resolves immediately for optimistic updates
         return new Promise<void>((resolve) => {
             this.pendingUpdateResolve = resolve;

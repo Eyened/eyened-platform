@@ -1,23 +1,23 @@
-import type { Color } from './utils';
+import type { Color } from "./utils";
 
 export type int = number;
 export type img_id = string;
 
 export type FilterFieldSpec =
-    | 'VARCHAR'
-    | 'INTEGER'
-    | 'BOOLEAN'
-    | 'FLOAT'
-    | 'DATE'
+    | "VARCHAR"
+    | "INTEGER"
+    | "BOOLEAN"
+    | "FLOAT"
+    | "DATE"
     | number[]
     | string[];
 
 export type Keypoints = {
-    fovea_xy: [number, number],
-    disc_edge_xy: [number, number],
-    prep_fovea_xy: [number, number],
-    prep_disc_edge_xy: [number, number]
-}
+    fovea_xy: [number, number];
+    disc_edge_xy: [number, number];
+    prep_fovea_xy: [number, number];
+    prep_disc_edge_xy: [number, number];
+};
 
 export interface Position2D {
     x: number;
@@ -37,7 +37,6 @@ export interface ETDRSCoordinates {
 export type Branch = {
     id: string;
     drawing: string;
-    vesselType: 'Artery' | 'Vein' | 'Vessel';
+    vesselType: "Artery" | "Vein" | "Vessel";
     color?: Color;
 };
-

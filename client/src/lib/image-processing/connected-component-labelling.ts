@@ -1,4 +1,9 @@
-export function BlobExtraction(data: Uint8Array, w: number, h: number, connectivity: 4 | 8 = 8) {
+export function BlobExtraction(
+    data: Uint8Array,
+    w: number,
+    h: number,
+    connectivity: 4 | 8 = 8,
+) {
     const directions = [
         [-1, 0],
         [1, 0],
@@ -6,12 +11,7 @@ export function BlobExtraction(data: Uint8Array, w: number, h: number, connectiv
         [0, 1],
     ];
     if (connectivity == 8) {
-        directions.push(
-            [-1, -1],
-            [-1, 1],
-            [1, -1],
-            [1, 1],
-        );
+        directions.push([-1, -1], [-1, 1], [1, -1], [1, 1]);
     }
     const visited = new Uint8Array(data.length);
     const label = new Uint8Array(data.length);

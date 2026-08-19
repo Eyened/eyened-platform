@@ -1,5 +1,9 @@
 <script lang="ts">
-    import type { EventName, ViewerModifiers, ViewerWheelData } from "./viewer-utils";
+    import type {
+        EventName,
+        ViewerModifiers,
+        ViewerWheelData,
+    } from "./viewer-utils";
     import type { ViewerContext } from "./viewerContext.svelte";
     import { getContext, onDestroy, onMount } from "svelte";
     import { ViewerWindowContext } from "$lib/viewer-window/viewerWindowContext.svelte";
@@ -42,6 +46,10 @@
 
     //
     onMount(() => {
+        // canvas2D is a raw <canvas> created and owned by ViewerContext
+        // (document.createElement, used directly for 2D rendering outside
+        // Svelte's reactivity); it must be attached imperatively.
+        // eslint-disable-next-line svelte/no-dom-manipulating -- canvas2D is owned by ViewerContext, not Svelte-managed
         viewerElement.appendChild(viewerContext.canvas2D);
     });
 
@@ -71,7 +79,11 @@
     }
 
     function buildModifiers(event: Event): ViewerModifiers {
-        const eventWithModifiers = event as KeyboardEvent | MouseEvent | WheelEvent | PointerEvent;
+        const eventWithModifiers = event as
+            | KeyboardEvent
+            | MouseEvent
+            | WheelEvent
+            | PointerEvent;
         if (typeof eventWithModifiers.shiftKey === "boolean") {
             return {
                 shift: modifierState.shift || eventWithModifiers.shiftKey,
@@ -83,7 +95,10 @@
         return modifierState;
     }
 
-    function buildWheelData(event: WheelEvent, modifiers: ViewerModifiers): ViewerWheelData {
+    function buildWheelData(
+        event: WheelEvent,
+        modifiers: ViewerModifiers,
+    ): ViewerWheelData {
         const deltaXPx = wheelDeltaToPixels(event, event.deltaX);
         const deltaYPx = wheelDeltaToPixels(event, event.deltaY);
         const primaryDeltaPx = Math.abs(deltaYPx) > 0.001 ? deltaYPx : deltaXPx;
@@ -109,9 +124,10 @@
     function forwardEvent(eventName: EventName, event: Event) {
         const position = viewerContext.viewerToImageCoordinates(cursor);
         const modifiers = buildModifiers(event);
-        const wheel = event instanceof WheelEvent
-            ? buildWheelData(event, modifiers)
-            : undefined;
+        const wheel =
+            event instanceof WheelEvent
+                ? buildWheelData(event, modifiers)
+                : undefined;
         viewerContext.forwardEvent(eventName, {
             event,
             viewerContext,
@@ -235,9 +251,8 @@
                     />
                     <span>{index.value}</span>
                 </div>
-                
             {/if}
-            {#if viewerContext.image.orientation === 'axial'}
+            {#if viewerContext.image.orientation === "axial"}
                 <WindowLevel />
                 <Stretch />
             {/if}
