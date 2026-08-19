@@ -8,9 +8,12 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from pydicom.dataset import Dataset, FileDataset
+from pydicom.dataset import Dataset, FileDataset, FileMetaDataset
 from pydicom.uid import (
+    PYDICOM_IMPLEMENTATION_UID,
     ExplicitVRLittleEndian,
+    MultiFrameGrayscaleByteSecondaryCaptureImageStorage,
+    MultiFrameGrayscaleWordSecondaryCaptureImageStorage,
     SecondaryCaptureImageStorage,
     generate_uid,
 )
@@ -18,6 +21,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from eyened_orm import ImageInstance, Patient, Project, Series, Study
+
+# v1 writes Secondary Capture for interchange, not a vendor OCT IOD.
+# De-identification mints new Study/Series/SOP UIDs and keeps the patient
+# keyfile outside the share directory.
 
 
 @dataclass(slots=True)
@@ -33,6 +40,7 @@ class DicomExportConfig:
     date_offset_max_days: int = 365
     keyfile_path: Path | None = None
     image_keyfile_path: Path | None = None
+    reuse_source_uids: bool = False
 
 
 @dataclass(slots=True)
@@ -82,6 +90,52 @@ def normalize_pixel_array(arr: np.ndarray) -> tuple[np.ndarray, int, int, int]:
         arr = np.zeros_like(arr)
     arr = (arr * 65535.0).astype(np.uint16)
     return arr, 1, 16, 0
+
+
+def select_secondary_capture_sop_class(
+    arr: np.ndarray,
+    samples_per_pixel: int,
+    bits_allocated: int,
+) -> str:
+    is_volume = arr.ndim == 3 and samples_per_pixel == 1
+    if is_volume:
+        if bits_allocated > 8:
+            return str(MultiFrameGrayscaleWordSecondaryCaptureImageStorage)
+        return str(MultiFrameGrayscaleByteSecondaryCaptureImageStorage)
+    return str(SecondaryCaptureImageStorage)
+
+
+def is_deidentifying(config: DicomExportConfig) -> bool:
+    return config.pseudonymize_patient_ids or config.offset_dates_per_patient
+
+
+def _is_path_inside(path: Path, directory: Path) -> bool:
+    try:
+        path.resolve().relative_to(directory.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def validate_export_config(config: DicomExportConfig) -> None:
+    deidentifying = is_deidentifying(config)
+    if config.reuse_source_uids and deidentifying:
+        raise ValueError("reuse_source_uids cannot be combined with de-identification")
+    if config.pseudonymize_patient_ids and not config.pseudonym_salt.strip():
+        raise ValueError("pseudonym_salt is required when pseudonymize_patient_ids is enabled")
+    if config.offset_dates_per_patient and not config.date_offset_salt.strip():
+        raise ValueError("date_offset_salt is required when offset_dates_per_patient is enabled")
+    if deidentifying and config.keyfile_path is None:
+        raise ValueError(
+            "keyfile_path is required when de-identifying; "
+            "do not store the patient keyfile in output_dir"
+        )
+    if (
+        deidentifying
+        and config.keyfile_path is not None
+        and _is_path_inside(config.keyfile_path, config.output_dir)
+    ):
+        raise ValueError("patient keyfile_path must be outside output_dir")
 
 
 def pseudonymize_patient_identifier(
@@ -170,7 +224,7 @@ def write_patient_keyfile(
 
 def write_image_filename_keyfile(
     path: Path,
-    filename_to_public_id: dict[str, str],
+    rows: list[tuple[str, str, str, str, str]],
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
@@ -179,10 +233,13 @@ def write_image_filename_keyfile(
             [
                 "exported_filename",
                 "image_public_id",
+                "sop_instance_uid",
+                "series_instance_uid",
+                "study_instance_uid",
             ]
         )
-        for filename in sorted(filename_to_public_id):
-            writer.writerow([filename, filename_to_public_id[filename]])
+        for row in sorted(rows, key=lambda item: item[0]):
+            writer.writerow(row)
 
 
 def shift_date_value(value: date | None, offset_days: int) -> date | None:
@@ -296,47 +353,195 @@ def fetch_instances_for_export(
 
 def build_uid_registry(
     instances: list[ImageInstance],
-) -> tuple[
-    dict[int, tuple[str, str]],
-    dict[int, str],
-    dict[int, str],
-]:
-    instance_registry: dict[int, tuple[str, str]] = {}
+    *,
+    reuse_source_uids: bool = False,
+) -> tuple[dict[int, str], dict[int, str], dict[int, str]]:
+    instance_registry: dict[int, str] = {}
     series_registry: dict[int, str] = {}
     study_registry: dict[int, str] = {}
 
     for im in instances:
-        sop_class_uid = im.SOPClassUid or SecondaryCaptureImageStorage
-        sop_instance_uid = im.SOPInstanceUid or generate_uid()
-        instance_registry[im.ImageInstanceID] = (str(sop_class_uid), str(sop_instance_uid))
+        source_sop = im.SOPInstanceUid if reuse_source_uids else None
+        instance_registry[im.ImageInstanceID] = str(source_sop or generate_uid())
 
         if im.SeriesID not in series_registry:
-            series_registry[im.SeriesID] = str(im.Series.SeriesInstanceUid or generate_uid())
+            source_series = im.Series.SeriesInstanceUid if reuse_source_uids else None
+            series_registry[im.SeriesID] = str(source_series or generate_uid())
 
         study_id = im.Series.StudyID
         if study_id not in study_registry:
-            study_registry[study_id] = str(im.Series.StudyInstanceUid or generate_uid())
+            source_study = im.Series.StudyInstanceUid if reuse_source_uids else None
+            study_registry[study_id] = str(source_study or generate_uid())
 
     return instance_registry, series_registry, study_registry
+
+
+def build_study_datetime_map(
+    instances: list[ImageInstance],
+    patient_date_offset_map: dict[str, int] | None = None,
+) -> dict[int, tuple[date | None, datetime | None]]:
+    grouped: dict[int, list[ImageInstance]] = {}
+    for im in instances:
+        grouped.setdefault(im.Series.StudyID, []).append(im)
+
+    result: dict[int, tuple[date | None, datetime | None]] = {}
+    for study_id, members in grouped.items():
+        source_patient_id = members[0].Patient.PatientIdentifier or "UNKNOWN"
+        offset_days = 0
+        if patient_date_offset_map:
+            offset_days = patient_date_offset_map.get(source_patient_id, 0)
+
+        study_date = shift_date_value(members[0].Study.StudyDate, offset_days)
+        acquisition_times = [
+            im.AcquisitionDateTime for im in members if im.AcquisitionDateTime is not None
+        ]
+        study_time_src = min(acquisition_times) if acquisition_times else None
+        study_time = shift_datetime_value(study_time_src, offset_days)
+        result[study_id] = (study_date, study_time)
+    return result
+
+
+def build_instance_number_map(instances: list[ImageInstance]) -> dict[int, int]:
+    grouped: dict[int, list[ImageInstance]] = {}
+    for im in instances:
+        grouped.setdefault(im.SeriesID, []).append(im)
+
+    result: dict[int, int] = {}
+    for members in grouped.values():
+        ordered = sorted(members, key=lambda x: x.ImageInstanceID)
+        for index, im in enumerate(ordered, start=1):
+            result[im.ImageInstanceID] = index
+    return result
+
+
+def _resolved_patient_id(
+    instance: ImageInstance,
+    patient_id_map: dict[str, str] | None,
+) -> tuple[str, str]:
+    source_patient_id = instance.Patient.PatientIdentifier or "UNKNOWN"
+    patient_id_value = source_patient_id
+    if patient_id_map:
+        patient_id_value = patient_id_map.get(source_patient_id, patient_id_value)
+    return source_patient_id, patient_id_value
+
+
+def series_description_for_instance(instance: ImageInstance) -> str:
+    parts: list[str] = []
+    scan = getattr(instance, "Scan", None)
+    scan_mode = getattr(scan, "ScanMode", None)
+    if scan_mode:
+        parts.append(str(scan_mode))
+    elif instance.Modality:
+        parts.append(getattr(instance.Modality, "value", str(instance.Modality)))
+    etdrs = getattr(instance.ETDRSField, "value", None)
+    if etdrs:
+        parts.append(str(etdrs))
+    anatomic = instance.AnatomicRegion
+    if anatomic == 1:
+        parts.append("OpticDisc")
+    elif anatomic == 2:
+        parts.append("Macula")
+    return " ".join(parts)
+
+
+def pixel_spacing_mm(
+    instance: ImageInstance, *, is_volume: bool
+) -> tuple[float, float] | None:
+    """Row/column spacing in millimetres, matching ImageInstance axis conventions."""
+    if is_volume:
+        row_mm = instance.ResolutionAxial
+        col_mm = instance.ResolutionHorizontal
+    else:
+        row_mm = instance.ResolutionVertical
+        col_mm = instance.ResolutionHorizontal
+    if row_mm is None or col_mm is None:
+        return None
+    return float(row_mm), float(col_mm)
+
+
+def apply_optional_instance_metadata(
+    ds: Dataset,
+    instance: ImageInstance,
+    *,
+    is_volume: bool,
+    date_offset_days: int = 0,
+    deidentify: bool = False,
+) -> None:
+    ds.SpecificCharacterSet = "ISO_IR 100"
+    ds.ImageType = ["DERIVED", "SECONDARY"]
+    ds.AccessionNumber = ""
+    ds.PatientName = ds.get("PatientName", "")
+
+    study = instance.Study
+    if study.StudyDescription:
+        ds.StudyDescription = study.StudyDescription
+    if study.StudyRound is not None:
+        ds.StudyID = str(study.StudyRound)
+
+    description = series_description_for_instance(instance)
+    if description:
+        ds.SeriesDescription = description
+
+    laterality = getattr(instance.Laterality, "value", None)
+    if laterality:
+        ds.Laterality = laterality
+
+    shifted_acq = shift_datetime_value(instance.AcquisitionDateTime, date_offset_days)
+    if shifted_acq is not None:
+        ds.AcquisitionDate = dt_to_dicom_date(shifted_acq)
+        ds.AcquisitionTime = dt_to_dicom_time(shifted_acq)
+
+    spacing = pixel_spacing_mm(instance, is_volume=is_volume)
+    if spacing is not None:
+        ds.PixelSpacing = [spacing[0], spacing[1]]
+
+    slice_thickness = instance.SliceThickness
+    if slice_thickness is None and is_volume:
+        slice_thickness = instance.ResolutionVertical
+    if slice_thickness is not None:
+        ds.SliceThickness = float(slice_thickness)
+    if is_volume and instance.ResolutionVertical is not None:
+        ds.SpacingBetweenSlices = float(instance.ResolutionVertical)
+
+    if instance.HorizontalFieldOfView is not None:
+        ds.HorizontalFieldOfView = float(instance.HorizontalFieldOfView)
+
+    if instance.PupilDilated is not None:
+        ds.PupilDilated = "YES" if instance.PupilDilated else "NO"
+
+    device = getattr(instance, "DeviceInstance", None)
+    serial = getattr(device, "SerialNumber", None)
+    if serial and not deidentify:
+        ds.DeviceSerialNumber = serial
 
 
 def build_dicom_dataset(
     instance: ImageInstance,
     pixel_array: np.ndarray,
     sop_instance_uid: str,
-    sop_class_uid: str,
     study_instance_uid: str,
     series_instance_uid: str,
     patient_id_value: str | None = None,
     date_offset_days: int = 0,
     localizer_refs: list[tuple[str, str]] | None = None,
+    instance_number: int = 1,
+    study_date: date | None = None,
+    study_time: datetime | None = None,
+    deidentify: bool = False,
 ) -> FileDataset:
-    arr, samples_per_pixel, bits_allocated, pixel_representation = normalize_pixel_array(pixel_array)
+    arr, samples_per_pixel, bits_allocated, pixel_representation = normalize_pixel_array(
+        pixel_array
+    )
+    sop_class_uid = select_secondary_capture_sop_class(
+        arr, samples_per_pixel, bits_allocated
+    )
 
-    file_meta = Dataset()
+    file_meta = FileMetaDataset()
+    file_meta.FileMetaInformationVersion = b"\x00\x01"
     file_meta.MediaStorageSOPClassUID = sop_class_uid
     file_meta.MediaStorageSOPInstanceUID = sop_instance_uid
     file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    file_meta.ImplementationClassUID = PYDICOM_IMPLEMENTATION_UID
 
     ds = FileDataset(
         filename_or_obj="",
@@ -347,23 +552,32 @@ def build_dicom_dataset(
 
     ds.SOPClassUID = sop_class_uid
     ds.SOPInstanceUID = sop_instance_uid
+    ds.ConversionType = "WSD"
+    ds.PatientName = ""
 
-    shifted_birth_date = shift_date_value(instance.Patient.BirthDate, date_offset_days)
-    shifted_study_date = shift_date_value(instance.Study.StudyDate, date_offset_days)
-    shifted_acq_dt = shift_datetime_value(instance.AcquisitionDateTime, date_offset_days)
-    shifted_now = datetime.now() + timedelta(days=date_offset_days)
+    if study_date is None:
+        study_date = shift_date_value(instance.Study.StudyDate, date_offset_days)
+    if study_time is None:
+        study_time = shift_datetime_value(instance.AcquisitionDateTime, date_offset_days)
 
     ds.PatientID = patient_id_value or instance.Patient.PatientIdentifier or "UNKNOWN"
     ds.PatientSex = instance.Patient.Sex.value if instance.Patient.Sex else ""
-    ds.PatientBirthDate = dt_to_dicom_date(shifted_birth_date)
+    if deidentify:
+        ds.PatientBirthDate = ""
+    else:
+        ds.PatientBirthDate = dt_to_dicom_date(instance.Patient.BirthDate)
 
     ds.StudyInstanceUID = study_instance_uid
     ds.SeriesInstanceUID = series_instance_uid
 
-    ds.StudyDate = dt_to_dicom_date(shifted_study_date)
-    ds.StudyTime = dt_to_dicom_time(shifted_acq_dt)
+    ds.StudyDate = dt_to_dicom_date(study_date)
+    ds.StudyTime = dt_to_dicom_time(study_time)
     ds.SeriesNumber = instance.Series.SeriesNumber or 1
-    ds.InstanceNumber = 1
+    ds.InstanceNumber = int(instance_number)
+
+    laterality = getattr(instance.Laterality, "value", None)
+    if laterality:
+        ds.ImageLaterality = laterality
 
     ds.Modality = instance.DICOMModality.value if instance.DICOMModality else "OP"
     model = getattr(getattr(instance, "DeviceInstance", None), "DeviceModel", None)
@@ -378,12 +592,23 @@ def build_dicom_dataset(
 
     if arr.ndim == 2:
         rows, cols = arr.shape
+        is_volume = False
     elif arr.ndim == 3 and samples_per_pixel == 3:
         rows, cols, _ = arr.shape
         ds.PlanarConfiguration = 0
+        is_volume = False
     else:
         frames, rows, cols = arr.shape
         ds.NumberOfFrames = int(frames)
+        is_volume = True
+
+    apply_optional_instance_metadata(
+        ds,
+        instance,
+        is_volume=is_volume,
+        date_offset_days=date_offset_days,
+        deidentify=deidentify,
+    )
 
     ds.Rows = int(rows)
     ds.Columns = int(cols)
@@ -400,69 +625,75 @@ def build_dicom_dataset(
             ref.ReferencedSOPInstanceUID = ref_sop_instance_uid
             ds.ReferencedImageSequence.append(ref)
 
-    ds.is_little_endian = True
-    ds.is_implicit_VR = False
     ds.PixelData = arr.tobytes()
-    ds.ContentDate = shifted_now.strftime("%Y%m%d")
-    ds.ContentTime = shifted_now.strftime("%H%M%S")
+    now = datetime.now()
+    ds.ContentDate = now.strftime("%Y%m%d")
+    ds.ContentTime = now.strftime("%H%M%S")
     return ds
 
 
 def export_instance_to_dicom(
     instance: ImageInstance,
     output_dir: Path,
-    uid_registry: dict[int, tuple[str, str]],
+    uid_registry: dict[int, str],
     series_uid_registry: dict[int, str],
     study_uid_registry: dict[int, str],
     patient_id_map: dict[str, str] | None = None,
     patient_date_offset_map: dict[str, int] | None = None,
     filename_suffix: str | None = None,
     localizer_instances: list[ImageInstance] | None = None,
+    instance_number: int = 1,
+    study_date: date | None = None,
+    study_time: datetime | None = None,
+    deidentify: bool = False,
+    reuse_source_uids: bool = False,
 ) -> Path:
     pixel_array = instance.pixel_array
-    sop_class_uid, sop_instance_uid = uid_registry[instance.ImageInstanceID]
+    sop_instance_uid = uid_registry[instance.ImageInstanceID]
 
-    source_patient_id = instance.Patient.PatientIdentifier or "UNKNOWN"
-    patient_id_value = source_patient_id
-    if patient_id_map:
-        patient_id_value = patient_id_map.get(source_patient_id, patient_id_value)
+    _, patient_id_value = _resolved_patient_id(instance, patient_id_map)
 
     date_offset_days = 0
     if patient_date_offset_map:
+        source_patient_id = instance.Patient.PatientIdentifier or "UNKNOWN"
         date_offset_days = patient_date_offset_map.get(source_patient_id, 0)
 
     localizer_refs: list[tuple[str, str]] = []
     if localizer_instances:
         for loc in localizer_instances:
             if loc.ImageInstanceID not in uid_registry:
-                uid_registry[loc.ImageInstanceID] = (
-                    str(loc.SOPClassUid or SecondaryCaptureImageStorage),
-                    str(loc.SOPInstanceUid or generate_uid()),
-                )
-            localizer_refs.append(uid_registry[loc.ImageInstanceID])
+                source_sop = loc.SOPInstanceUid if reuse_source_uids else None
+                uid_registry[loc.ImageInstanceID] = str(source_sop or generate_uid())
+            localizer_refs.append(
+                (str(SecondaryCaptureImageStorage), uid_registry[loc.ImageInstanceID])
+            )
 
     ds = build_dicom_dataset(
         instance,
         pixel_array,
         sop_instance_uid=sop_instance_uid,
-        sop_class_uid=sop_class_uid,
         study_instance_uid=study_uid_registry[instance.Series.StudyID],
         series_instance_uid=series_uid_registry[instance.SeriesID],
         patient_id_value=patient_id_value,
         date_offset_days=date_offset_days,
         localizer_refs=localizer_refs,
+        instance_number=instance_number,
+        study_date=study_date,
+        study_time=study_time,
+        deidentify=deidentify,
     )
 
-    shifted_study_date = shift_date_value(instance.Study.StudyDate, date_offset_days)
+    if study_date is None:
+        study_date = shift_date_value(instance.Study.StudyDate, date_offset_days)
     suffix = filename_suffix or f"S{instance.ImageInstanceID:03d}"
     filename = build_export_filename(
         patient_id_value=patient_id_value,
-        study_date_value=shifted_study_date,
+        study_date_value=study_date,
         laterality_value=getattr(instance.Laterality, "value", None),
         suffix=suffix,
     )
     output_path = output_dir / filename
-    ds.save_as(str(output_path), write_like_original=False)
+    ds.save_as(str(output_path), enforce_file_format=True)
     return output_path
 
 
@@ -471,16 +702,17 @@ def export_instances_to_dicom(
     instances: list[ImageInstance],
     config: DicomExportConfig,
 ) -> DicomExportResult:
+    validate_export_config(config)
     config.output_dir.mkdir(parents=True, exist_ok=True)
 
-    keyfile_path = config.keyfile_path or (config.output_dir / "patient_id_keyfile.csv")
+    deidentifying = is_deidentifying(config)
+    keyfile_path = config.keyfile_path
     image_keyfile_path = config.image_keyfile_path or (
         config.output_dir / "image_filename_keyfile.csv"
     )
     exported_paths: list[Path] = []
-    filename_to_public_id: dict[str, str] = {}
+    image_keyfile_rows: list[tuple[str, str, str, str, str]] = []
     query_instances = list(instances)
-
 
     series_ids = sorted({im.SeriesID for im in query_instances})
     if series_ids:
@@ -510,7 +742,10 @@ def export_instances_to_dicom(
             instances_to_export_ids.add(loc.ImageInstanceID)
 
     instances_to_export = [by_id[iid] for iid in sorted(instances_to_export_ids) if iid in by_id]
-    uid_registry, series_uid_registry, study_uid_registry = build_uid_registry(instances_to_export)
+    uid_registry, series_uid_registry, study_uid_registry = build_uid_registry(
+        instances_to_export,
+        reuse_source_uids=config.reuse_source_uids,
+    )
 
     patient_id_map: Optional[dict[str, str]] = None
     if config.pseudonymize_patient_ids:
@@ -529,39 +764,35 @@ def export_instances_to_dicom(
             max_days=config.date_offset_max_days,
         )
 
-    if config.pseudonymize_patient_ids or config.offset_dates_per_patient:
+    if deidentifying:
+        if keyfile_path is None:
+            raise ValueError("keyfile_path is required when de-identifying")
         write_patient_keyfile(
             keyfile_path,
             patient_id_map=patient_id_map,
             date_offset_map=patient_date_offset_map,
         )
-    else:
-        keyfile_path = None
+
+    study_datetime_map = build_study_datetime_map(
+        instances_to_export,
+        patient_date_offset_map=patient_date_offset_map,
+    )
+    instance_number_map = build_instance_number_map(instances_to_export)
 
     filename_suffix_map: dict[int, str] = {}
     group_counters: dict[tuple[str, str], int] = {}
     for im in instances_to_export:
-        source_patient_id = im.Patient.PatientIdentifier or "UNKNOWN"
-        patient_id_value = source_patient_id
-        if patient_id_map:
-            patient_id_value = patient_id_map.get(source_patient_id, patient_id_value)
-
-        date_offset_days = 0
-        if patient_date_offset_map:
-            date_offset_days = patient_date_offset_map.get(source_patient_id, 0)
-
-        shifted_study_date = shift_date_value(im.Study.StudyDate, date_offset_days)
-        study_key = dt_to_dicom_date(shifted_study_date) or "UNKNOWNDATE"
+        _, patient_id_value = _resolved_patient_id(im, patient_id_map)
+        study_date, _ = study_datetime_map[im.Series.StudyID]
+        study_key = dt_to_dicom_date(study_date) or "UNKNOWNDATE"
         group_key = (patient_id_value, study_key)
         current = group_counters.get(group_key, 0) + 1
         group_counters[group_key] = current
         filename_suffix_map[im.ImageInstanceID] = f"S{current:03d}"
 
     for im in instances_to_export:
-        source_patient_id = im.Patient.PatientIdentifier or "UNKNOWN"
-        patient_id_value = source_patient_id
-        if patient_id_map:
-            patient_id_value = patient_id_map.get(source_patient_id, patient_id_value)
+        _, patient_id_value = _resolved_patient_id(im, patient_id_map)
+        study_date, study_time = study_datetime_map[im.Series.StudyID]
 
         target_output_dir = config.output_dir
         if config.export_per_patient_subdir:
@@ -580,19 +811,32 @@ def export_instances_to_dicom(
             patient_date_offset_map=patient_date_offset_map,
             filename_suffix=filename_suffix_map.get(im.ImageInstanceID),
             localizer_instances=localizers,
+            instance_number=instance_number_map.get(im.ImageInstanceID, 1),
+            study_date=study_date,
+            study_time=study_time,
+            deidentify=deidentifying,
+            reuse_source_uids=config.reuse_source_uids,
         )
         exported_paths.append(output_path)
         exported_key = str(output_path.relative_to(config.output_dir))
-        filename_to_public_id[exported_key] = im.PublicID
+        image_keyfile_rows.append(
+            (
+                exported_key,
+                im.PublicID,
+                uid_registry[im.ImageInstanceID],
+                series_uid_registry[im.SeriesID],
+                study_uid_registry[im.Series.StudyID],
+            )
+        )
 
     write_image_filename_keyfile(
         image_keyfile_path,
-        filename_to_public_id=filename_to_public_id,
+        rows=image_keyfile_rows,
     )
 
     return DicomExportResult(
         exported_paths=exported_paths,
-        keyfile_path=keyfile_path,
+        keyfile_path=keyfile_path if deidentifying else None,
         image_keyfile_path=image_keyfile_path,
         requested_count=len(query_instances),
         exported_count=len(exported_paths),
