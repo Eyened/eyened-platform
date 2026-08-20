@@ -16,6 +16,8 @@ from eyened_orm.utils.env import env_flag_enabled, load_env_file
 # access to the values within the .ini file in use.
 config = context.config
 
+injected_connection = config.attributes.get("connection", None)
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
@@ -58,9 +60,8 @@ no_prompt_cmds = {
     "show",
     "check",
     "list_templates",
-    "stamp",
 }
-if cmd not in no_prompt_cmds:
+if cmd not in no_prompt_cmds and injected_connection is None:
     confirm_target = (
         f"{db_settings.user}@{db_settings.host}:{db_settings.port}/{db_settings.database}"
     )
@@ -111,22 +112,27 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
 
-    with connectable.connect() as connection:
+    def _run(connection) -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
             render_item=render_optional_enum,
         )
-
         with context.begin_transaction():
             context.run_migrations()
+
+    if injected_connection is None:
+        connectable = engine_from_config(
+            config.get_section(config.config_ini_section, {}),
+            prefix="sqlalchemy.",
+            poolclass=pool.NullPool,
+        )
+        with connectable.connect() as connection:  # we own it
+            _run(connection)
+    else:
+        _run(injected_connection)  # borrowed -- do not close
 
 
 if context.is_offline_mode():
