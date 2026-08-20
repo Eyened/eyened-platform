@@ -36,12 +36,18 @@ noise with nothing to protect against.
 The backfill is deliberately plain DML in the ambient migration transaction,
 not wrapped in `context.get_context().autocommit_block()`. Both DDL
 statements below (CREATE TABLE, CREATE INDEX) run and implicitly commit
-before the INSERT is ever sent, so the only way this function can be
-re-entered by a re-run is if the process died before the INSERT's surrounding
-transaction committed -- in which case the INSERT was never durable and the
-table is empty again. That makes a bare `INSERT ... SELECT` safe without an
-`INSERT IGNORE` or a duplicate check: either it lands together with the
-alembic_version stamp in one commit, or it does not land at all.
+before the INSERT is ever sent, so a re-run can reach this INSERT with the
+table already created, indexed, and populated -- not only from a crash before
+the INSERT's own transaction committed, but from an operator recovery move
+(`alembic stamp <down_revision>` followed by `alembic upgrade head`) or a
+backup restored after the DDL committed. The INSERT is written as an
+anti-join against TaskProject itself (`LEFT JOIN ... WHERE tp.TaskID IS
+NULL`), so a row already present is simply not selected again; re-running it
+against a populated table inserts only what is still missing and is a no-op
+once the declaration is complete. `INSERT IGNORE` is deliberately not used
+instead: it would downgrade a foreign-key violation or truncation to a
+warning, silently dropping a row instead of failing loud -- exactly the
+failure a later task's equivalence gate depends on surfacing.
 """
 from typing import Sequence, Union
 
@@ -112,9 +118,17 @@ def upgrade() -> None:
     # this one is missing. That index is undeclarable in the ORM model and
     # undroppable in the database (ERROR 1553: "needed in a foreign key
     # constraint"), so confirm it exists under the name the model gives it.
+    #
+    # Raw SQL, not op.create_index: on a brand-new empty table the online-DDL
+    # clause is moot, but a re-run that finds the table already created and
+    # populated with only the index missing -- a crash between the two DDL
+    # statements -- would otherwise run CREATE INDEX against live rows with no
+    # assertion that it stays online, the same rule the sibling migration's
+    # ALTER TABLE statements follow.
     if not _index_exists(conn, "TaskProject", "ix_TaskProject_Project"):
-        op.create_index(
-            "ix_TaskProject_Project", "TaskProject", ["ProjectID"], unique=False
+        op.execute(
+            "CREATE INDEX ix_TaskProject_Project ON TaskProject (ProjectID), "
+            "ALGORITHM=INPLACE, LOCK=NONE"
         )
 
     # The declaration seeded from what each task currently derives: the set
@@ -127,6 +141,11 @@ def upgrade() -> None:
     # image still ties its project to the task, and excluding it would narrow
     # the declaration below what the (still-present) links require -- the
     # same reasoning as the walk this replaces.
+    #
+    # The trailing LEFT JOIN / WHERE ... IS NULL is an anti-join against
+    # TaskProject itself, not part of the derivation above: it is what makes
+    # a re-run against an already-populated table insert only the rows still
+    # missing instead of dying on a duplicate-key error.
     op.execute("""
         INSERT INTO TaskProject (TaskID, ProjectID)
         SELECT DISTINCT st.TaskID, p.ProjectID
@@ -136,6 +155,9 @@ def upgrade() -> None:
           JOIN Series se ON se.SeriesID = ii.SeriesID
           JOIN Study sy ON sy.StudyID = se.StudyID
           JOIN Patient p ON p.PatientID = sy.PatientID
+          LEFT JOIN TaskProject tp
+            ON tp.TaskID = st.TaskID AND tp.ProjectID = p.ProjectID
+        WHERE tp.TaskID IS NULL
     """)
 
 
