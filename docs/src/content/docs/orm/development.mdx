@@ -90,6 +90,10 @@ When committing migrations to production:
    **Check carefully**. Especially note that Alembic cannot detect changes in table and column names and will instead generate, e.g., a `drop_column` command followed by an `add_column` command. These should be changed into [`alter_column`](https://alembic.sqlalchemy.org/en/latest/ops.html#alembic.operations.Operations.alter_column) or [`rename_table`](https://alembic.sqlalchemy.org/en/latest/ops.html#alembic.operations.Operations.rename_table). See [here for limitations of Alembic auto-generation](https://alembic.sqlalchemy.org/en/latest/autogenerate.html#what-does-autogenerate-detect-and-what-does-it-not-detect).
    :::
 
+   :::caution
+   MySQL names a table's foreign keys `<table>_ibfk_N`, numbered per table in the order the constraints are attached — `orm_baseline` creates tables alphabetically, so a database built fresh from it numbers them differently than production, which numbered them in declaration order. `alembic check` is unaffected, since it compares foreign keys by signature (constrained columns, referred table, options), not by name. Never hard-code an `_ibfk_N` name in a migration: reflect it at runtime, or drop by column, as `orm/migrations/alembic/versions_archive/2026_07_30-restrict_tag_deletes.py` does.
+   :::
+
 6. Once you are satisfied with the migration file, run the migration on the test database:
    ```bash
    alembic upgrade head

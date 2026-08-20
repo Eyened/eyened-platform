@@ -8,14 +8,14 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 
 ## Rules
 
+- Run `alembic upgrade head` on your **current** checkout before deploying, never after.
 - Run every Alembic command from `orm/migrations`.
 - Put `-x env_file=` **before** the subcommand: `alembic -x env_file=/path/to/.env upgrade head`.
-- Take a full backup immediately before step 1. It is the only rollback path.
-- Run `alembic upgrade head` on your **current** checkout before deploying, never after.
+- Take a full backup immediately before step 1. It is the only rollback path — no backup, stop and contact `<contact>`.
 - Do not stamp before upgrading — it claims tables whose DDL the squash deleted. If you already have, stop and contact `<contact>`.
 - Do not run `Base.metadata.create_all()` to recover — it creates missing tables but silently skips missing columns, so it looks like it worked.
 - Do not stamp any revision earlier than `b2e2800000b2` — the next `upgrade head` replays `CREATE TABLE AuditLog` against an existing table.
-- `upgrade` and `stamp` both prompt `Proceed? [y/N]`; `current` and `check` never do. Run them interactively, or set `EYENED_ALEMBIC_ASSUME_YES=1` for that one command — without a TTY the prompt raises `EOFError` and the command silently does nothing.
+- `upgrade` and `stamp` both prompt naming the target database, then `Proceed? [y/N]` — your last check you're pointed at the right one; `current` and `check` never do. Run them interactively, or set `EYENED_ALEMBIC_ASSUME_YES=1` for that one command, which skips that check — without a TTY the prompt raises `EOFError` and the command silently does nothing.
 - Anything that does not match this document: stop before the next command and contact `<contact>`.
 
 ## Steps
@@ -25,8 +25,9 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 - Expect: exactly one revision id you recognise as this site's position.
 - Nothing, more than one, or an id you don't recognise: stop before step 1 and contact `<contact>`. Do not substitute `alembic check` — it errors on a behind-head database.
 
-**1. `alembic upgrade head`** — on your **current** checkout. Real DDL: back up first, inside a maintenance window.
+**1. `alembic upgrade head`** — on your **current** checkout. Real DDL: back up first, inside a maintenance window scoped to this step.
 
+- Creates `AuditLog` (plus indexes `ix_AuditLog_ActorID`, `ix_AuditLog_Timestamp`) and `ProjectMember`, adds `Creator.IsAdmin` then `Creator.Inactive`, and drops and recreates five tag foreign keys — `StudyTag`, `ImageInstanceTag`, `AnnotationTag`, `SegmentationTag`, `FormAnnotationTag` — as `ON DELETE RESTRICT`.
 - Expect: the upgrade completes.
 - Otherwise: do not re-run over the result (MySQL DDL is not transactional) — restore the backup and retry from clean.
 
@@ -49,8 +50,6 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 
 - Expect: `orm_baseline (head)` and a clean check — done.
 - Drift reported here is expected at a site carrying pre-existing schema differences: record it and contact `<contact>`, do not roll back.
-
-Step 1 creates `AuditLog` (plus indexes `ix_AuditLog_ActorID`, `ix_AuditLog_Timestamp`) and `ProjectMember`, adds `Creator.IsAdmin` then `Creator.Inactive`, and drops and recreates five tag foreign keys — `StudyTag`, `ImageInstanceTag`, `AnnotationTag`, `SegmentationTag`, `FormAnnotationTag` — as `ON DELETE RESTRICT`.
 
 ## Recovery and rollback
 
