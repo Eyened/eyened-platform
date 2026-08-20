@@ -32,5 +32,70 @@ jobs:
       - run: npm ci
       - run: npm run verify:runes # export-let guard (grep, instant)
       - run: npm run lint         # eslint . && prettier --check . (+ suppressions ratchet)
-      - run: npm run test         # vitest run
       - run: npm run build        # vite build (most expensive — last)
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Same reason as server-ci.yml: diff-cover diffs against
+          # origin/<base>, which depth 1 never fetches, and an absent compare
+          # branch raises ValueError (measured, diff-cover 10.5.1) rather than
+          # passing. The silent-green failure here is the SF: path trap below,
+          # not this one.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: client/.nvmrc   # node 24
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - run: npm run test:coverage
+
+      # Before the gate: a failing step ends the job, and the totals are wanted
+      # either way.
+      - name: Coverage totals
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const t = JSON.parse(readFileSync("coverage/coverage-summary.json", "utf8")).total;
+            const rows = ["lines", "statements", "functions", "branches"]
+              .map((k) => `| ${k} | ${t[k].pct}% | ${t[k].covered}/${t[k].total} |`)
+              .join("\n");
+            console.log(`### Client coverage (project total)\n\n| metric | % | covered / total |\n|---|--:|--:|\n${rows}`);
+          ' >> "$GITHUB_STEP_SUMMARY"
+
+      # These three exist only to serve the gate below, so they carry its
+      # condition too -- otherwise every push to main/development bootstraps a
+      # Python toolchain for a step that is skipped.
+      - uses: actions/setup-python@v6
+        if: github.event_name == 'pull_request'
+        with:
+          python-version: "3.12"
+      - run: pip install "diff-cover==10.*"   # keep in step with server/test-requirements.txt
+        if: github.event_name == 'pull_request'
+
+      # vitest writes SF: paths relative to client/; git records them from the
+      # repo root, and diff-cover reads SF: as git-root-relative. Without this
+      # rewrite it matches nothing and exits 0. A second file, so the original
+      # stays consumable by anything expecting vitest's own convention.
+      #
+      # The blind prepend assumes every SF: line is a bare client-relative path.
+      # That holds for vitest's v8 reporter (verified: 293/293 lines). If a future
+      # reporter emits absolute or already-prefixed paths, this would produce
+      # garbage paths and silently restore the very vacuous pass it prevents --
+      # so if you change the provider or reporter, re-run the check in the plan.
+      - run: sed 's|^SF:|SF:client/|' coverage/lcov.info > coverage/lcov-rootpaths.info
+        if: github.event_name == 'pull_request'
+
+      - name: Patch coverage (80% floor on changed lines)
+        if: github.event_name == 'pull_request'
+        run: |
+          status=0
+          diff-cover coverage/lcov-rootpaths.info \
+            --compare-branch=origin/${{ github.base_ref }} \
+            --fail-under=80 \
+            --format "markdown:diff-cover-client.md" || status=$?
+          cat diff-cover-client.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
