@@ -82,20 +82,28 @@ def _project_of(session: Session, obj: object, *, required: bool = True) -> int 
     looping, because this sits on the write path for every image.
 
     Args:
-        required: whether a dead end is an error. ``False`` at ``before_flush``,
-            where an ancestor may simply not have been inserted yet and the
-            ``before_insert`` backstop will get a second, better-informed try;
-            ``True`` there, at the last moment the value can still be set.
+        required: whether a *deferrable* dead end is an error. ``False`` at
+            ``before_flush``, where an ancestor may simply not have been
+            inserted yet and the ``before_insert`` backstop will get a second,
+            better-informed try; ``True`` at ``before_insert``, the last moment
+            the value can still be set. It does not govern a parent id that
+            reaches no row -- see ``Raises``.
 
     Returns:
-        The governing ``ProjectID``, or ``None`` when the walk dead-ends and
-        ``required`` is false.
+        The governing ``ProjectID``, or ``None`` when the walk dead-ends on an
+        ancestor that is merely pending and ``required`` is false.
 
     Raises:
-        ValueError: when ``required`` and neither route reaches a project,
-            naming the object and the hop that dead-ended. The composite
-            foreign keys are still the enforcement; this only makes the
-            ergonomic layer in front of them fail legibly.
+        ValueError: naming the object and the hop that dead-ended, when either
+
+            * a hop's id attribute is set and reaches no row. Raised whatever
+              ``required`` says, because no later moment will make that id
+              resolve, and deferring it only moves the failure past the
+              ancestors' INSERTs, where it arrives as ``PendingRollbackError``;
+            * or ``required`` and the walk dead-ends any other way.
+
+            The composite foreign keys are still the enforcement; this only
+            makes the ergonomic layer in front of them fail legibly.
     """
     refs = _parent_ref()
     start = obj
@@ -110,12 +118,19 @@ def _project_of(session: Session, obj: object, *, required: bool = True) -> int 
         parent = getattr(obj, attribute, None)
         if parent is None:
             parent_id = getattr(obj, id_attribute, None)
-            parent = (
-                None if parent_id is None else session.get(parent_class, parent_id)
-            )
+            if parent_id is None:
+                # The ancestor is merely pending -- no relationship, no id yet.
+                # That is the one dead end a later moment can still resolve.
+                if not required:
+                    return None
+            else:
+                parent = session.get(parent_class, parent_id)
         if parent is None:
-            if not required:
-                return None
+            # Reaching here with the id set means the id reaches no row.
+            # Nothing later will make it resolve, so it is raised whatever
+            # `required` says: deferring only moves the failure past the
+            # ancestors' INSERTs, where it surfaces as PendingRollbackError
+            # instead of as this message, before any SQL.
             raise ValueError(
                 f"cannot resolve ProjectID for {type(start).__name__}: "
                 f"{type(obj).__name__}.{attribute} is unset and "

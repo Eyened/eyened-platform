@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from sqlalchemy import literal, select
 
 from eyened_orm import ImageInstance, Patient, Project, Series, Study
 from eyened_orm.project import ExternalEnum
@@ -99,3 +100,22 @@ def test_an_unreachable_parent_names_the_hop_that_dead_ended(session):
     session.add(image)
     with pytest.raises(ValueError, match=r"ImageInstance.Series is unset"):
         session.flush()
+
+
+def test_a_parent_id_that_reaches_no_row_is_not_deferred(session):
+    """The dead end is raised at before_flush, so no INSERT is ever emitted."""
+    device = make_device(session, "d5")
+    image = ImageInstance(
+        SeriesID=9998,
+        PublicID="img-dead-parent",
+        DeviceInstanceID=device.DeviceInstanceID,
+        DatasetIdentifier="ds-dead-parent",
+        Rows_y=4,
+        Columns_x=4,
+    )
+    session.add(image)
+    with pytest.raises(ValueError, match=r"SeriesID=9998 reaches no Series row"):
+        session.flush()
+    # Deferring to before_insert would have raised mid-flush, after the
+    # ancestors' INSERTs, leaving the session in PendingRollbackError.
+    assert session.execute(select(literal(1))).scalar() == 1
