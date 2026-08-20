@@ -59,6 +59,47 @@ class TaskState(Enum):
     Archived = "Archived"
 
 
+class TaskProject(Base):
+    """The projects a task declares. Authoritative, not derived.
+
+    A task's images must lie within this set -- enforced by
+    ``SubTaskImageLink (TaskID, ProjectID) -> TaskProject``, not by
+    application code. Adding an image from an undeclared project is refused by
+    the database; removing an image never changes the declaration.
+
+    ``ondelete="RESTRICT"`` on ProjectID because deleting a project out from
+    under a task's declaration would silently widen who can see that task.
+    """
+
+    __tablename__ = "TaskProject"
+    __table_args__ = (
+        # Named explicitly because InnoDB requires an index on the referencing
+        # side of the ProjectID foreign key and will create one itself,
+        # called `ProjectID`, if we do not. That index is then undeclarable in
+        # the model and undroppable in the database (ERROR 1553: "needed in a
+        # foreign key constraint"), so every future `alembic revision
+        # --autogenerate` emits a remove_index for it, forever. Every other
+        # table in this schema names its FK index; this one was the exception.
+        Index("ix_TaskProject_Project", "ProjectID"),
+    )
+
+    TaskID: Mapped[int] = mapped_column(
+        ForeignKey("Task.TaskID", ondelete="CASCADE"), primary_key=True
+    )
+    ProjectID: Mapped[int] = mapped_column(
+        ForeignKey("Project.ProjectID", ondelete="RESTRICT"), primary_key=True
+    )
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # Needed to attach a declaration to a Task that is still pending: the
+    # importer and create_from_imagesets both build the Task and its
+    # declaration in one flush, and only the relationship can carry TaskID
+    # across an INSERT that has not happened yet.
+    Task: Mapped["Task"] = relationship(
+        "eyened_orm.task.Task", back_populates="TaskProjects"
+    )
+
+
 class Task(Base):
     __tablename__ = "Task"
     __table_args__ = (
@@ -94,6 +135,13 @@ class Task(Base):
     SubTasks: Mapped[List["SubTask"]] = relationship(
         "eyened_orm.task.SubTask",
         back_populates="Task",
+        passive_deletes=True,
+    )
+
+    TaskProjects: Mapped[List["TaskProject"]] = relationship(
+        "eyened_orm.task.TaskProject",
+        back_populates="Task",
+        cascade="all, delete-orphan",
         passive_deletes=True,
     )
 
