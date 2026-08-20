@@ -33,14 +33,12 @@ written to a table that has no rows and no readers yet (it does not exist
 until this same migration creates it) -- chunking machinery here would be
 noise with nothing to protect against.
 
-The backfill is deliberately plain DML in the ambient migration transaction,
-not wrapped in `context.get_context().autocommit_block()`. Both DDL
-statements below (CREATE TABLE, CREATE INDEX) run and implicitly commit
-before the INSERT is ever sent, so a re-run can reach this INSERT with the
-table already created, indexed, and populated -- not only from a crash before
-the INSERT's own transaction committed, but from an operator recovery move
-(`alembic stamp <down_revision>` followed by `alembic upgrade head`) or a
-backup restored after the DDL committed. The INSERT is written as an
+Both DDL statements below (CREATE TABLE, CREATE INDEX) run and implicitly
+commit before the INSERT is ever sent, so a re-run can reach this INSERT with
+the table already created, indexed, and populated -- not only from a crash
+before the INSERT's own transaction committed, but from an operator recovery
+move (`alembic stamp <down_revision>` followed by `alembic upgrade head`) or
+a backup restored after the DDL committed. The INSERT is written as an
 anti-join against TaskProject itself (`LEFT JOIN ... WHERE tp.TaskID IS
 NULL`), so a row already present is simply not selected again; re-running it
 against a populated table inserts only what is still missing and is a no-op
@@ -48,10 +46,14 @@ once the declaration is complete. `INSERT IGNORE` is deliberately not used
 instead: it would downgrade a foreign-key violation or truncation to a
 warning, silently dropping a row instead of failing loud -- exactly the
 failure a later task's equivalence gate depends on surfacing.
+
+The INSERT reads at READ COMMITTED from inside an autocommit block. Neither
+half of that pairing works without the other; the comment above the statement
+says what each one is holding up and what breaks when it is dropped.
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import context, op
 import sqlalchemy as sa
 from sqlalchemy.engine import Connection
 
@@ -151,19 +153,86 @@ def upgrade() -> None:
     # TaskProject itself, not part of the derivation above: it is what makes
     # a re-run against an already-populated table insert only the rows still
     # missing instead of dying on a duplicate-key error.
-    op.execute("""
-        INSERT INTO TaskProject (TaskID, ProjectID)
-        SELECT DISTINCT st.TaskID, p.ProjectID
-        FROM SubTask st
-          JOIN SubTaskImageLink sil ON sil.SubTaskID = st.SubTaskID
-          JOIN ImageInstance ii ON ii.ImageInstanceID = sil.ImageInstanceID
-          JOIN Series se ON se.SeriesID = ii.SeriesID
-          JOIN Study sy ON sy.StudyID = se.StudyID
-          JOIN Patient p ON p.PatientID = sy.PatientID
-          LEFT JOIN TaskProject tp
-            ON tp.TaskID = st.TaskID AND tp.ProjectID = p.ProjectID
-        WHERE tp.TaskID IS NULL
-    """)
+    # The INSERT ... SELECT below reads six tables it does not write. At
+    # REPEATABLE READ, MySQL takes a shared next-key lock on every source row
+    # it reads on the way to the rows it inserts -- 57k of them against
+    # production-sized data, with concurrent inserts into SubTaskImageLink and
+    # of new SubTasks stalling behind them for as long as the statement runs.
+    # What this seeds is a derivation, and a snapshot-consistent read of the
+    # sources buys it nothing worth blocking live writers for: READ COMMITTED
+    # reads the same rows and takes no locks on them at all.
+    #
+    # Reaching READ COMMITTED is the awkward part, and both halves of what
+    # follows are load-bearing.
+    #
+    # `SET SESSION transaction_isolation` only affects transactions that begin
+    # after it. Issued while one is already open, MySQL accepts it silently and
+    # the running transaction keeps the isolation it started with -- so it has
+    # to be issued with no transaction in progress. On a first run the DDL
+    # above has just implicitly committed and there is none; on a re-run the
+    # DDL is skipped, only the two information_schema probes have run, and they
+    # have left one open. A bare SET is therefore a fix that verifies green
+    # against a fresh database and silently takes the full lock footprint on
+    # the recovery path this migration was written to support.
+    #
+    # `autocommit_block()` is what guarantees no transaction is in progress: it
+    # commits alembic's transaction through alembic's own transaction object
+    # and switches the connection to AUTOCOMMIT, so the SET lands between
+    # transactions on both paths and the INSERT commits on its own. Committing
+    # the connection directly (`conn.commit()`) closes the transaction too, but
+    # it deactivates the object alembic is holding: everything after it
+    # autobegins a transaction alembic never commits, and the UPDATE of
+    # alembic_version is lost at connection close -- table created and seeded,
+    # revision never stamped.
+    #
+    # The block on its own is not enough either. AUTOCOMMIT changes transaction
+    # boundaries, not isolation: without the SET, the statement inside the
+    # block still runs at REPEATABLE READ and still takes every source lock.
+    #
+    # The isolation is then put back explicitly. Migrations later in the same
+    # `alembic upgrade` run share this connection -- on MySQL alembic gives
+    # each migration its own transaction, but not its own session -- and one
+    # left at READ COMMITTED would quietly change how they read. Leaving the
+    # block restores it as well, but only as a side effect of undoing
+    # AUTOCOMMIT; that is alembic's bookkeeping, not a promise about isolation,
+    # so the restore is stated here rather than inherited from it.
+    #
+    # This needs row-based binary logging, which is what this deployment runs.
+    # InnoDB cannot statement-log at READ COMMITTED, so under
+    # binlog_format=STATEMENT the INSERT fails with ERROR 1665 rather than
+    # logging something wrong.
+    with context.get_context().autocommit_block():
+        # The block swaps in a connection at AUTOCOMMIT isolation, so the bind
+        # has to be re-fetched here rather than reused from above.
+        block_conn = op.get_bind()
+        prior_isolation = block_conn.execute(
+            sa.text("SELECT @@SESSION.transaction_isolation")
+        ).scalar()
+        block_conn.execute(
+            sa.text("SET SESSION transaction_isolation = 'READ-COMMITTED'")
+        )
+        try:
+            op.execute("""
+                INSERT INTO TaskProject (TaskID, ProjectID)
+                SELECT DISTINCT st.TaskID, p.ProjectID
+                FROM SubTask st
+                  JOIN SubTaskImageLink sil ON sil.SubTaskID = st.SubTaskID
+                  JOIN ImageInstance ii ON ii.ImageInstanceID = sil.ImageInstanceID
+                  JOIN Series se ON se.SeriesID = ii.SeriesID
+                  JOIN Study sy ON sy.StudyID = se.StudyID
+                  JOIN Patient p ON p.PatientID = sy.PatientID
+                  LEFT JOIN TaskProject tp
+                    ON tp.TaskID = st.TaskID AND tp.ProjectID = p.ProjectID
+                WHERE tp.TaskID IS NULL
+            """)
+        finally:
+            # Read back rather than named literally, so this restores what the
+            # session was actually on and not what the server default is
+            # assumed to be.
+            block_conn.execute(
+                sa.text("SET SESSION transaction_isolation = :level"),
+                {"level": prior_isolation},
+            )
 
 
 def downgrade() -> None:
