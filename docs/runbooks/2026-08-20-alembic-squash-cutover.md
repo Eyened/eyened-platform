@@ -1,8 +1,16 @@
 # Alembic squash cutover — deploying `orm_baseline`
 
-**Contact:** `<contact>` — if anything you see while running this differs
-from what this document describes, stop before running anything else and
-reach out. Do not improvise a fix; several of the wrong ones look like they
+> **Before this document goes to any site: fill in the contact below.**
+> `<contact>` is a placeholder, not a value. This document tells the
+> operator to stop and reach out at several points where the wrong next
+> move destroys production data — do not let it ship with nobody named to
+> reach.
+
+**Contact:** `<contact>`
+
+If anything you see while running this differs from what this document
+describes, stop before running anything else and reach out to the contact
+above. Do not improvise a fix; several of the wrong ones look like they
 worked (see §4).
 
 Follow this once per site: the first time you deploy a release built on top
@@ -69,7 +77,11 @@ broken, and now it looks fixed.
 There is no self-service fix for "already stamped without upgrading first" in
 this document — it isn't one of the situations §7 (Recovery) or §8 (Rollback)
 covers. If you find yourself here, stop and contact us (see the top of this
-document) instead of reaching for `create_all()` or anything else clever.
+document) instead of reaching for `create_all()` or anything else clever. Do
+not run `alembic upgrade head` on the deployed checkout while you wait,
+either: that checkout has no legacy chain in it, only `orm_baseline`, so
+there is no missing DDL for it to walk your database through — running it
+cannot fix this, whatever the current state of `alembic_version` is.
 
 ## §5 — The steps, per site
 
@@ -91,13 +103,14 @@ without a TTY, the prompt raises `EOFError` and the stamp silently does not
 happen.
 
 **Take a full backup of the database immediately before step 1.** It is the
-only rollback path this procedure has (§8) — there is no other.
+only rollback path this procedure has (§8) — there is no other. If you have
+not taken one, stop and contact us before running step 1.
 
 | # | Command | Character |
 |---|---|---|
 | 0 | `alembic current` | precondition check — see below |
 | 1 | `alembic upgrade head` on the **current** checkout | real DDL — backup and window |
-| 2 | `alembic current` again | gate: must show the legacy head before deploying |
+| 2 | `alembic current` again | **gate: must print `b2e2800000b2` before deploying** |
 | 3 | deploy the release | — |
 | 4 | `alembic stamp orm_baseline` | one row, no DDL — prompts, see above |
 | 5 | `alembic current`, `alembic check` | clean = done |
@@ -111,12 +124,18 @@ don't recognise — stop before step 1 and contact us. Do not run
 (`CommandError: Target database is not up to date.`) before it produces any
 diff, so it cannot serve as a starting point at this step.
 
-**Step 2 is a gate, not a formality.** Compare its output to what step 1
-reported reaching. A partially-failed step 1 is possible and can go
-unnoticed; deploying on top of one walks straight into the trap §3 describes
-— once deployed, the checkout that could still run the missing DDL is gone.
-If step 2's output doesn't match what step 1 completed, or step 1 showed any
-error at all, stop before step 3 and contact us.
+**Step 2 is a gate, not a formality — state it as an assertion, not a
+comparison.** It must print exactly `b2e2800000b2`, the single legacy head:
+among the 24 revisions at `6c675e5`, it is the only one nothing lists as its
+`down_revision`, and it is the same constant at every site. Do not fall back
+on "compare it to what step 1 printed" — that reduces the gate to reading
+terminal scrollback, which fails the operator whose window has scrolled, or
+who skipped step 1 entirely, which is exactly the case this gate exists to
+catch. Anything other than `b2e2800000b2`, including nothing at all, means:
+stop before step 3 and contact us. A partially-failed step 1 is possible and
+can go unnoticed; deploying on top of one walks straight into the trap §3
+describes — once deployed, the checkout that could still run the missing
+DDL is gone.
 
 **Between step 3 and step 4, Alembic itself cannot resolve this database.**
 The deployed checkout contains only `orm_baseline`; the database is still
@@ -168,22 +187,42 @@ all 24 legacy revisions) into an environment with `eyened_orm` installed —
 `alembic upgrade head` from that checkout, then redeploy the release and run
 `alembic stamp orm_baseline` as normal.
 
-## §8 — Rollback
+## §8 — Rollback, split by what actually needs undoing
 
-**Rollback is restoring the backup taken before step 1. Nothing more
-clever.**
+A single blanket instruction is what made the earlier drafts of this section
+wrong — once by telling every rollback to restore the backup regardless of
+how much time had passed, which can destroy live clinical data written since
+cutover; once by forbidding *all* stamping as a way back, which also rules
+out the one stamp that is safe. Which of the three cases below applies
+depends on how far the cutover got.
 
-Do not stamp your way back. After a real step 1, the schema is at the legacy
-head. Stamping an earlier revision leaves Alembic believing migrations it has
-already applied are unapplied, so the next `alembic upgrade head` would try
-to replay `CREATE TABLE AuditLog` against a table that already exists —
-failing part-way through a production schema. Restoring the backup is the
-only route offered here because it returns the schema and the
-`alembic_version` row together, in one action, exactly as they were.
+**Code only, step 1 succeeded, before step 4.** Redeploy the previous
+release. The database is already at the legacy head (`b2e2800000b2`) —
+change nothing else.
 
-If only the *code* needs reverting and step 1 succeeded, that is not a
-rollback: redeploy the previous release and leave the database at the legacy
-head. Contact us before stamping anything.
+**Code only, step 1 succeeded, after step 4.** Redeploy the previous
+release, then run `alembic stamp b2e2800000b2` from that checkout. This is
+**exact and lossless**: after step 1 the schema genuinely is at the legacy
+head, so this stamp states a true fact rather than an earlier, false one.
+Skip it and the old checkout cannot resolve `orm_baseline` — every Alembic
+command run against it fails with §7's `Can't locate revision identified by
+'orm_baseline'`, in a situation §7 does not describe (that section is about
+deploying too early, not reverting after a completed cutover).
+
+**Step 1's own DDL must be undone.** Restore the backup taken before
+step 1 — **and only while the maintenance window is still open, before the
+new release has taken any writes.** Once it has taken writes, restoring the
+backup loses them. Past that point, contact us instead of restoring.
+
+Stamping `b2e2800000b2` above is **not** the rollback anchor returning. The
+anchor an earlier draft of this document used was a *per-site* value the
+operator had to record during step 0 and might not still have on hand hours
+later. `b2e2800000b2` is a constant, hardcoded here exactly like `6c675e5` —
+every site's legacy chain has the same single head, always. The prohibition
+that still holds is on stamping an **earlier** revision: that leaves Alembic
+believing already-applied migrations are unapplied, and the next
+`alembic upgrade head` would try to replay `CREATE TABLE AuditLog` against a
+table that already exists, failing part-way through a production schema.
 
 ## §9 — Expect `alembic check` to report drift after stamping
 
@@ -194,19 +233,30 @@ deployment because of it.
 
 ## §10 — Foreign-key constraint names now diverge, permanently and harmlessly
 
-Production keeps the `<table>_ibfk_N` numbers MySQL assigned as each foreign
-key was attached to a given table, over the life of the legacy chain — that
-numbering is **per table**, in attachment order, not related to which table
-was created first. `2026_07_30-restrict_tag_deletes.py` dropped and
-recreated the `TagID` foreign key on the five tables listed in §6, which
-moved each of those constraints to the end of its table's numbering. A
-database built fresh from `orm_baseline` creates every one of a table's
-foreign keys inside that table's single `CREATE TABLE` statement, in
-whatever order they're declared there — a different history, so a different
-number. `alembic check` compares foreign keys by signature (columns,
-referenced table, `ON DELETE` action), not by name, so it does not report
-this as drift. It is permanent — nothing will bring the numbering back in
-sync — and harmless.
+MySQL numbers a table's `<table>_ibfk_N` constraints **per table**, in the
+order the foreign keys are attached to that table — and only when no
+explicit name is supplied. Alembic renders each table's foreign keys sorted
+inside its `create_table` call, so a database built fresh from `orm_baseline`
+numbers them in that sorted order: `StudyTag`'s `CREATE TABLE` declares
+`CreatorID`, then `StudyID`, then `TagID`, so `TagID` becomes the third.
+Production's numbering instead follows the order the constraints were
+originally declared across the legacy chain, plus wherever a later migration
+added one — a different history, so a different number for the same
+foreign key.
+
+**Do not attribute this to `2026_07_30-restrict_tag_deletes.py`'s
+drop-and-recreate of the five tag foreign keys.** That migration discovers
+each constraint's existing name and passes it straight back into
+`op.create_foreign_key(name, ...)` — MySQL only auto-assigns a fresh
+`_ibfk_N` number when no name is supplied, so the number those five
+constraints already had is preserved, not moved. That migration is the
+*correct* example: discover the name, then reuse it, which is exactly the
+pattern §10's own rule below asks a future migration to follow.
+
+`alembic check` compares foreign keys by signature (columns, referenced
+table, `ON DELETE` action), not by name, so it does not report any of this
+as drift. It is permanent — nothing will bring the numbering back in sync —
+and harmless.
 
 The one rule this imposes going forward: a future hand-written migration must
 never hard-code an `_ibfk_N` name. A name that is correct against a fresh
@@ -222,3 +272,7 @@ error, or a state doesn't match what's written here — at any point, not only
 the ones that name it explicitly — stop before running the next command and
 contact `<contact>`. Guessing your way past a mismatch is how a recoverable
 situation becomes a destroyed schema.
+
+This deliberately repeats the notice at the top of this document rather than
+assuming one reading was enough. A procedure whose failure mode is a
+destroyed production schema is allowed to say "stop and ask" twice.
