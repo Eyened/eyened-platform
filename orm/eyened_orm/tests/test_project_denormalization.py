@@ -152,3 +152,32 @@ def test_a_pending_chain_reaches_study_and_series_at_insert_time(session):
     session.expunge_all()
     assert session.get(Study, study_id).ProjectID == project_id
     assert session.get(Series, series_id).ProjectID == project_id
+
+
+def test_link_from_a_raw_id_writer_inherits_task_and_project(session, spanning):
+    """add_link and the fixtures pass SubTaskID; the listener reads the row."""
+    from eyened_orm import SubTaskImageLink
+
+    fresh = session.get(
+        SubTaskImageLink,
+        {
+            "SubTaskID": spanning["subtasks"]["spanning-A"],
+            "ImageInstanceID": spanning["images"]["A"],
+        },
+    )
+    assert fresh.TaskID == spanning["task"]
+    assert fresh.ProjectID == spanning["projects"]["A"]
+
+
+def test_link_from_a_pending_task_inherits_task_and_project(session, spanning):
+    """create_from_imagesets: TaskID cannot be read, only synced by the FK."""
+    from eyened_orm import Task
+
+    task = Task.create_from_imagesets(
+        session, "def", "pending", imagesets=[[spanning["images"]["A"]]]
+    )
+    session.add(task)
+    session.flush()
+    link = task.SubTasks[0].SubTaskImageLinks[0]
+    assert link.TaskID == task.TaskID
+    assert link.ProjectID == spanning["projects"]["A"]

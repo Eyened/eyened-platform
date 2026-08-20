@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from eyened_orm import ImageInstance, Patient, Series, Study
+from eyened_orm import ImageInstance, Patient, Series, Study, TaskProject
 from eyened_orm.utils.factories import make_project
 
 # (table, primary key column) for each level that carries a derived ProjectID,
@@ -27,22 +27,43 @@ def _chain_of(session, image_id: int) -> dict[str, int]:
 
 
 def test_moving_a_patient_carries_its_whole_chain(session, spanning):
-    """ON UPDATE CASCADE down all four levels, so no copy can go stale."""
+    """ON UPDATE CASCADE down all five levels, so no copy can go stale.
+
+    Image A is linked by BOTH the spanning task and the a_only task, so both
+    must declare the destination before the move is legal. That is the design
+    working, not an inconvenience: a patient's project cannot move out from
+    under a task that has not agreed to it. Without those two declarations
+    this is `test_moving_a_patient_into_an_undeclared_project_is_refused`.
+    """
     other = make_project(session, "C")
+    # Captured before anything detaches `other`, per the suite's
+    # expire_on_commit=True convention.
+    other_id = other.ProjectID
+    for task_id in (spanning["task"], spanning["a_only"]):
+        session.add(TaskProject(TaskID=task_id, ProjectID=other_id))
+    session.flush()
+
     ids = _chain_of(session, spanning["images"]["A"])
-    session.get(Patient, ids["Patient"]).ProjectID = other.ProjectID
+    session.get(Patient, ids["Patient"]).ProjectID = other_id
     session.flush()
     session.expunge_all()
 
     # Asserted level by level rather than on the image alone: a cascade that
     # stops part way down then names the level it stopped at, instead of
     # reporting only that the deepest copy is stale.
-    assert session.get(Patient, ids["Patient"]).ProjectID == other.ProjectID
-    assert session.get(Study, ids["Study"]).ProjectID == other.ProjectID
-    assert session.get(Series, ids["Series"]).ProjectID == other.ProjectID
-    assert (
-        session.get(ImageInstance, ids["ImageInstance"]).ProjectID == other.ProjectID
-    )
+    assert session.get(Patient, ids["Patient"]).ProjectID == other_id
+    assert session.get(Study, ids["Study"]).ProjectID == other_id
+    assert session.get(Series, ids["Series"]).ProjectID == other_id
+    assert session.get(ImageInstance, ids["ImageInstance"]).ProjectID == other_id
+    # The fifth level: SubTaskImageLink carries its own copy, and only
+    # fk_SubTaskImageLink_Image_Project's ON UPDATE CASCADE keeps it in step.
+    assert session.execute(
+        text(
+            "SELECT DISTINCT ProjectID FROM SubTaskImageLink "
+            "WHERE ImageInstanceID = :id"
+        ),
+        {"id": ids["ImageInstance"]},
+    ).scalars().all() == [other_id]
 
 
 @pytest.mark.parametrize(("table", "pk_column"), _CHAIN)
@@ -106,3 +127,39 @@ def test_deleting_a_patient_still_takes_its_chain_with_it(session, spanning):
             text(f"SELECT COUNT(*) FROM {table} WHERE {pk_column} = :id"),
             {"id": kept[table]},
         ).scalar() == 1, f"{table} lost a row belonging to another Patient"
+
+
+def test_an_undeclared_image_cannot_be_linked(session, spanning):
+    """The whole design in one assertion."""
+    from eyened_orm import SubTaskImageLink
+
+    session.add(
+        SubTaskImageLink(
+            SubTaskID=spanning["subtasks"]["a_only-A"],
+            ImageInstanceID=spanning["images"]["B"],
+            ImageIndex=99,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        session.flush()
+
+
+def test_a_declaration_in_use_cannot_be_removed(session, spanning):
+    """Shrinking below what the links need would be fail-open."""
+    declared = session.get(
+        TaskProject,
+        {"TaskID": spanning["task"], "ProjectID": spanning["projects"]["A"]},
+    )
+    assert declared is not None, "Task 4 should have made the fixture declare this"
+    session.delete(declared)
+    with pytest.raises(IntegrityError):
+        session.flush()
+
+
+def test_moving_a_patient_into_an_undeclared_project_is_refused(session, spanning):
+    """The refusal fires at the far end of a four-level cascade."""
+    other = make_project(session, "C")
+    patient = session.get(ImageInstance, spanning["images"]["A"]).Series.Study.Patient
+    patient.ProjectID = other.ProjectID
+    with pytest.raises(IntegrityError):
+        session.flush()

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, ClassVar, List, Optional, Iterable
 from sqlalchemy import (
     JSON,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Text,
     String,
@@ -240,27 +241,67 @@ class Task(Base):
 
 
 class SubTaskImageLink(Base):
+    """An image inside a subtask, and the point where containment is enforced.
+
+    ``(TaskID, ProjectID)`` referencing ``TaskProject`` is what makes a task's
+    declaration binding: an image from a project the task has not declared
+    cannot be linked by any writer -- service, script, or raw SQL -- because
+    the database refuses the row.
+    """
+
     __tablename__ = "SubTaskImageLink"
     __table_args__ = (
-        Index("fk_SubTaskImageLink_SubTask1_idx", "SubTaskID"),
-        Index("fk_SubTaskImageLink_ImageInstance1_idx", "ImageInstanceID"),
+        # (ImageInstanceID, ProjectID) and (SubTaskID, TaskID) lead their
+        # indexes because each backs a foreign key.
+        #
+        # SubTaskID moves to third position in the first index, so it is no
+        # longer a two-column lookup for (image, subtask) the way the index
+        # this replaces was. That is fine rather than free: an equality on
+        # ImageInstanceID leaves a handful of rows, so the residual scan is
+        # not measurable. Do not describe it as covering the same lookups --
+        # it covers the same *queries*, by a slightly worse route.
         Index(
-            "ix_SubTaskImageLink_Image_SubTask",
-            "ImageInstanceID",
-            "SubTaskID",
+            "ix_SubTaskImageLink_Image_Project",
+            "ImageInstanceID", "ProjectID", "SubTaskID",
         ),
+        Index("ix_SubTaskImageLink_SubTask_Task", "SubTaskID", "TaskID"),
+        Index("ix_SubTaskImageLink_Task_Project", "TaskID", "ProjectID"),
         UniqueConstraint(
             "SubTaskID", "ImageIndex", name="uq_SubTaskImageLink_SubTask_ImageIndex"
         ),
+        ForeignKeyConstraint(
+            ["SubTaskID", "TaskID"],
+            ["SubTask.SubTaskID", "SubTask.TaskID"],
+            name="fk_SubTaskImageLink_SubTask_Task",
+            onupdate="CASCADE",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["ImageInstanceID", "ProjectID"],
+            ["ImageInstance.ImageInstanceID", "ImageInstance.ProjectID"],
+            name="fk_SubTaskImageLink_Image_Project",
+            onupdate="CASCADE",
+            ondelete="CASCADE",
+        ),
+        # No onupdate="CASCADE", deliberately: cascading it would let a change
+        # to TaskProject silently rewrite link rows. The point is that it
+        # refuses instead. No ondelete either, so a declaration cannot be
+        # removed out from under the links that rely on it.
+        ForeignKeyConstraint(
+            ["TaskID", "ProjectID"],
+            ["TaskProject.TaskID", "TaskProject.ProjectID"],
+            name="fk_SubTaskImageLink_TaskProject",
+        ),
     )
-    SubTaskID: Mapped[int] = mapped_column(
-        ForeignKey("SubTask.SubTaskID", ondelete="CASCADE"), primary_key=True
-    )
-    ImageInstanceID: Mapped[int] = mapped_column(
-        ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"),
-        primary_key=True,
-    )
+    SubTaskID: Mapped[int] = mapped_column(primary_key=True)
+    ImageInstanceID: Mapped[int] = mapped_column(primary_key=True)
     ImageIndex: Mapped[int]
+    # Denormalized from SubTask and ImageInstance respectively. Neither is a
+    # cache: the composite foreign keys above hold both equal to their source,
+    # and the pair (TaskID, ProjectID) is what the containment constraint
+    # checks against TaskProject.
+    TaskID: Mapped[int]
+    ProjectID: Mapped[int]
 
     SubTask: Mapped["SubTask"] = relationship(
         "eyened_orm.task.SubTask", back_populates="SubTaskImageLinks"
@@ -276,6 +317,10 @@ class SubTask(Base):
         Index("fk_SubTask_Creator1_idx", "CreatorID"),
         Index("fk_SubTask_Task1_idx", "TaskID"),
         Index("ix_SubTask_TaskState_Creator", "TaskState", "CreatorID"),
+        # Redundant as a uniqueness claim -- SubTaskID alone is the primary
+        # key -- but InnoDB will not let SubTaskImageLink's composite foreign
+        # key reference (SubTaskID, TaskID) unless that exact pair is a key.
+        UniqueConstraint("SubTaskID", "TaskID", name="uq_SubTask_SubTask_Task"),
     )
 
     SubTaskID: Mapped[int] = mapped_column(primary_key=True)

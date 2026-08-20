@@ -126,10 +126,17 @@ def test_a_grader_in_a_who_only_reads_b_cannot_add_an_image_from_b(
 
 
 def test_a_grader_in_both_can_add_an_image_from_either(client_scoped, spanning):
+    """A grader who holds both projects can add either into a task that declares both.
+
+    Posting into `a_only` (which declares A only) is now refused by
+    fk_SubTaskImageLink_TaskProject -- a different axis (containment) than the
+    role floor this test pins. Point it at `spanning` (declares A and B)
+    instead, so the only thing under test is the floor.
+    """
     client, set_scope = client_scoped
     set_scope(scope_for(*spanning["projects"].values(), role=ProjectRole.grader))
     resp = client.post(
-        f"/subtasks/{spanning['subtasks']['a_only-A']}/images",
+        f"/subtasks/{spanning['subtasks']['spanning-A']}/images",
         json={"instance_id": spanning["public_ids"]["B"]},
     )
     assert resp.status_code == 200

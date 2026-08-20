@@ -4,9 +4,10 @@
 SubTaskImageLink are each meant to carry a copy so that ``apply_scope`` is an
 indexed lookup rather than a five-hop walk, with each copy held equal to its
 parent by a composite foreign key (see the containment design, section 4.5).
-Study, Series and ImageInstance now have that foreign key. The two listeners
-here fill the column for the writers the constraint alone cannot serve, and
-they cover different ones:
+All four now have that foreign key; SubTaskImageLink carries a copy of TaskID
+under one as well, and is additionally held inside its task's declaration by a
+third. The two listeners here fill the columns for the writers the constraints
+alone cannot serve, and they cover different ones:
 
 * **This listener, at ``before_flush``**, for writers that assign a raw
   foreign-key *id*: ``Study(PatientID=...)`` in the test factories,
@@ -45,12 +46,20 @@ both and is caught by the constraint, which is the right way round.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 from sqlalchemy import event
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Mapper, Session, UOWTransaction, object_session
 
 from ..base import Base
+
+if TYPE_CHECKING:
+    # Deferred, not eager: importing ``..task`` at module scope closes the
+    # circular import through ``eyened_orm.__init__`` that ``_parent_ref``
+    # exists to dodge. ``from __future__ import annotations`` above means the
+    # annotation below is never evaluated at runtime.
+    from ..task import SubTaskImageLink
 
 __all__ = ["populate_project_id_on_insert", "populate_project_ids", "register"]
 
@@ -175,12 +184,19 @@ def populate_project_ids(
     from ..image_instance import ImageInstance
     from ..series import Series
     from ..study import Study
+    from ..task import SubTaskImageLink
 
     # This tuple and the columns move together: `obj.ProjectID` on a class that
     # does not carry the column is an AttributeError, not a None, and a class
     # that carries it but is left out here gets no value from any raw-id writer
     # and dies on NOT NULL.
     for obj in session.new:
+        # Checked first and `continue`d: a link has two columns to fill, and
+        # the shared `ProjectID is not None` guard below would skip one whose
+        # ProjectID is set but whose TaskID is not.
+        if isinstance(obj, SubTaskImageLink):
+            _populate_link(session, obj)
+            continue
         if not isinstance(obj, (Study, Series, ImageInstance)):
             continue
         if obj.ProjectID is not None:
@@ -188,6 +204,39 @@ def populate_project_ids(
         project_id = _project_of(session, obj, required=False)
         if project_id is not None:
             obj.ProjectID = project_id
+
+
+def _populate_link(session: Session, link: "SubTaskImageLink") -> None:
+    """Fill a link's TaskID and ProjectID, where they can be known yet.
+
+    ``TaskID`` is left alone when the parent SubTask is itself pending: its
+    own ``TaskID`` is not assigned until the Task's INSERT, so there is
+    nothing to copy. Foreign-key sync fills it during the flush instead --
+    which is the only mechanism that can, and the reason the columns and the
+    composite key ship together.
+
+    ``_project_of`` is called with its default ``required=True`` here, unlike
+    the caller above: ``image`` is always persistent, read either off the
+    relationship or by ``session.get``, so a dead end is a real error rather
+    than something a later moment resolves. That is also why this table gets
+    no ``before_insert`` backstop -- ``SubTaskRepository.add_link`` works from
+    a persistent ``ImageInstance``, so this pass alone suffices.
+    """
+    from ..image_instance import ImageInstance
+    from ..task import SubTask
+
+    if link.TaskID is None:
+        subtask = link.SubTask
+        if subtask is None and link.SubTaskID is not None:
+            subtask = session.get(SubTask, link.SubTaskID)
+        if subtask is not None and subtask.TaskID is not None:
+            link.TaskID = subtask.TaskID
+    if link.ProjectID is None:
+        image = link.ImageInstance
+        if image is None and link.ImageInstanceID is not None:
+            image = session.get(ImageInstance, link.ImageInstanceID)
+        if image is not None:
+            link.ProjectID = _project_of(session, image)
 
 
 def populate_project_id_on_insert(
