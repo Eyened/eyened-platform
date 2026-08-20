@@ -1,7 +1,14 @@
 import datetime
 from typing import TYPE_CHECKING, List, Optional, Set
 
-from sqlalchemy import ForeignKey, Index, String, func, select
+from sqlalchemy import (
+    ForeignKeyConstraint,
+    Index,
+    String,
+    UniqueConstraint,
+    func,
+    select,
+)
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
@@ -28,21 +35,45 @@ class Study(Base):
         Index("fk_Study_Patient1_idx", "PatientID"),
         Index("ix_Study_PatientID_StudyRound", "PatientID", "StudyRound"),
         Index("ix_Study_StudyRound_StudyDate", "StudyRound", "StudyDate"),
+        # The parent half of Series' composite foreign key -- see the
+        # equivalent on Patient.
+        UniqueConstraint("StudyID", "ProjectID", name="uq_Study_Study_Project"),
+        # Declared rather than left to InnoDB, which would otherwise create the
+        # referencing-side index itself under a generated name that no later
+        # migration can predict or drop.
+        Index("ix_Study_Patient_Project", "PatientID", "ProjectID"),
+        # This REPLACES the single-column FK that used to sit on PatientID; it
+        # is not added alongside it. Two foreign-key paths between Study and
+        # Patient make SQLAlchemy refuse to configure Study.Patient at all
+        # (AmbiguousForeignKeysError), and the replacement is also what makes
+        # the ORM copy ProjectID parent-to-child on flush.
+        #
+        # ondelete carried across from the key it replaces: Patient.Studies is
+        # passive_deletes=True, so SQLAlchemy deliberately leaves the cascade
+        # to the database. onupdate is new, and is what holds the denormalized
+        # copy equal to its parent when a patient moves project.
+        ForeignKeyConstraint(
+            ["PatientID", "ProjectID"],
+            ["Patient.PatientID", "Patient.ProjectID"],
+            name="fk_Study_Patient_Project",
+            onupdate="CASCADE",
+            ondelete="CASCADE",
+        ),
     )
 
     StudyID: Mapped[int] = mapped_column(primary_key=True)
-    PatientID: Mapped[int] = mapped_column(
-        ForeignKey("Patient.PatientID", ondelete="CASCADE")
-    )
+    # No column-level ForeignKey: the key on this column is the composite in
+    # __table_args__ above.
+    PatientID: Mapped[int]
     # The project that the study belongs to, denormalized from
-    # Patient.ProjectID. Populated by the before_flush and before_insert
-    # listeners in authz/denormalization.py -- see that module's docstring for
-    # which writer needs which.
+    # Patient.ProjectID and held equal to it by the composite foreign key
+    # above. Also populated by the before_flush listener in
+    # authz/denormalization.py, which covers the writers foreign-key sync
+    # never fires for -- see that module's docstring.
     #
-    # Deliberately no ForeignKey to Project here: the value is meant to be held
-    # equal to the parent Patient's own copy by a composite foreign key, and a
-    # second single-column FK straight to Project would let the two disagree
-    # about which project this study is in.
+    # Deliberately no ForeignKey to Project here: a second single-column FK
+    # straight to Project would let the two disagree about which project this
+    # study is in.
     ProjectID: Mapped[int]
     StudyRound: Mapped[Optional[int]]
     StudyDescription: Mapped[Optional[str]] = mapped_column(String(64))

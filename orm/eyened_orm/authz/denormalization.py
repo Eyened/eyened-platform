@@ -4,34 +4,40 @@
 SubTaskImageLink are each meant to carry a copy so that ``apply_scope`` is an
 indexed lookup rather than a five-hop walk, with each copy held equal to its
 parent by a composite foreign key (see the containment design, section 4.5).
-That foreign key does not exist yet -- ``ImageInstance.ProjectID`` today
-carries no foreign key at all, deliberately -- so two listeners fill the
-column instead, and they cover different writers:
+Study, Series and ImageInstance now have that foreign key. The two listeners
+here fill the column for the writers the constraint alone cannot serve, and
+they cover different ones:
 
 * **This listener, at ``before_flush``**, for writers that assign a raw
   foreign-key *id*: ``Study(PatientID=...)`` in the test factories,
   ``SubTaskRepository.add_link``. There the parent row is already persistent,
   so it can simply be read. ``before_flush`` is where querying the database is
   legal, so it resolves what it can and leaves the rest to the listener below.
-* **The ``before_insert`` listener**, the backstop for a hierarchy that was
-  still entirely pending at ``before_flush`` -- the importer's shape, where
-  nothing upstream had a primary key yet, so ``before_flush`` found no row to
-  read and left the column unset. By the time a child's INSERT is assembled,
-  the unit of work has already inserted its ancestors, so the same walk now
-  succeeds on in-memory attributes alone, with no query.
+  This pass is load-bearing permanently: foreign-key sync only ever copies a
+  *relationship's* columns, and a raw-id writer never sets one, so sync never
+  fires for that case. Measured with both listeners removed, a raw-id
+  ``Study(PatientID=...)`` dies on ``NOT NULL constraint failed:
+  Study.ProjectID``.
+* **The ``before_insert`` listener**, historically the backstop for a
+  hierarchy that was still entirely pending at ``before_flush`` -- the
+  importer's shape, where nothing upstream had a primary key yet.
 
-Neither listener is the enforcement. The foreign keys are what will guarantee
-the value is correct; these only spare each writer from having to know. Raw
-SQL bypasses both, and once the composite foreign keys land it will be caught
-by the constraint, which is the right way round.
+**The ``before_insert`` backstop is now a no-op, and is kept anyway.** Two
+independent mechanisms reach the same value before it runs: ``_project_of``
+walks the *object* graph, so the ``before_flush`` pass above already resolves
+a wholly-pending hierarchy from memory; and since the composite foreign keys
+landed, SQLAlchemy's own foreign-key sync copies ProjectID parent-to-child
+during the flush for any writer that assigns the relationship. Measured over
+the whole backend suite, the backstop fired 2204 times and set a value zero
+times; measured with both listeners stripped, foreign-key sync alone fills all
+three levels of the importer's shape. It is retained because deleting a
+redundant safety net is a decision in its own right -- one for whoever weighs
+it deliberately, with these numbers in hand -- and not something the task that
+made it redundant should do as tidying.
 
-Task 5 adds those composite foreign keys. From then on, SQLAlchemy's own
-foreign-key sync fills the column during the flush for any writer that
-assigns the *relationship* (the importer's shape), and the ``before_insert``
-backstop becomes a no-op. The ``before_flush`` pass here stays load-bearing
-permanently, though: foreign-key sync only ever copies a relationship's
-columns, and a raw-id writer never sets one, so sync never fires for that
-case.
+Neither listener is the enforcement. The foreign keys guarantee the value is
+correct; these only spare each writer from having to know. Raw SQL bypasses
+both and is caught by the constraint, which is the right way round.
 """
 from __future__ import annotations
 
@@ -186,6 +192,9 @@ def populate_project_id_on_insert(
     relationship walk runs entirely on loaded attributes. Modifying a
     column-based attribute here is the documented purpose of ``before_insert``
     and is picked up by the INSERT being assembled.
+
+    Retained but no longer reached with anything left to do -- see this
+    module's docstring for the measurement and for why it is kept.
     """
     if getattr(target, "ProjectID", None) is not None:
         return

@@ -17,7 +17,16 @@ import SimpleITK as sitk
 from PIL import Image
 from rtnls_fundusprep.cfi_bounds import CFIBounds
 from rtnls_fundusprep.transformation import ProjectiveTransform
-from sqlalchemy import event, ForeignKey, Index, String, func, select
+from sqlalchemy import (
+    event,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    String,
+    UniqueConstraint,
+    func,
+    select,
+)
 from sqlalchemy.dialects.mysql import BINARY, JSON, TEXT
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from sqlalchemy.types import CHAR
@@ -213,6 +222,27 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             "SOPInstanceUid",
             unique=True,
         ),
+        # Declared for symmetry with Study and Series, which each need theirs as
+        # the parent half of a child's composite key. Nothing references
+        # ImageInstance by (ImageInstanceID, ProjectID) yet; Task 6's key on
+        # SubTaskImageLink is what will.
+        UniqueConstraint(
+            "ImageInstanceID", "ProjectID", name="uq_ImageInstance_Image_Project"
+        ),
+        # Declared rather than left to InnoDB, which would otherwise create the
+        # referencing-side index itself under a generated name that no later
+        # migration can predict or drop. Additional to
+        # fk_ImageInstance_Series1_idx above, which indexes SeriesID alone.
+        Index("ix_ImageInstance_Series_Project", "SeriesID", "ProjectID"),
+        # This REPLACES the single-column FK that used to sit on SeriesID -- see
+        # the equivalent on Study for why it cannot be added alongside it.
+        ForeignKeyConstraint(
+            ["SeriesID", "ProjectID"],
+            ["Series.SeriesID", "Series.ProjectID"],
+            name="fk_ImageInstance_Series_Project",
+            onupdate="CASCADE",
+            ondelete="CASCADE",
+        ),
     )
     _name_column = "PublicID"
 
@@ -225,20 +255,19 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         nullable=False,
     )
 
-    # The series that the image belongs to
-    SeriesID: Mapped[int] = mapped_column(
-        ForeignKey("Series.SeriesID", ondelete="CASCADE")
-    )
+    # The series that the image belongs to. No column-level ForeignKey: the key
+    # on this column is the composite in __table_args__ above.
+    SeriesID: Mapped[int]
     # The project that the image belongs to, denormalized from Patient.ProjectID
     # so that authorization scoping is an indexed lookup rather than a five-hop
-    # join. Populated by the before_flush and before_insert listeners in
-    # authz/denormalization.py -- see that module's docstring for which writer
-    # needs which.
+    # join, and held equal to the parent Series' own copy by the composite
+    # foreign key above. Also populated by the before_flush listener in
+    # authz/denormalization.py, which covers the writers foreign-key sync never
+    # fires for -- see that module's docstring.
     #
-    # Deliberately no ForeignKey to Project here: the value is meant to be held
-    # equal to the parent Series' own copy by a composite foreign key, and a
-    # second single-column FK straight to Project would let the two disagree
-    # about which project this image is in.
+    # Deliberately no ForeignKey to Project here: a second single-column FK
+    # straight to Project would let the two disagree about which project this
+    # image is in.
     ProjectID: Mapped[int]
     # The source that the image belongs to (optional, not used by platform)
     SourceInfoID: Mapped[Optional[int]] = mapped_column(
