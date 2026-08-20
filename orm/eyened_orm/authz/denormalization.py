@@ -12,7 +12,10 @@ they cover different ones:
   foreign-key *id*: ``Study(PatientID=...)`` in the test factories,
   ``SubTaskRepository.add_link``. There the parent row is already persistent,
   so it can simply be read. ``before_flush`` is where querying the database is
-  legal, so it resolves what it can and leaves the rest to the listener below.
+  legal, which is why that read happens here. What it still cannot resolve it
+  leaves unset, and the flush that follows fills it -- by foreign-key sync,
+  not by the listener below, which the measurement further down shows has
+  never once been the thing that set the value.
   This pass is load-bearing permanently: foreign-key sync only ever copies a
   *relationship's* columns, and a raw-id writer never sets one, so sync never
   fires for that case. Measured with both listeners removed, a raw-id
@@ -28,7 +31,7 @@ walks the *object* graph, so the ``before_flush`` pass above already resolves
 a wholly-pending hierarchy from memory; and since the composite foreign keys
 landed, SQLAlchemy's own foreign-key sync copies ProjectID parent-to-child
 during the flush for any writer that assigns the relationship. Measured over
-the whole backend suite, the backstop fired 2204 times and set a value zero
+the whole backend suite, the backstop fired 2228 times and set a value zero
 times; measured with both listeners stripped, foreign-key sync alone fills all
 three levels of the importer's shape. It is retained because deleting a
 redundant safety net is a decision in its own right -- one for whoever weighs
@@ -162,8 +165,12 @@ def populate_project_ids(
 ) -> None:
     """Fill any unset derived ``ProjectID`` before the flush that writes it.
 
-    Anything still unresolvable here has an ancestor that is itself pending, so
-    it is left to ``populate_project_id_on_insert``.
+    Anything still unresolvable here has an ancestor that is itself pending,
+    and is deliberately left unset: the flush that follows copies the value
+    down parent-to-child by foreign-key sync. ``populate_project_id_on_insert``
+    runs later and would be the other candidate, but measured over the whole
+    backend suite it has never been the one that set the value -- see this
+    module's docstring for the numbers.
     """
     from ..image_instance import ImageInstance
     from ..series import Series
