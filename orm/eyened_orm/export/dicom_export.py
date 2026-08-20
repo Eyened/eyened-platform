@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import NamedTuple, Optional
 
 import numpy as np
 from pydicom.dataset import Dataset, FileDataset, FileMetaDataset
@@ -14,6 +15,7 @@ from pydicom.uid import (
     ExplicitVRLittleEndian,
     MultiFrameGrayscaleByteSecondaryCaptureImageStorage,
     MultiFrameGrayscaleWordSecondaryCaptureImageStorage,
+    MultiFrameTrueColorSecondaryCaptureImageStorage,
     SecondaryCaptureImageStorage,
     generate_uid,
 )
@@ -41,6 +43,7 @@ class DicomExportConfig:
     keyfile_path: Path | None = None
     image_keyfile_path: Path | None = None
     reuse_source_uids: bool = False
+    include_inactive: bool = False
 
 
 @dataclass(slots=True)
@@ -68,28 +71,42 @@ def dt_to_dicom_time(value) -> str:
     return ""
 
 
-def normalize_pixel_array(arr: np.ndarray) -> tuple[np.ndarray, int, int, int]:
+class NormalizedPixels(NamedTuple):
+    array: np.ndarray
+    samples_per_pixel: int
+    bits_allocated: int
+    pixel_representation: int
+    rescale_slope: float = 1.0
+    rescale_intercept: float = 0.0
+
+
+def normalize_pixel_array(arr: np.ndarray) -> NormalizedPixels:
     arr = np.asarray(arr)
-    if arr.ndim == 3 and arr.shape[-1] in (3, 4):
+    if arr.ndim >= 3 and arr.shape[-1] in (3, 4):
         arr = arr[..., :3]
         if arr.dtype != np.uint8:
             arr = np.clip(arr, 0, 255).astype(np.uint8)
-        return arr, 3, 8, 0
+        return NormalizedPixels(arr, 3, 8, 0)
 
     if arr.dtype == np.uint8:
-        return arr, 1, 8, 0
+        return NormalizedPixels(arr, 1, 8, 0)
     if arr.dtype == np.uint16:
-        return arr, 1, 16, 0
+        return NormalizedPixels(arr, 1, 16, 0)
 
     arr = arr.astype(np.float32)
-    arr_min = float(arr.min())
-    arr_max = float(arr.max())
+    arr_min = float(arr.min()) if arr.size else 0.0
+    arr_max = float(arr.max()) if arr.size else 0.0
     if arr_max > arr_min:
-        arr = (arr - arr_min) / (arr_max - arr_min)
+        scaled = (arr - arr_min) / (arr_max - arr_min)
+        slope = (arr_max - arr_min) / 65535.0
+        intercept = arr_min
     else:
-        arr = np.zeros_like(arr)
-    arr = (arr * 65535.0).astype(np.uint16)
-    return arr, 1, 16, 0
+        scaled = np.zeros_like(arr)
+        slope = 1.0
+        intercept = arr_min
+    return NormalizedPixels(
+        (scaled * 65535.0).astype(np.uint16), 1, 16, 0, slope, intercept
+    )
 
 
 def select_secondary_capture_sop_class(
@@ -97,6 +114,8 @@ def select_secondary_capture_sop_class(
     samples_per_pixel: int,
     bits_allocated: int,
 ) -> str:
+    if samples_per_pixel == 3 and arr.ndim == 4:
+        return str(MultiFrameTrueColorSecondaryCaptureImageStorage)
     is_volume = arr.ndim == 3 and samples_per_pixel == 1
     if is_volume:
         if bits_allocated > 8:
@@ -119,6 +138,8 @@ def _is_path_inside(path: Path, directory: Path) -> bool:
 
 def validate_export_config(config: DicomExportConfig) -> None:
     deidentifying = is_deidentifying(config)
+    if config.offset_dates_per_patient and not config.pseudonymize_patient_ids:
+        raise ValueError("offset_dates_per_patient requires pseudonymize_patient_ids")
     if config.reuse_source_uids and deidentifying:
         raise ValueError("reuse_source_uids cannot be combined with de-identification")
     if config.pseudonymize_patient_ids and not config.pseudonym_salt.strip():
@@ -130,12 +151,19 @@ def validate_export_config(config: DicomExportConfig) -> None:
             "keyfile_path is required when de-identifying; "
             "do not store the patient keyfile in output_dir"
         )
-    if (
-        deidentifying
-        and config.keyfile_path is not None
-        and _is_path_inside(config.keyfile_path, config.output_dir)
+    if deidentifying and config.image_keyfile_path is None:
+        raise ValueError(
+            "image_keyfile_path is required when de-identifying; "
+            "do not store the image keyfile in output_dir"
+        )
+    if config.keyfile_path is not None and _is_path_inside(
+        config.keyfile_path, config.output_dir
     ):
         raise ValueError("patient keyfile_path must be outside output_dir")
+    if config.image_keyfile_path is not None and _is_path_inside(
+        config.image_keyfile_path, config.output_dir
+    ):
+        raise ValueError("image_keyfile_path must be outside output_dir")
 
 
 def pseudonymize_patient_identifier(
@@ -193,6 +221,12 @@ def build_patient_date_offset_map(
     }
 
 
+def _open_restricted_csv(path: Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    return os.fdopen(fd, "w", newline="", encoding="utf-8")
+
+
 def write_patient_keyfile(
     path: Path,
     patient_id_map: dict[str, str] | None = None,
@@ -202,8 +236,7 @@ def write_patient_keyfile(
     date_offset_map = date_offset_map or {}
     all_patient_ids = sorted(set(patient_id_map) | set(date_offset_map))
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as f:
+    with _open_restricted_csv(path) as f:
         writer = csv.writer(f)
         writer.writerow(
             [
@@ -226,8 +259,7 @@ def write_image_filename_keyfile(
     path: Path,
     rows: list[tuple[str, str, str, str, str]],
 ) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as f:
+    with _open_restricted_csv(path) as f:
         writer = csv.writer(f)
         writer.writerow(
             [
@@ -388,8 +420,10 @@ def build_study_datetime_map(
     for study_id, members in grouped.items():
         source_patient_id = members[0].Patient.PatientIdentifier or "UNKNOWN"
         offset_days = 0
-        if patient_date_offset_map:
-            offset_days = patient_date_offset_map.get(source_patient_id, 0)
+        if patient_date_offset_map is not None:
+            offset_days = _require_mapped(
+                patient_date_offset_map, source_patient_id, "date offset"
+            )
 
         study_date = shift_date_value(members[0].Study.StudyDate, offset_days)
         acquisition_times = [
@@ -414,15 +448,20 @@ def build_instance_number_map(instances: list[ImageInstance]) -> dict[int, int]:
     return result
 
 
+def _require_mapped(mapping: dict, key, label: str):
+    if key not in mapping:
+        raise KeyError(f"missing {label} for {key!r}")
+    return mapping[key]
+
+
 def _resolved_patient_id(
     instance: ImageInstance,
     patient_id_map: dict[str, str] | None,
 ) -> tuple[str, str]:
     source_patient_id = instance.Patient.PatientIdentifier or "UNKNOWN"
-    patient_id_value = source_patient_id
-    if patient_id_map:
-        patient_id_value = patient_id_map.get(source_patient_id, patient_id_value)
-    return source_patient_id, patient_id_value
+    if patient_id_map is None:
+        return source_patient_id, source_patient_id
+    return source_patient_id, _require_mapped(patient_id_map, source_patient_id, "pseudonym")
 
 
 def series_description_for_instance(instance: ImageInstance) -> str:
@@ -472,12 +511,6 @@ def apply_optional_instance_metadata(
     ds.AccessionNumber = ""
     ds.PatientName = ds.get("PatientName", "")
 
-    study = instance.Study
-    if study.StudyDescription:
-        ds.StudyDescription = study.StudyDescription
-    if study.StudyRound is not None:
-        ds.StudyID = str(study.StudyRound)
-
     description = series_description_for_instance(instance)
     if description:
         ds.SeriesDescription = description
@@ -514,6 +547,12 @@ def apply_optional_instance_metadata(
     if serial and not deidentify:
         ds.DeviceSerialNumber = serial
 
+    if deidentify:
+        ds.PatientIdentityRemoved = "YES"
+        ds.DeidentificationMethod = (
+            "Patient IDs hashed; dates offset; UIDs replaced"
+        )
+
 
 def build_dicom_dataset(
     instance: ImageInstance,
@@ -529,9 +568,11 @@ def build_dicom_dataset(
     study_time: datetime | None = None,
     deidentify: bool = False,
 ) -> FileDataset:
-    arr, samples_per_pixel, bits_allocated, pixel_representation = normalize_pixel_array(
-        pixel_array
-    )
+    normalized = normalize_pixel_array(pixel_array)
+    arr = normalized.array
+    samples_per_pixel = normalized.samples_per_pixel
+    bits_allocated = normalized.bits_allocated
+    pixel_representation = normalized.pixel_representation
     sop_class_uid = select_secondary_capture_sop_class(
         arr, samples_per_pixel, bits_allocated
     )
@@ -585,22 +626,28 @@ def build_dicom_dataset(
         ds.Manufacturer = model.Manufacturer
         ds.ManufacturerModelName = model.ManufacturerModelName
 
-    ds.PhotometricInterpretation = (
-        "RGB" if samples_per_pixel == 3 else (instance.PhotometricInterpretation or "MONOCHROME2")
-    )
+    ds.PhotometricInterpretation = "RGB" if samples_per_pixel == 3 else "MONOCHROME2"
     ds.SamplesPerPixel = samples_per_pixel
+    ds.BurnedInAnnotation = "YES"
 
-    if arr.ndim == 2:
+    if samples_per_pixel == 3 and arr.ndim == 4:
+        frames, rows, cols, _ = arr.shape
+        ds.NumberOfFrames = int(frames)
+        ds.PlanarConfiguration = 0
+        is_volume = False
+    elif arr.ndim == 2:
         rows, cols = arr.shape
         is_volume = False
     elif arr.ndim == 3 and samples_per_pixel == 3:
         rows, cols, _ = arr.shape
         ds.PlanarConfiguration = 0
         is_volume = False
-    else:
+    elif arr.ndim == 3:
         frames, rows, cols = arr.shape
         ds.NumberOfFrames = int(frames)
         is_volume = True
+    else:
+        raise ValueError(f"unsupported pixel array shape {arr.shape}")
 
     apply_optional_instance_metadata(
         ds,
@@ -616,6 +663,16 @@ def build_dicom_dataset(
     ds.BitsStored = bits_allocated
     ds.HighBit = bits_allocated - 1
     ds.PixelRepresentation = pixel_representation
+
+    if samples_per_pixel == 1:
+        ds.RescaleIntercept = float(normalized.rescale_intercept)
+        ds.RescaleSlope = float(normalized.rescale_slope)
+        ds.RescaleType = "US"
+        ds.PresentationLUTShape = "IDENTITY"
+
+    if getattr(ds, "NumberOfFrames", None):
+        ds.FrameTime = 0.0
+        ds.FrameIncrementPointer = ds["FrameTime"].tag
 
     if localizer_refs:
         ds.ReferencedImageSequence = []
@@ -654,9 +711,11 @@ def export_instance_to_dicom(
     _, patient_id_value = _resolved_patient_id(instance, patient_id_map)
 
     date_offset_days = 0
-    if patient_date_offset_map:
+    if patient_date_offset_map is not None:
         source_patient_id = instance.Patient.PatientIdentifier or "UNKNOWN"
-        date_offset_days = patient_date_offset_map.get(source_patient_id, 0)
+        date_offset_days = _require_mapped(
+            patient_date_offset_map, source_patient_id, "date offset"
+        )
 
     localizer_refs: list[tuple[str, str]] = []
     if localizer_instances:
@@ -707,9 +766,11 @@ def export_instances_to_dicom(
 
     deidentifying = is_deidentifying(config)
     keyfile_path = config.keyfile_path
-    image_keyfile_path = config.image_keyfile_path or (
-        config.output_dir / "image_filename_keyfile.csv"
-    )
+    image_keyfile_path = config.image_keyfile_path
+    if image_keyfile_path is None:
+        image_keyfile_path = config.output_dir.resolve().parent / "image_filename_keyfile.csv"
+        if _is_path_inside(image_keyfile_path, config.output_dir):
+            raise ValueError("image_keyfile_path must be outside output_dir")
     exported_paths: list[Path] = []
     image_keyfile_rows: list[tuple[str, str, str, str, str]] = []
     query_instances = list(instances)
@@ -717,6 +778,8 @@ def export_instances_to_dicom(
     series_ids = sorted({im.SeriesID for im in query_instances})
     if series_ids:
         stmt_series = select(ImageInstance).where(ImageInstance.SeriesID.in_(series_ids))
+        if not config.include_inactive:
+            stmt_series = stmt_series.where(~ImageInstance.Inactive)
         all_series_instances = session.scalars(stmt_series).all()
     else:
         all_series_instances = list(query_instances)
@@ -790,49 +853,50 @@ def export_instances_to_dicom(
         group_counters[group_key] = current
         filename_suffix_map[im.ImageInstanceID] = f"S{current:03d}"
 
-    for im in instances_to_export:
-        _, patient_id_value = _resolved_patient_id(im, patient_id_map)
-        study_date, study_time = study_datetime_map[im.Series.StudyID]
+    try:
+        for im in instances_to_export:
+            _, patient_id_value = _resolved_patient_id(im, patient_id_map)
+            study_date, study_time = study_datetime_map[im.Series.StudyID]
 
-        target_output_dir = config.output_dir
-        if config.export_per_patient_subdir:
-            patient_dirname = safe_filename_component(patient_id_value)
-            target_output_dir = config.output_dir / patient_dirname
-            target_output_dir.mkdir(parents=True, exist_ok=True)
+            target_output_dir = config.output_dir
+            if config.export_per_patient_subdir:
+                patient_dirname = safe_filename_component(patient_id_value)
+                target_output_dir = config.output_dir / patient_dirname
+                target_output_dir.mkdir(parents=True, exist_ok=True)
 
-        localizers = localizer_map.get(im.ImageInstanceID, [])
-        output_path = export_instance_to_dicom(
-            im,
-            target_output_dir,
-            uid_registry=uid_registry,
-            series_uid_registry=series_uid_registry,
-            study_uid_registry=study_uid_registry,
-            patient_id_map=patient_id_map,
-            patient_date_offset_map=patient_date_offset_map,
-            filename_suffix=filename_suffix_map.get(im.ImageInstanceID),
-            localizer_instances=localizers,
-            instance_number=instance_number_map.get(im.ImageInstanceID, 1),
-            study_date=study_date,
-            study_time=study_time,
-            deidentify=deidentifying,
-            reuse_source_uids=config.reuse_source_uids,
-        )
-        exported_paths.append(output_path)
-        exported_key = str(output_path.relative_to(config.output_dir))
-        image_keyfile_rows.append(
-            (
-                exported_key,
-                im.PublicID,
-                uid_registry[im.ImageInstanceID],
-                series_uid_registry[im.SeriesID],
-                study_uid_registry[im.Series.StudyID],
+            localizers = localizer_map.get(im.ImageInstanceID, [])
+            output_path = export_instance_to_dicom(
+                im,
+                target_output_dir,
+                uid_registry=uid_registry,
+                series_uid_registry=series_uid_registry,
+                study_uid_registry=study_uid_registry,
+                patient_id_map=patient_id_map,
+                patient_date_offset_map=patient_date_offset_map,
+                filename_suffix=filename_suffix_map.get(im.ImageInstanceID),
+                localizer_instances=localizers,
+                instance_number=instance_number_map.get(im.ImageInstanceID, 1),
+                study_date=study_date,
+                study_time=study_time,
+                deidentify=deidentifying,
+                reuse_source_uids=config.reuse_source_uids,
             )
+            exported_paths.append(output_path)
+            exported_key = str(output_path.relative_to(config.output_dir))
+            image_keyfile_rows.append(
+                (
+                    exported_key,
+                    im.PublicID,
+                    uid_registry[im.ImageInstanceID],
+                    series_uid_registry[im.SeriesID],
+                    study_uid_registry[im.Series.StudyID],
+                )
+            )
+    finally:
+        write_image_filename_keyfile(
+            image_keyfile_path,
+            rows=image_keyfile_rows,
         )
-
-    write_image_filename_keyfile(
-        image_keyfile_path,
-        rows=image_keyfile_rows,
-    )
 
     return DicomExportResult(
         exported_paths=exported_paths,

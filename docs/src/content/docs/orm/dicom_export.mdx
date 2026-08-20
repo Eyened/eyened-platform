@@ -16,6 +16,7 @@ This is an interchange format, not a round-trip of the original acquisition. Fil
 ## Basic export
 
 ```python
+import os
 from pathlib import Path
 
 from sqlalchemy import select
@@ -45,10 +46,11 @@ with db.get_session() as session:
         DicomExportConfig(
             output_dir=output_dir,
             pseudonymize_patient_ids=True,
-            pseudonym_salt="replace-with-a-secret",
+            pseudonym_salt=os.environ["DICOM_EXPORT_PSEUDONYM_SALT"],
             offset_dates_per_patient=True,
-            date_offset_salt="another-secret",
+            date_offset_salt=os.environ["DICOM_EXPORT_DATE_OFFSET_SALT"],
             keyfile_path=keyfile_path,
+            image_keyfile_path=Path("/path/to/keep-local/image_filename_keyfile.csv"),
         ),
     )
 
@@ -56,40 +58,46 @@ print(f"Wrote {result.exported_count} files")
 print(result.image_keyfile_path)
 ```
 
-The patient keyfile must sit **outside** `output_dir` so it is not included in the share folder. The image keyfile defaults to `output_dir / image_filename_keyfile.csv`.
+Both keyfiles must sit **outside** `output_dir` so they are not included in the share folder.
 
 ## Configuration
 
 | Field | Default | Meaning |
 |-------|---------|---------|
-| `output_dir` | required | Directory for `.dcm` files (and the image keyfile unless overridden) |
+| `output_dir` | required | Directory for `.dcm` files only |
 | `export_per_patient_subdir` | `True` | One subdirectory per (possibly pseudonymized) patient ID |
 | `pseudonymize_patient_ids` | `False` | Replace `PatientID` with `prefix` + SHA-256 of `salt\|original_id` |
 | `pseudonym_salt` | `""` | Required and non-empty when pseudonymizing |
 | `pseudonym_prefix` | `"PID"` | Prefix for generated IDs |
-| `offset_dates_per_patient` | `False` | Shift study/acquisition/birth-related dates by a stable per-patient offset |
+| `offset_dates_per_patient` | `False` | Shift study and acquisition dates by a stable per-patient offset. Requires `pseudonymize_patient_ids` |
 | `date_offset_salt` | `""` | Required and non-empty when offsetting dates |
 | `date_offset_min_days` / `date_offset_max_days` | `-365` / `365` | Inclusive range for the offset |
 | `keyfile_path` | `None` | **Required** when de-identifying; must resolve **outside** `output_dir` |
-| `image_keyfile_path` | `output_dir / image_filename_keyfile.csv` | Filename → `PublicID` and new UIDs |
+| `image_keyfile_path` | parent of `output_dir` when not de-identifying; **required** when de-identifying | Filename → `PublicID` and new UIDs; must be **outside** `output_dir` |
 | `reuse_source_uids` | `False` | Reuse original Study/Series/SOP Instance UIDs. Cannot be combined with de-identification |
+| `include_inactive` | `False` | If true, series-expansion may pull inactive localizers |
 
 `DicomExportResult` reports `exported_paths`, `keyfile_path`, `image_keyfile_path`, `requested_count`, and `exported_count`. `exported_count` can be larger than `requested_count` when OCT localizers are pulled in.
 
 ## De-identification
 
-When either `pseudonymize_patient_ids` or `offset_dates_per_patient` is on:
+Date offset cannot be used without pseudonymizing IDs. When `pseudonymize_patient_ids` is on:
 
-- New Study, Series, and SOP Instance UIDs are minted (never the source UIDs)
-- `PatientBirthDate` is omitted
-- Device serial number is omitted
+- `PatientID` in the file, filename, and subdirectory is the pseudonym, never the source identifier
+- New Study, Series, and SOP Instance UIDs are minted
+- `PatientBirthDate` is omitted (not shifted)
+- Device serial is omitted
+- `PatientIdentityRemoved` / `DeidentificationMethod` are set
 - `ContentDate` / `ContentTime` are the real export timestamp (not shifted)
-- Each study gets one `StudyDate` / `StudyTime` (study date plus the earliest acquisition time in that study, then shifted)
-- Acquisition date/time on each instance is shifted by the same per-patient offset
+- Each study gets one `StudyDate` / `StudyTime` (study date plus the earliest acquisition time, then shifted if date offset is on)
 - `PatientSex` is still written
-- The patient keyfile maps original ID → pseudonym and date offset; keep it off the share
+- Both keyfiles must be outside `output_dir` (mode `0600`)
 
-Empty salts and a missing or in-share `keyfile_path` raise `ValueError`.
+Empty salts and a missing or in-share keyfile path raise `ValueError`.
+
+:::caution
+This is tag-level de-identification. Burned-in pixel text is not inspected; `BurnedInAnnotation` is set to `YES`.
+:::
 
 ## What is written
 
@@ -102,7 +110,6 @@ Every file is Secondary Capture (`ConversionType = WSD`, `ImageType = DERIVED\SE
 | Birth date (only if not de-identifying) | `PatientBirthDate` |
 | Study date / earliest acquisition | `StudyDate` / `StudyTime` |
 | `AcquisitionDateTime` | `AcquisitionDate` / `AcquisitionTime` |
-| Study description / round | `StudyDescription` / `StudyID` |
 | Scan mode, ETDRS field, disc/macula | `SeriesDescription` |
 | Laterality | `ImageLaterality` and `Laterality` |
 | `DICOMModality` (else `OP`) | `Modality` |
@@ -123,7 +130,7 @@ Filenames are `{patient}_{studyDate}_{laterality}_{Snnn}.dcm`. Instance numbers 
 
 ## OCT localizers
 
-For an OCT volume (`NrOfFrames > 1` and modality name containing `OCT`), the exporter also writes likely localizers from the same series (infrared, SLO, fundus, or DICOM modality `OP`). Prefer images that share a storage directory with the OCT; otherwise it falls back to those heuristics. The OCT file references the **new** localizer SOP Instance UID.
+For an OCT volume (`NrOfFrames > 1` and modality name containing `OCT`), the exporter also writes likely localizers from the same series (infrared, SLO, fundus, or DICOM modality `OP`). Inactive series-mates are skipped unless `include_inactive=True`. Prefer images that share a storage directory with the OCT; otherwise it falls back to those heuristics. The OCT file references the **new** localizer SOP Instance UID.
 
 ## Why Secondary Capture
 
@@ -145,4 +152,4 @@ Image keyfile (always written):
 exported_filename,image_public_id,sop_instance_uid,series_instance_uid,study_instance_uid
 ```
 
-`exported_filename` is relative to `output_dir`.
+`exported_filename` is relative to `output_dir`. Both files are created with mode `0600`. A later export to the same path **overwrites** the previous mapping; keep a copy if you need a historical ledger.

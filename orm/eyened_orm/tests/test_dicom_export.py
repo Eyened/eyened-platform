@@ -77,30 +77,56 @@ def _config(tmp_path: Path, **overrides) -> DicomExportConfig:
     return DicomExportConfig(**values)
 
 
+def _deid_config(tmp_path: Path, **overrides) -> DicomExportConfig:
+    values = {
+        "output_dir": tmp_path / "dicoms",
+        "export_per_patient_subdir": True,
+        "pseudonymize_patient_ids": True,
+        "pseudonym_salt": "test-pseudonym-salt",
+        "pseudonym_prefix": "PID",
+        "offset_dates_per_patient": True,
+        "date_offset_salt": "test-date-salt",
+        "date_offset_min_days": -30,
+        "date_offset_max_days": 30,
+        "keyfile_path": tmp_path / "patient_keys.csv",
+        "image_keyfile_path": tmp_path / "image_keys.csv",
+    }
+    values.update(overrides)
+    return DicomExportConfig(**values)
+
+
 def test_normalize_pixel_array_keeps_uint8_and_uint16():
     u8 = np.arange(6, dtype=np.uint8).reshape(2, 3)
-    out8, spp8, bits8, _ = normalize_pixel_array(u8)
+    out8, spp8, bits8, *_ = normalize_pixel_array(u8)
     assert out8.dtype == np.uint8
     assert spp8 == 1 and bits8 == 8
     np.testing.assert_array_equal(out8, u8)
 
     u16 = np.array([[0, 40000]], dtype=np.uint16)
-    out16, spp16, bits16, _ = normalize_pixel_array(u16)
+    out16, spp16, bits16, *_ = normalize_pixel_array(u16)
     assert out16.dtype == np.uint16
     assert spp16 == 1 and bits16 == 16
 
 
 def test_normalize_pixel_array_rgb_and_float():
     rgb = np.zeros((4, 5, 3), dtype=np.uint8)
-    out, spp, bits, _ = normalize_pixel_array(rgb)
+    out, spp, bits, *_ = normalize_pixel_array(rgb)
     assert out.shape == (4, 5, 3)
     assert spp == 3 and bits == 8
 
     floats = np.array([[0.0, 1.0], [0.5, 0.25]], dtype=np.float32)
-    out_f, spp_f, bits_f, _ = normalize_pixel_array(floats)
+    out_f, spp_f, bits_f, _, slope, intercept = normalize_pixel_array(floats)
     assert out_f.dtype == np.uint16
     assert spp_f == 1 and bits_f == 16
     assert out_f.max() == 65535
+    assert slope == pytest.approx(1.0 / 65535.0)
+    assert intercept == pytest.approx(0.0)
+
+    volume_rgb = np.zeros((3, 4, 5, 3), dtype=np.uint8)
+    out_v, spp_v, bits_v, *_ = normalize_pixel_array(volume_rgb)
+    assert out_v.shape == (3, 4, 5, 3)
+    assert spp_v == 3
+    assert select_secondary_capture_sop_class(out_v, 3, 8).endswith(".7.4")
 
 
 def test_select_secondary_capture_sop_class_2d_and_volume():
@@ -179,20 +205,35 @@ def test_series_description_includes_scan_mode_and_anatomy():
 
 def test_validate_export_config_requires_salt_and_keyfile(tmp_path):
     output_dir = tmp_path / "out"
+    validate_export_config(DicomExportConfig(output_dir=output_dir))
+    with pytest.raises(ValueError, match="requires pseudonymize_patient_ids"):
+        validate_export_config(
+            DicomExportConfig(
+                output_dir=output_dir,
+                offset_dates_per_patient=True,
+                date_offset_salt="abc",
+                keyfile_path=tmp_path / "keys.csv",
+                image_keyfile_path=tmp_path / "images.csv",
+            )
+        )
     with pytest.raises(ValueError, match="pseudonym_salt"):
         validate_export_config(
             DicomExportConfig(
                 output_dir=output_dir,
                 pseudonymize_patient_ids=True,
                 keyfile_path=tmp_path / "keys.csv",
+                image_keyfile_path=tmp_path / "images.csv",
             )
         )
     with pytest.raises(ValueError, match="date_offset_salt"):
         validate_export_config(
             DicomExportConfig(
                 output_dir=output_dir,
+                pseudonymize_patient_ids=True,
+                pseudonym_salt="abc",
                 offset_dates_per_patient=True,
                 keyfile_path=tmp_path / "keys.csv",
+                image_keyfile_path=tmp_path / "images.csv",
             )
         )
     with pytest.raises(ValueError, match="keyfile_path is required"):
@@ -203,13 +244,33 @@ def test_validate_export_config_requires_salt_and_keyfile(tmp_path):
                 pseudonym_salt="abc",
             )
         )
-    with pytest.raises(ValueError, match="outside output_dir"):
+    with pytest.raises(ValueError, match="image_keyfile_path is required"):
+        validate_export_config(
+            DicomExportConfig(
+                output_dir=output_dir,
+                pseudonymize_patient_ids=True,
+                pseudonym_salt="abc",
+                keyfile_path=tmp_path / "keys.csv",
+            )
+        )
+    with pytest.raises(ValueError, match="patient keyfile_path must be outside"):
         validate_export_config(
             DicomExportConfig(
                 output_dir=output_dir,
                 pseudonymize_patient_ids=True,
                 pseudonym_salt="abc",
                 keyfile_path=output_dir / "patient_id_keyfile.csv",
+                image_keyfile_path=tmp_path / "images.csv",
+            )
+        )
+    with pytest.raises(ValueError, match="image_keyfile_path must be outside"):
+        validate_export_config(
+            DicomExportConfig(
+                output_dir=output_dir,
+                pseudonymize_patient_ids=True,
+                pseudonym_salt="abc",
+                keyfile_path=tmp_path / "keys.csv",
+                image_keyfile_path=output_dir / "image_filename_keyfile.csv",
             )
         )
     with pytest.raises(ValueError, match="reuse_source_uids"):
@@ -217,9 +278,12 @@ def test_validate_export_config_requires_salt_and_keyfile(tmp_path):
             DicomExportConfig(
                 output_dir=output_dir,
                 reuse_source_uids=True,
+                pseudonymize_patient_ids=True,
+                pseudonym_salt="abc",
                 offset_dates_per_patient=True,
                 date_offset_salt="abc",
                 keyfile_path=tmp_path / "keys.csv",
+                image_keyfile_path=tmp_path / "images.csv",
             )
         )
 
@@ -269,7 +333,8 @@ def test_export_uses_secondary_capture_and_new_uids(session, tmp_path, monkeypat
     assert ds.Manufacturer == "Mf-dev-PAT-1"
     assert list(ds.ImageType) == ["DERIVED", "SECONDARY"]
     assert ds.AcquisitionDate == "20240315"
-    assert ds.AcquisitionTime == "083000"
+    assert ds.BurnedInAnnotation == "YES"
+    assert ds.PhotometricInterpretation == "MONOCHROME2"
 
 
 def test_export_instance_numbers_are_per_series(session, tmp_path, monkeypatch):
@@ -330,8 +395,8 @@ def test_export_writes_geometry_and_ophthalmic_metadata(session, tmp_path, monke
     result = export_instances_to_dicom(session, [img], _config(tmp_path))
     ds = pydicom.dcmread(result.exported_paths[0])
 
-    assert ds.StudyDescription == "follow-up"
-    assert ds.StudyID == "3"
+    assert "StudyDescription" not in ds
+    assert "StudyID" not in ds
     assert ds.SeriesDescription == "Volume F2 Macula"
     assert ds.Laterality == "R"
     assert [float(x) for x in ds.PixelSpacing] == pytest.approx([0.0039, 0.0119])
@@ -341,22 +406,24 @@ def test_export_writes_geometry_and_ophthalmic_metadata(session, tmp_path, monke
     assert ds.PupilDilated == "YES"
     assert ds.DeviceSerialNumber == "SN-42"
     assert ds.AcquisitionDate == "20240315"
+    assert ds.FrameIncrementPointer
+    assert float(ds.RescaleSlope) == pytest.approx(1.0)
 
     deid = export_instances_to_dicom(
         session,
         [img],
-        _config(
+        _deid_config(
             tmp_path / "deid",
-            offset_dates_per_patient=True,
-            date_offset_salt="meta-salt",
             date_offset_min_days=5,
             date_offset_max_days=5,
-            keyfile_path=tmp_path / "meta-keys.csv",
         ),
     )
     deid_ds = pydicom.dcmread(deid.exported_paths[0])
     assert "DeviceSerialNumber" not in deid_ds
+    assert "StudyDescription" not in deid_ds
     assert deid_ds.AcquisitionDate == "20240320"
+    assert deid_ds.PatientID != "meta"
+    assert deid_ds.PatientIdentityRemoved == "YES"
 
 
 def test_oct_localizer_reference_uses_new_sop_uid(session, tmp_path, monkeypatch):
@@ -430,6 +497,17 @@ def test_deid_requires_keyfile_outside_output_dir(session, tmp_path, monkeypatch
                 pseudonym_salt="secret",
             ),
         )
+    with pytest.raises(ValueError, match="image_keyfile_path is required"):
+        export_instances_to_dicom(
+            session,
+            [img],
+            DicomExportConfig(
+                output_dir=output_dir,
+                pseudonymize_patient_ids=True,
+                pseudonym_salt="secret",
+                keyfile_path=tmp_path / "keys.csv",
+            ),
+        )
 
 
 def test_deid_omits_birth_date_and_does_not_shift_content_date(
@@ -459,21 +537,25 @@ def test_deid_omits_birth_date_and_does_not_shift_content_date(
     result = export_instances_to_dicom(
         session,
         [img],
-        _config(
+        _deid_config(
             tmp_path,
-            offset_dates_per_patient=True,
-            date_offset_salt="offset-salt",
             date_offset_min_days=10,
             date_offset_max_days=10,
-            keyfile_path=tmp_path / "patient_keys.csv",
         ),
     )
     ds = pydicom.dcmread(result.exported_paths[0])
     assert ds.PatientBirthDate == ""
     assert ds.StudyDate == "20240325"
     assert ds.ContentDate == "20260818"
+    assert ds.PatientID != "PAT-1"
     assert result.keyfile_path == tmp_path / "patient_keys.csv"
     assert not str(result.keyfile_path).startswith(str(tmp_path / "dicoms"))
+    with result.keyfile_path.open(newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    assert rows[0]["original_patient_id"] == "PAT-1"
+    assert rows[0]["pseudonymized_patient_id"] == ds.PatientID
+    assert rows[0]["date_offset_days"] == "10"
+    assert (result.keyfile_path.stat().st_mode & 0o777) == 0o600
 
 
 def test_study_date_time_consistent_across_instances(session, tmp_path, monkeypatch):
@@ -516,6 +598,8 @@ def test_image_keyfile_includes_uids(session, tmp_path, monkeypatch):
         monkeypatch, {img.ImageInstanceID: np.zeros((4, 4), dtype=np.uint8)}
     )
     result = export_instances_to_dicom(session, [img], _config(tmp_path))
+    assert result.image_keyfile_path == tmp_path / "image_filename_keyfile.csv"
+    assert not str(result.image_keyfile_path).startswith(str(tmp_path / "dicoms"))
     with result.image_keyfile_path.open(newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     assert rows[0]["image_public_id"] == "img-key"
@@ -604,3 +688,118 @@ def test_fetch_instances_for_export_filters_inactive(session):
         session, project.ProjectName, limit=50, include_inactive=True
     )
     assert {im.PublicID for im in including_inactive} == {"active", "gone"}
+
+
+def _share_bytes(output_dir: Path) -> bytes:
+    chunks: list[bytes] = []
+    for path in sorted(output_dir.rglob("*")):
+        chunks.append(str(path.relative_to(output_dir)).encode("utf-8"))
+        if path.is_file():
+            chunks.append(path.read_bytes())
+    return b"\n".join(chunks)
+
+
+def test_deid_share_contains_no_source_identifiers(session, tmp_path, monkeypatch):
+    identifier = "PAT-SECRET-99"
+    backend, _, patient, _, series, device = _export_world(
+        session, identifier=identifier
+    )
+    device.SerialNumber = "SN-LEAK"
+    device.DeviceModel.Manufacturer = "Heidelberg"
+    device.DeviceModel.ManufacturerModelName = "Spectralis"
+    img = make_image(
+        session,
+        series,
+        device,
+        backend,
+        "img-secret",
+        Laterality=Laterality.L,
+        SOPInstanceUid="1.2.840.999999.1.9",
+        AcquisitionDateTime=datetime(2024, 3, 15, 9, 0, 0),
+        PhotometricInterpretation="PALETTE COLOR",
+    )
+    _patch_pixel_arrays(
+        monkeypatch, {img.ImageInstanceID: np.zeros((4, 4), dtype=np.uint8)}
+    )
+
+    result = export_instances_to_dicom(session, [img], _deid_config(tmp_path))
+    ds = pydicom.dcmread(result.exported_paths[0])
+    blob = _share_bytes(tmp_path / "dicoms")
+
+    assert identifier.encode() not in blob
+    assert b"19800520" not in blob
+    assert b"1.2.840.999999.1.9" not in blob
+    assert b"1.2.840.999999.1.1" not in blob
+    assert b"1.2.840.999999.1.2" not in blob
+    assert b"SN-LEAK" not in blob
+    assert ds.PatientID != identifier
+    assert ds.PatientIdentityRemoved == "YES"
+    assert ds.PhotometricInterpretation == "MONOCHROME2"
+    assert identifier not in str(result.exported_paths[0])
+    assert result.keyfile_path is not None
+    assert not str(result.keyfile_path).startswith(str(tmp_path / "dicoms"))
+    assert not str(result.image_keyfile_path).startswith(str(tmp_path / "dicoms"))
+
+    with result.keyfile_path.open(newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    assert rows[0]["original_patient_id"] == identifier
+    assert rows[0]["pseudonymized_patient_id"] == ds.PatientID
+    offset = int(rows[0]["date_offset_days"])
+    assert -30 <= offset <= 30
+    assert offset == patient_date_offset_days(
+        identifier, "test-date-salt", -30, 30
+    )
+
+
+def test_inactive_localizers_are_not_exported(session, tmp_path, monkeypatch):
+    backend, _, _, _, series, device = _export_world(session, identifier="inact")
+    oct_img = make_image(
+        session,
+        series,
+        device,
+        backend,
+        "oct-live",
+        Modality=Modality.OCT,
+        NrOfFrames=3,
+        Laterality=Laterality.L,
+    )
+    ir = make_image(
+        session,
+        series,
+        device,
+        backend,
+        "ir-retired",
+        Modality=Modality.InfraredReflectance,
+        DICOMModality=ModalityType.OP,
+        inactive=True,
+    )
+    oct_img.primary_storage.ObjectKey = "vol/oct.dcm"
+    ir.primary_storage.ObjectKey = "vol/ir.png"
+    session.flush()
+    _patch_pixel_arrays(
+        monkeypatch,
+        {
+            oct_img.ImageInstanceID: np.zeros((3, 8, 8), dtype=np.uint8),
+            ir.ImageInstanceID: np.zeros((8, 8), dtype=np.uint8),
+        },
+    )
+    result = export_instances_to_dicom(session, [oct_img], _config(tmp_path))
+    assert result.exported_count == 1
+
+
+def test_export_rgb_volume_does_not_crash(session, tmp_path, monkeypatch):
+    backend, _, _, _, series, device = _export_world(session, identifier="rgbvol")
+    img = make_image(
+        session, series, device, backend, "img-rgbvol", NrOfFrames=3
+    )
+    _patch_pixel_arrays(
+        monkeypatch,
+        {img.ImageInstanceID: np.zeros((3, 6, 7, 3), dtype=np.uint8)},
+    )
+    result = export_instances_to_dicom(session, [img], _config(tmp_path))
+    ds = pydicom.dcmread(result.exported_paths[0])
+    assert ds.NumberOfFrames == 3
+    assert ds.SamplesPerPixel == 3
+    assert ds.PhotometricInterpretation == "RGB"
+    assert ds.SOPClassUID.endswith(".7.4")
+    assert ds.FrameIncrementPointer
