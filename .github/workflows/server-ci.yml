@@ -52,6 +52,11 @@ jobs:
           pip install -r server/test-requirements.txt
       - run: pytest --cov --cov-report=xml --cov-report=term
 
+      # Alembic revision scripts under orm/migrations/ are DDL, not
+      # unit-testable logic -- excluded from the gate rather than from
+      # coverage.run, because the schema-sync job below applies them to a
+      # real mysql:8.0.27 and diffs the result against the models, which is a
+      # stronger check than line coverage.
       - name: Patch coverage (80% floor on changed lines)
         # base_ref is empty on push events, which would make --compare-branch
         # origin/ and fail every push to development.
@@ -61,6 +66,7 @@ jobs:
           diff-cover coverage.xml \
             --compare-branch=origin/${{ github.base_ref }} \
             --fail-under=80 \
+            --exclude "*/orm/migrations/*" \
             --format "markdown:diff-cover.md" || status=$?
           cat diff-cover.md >> "$GITHUB_STEP_SUMMARY"
           exit $status
