@@ -41,7 +41,7 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 
 - Expect: from here until step 4 completes, every Alembic command fails to resolve this database. That is expected — do not act on it.
 
-**4. `alembic stamp orm_baseline`** — one row, no DDL. Prompts.
+**4. `alembic stamp --purge orm_baseline`** — one row, no DDL; `--purge` is required, it skips resolving the id the squash removed from the map. Prompts.
 
 - Expect: the stamp completes.
 - Otherwise: stop and contact `<contact>`.
@@ -57,5 +57,5 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 |---|---|
 | Deployed before step 1 ran; every command fails with `Can't locate revision identified by '<id>'` | Nothing is damaged. Check out `6c675e5` into an environment with `eyened_orm` installed, run `alembic upgrade head`, redeploy, then run step 4. |
 | Roll back code only; step 1 succeeded; before step 4 | If already deployed, redeploy the previous release; if not, there is nothing to undo. Change nothing in the database. |
-| Roll back code only; step 1 succeeded; after step 4 | Redeploy the previous release, then `alembic stamp b2e2800000b2` from that checkout (it prompts). If you are not certain step 2 printed the head, do not stamp — contact `<contact>`. |
+| Roll back code only; step 1 succeeded; after step 4 | Redeploy the previous release, then `alembic stamp --purge b2e2800000b2` from that checkout (it prompts; `--purge` is required — the database holds `orm_baseline`, which that checkout's map doesn't contain). If you are not certain step 2 printed the head, do not stamp — contact `<contact>`. |
 | Step 1's own DDL must be undone | Redeploy the previous release **first**, then restore the pre-step-1 backup — only while the maintenance window is still open. Once the new release has taken writes, restoring loses them: contact `<contact>` instead. |

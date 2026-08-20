@@ -33,7 +33,7 @@ This release focuses on viewer persistence and enface overlays, a service-layer 
 
 ### Upgrade notes
 
-1. Run `alembic upgrade head` on your current checkout before deploying this release, then deploy, then run `alembic stamp orm_baseline`. This release squashes the Alembic history to a single baseline revision, so a database left behind head cannot be migrated afterwards — the revisions it still needs, including the one that added `AuditLog`, are no longer on the trail. Deploying first leaves Alembic unable to resolve your current revision. Full procedure: `docs/runbooks/2026-08-20-alembic-squash-cutover.md`.
+1. Run `alembic upgrade head` on your current checkout before deploying this release, then deploy, then run `alembic stamp --purge orm_baseline` (`--purge` is required — the squash drops the pre-cutover id from the revision map). This release squashes the Alembic history to a single baseline revision, so a database left behind head cannot be migrated afterwards — the revisions it still needs, including the one that added `AuditLog`, are no longer on the trail. Deploying first leaves Alembic unable to resolve your current revision. Full procedure: `docs/runbooks/2026-08-20-alembic-squash-cutover.md`.
 2. Reinstall `eyened_orm` after pulling.
 3. Use `eorm run-cfi-models` instead of the removed legacy CFI writers.
 4. Do not depend on `mysql-connector-python`.
