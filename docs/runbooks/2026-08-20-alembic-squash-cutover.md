@@ -15,7 +15,7 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 - Do not stamp before upgrading — it claims tables whose DDL the squash deleted. If you already have, stop and contact `<contact>`.
 - Do not run `Base.metadata.create_all()` to recover — it creates missing tables but silently skips missing columns, so it looks like it worked.
 - Do not stamp any revision earlier than `b2e2800000b2` — the next `upgrade head` replays `CREATE TABLE AuditLog` against an existing table.
-- `upgrade` and `stamp` both prompt naming the target database, then `Proceed? [y/N]` — your last check you're pointed at the right one; `current` and `check` never do. Run them interactively, or set `EYENED_ALEMBIC_ASSUME_YES=1` for that one command, which skips that check — without a TTY the prompt raises `EOFError` and the command silently does nothing.
+- `upgrade` and `stamp` both prompt naming the target database, then `Proceed? [y/N]` — your last check you're pointed at the right one; `current` and `check` never do. Run them interactively, or set `EYENED_ALEMBIC_ASSUME_YES=1` for that one command, which skips that check — without a TTY the prompt raises an uncaught `EOFError` and the command aborts with a traceback.
 - Anything that does not match this document: stop before the next command and contact `<contact>`.
 
 ## Steps
