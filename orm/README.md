@@ -32,7 +32,7 @@ This runs the Alembic migration trail to head. There is no separate
 table-creation step: `orm_baseline`, the root migration, creates the full
 schema.
 
-The database itself must already exist -- pass `--recreate` to drop and create
+The database itself must already exist — pass `--recreate` to drop and create
 it first.
 
 Preferred way to apply migrations:
