@@ -23,3 +23,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [Scoped segmentation counts walk four tables on the boot path](2026-08-13-segmentation-project-denormalization.md)
 - [`eorm create-user --is-human` can never be false](2026-08-13-create-user-cli-is-human-flag.md)
 - [`eorm create-user` writes no `AuditLog` row](2026-08-13-create-user-cli-no-audit-row.md)
+- [A large `IN` list makes MySQL abandon the range optimizer](2026-08-20-large-in-list-defeats-range-optimizer.md)
