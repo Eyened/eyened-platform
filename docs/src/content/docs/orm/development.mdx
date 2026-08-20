@@ -91,7 +91,7 @@ When committing migrations to production:
    :::
 
    :::caution
-   MySQL names a table's foreign keys `<table>_ibfk_N`, numbered per table in the order the constraints are attached — `orm_baseline` creates tables alphabetically, so a database built fresh from it numbers them differently than production, which numbered them in declaration order. `alembic check` is unaffected, since it compares foreign keys by signature (constrained columns, referred table, options), not by name. Never hard-code an `_ibfk_N` name in a migration: reflect it at runtime, or drop by column, as `orm/migrations/alembic/versions_archive/2026_07_30-restrict_tag_deletes.py` does.
+   MySQL names a table's foreign keys `<table>_ibfk_N`, numbered per table in the order the constraints are attached — `orm_baseline` creates tables alphabetically, so a database built fresh from it numbers them differently than production, which numbered them in declaration order. `alembic check` is unaffected, since it compares foreign keys by signature (constrained columns, referred table, options), not by name. Never hard-code an `_ibfk_N` name in a migration: reflect the live constraint and use the name you discover, as `orm/migrations/alembic/versions_archive/2026_07_30-restrict_tag_deletes.py` does, or drop by column.
    :::
 
 6. Once you are satisfied with the migration file, run the migration on the test database:

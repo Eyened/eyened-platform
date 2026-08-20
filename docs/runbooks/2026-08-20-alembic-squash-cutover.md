@@ -27,7 +27,7 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 
 **1. `alembic upgrade head`** — on your **current** checkout. Real DDL: back up first, inside a maintenance window scoped to this step.
 
-- Creates `AuditLog` (plus indexes `ix_AuditLog_ActorID`, `ix_AuditLog_Timestamp`) and `ProjectMember`, adds `Creator.IsAdmin` then `Creator.Inactive`, and drops and recreates five tag foreign keys — `StudyTag`, `ImageInstanceTag`, `AnnotationTag`, `SegmentationTag`, `FormAnnotationTag` — as `ON DELETE RESTRICT`.
+- Does: creates `AuditLog` (plus indexes `ix_AuditLog_ActorID`, `ix_AuditLog_Timestamp`) and `ProjectMember`, adds `Creator.IsAdmin` then `Creator.Inactive`, and drops and recreates five tag foreign keys — `StudyTag`, `ImageInstanceTag`, `AnnotationTag`, `SegmentationTag`, `FormAnnotationTag` — as `ON DELETE RESTRICT`.
 - Expect: the upgrade completes.
 - Otherwise: do not re-run over the result (MySQL DDL is not transactional) — restore the backup and retry from clean.
 
