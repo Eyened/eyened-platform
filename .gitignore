@@ -21,6 +21,7 @@ segmentations.zarr/
 .cursor/
 client/src/lib/extensions.ts
 venv
+<<<<<<< Updated upstream
 trash
 scratch.txt
 dev/.venv
@@ -40,3 +41,14 @@ client/coverage/
 # diff-cover writes its markdown report to the cwd, not into coverage/.
 diff-cover.md
 client/diff-cover-client.md
+=======
+trashMedSAM/*.pth
+MedSAM/*.pth
+MedSAM/*.pth
+*.pth
+.local/
+MedSAM/Medical-SAM2-main/
+>>>>>>> Stashed changes
+*.pth
+.local/
+MedSAM/Medical-SAM2-main/
