@@ -15,6 +15,7 @@ from pydicom.uid import (
 from eyened_orm.export.dicom_export import (
     DicomExportConfig,
     build_export_filename,
+    deidentification_method,
     export_instances_to_dicom,
     fetch_instances_for_export,
     normalize_pixel_array,
@@ -159,6 +160,16 @@ def test_pseudonym_and_date_offset_are_deterministic():
     assert offset == patient_date_offset_days("A", "salt", -10, 10)
     with pytest.raises(ValueError, match="date_offset_min_days"):
         patient_date_offset_days("A", "salt", 5, -1)
+
+
+def test_deidentification_method_matches_steps():
+    hashed_only = deidentification_method(dates_offset=False)
+    hashed_and_shifted = deidentification_method(dates_offset=True)
+    assert hashed_only == "Patient IDs hashed; UIDs replaced"
+    assert hashed_and_shifted == "Patient IDs hashed; dates offset; UIDs replaced"
+    assert "dates offset" not in hashed_only
+    assert len(hashed_only) <= 64
+    assert len(hashed_and_shifted) <= 64
 
 
 def test_build_export_filename_sanitizes_components():
@@ -424,6 +435,7 @@ def test_export_writes_geometry_and_ophthalmic_metadata(session, tmp_path, monke
     assert deid_ds.AcquisitionDate == "20240320"
     assert deid_ds.PatientID != "meta"
     assert deid_ds.PatientIdentityRemoved == "YES"
+    assert deid_ds.DeidentificationMethod == deidentification_method(dates_offset=True)
 
 
 def test_oct_localizer_reference_uses_new_sop_uid(session, tmp_path, monkeypatch):
@@ -548,6 +560,7 @@ def test_deid_omits_birth_date_and_does_not_shift_content_date(
     assert ds.StudyDate == "20240325"
     assert ds.ContentDate == "20260818"
     assert ds.PatientID != "PAT-1"
+    assert ds.DeidentificationMethod == deidentification_method(dates_offset=True)
     assert result.keyfile_path == tmp_path / "patient_keys.csv"
     assert not str(result.keyfile_path).startswith(str(tmp_path / "dicoms"))
     with result.keyfile_path.open(newline="", encoding="utf-8") as f:
@@ -556,6 +569,19 @@ def test_deid_omits_birth_date_and_does_not_shift_content_date(
     assert rows[0]["pseudonymized_patient_id"] == ds.PatientID
     assert rows[0]["date_offset_days"] == "10"
     assert (result.keyfile_path.stat().st_mode & 0o777) == 0o600
+
+    hash_only = export_instances_to_dicom(
+        session,
+        [img],
+        _deid_config(
+            tmp_path / "hash-only",
+            offset_dates_per_patient=False,
+        ),
+    )
+    hash_ds = pydicom.dcmread(hash_only.exported_paths[0])
+    assert hash_ds.StudyDate == "20240315"
+    assert hash_ds.DeidentificationMethod == deidentification_method(dates_offset=False)
+    assert "dates offset" not in hash_ds.DeidentificationMethod
 
 
 def test_study_date_time_consistent_across_instances(session, tmp_path, monkeypatch):

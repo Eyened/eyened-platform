@@ -46,9 +46,9 @@ with db.get_session() as session:
         DicomExportConfig(
             output_dir=output_dir,
             pseudonymize_patient_ids=True,
-            pseudonym_salt=os.environ["DICOM_EXPORT_PSEUDONYM_SALT"],
+            pseudonym_salt="replace-with-a-secret",
             offset_dates_per_patient=True,
-            date_offset_salt=os.environ["DICOM_EXPORT_DATE_OFFSET_SALT"],
+            date_offset_salt="another-secret",
             keyfile_path=keyfile_path,
             image_keyfile_path=Path("/path/to/keep-local/image_filename_keyfile.csv"),
         ),
@@ -86,7 +86,7 @@ Date offset cannot be used without pseudonymizing IDs. When `pseudonymize_patien
 - `PatientID` in the file, filename, and subdirectory is the pseudonym, never the source identifier
 - New Study, Series, and SOP Instance UIDs are minted
 - `PatientBirthDate` is omitted (not shifted)
-- Device serial is omitted
+- `StudyDescription` and device serial are omitted
 - `PatientIdentityRemoved` / `DeidentificationMethod` are set
 - `ContentDate` / `ContentTime` are the real export timestamp (not shifted)
 - Each study gets one `StudyDate` / `StudyTime` (study date plus the earliest acquisition time, then shifted if date offset is on)
@@ -110,6 +110,7 @@ Every file is Secondary Capture (`ConversionType = WSD`, `ImageType = DERIVED\SE
 | Birth date (only if not de-identifying) | `PatientBirthDate` |
 | Study date / earliest acquisition | `StudyDate` / `StudyTime` |
 | `AcquisitionDateTime` | `AcquisitionDate` / `AcquisitionTime` |
+| Study description / round | `StudyDescription` (omitted when de-identifying) / `StudyID` |
 | Scan mode, ETDRS field, disc/macula | `SeriesDescription` |
 | Laterality | `ImageLaterality` and `Laterality` |
 | `DICOMModality` (else `OP`) | `Modality` |

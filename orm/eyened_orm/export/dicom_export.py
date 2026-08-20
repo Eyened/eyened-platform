@@ -505,6 +505,7 @@ def apply_optional_instance_metadata(
     is_volume: bool,
     date_offset_days: int = 0,
     deidentify: bool = False,
+    dates_offset: bool = False,
 ) -> None:
     ds.SpecificCharacterSet = "ISO_IR 100"
     ds.ImageType = ["DERIVED", "SECONDARY"]
@@ -549,9 +550,17 @@ def apply_optional_instance_metadata(
 
     if deidentify:
         ds.PatientIdentityRemoved = "YES"
-        ds.DeidentificationMethod = (
-            "Patient IDs hashed; dates offset; UIDs replaced"
+        ds.DeidentificationMethod = deidentification_method(
+            dates_offset=dates_offset
         )
+
+
+def deidentification_method(*, dates_offset: bool) -> str:
+    parts = ["Patient IDs hashed"]
+    if dates_offset:
+        parts.append("dates offset")
+    parts.append("UIDs replaced")
+    return "; ".join(parts)
 
 
 def build_dicom_dataset(
@@ -567,6 +576,7 @@ def build_dicom_dataset(
     study_date: date | None = None,
     study_time: datetime | None = None,
     deidentify: bool = False,
+    dates_offset: bool = False,
 ) -> FileDataset:
     normalized = normalize_pixel_array(pixel_array)
     arr = normalized.array
@@ -655,6 +665,7 @@ def build_dicom_dataset(
         is_volume=is_volume,
         date_offset_days=date_offset_days,
         deidentify=deidentify,
+        dates_offset=dates_offset,
     )
 
     ds.Rows = int(rows)
@@ -740,6 +751,7 @@ def export_instance_to_dicom(
         study_date=study_date,
         study_time=study_time,
         deidentify=deidentify,
+        dates_offset=patient_date_offset_map is not None,
     )
 
     if study_date is None:
