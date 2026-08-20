@@ -17,7 +17,8 @@ on:
 
 # Neither job writes to the repository: `test` runs pytest and appends to
 # $GITHUB_STEP_SUMMARY (a file, not a token scope), and `schema-sync` only
-# reads the checkout. Pin read-only rather than inherit the repository default.
+# reads the checkout and a throwaway database service. Pin read-only rather
+# than inherit the repository default.
 permissions:
   contents: read
 
