@@ -74,3 +74,14 @@ View migration history:
 ```bash
 alembic history
 ```
+
+## versions_archive/
+
+The 24 revisions that predate `orm_baseline`. They are kept for history and are
+deliberately unreachable: `alembic.ini` leaves `version_locations` unset, so
+Alembic scans only `versions/`. They cannot build a database from empty — the
+old root was a stub whose declared parent had been deleted, and 27 of 44 tables
+were created by no migration at all.
+
+Do not move them back into `versions/`. Two roots make `upgrade head` walk both
+chains and fail.

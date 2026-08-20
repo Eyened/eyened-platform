@@ -15,7 +15,7 @@ The `eorm` CLI covers database setup, maintenance, and inference entry points. U
 
 ### initialize-database
 
-Creates tables on an empty database and stamps the current Alembic revision.
+Creates the database if it does not exist and runs the Alembic migration trail to head. There is no separate table-creation step: `orm_baseline`, the root migration, creates the full schema.
 
 ```bash
 eorm initialize-database [--seed-form-schemas] [--recreate]

@@ -122,13 +122,18 @@ This documentation overlaps with the README: https://github.com/Eyened/eyened-pl
    ```
    :::note
    alembic reads the environment for database credentials. 
-   you can pass an environemnt file like this to switch between production/development/test:
+   you can pass an environment file like this to switch between production/development/test:
    ```bash 
-   alembic -x env_file=/path/to/.env uograde head
+   alembic -x env_file=/path/to/.env upgrade head
    ```
    :::
 
-   This should always succeed. If there are issues with running the migration, it could be a bug or that other migrations have been applied in between. In this case, changing the `down_revision` might be necessary. Be careful!
+   This should always succeed. If it doesn't, the cause is either a genuine bug in the
+   migration or a database that was never brought to Alembic head before the history was
+   squashed to `orm_baseline`. Do not try to fix it by editing `down_revision` — the baseline
+   has `down_revision = None`, so there is nothing to point elsewhere, and changing it would
+   corrupt the chain rather than repair it. For a database stuck behind the squash, follow the
+   cutover runbook: `docs/runbooks/2026-08-20-alembic-squash-cutover.md`.
 
 ### What to Test
 

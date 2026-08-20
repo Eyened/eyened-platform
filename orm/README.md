@@ -24,6 +24,14 @@
 
 We use Alembic for database migrations.
 
+## Creating a fresh database
+
+    eorm initialize-database
+
+This creates the database if it does not exist and runs the Alembic migration
+trail to head. There is no separate table-creation step: `orm_baseline`, the
+root migration, creates the full schema.
+
 Preferred way to apply migrations:
 
 ```bash

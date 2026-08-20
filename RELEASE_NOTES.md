@@ -24,7 +24,13 @@ Viewer bookmarks and enface overlays, a service/repository layer with an append-
 
 ## Upgrade notes
 
-1. **Run database migrations** before starting the new server containers. This release adds `AuditLog`.
+1. **Run `alembic upgrade head` on your *current* checkout before deploying this
+   release**, then deploy, then run `alembic stamp orm_baseline`. This release
+   squashes the Alembic history to a single baseline revision, so a database left
+   behind head cannot be migrated afterwards — the revisions it still needs
+   (including the one adding `AuditLog`) are no longer on the trail. Deploying
+   first leaves Alembic unable to resolve your current revision. Full procedure:
+   `docs/runbooks/2026-08-20-alembic-squash-cutover.md`.
 2. **Reinstall `eyened_orm`** after pulling this release.
 3. Prefer **`eorm run-cfi-models`**; legacy CFI inference writers were removed.
 4. Do not depend on **`mysql-connector-python`**.
