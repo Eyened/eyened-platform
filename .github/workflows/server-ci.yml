@@ -64,3 +64,46 @@ jobs:
             --format "markdown:diff-cover.md" || status=$?
           cat diff-cover.md >> "$GITHUB_STEP_SUMMARY"
           exit $status
+
+  schema-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.0.27
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root
+          MYSQL_DATABASE: eyened_database
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+          --health-start-period=30s
+    env:
+      EYENED_DATABASE_USER: root
+      EYENED_DATABASE_PASSWORD: ci-root
+      EYENED_DATABASE_HOST: 127.0.0.1
+      EYENED_DATABASE_PORT: "3306"
+      EYENED_DATABASE_DATABASE: eyened_database
+      EYENED_ALEMBIC_ASSUME_YES: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: orm/setup.py
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e ./orm
+      # The service starts an empty eyened_database. Everything below has to
+      # come from the migration trail.
+      - name: Build the schema from empty
+        working-directory: orm/migrations
+        run: alembic upgrade head
+      - name: Assert models and migrations agree
+        working-directory: orm/migrations
+        run: alembic check
