@@ -126,9 +126,14 @@ def upgrade() -> None:
     # assertion that it stays online, the same rule the sibling migration's
     # ALTER TABLE statements follow.
     if not _index_exists(conn, "TaskProject", "ix_TaskProject_Project"):
+        # No commas before the clauses: those are ALTER TABLE syntax, where the
+        # statement is a comma-separated list of alter specifications. CREATE
+        # INDEX takes them space-separated, and the comma form is ERROR 1064 on
+        # 8.0.27 -- which would strand this migration with the table created
+        # and the index missing, since CREATE TABLE has already committed.
         op.execute(
-            "CREATE INDEX ix_TaskProject_Project ON TaskProject (ProjectID), "
-            "ALGORITHM=INPLACE, LOCK=NONE"
+            "CREATE INDEX ix_TaskProject_Project ON TaskProject (ProjectID) "
+            "ALGORITHM=INPLACE LOCK=NONE"
         )
 
     # The declaration seeded from what each task currently derives: the set
