@@ -114,10 +114,12 @@ def upgrade() -> None:
         # and the revision never stamped.
         with context.get_context().autocommit_block():
             # The block swaps in a connection at AUTOCOMMIT isolation, so the
-            # bind has to be re-fetched here rather than reused from above.
-            conn = op.get_bind()
-            lo = conn.execute(sa.text(f"SELECT MIN({pk}) FROM {table}")).scalar()
-            hi = conn.execute(sa.text(f"SELECT MAX({pk}) FROM {table}")).scalar()
+            # bind has to be re-fetched here rather than reused from above. It
+            # gets its own name so that `conn` above stays the one this loop
+            # uses for the next table, outside any block.
+            block_conn = op.get_bind()
+            lo = block_conn.execute(sa.text(f"SELECT MIN({pk}) FROM {table}")).scalar()
+            hi = block_conn.execute(sa.text(f"SELECT MAX({pk}) FROM {table}")).scalar()
             step = 20_000
             # MIN/MAX are read once and the ADD COLUMN ran LOCK=NONE, so rows
             # inserted while this loop runs -- by code that does not yet carry
@@ -143,7 +145,7 @@ def upgrade() -> None:
                 # done while rows were still landing inside it, and `lo` would
                 # step over them.
                 chunk_hi = min(lo + step - 1, hi)
-                conn.execute(
+                block_conn.execute(
                     sa.text(
                         f"UPDATE {table} t {parent_join} "
                         "SET t.ProjectID = p.ProjectID "
@@ -154,7 +156,7 @@ def upgrade() -> None:
                 lo = chunk_hi + 1
                 if lo > hi and catchups_left:
                     catchups_left -= 1
-                    hi = conn.execute(
+                    hi = block_conn.execute(
                         sa.text(f"SELECT MAX({pk}) FROM {table}")
                     ).scalar()
         op.execute(
@@ -164,8 +166,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Guarded for the same reason the ADD COLUMN above is: DDL commits
+    # implicitly, so dropping Series' column and then failing on Study's leaves
+    # a half-reverted schema, and an unguarded re-run dies on the column that
+    # is already gone.
+    conn = op.get_bind()
     for table in ("Series", "Study"):
-        op.execute(
-            f"ALTER TABLE {table} DROP COLUMN ProjectID, "
-            "ALGORITHM=INPLACE, LOCK=NONE"
-        )
+        if _column_exists(conn, table, "ProjectID"):
+            op.execute(
+                f"ALTER TABLE {table} DROP COLUMN ProjectID, "
+                "ALGORITHM=INPLACE, LOCK=NONE"
+            )
