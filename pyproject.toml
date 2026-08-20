@@ -41,7 +41,10 @@ testpaths = [
 # missing top-level name that is not repo code, which direction 1 treats as
 # an absent third-party package and accepts. The guard would reject the
 # omission only in a shell that happens to have orm/ on sys.path (e.g. a
-# local `PYTHONPATH=$PWD/orm` run), which is not CI's condition. Verified by
+# local `PYTHONPATH=$PWD/orm` run), which is not CI's condition. A
+# `*/orm/migrations/*` spelling instead fails the guard's own
+# `not glob.startswith("*")` check (test_coverage_omissions.py:96) before
+# direction 1 ever runs an import, in every environment. Verified by
 # replaying direction 1 against every file under orm/migrations/ both ways.
 source = ["server", "orm"]
 omit = [
