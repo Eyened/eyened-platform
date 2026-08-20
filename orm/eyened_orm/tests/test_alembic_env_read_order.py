@@ -62,6 +62,13 @@ def _keyword_is_true(call: ast.Call, name: str) -> bool:
     )
 
 
+def _keyword_is_name(call: ast.Call, name: str, value: str) -> bool:
+    return any(
+        kw.arg == name and isinstance(kw.value, ast.Name) and kw.value.id == value
+        for kw in call.keywords
+    )
+
+
 def test_assume_yes_is_read_from_the_environment_above_load_env_file():
     """load_env_file is load_dotenv(override=True), so a later read is bypassable."""
     tree = _module_ast()
@@ -114,7 +121,8 @@ def test_the_confirmation_prompt_still_exists():
 def test_online_configure_passes_render_item():
     """A correct renderer that nothing calls is worth nothing."""
     call = _configure_call(_module_ast(), "run_migrations_online")
-    assert any(kw.arg == "render_item" for kw in call.keywords), (
-        "run_migrations_online()'s context.configure(...) does not pass render_item; "
-        "OptionalEnum columns would autogenerate as code that cannot run"
+    assert _keyword_is_name(call, "render_item", "render_optional_enum"), (
+        "run_migrations_online()'s context.configure(...) does not pass "
+        "render_item=render_optional_enum; OptionalEnum columns would autogenerate as "
+        "code that cannot run"
     )
