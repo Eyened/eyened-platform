@@ -91,7 +91,7 @@ _register_rbac_commands()
 
 
 @eorm.command()
-@click.option("--recreate", is_flag=True, default=False, help="Drop and create the database before creating the models")
+@click.option("--recreate", is_flag=True, default=False, help="Drop and recreate the database before running the migrations")
 @click.option(
     "--seed-form-schemas",
     is_flag=True,
