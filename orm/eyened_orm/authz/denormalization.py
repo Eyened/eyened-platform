@@ -160,13 +160,15 @@ def populate_project_ids(
     it is left to ``populate_project_id_on_insert``.
     """
     from ..image_instance import ImageInstance
+    from ..series import Series
+    from ..study import Study
 
-    # Only ImageInstance carries the column at this point. Task 2 adds Study
-    # and Series to this tuple along with their columns -- the two must move
-    # together, because `obj.ProjectID` on a class that has no such column is
-    # an AttributeError, not a None.
+    # This tuple and the columns move together: `obj.ProjectID` on a class that
+    # does not carry the column is an AttributeError, not a None, and a class
+    # that carries it but is left out here gets no value from any raw-id writer
+    # and dies on NOT NULL.
     for obj in session.new:
-        if not isinstance(obj, ImageInstance):
+        if not isinstance(obj, (Study, Series, ImageInstance)):
             continue
         if obj.ProjectID is not None:
             continue
@@ -191,10 +193,16 @@ def populate_project_id_on_insert(
 
 
 def register() -> None:
-    """Attach the listeners to every Session and to ImageInstance. Idempotent."""
+    """Attach the listeners to every Session and to every carrier class.
+
+    The carriers are Study, Series and ImageInstance. Idempotent.
+    """
     from ..image_instance import ImageInstance
+    from ..series import Series
+    from ..study import Study
 
     if not event.contains(Session, "before_flush", populate_project_ids):
         event.listen(Session, "before_flush", populate_project_ids)
-    if not event.contains(ImageInstance, "before_insert", populate_project_id_on_insert):
-        event.listen(ImageInstance, "before_insert", populate_project_id_on_insert)
+    for cls in (Study, Series, ImageInstance):
+        if not event.contains(cls, "before_insert", populate_project_id_on_insert):
+            event.listen(cls, "before_insert", populate_project_id_on_insert)

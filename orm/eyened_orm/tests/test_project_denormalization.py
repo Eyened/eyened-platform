@@ -119,3 +119,36 @@ def test_a_parent_id_that_reaches_no_row_is_not_deferred(session):
     # Deferring to before_insert would have raised mid-flush, after the
     # ancestors' INSERTs, leaving the session in PendingRollbackError.
     assert session.execute(select(literal(1))).scalar() == 1
+
+
+def test_study_and_series_inherit_the_project(session):
+    """The whole chain is populated whichever writer built it."""
+    project = make_project(session, "P6")
+    project_id = project.ProjectID  # capture BEFORE commit()
+    patient = make_patient(session, project, "pat-chain")
+    study = make_study(session, patient, date(2024, 1, 6))
+    series = make_series(session, study)
+    session.commit()
+    study_id, series_id = study.StudyID, series.SeriesID
+    session.expunge_all()
+    assert session.get(Study, study_id).ProjectID == project_id
+    assert session.get(Series, series_id).ProjectID == project_id
+
+
+def test_a_pending_chain_reaches_study_and_series_at_insert_time(session):
+    """The Study/Series backstop, with no ImageInstance to carry it.
+
+    Nothing upstream is readable at before_flush -- the project's id does not
+    exist until its own INSERT -- so if before_insert were still attached to
+    ImageInstance alone, both columns would arrive at their INSERTs unset.
+    """
+    project = Project(ProjectName="P7", External=ExternalEnum.N)
+    patient = Patient(PatientIdentifier="pat-chain-pending", Project=project)
+    study = Study(Patient=patient, StudyDate=date(2024, 1, 7))
+    series = Series(Study=study)
+    session.add(series)
+    session.commit()
+    study_id, series_id, project_id = study.StudyID, series.SeriesID, project.ProjectID
+    session.expunge_all()
+    assert session.get(Study, study_id).ProjectID == project_id
+    assert session.get(Series, series_id).ProjectID == project_id

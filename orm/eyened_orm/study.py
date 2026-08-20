@@ -34,6 +34,16 @@ class Study(Base):
     PatientID: Mapped[int] = mapped_column(
         ForeignKey("Patient.PatientID", ondelete="CASCADE")
     )
+    # The project that the study belongs to, denormalized from
+    # Patient.ProjectID. Populated by the before_flush and before_insert
+    # listeners in authz/denormalization.py -- see that module's docstring for
+    # which writer needs which.
+    #
+    # Deliberately no ForeignKey to Project here: the value is meant to be held
+    # equal to the parent Patient's own copy by a composite foreign key, and a
+    # second single-column FK straight to Project would let the two disagree
+    # about which project this study is in.
+    ProjectID: Mapped[int]
     StudyRound: Mapped[Optional[int]]
     StudyDescription: Mapped[Optional[str]] = mapped_column(String(64))
     StudyDate: Mapped[datetime.date]

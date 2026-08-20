@@ -29,6 +29,16 @@ class Series(Base):
     StudyID: Mapped[int] = mapped_column(
         ForeignKey("Study.StudyID", ondelete="CASCADE")
     )
+    # The project that the series belongs to, denormalized from
+    # Patient.ProjectID by way of Study. Populated by the before_flush and
+    # before_insert listeners in authz/denormalization.py -- see that module's
+    # docstring for which writer needs which.
+    #
+    # Deliberately no ForeignKey to Project here: the value is meant to be held
+    # equal to the parent Study's own copy by a composite foreign key, and a
+    # second single-column FK straight to Project would let the two disagree
+    # about which project this series is in.
+    ProjectID: Mapped[int]
 
     SeriesNumber: Mapped[Optional[int]] = mapped_column()
     SeriesInstanceUid: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
