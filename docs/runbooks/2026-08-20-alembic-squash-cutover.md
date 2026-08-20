@@ -1,10 +1,11 @@
 # Alembic squash cutover — deploying `orm_baseline`
 
-> **Before this document goes to any site: fill in the contact below.**
-> `<contact>` is a placeholder, not a value. This document tells the
-> operator to stop and reach out at several points where the wrong next
-> move destroys production data — do not let it ship with nobody named to
-> reach.
+> **Note to whoever is preparing this document for a site — not to the
+> operator running the cutover. Delete this note once you've done this:**
+> fill in the contact below before sending this document anywhere.
+> `<contact>` is a placeholder, not a value. Several points in this
+> document tell the operator to stop and reach out, and all of them depend
+> on it being filled in — do not let it ship with nobody named to reach.
 
 **Contact:** `<contact>`
 
@@ -110,7 +111,7 @@ not taken one, stop and contact us before running step 1.
 |---|---|---|
 | 0 | `alembic current` | precondition check — see below |
 | 1 | `alembic upgrade head` on the **current** checkout | real DDL — backup and window |
-| 2 | `alembic current` again | **gate: must print `b2e2800000b2` before deploying** |
+| 2 | `alembic current` again | **gate: must print `b2e2800000b2 (head)` before deploying** |
 | 3 | deploy the release | — |
 | 4 | `alembic stamp orm_baseline` | one row, no DDL — prompts, see above |
 | 5 | `alembic current`, `alembic check` | clean = done |
@@ -125,17 +126,31 @@ don't recognise — stop before step 1 and contact us. Do not run
 diff, so it cannot serve as a starting point at this step.
 
 **Step 2 is a gate, not a formality — state it as an assertion, not a
-comparison.** It must print exactly `b2e2800000b2`, the single legacy head:
-among the 24 revisions at `6c675e5`, it is the only one nothing lists as its
-`down_revision`, and it is the same constant at every site. Do not fall back
-on "compare it to what step 1 printed" — that reduces the gate to reading
-terminal scrollback, which fails the operator whose window has scrolled, or
-who skipped step 1 entirely, which is exactly the case this gate exists to
-catch. Anything other than `b2e2800000b2`, including nothing at all, means:
-stop before step 3 and contact us. A partially-failed step 1 is possible and
-can go unnoticed; deploying on top of one walks straight into the trap §3
-describes — once deployed, the checkout that could still run the missing
-DDL is gone.
+comparison.** It must print exactly `b2e2800000b2 (head)`, the single legacy
+head: among the 24 revisions at `6c675e5`, `b2e2800000b2` is the only one
+nothing lists as its `down_revision`, and it is the same constant at every
+site. The `(head)` suffix is expected, not a warning — Alembic appends it to
+any revision that is the real head of the chain it's being read against, and
+at this point in the checkout you're running today, it is. Quoting the
+assertion as a bare id would stop a *correct* cutover at its first gate. Do
+not fall back on "compare it to what step 1 printed" either — that reduces
+the gate to reading terminal scrollback, which fails the operator whose
+window has scrolled, or who skipped step 1 entirely, which is exactly the
+case this gate exists to catch.
+
+This gate has two distinct failure branches, not one:
+
+- **An earlier revision.** This means the checkout you're running today
+  predates the full legacy chain, so `alembic upgrade head` in step 1
+  stopped there — correctly, at that checkout's own head, just not the
+  site's ultimate legacy head. This is self-service, not an escalation:
+  check out commit `6c675e5` (it carries all 24 legacy revisions; §7 has
+  more detail on this checkout), run `alembic upgrade head` from there, and
+  re-run step 2.
+- **Nothing, or an id you don't recognise.** Stop before step 3 and contact
+  us. A partially-failed step 1 is possible and can go unnoticed; deploying
+  on top of one walks straight into the trap §3 describes — once deployed,
+  the checkout that could still run the missing DDL is gone.
 
 **Between step 3 and step 4, Alembic itself cannot resolve this database.**
 The deployed checkout contains only `orm_baseline`; the database is still
@@ -196,23 +211,35 @@ cutover; once by forbidding *all* stamping as a way back, which also rules
 out the one stamp that is safe. Which of the three cases below applies
 depends on how far the cutover got.
 
-**Code only, step 1 succeeded, before step 4.** Redeploy the previous
-release. The database is already at the legacy head (`b2e2800000b2`) —
-change nothing else.
+**Code only, step 1 succeeded, before step 4.** If you have already
+deployed, redeploy the previous release — the database is already at the
+legacy head (`b2e2800000b2`), so change nothing else. If you have not
+deployed yet, there is nothing to undo.
 
 **Code only, step 1 succeeded, after step 4.** Redeploy the previous
-release, then run `alembic stamp b2e2800000b2` from that checkout. This is
-**exact and lossless**: after step 1 the schema genuinely is at the legacy
-head, so this stamp states a true fact rather than an earlier, false one.
-Skip it and the old checkout cannot resolve `orm_baseline` — every Alembic
-command run against it fails with §7's `Can't locate revision identified by
-'orm_baseline'`, in a situation §7 does not describe (that section is about
-deploying too early, not reverting after a completed cutover).
+release, then run `alembic stamp b2e2800000b2` from that checkout. **If you
+are not certain step 2 printed the head, do not stamp — contact us
+instead**; this whole case depends on step 1 having genuinely finished.
+This stamp prompts for confirmation just like step 4 did (see §5): run it
+interactively, or set `EYENED_ALEMBIC_ASSUME_YES=1` for it. Done correctly,
+it is **exact and lossless**: after step 1 the schema genuinely is at the
+legacy head, so this stamp states a true fact rather than an earlier, false
+one. Skip it and the old checkout cannot resolve `orm_baseline` — every
+Alembic command run against it fails with §7's `Can't locate revision
+identified by 'orm_baseline'`, in a situation §7 does not describe (that
+section is about deploying too early, not reverting after a completed
+cutover).
 
-**Step 1's own DDL must be undone.** Restore the backup taken before
-step 1 — **and only while the maintenance window is still open, before the
-new release has taken any writes.** Once it has taken writes, restoring the
-backup loses them. Past that point, contact us instead of restoring.
+**Step 1's own DDL must be undone.** **Redeploy the previous release
+first**, then restore the backup taken before step 1 — **and only while the
+maintenance window is still open, before the new release has taken any
+writes.** Restoring underneath a still-deployed new release leaves it
+running against the pre-step-1 schema — no `AuditLog`, no `ProjectMember`,
+no `Creator.IsAdmin` / `Creator.Inactive` — which is exactly the failure
+state §3 exists to prevent; redeploying first avoids that. The restore also
+returns `alembic_version` to its pre-step-1 value, which is what the old
+checkout can resolve. Once the new release has taken writes, restoring the
+backup loses them — past that point, contact us instead of restoring.
 
 Stamping `b2e2800000b2` above is **not** the rollback anchor returning. The
 anchor an earlier draft of this document used was a *per-site* value the
