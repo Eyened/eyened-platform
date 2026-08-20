@@ -1,37 +1,37 @@
 """Populate the derived ``ProjectID`` columns from their parent rows.
 
 ``Patient.ProjectID`` is the sole authority. Study, Series, ImageInstance and
-SubTaskImageLink each carry a copy so that ``apply_scope`` is an indexed lookup
-rather than a five-hop walk, and each copy is held equal to its parent by a
-composite foreign key (see the containment design, section 4.5).
+SubTaskImageLink are each meant to carry a copy so that ``apply_scope`` is an
+indexed lookup rather than a five-hop walk, with each copy held equal to its
+parent by a composite foreign key (see the containment design, section 4.5).
+That foreign key does not exist yet -- ``ImageInstance.ProjectID`` today
+carries no foreign key at all, deliberately -- so two listeners fill the
+column instead, and they cover different writers:
 
-Two mechanisms fill those columns, and they cover different writers:
+* **This listener, at ``before_flush``**, for writers that assign a raw
+  foreign-key *id*: ``Study(PatientID=...)`` in the test factories,
+  ``SubTaskRepository.add_link``. There the parent row is already persistent,
+  so it can simply be read. ``before_flush`` is where querying the database is
+  legal, so it resolves what it can and leaves the rest to the listener below.
+* **The ``before_insert`` listener**, the backstop for a hierarchy that was
+  still entirely pending at ``before_flush`` -- the importer's shape, where
+  nothing upstream had a primary key yet, so ``before_flush`` found no row to
+  read and left the column unset. By the time a child's INSERT is assembled,
+  the unit of work has already inserted its ancestors, so the same walk now
+  succeeds on in-memory attributes alone, with no query.
 
-* **Foreign-key sync.** Where a writer assigns the *relationship* -- the
-  importer does, at ``importer/importer.py:342`` -- SQLAlchemy's unit of work
-  copies both columns of the composite key from parent to child during the
-  flush. It is the only mechanism that can work when the parent is itself
-  pending, because the parent's primary key does not exist until its INSERT.
-* **This listener**, for writers that assign a raw foreign-key *id* instead:
-  ``Study(PatientID=...)`` in the test factories, ``SubTaskRepository.add_link``.
-  There the parent row is already persistent, so it can simply be read.
+Neither listener is the enforcement. The foreign keys are what will guarantee
+the value is correct; these only spare each writer from having to know. Raw
+SQL bypasses both, and once the composite foreign keys land it will be caught
+by the constraint, which is the right way round.
 
-Neither is the enforcement. The foreign keys are what guarantee the value is
-correct; these only spare each writer from having to know. Raw SQL bypasses both
-and is caught by the constraint, which is the right way round.
-
-The listener runs at two moments, because those two writers need different
-ones:
-
-* ``before_flush`` is where querying the database is legal, so it is where a
-  raw-id parent gets read. It resolves what it can and leaves the rest.
-* ``before_insert`` is the backstop for a hierarchy that was still entirely
-  pending at ``before_flush`` -- the importer's shape, where nothing upstream
-  had a primary key yet. By the time a child's INSERT is assembled the unit of
-  work has already inserted its ancestors and synced their foreign keys, so the
-  same walk now succeeds on in-memory attributes alone, with no query. Until
-  the composite foreign keys exist, this backstop is the *only* thing that
-  fills the column for that writer.
+Task 5 adds those composite foreign keys. From then on, SQLAlchemy's own
+foreign-key sync fills the column during the flush for any writer that
+assigns the *relationship* (the importer's shape), and the ``before_insert``
+backstop becomes a no-op. The ``before_flush`` pass here stays load-bearing
+permanently, though: foreign-key sync only ever copies a relationship's
+columns, and a raw-id writer never sets one, so sync never fires for that
+case.
 """
 from __future__ import annotations
 

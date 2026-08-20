@@ -231,8 +231,9 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     )
     # The project that the image belongs to, denormalized from Patient.ProjectID
     # so that authorization scoping is an indexed lookup rather than a five-hop
-    # join. Populated on insert by the before_flush listener in
-    # authz/denormalization.py.
+    # join. Populated by the before_flush and before_insert listeners in
+    # authz/denormalization.py -- see that module's docstring for which writer
+    # needs which.
     #
     # Deliberately no ForeignKey to Project here: the value is meant to be held
     # equal to the parent Series' own copy by a composite foreign key, and a
