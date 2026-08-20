@@ -93,10 +93,10 @@ def _project_of(session: Session, obj: object, *, required: bool = True) -> int 
     Args:
         required: whether a *deferrable* dead end is an error. ``False`` at
             ``before_flush``, where an ancestor may simply not have been
-            inserted yet and the ``before_insert`` backstop will get a second,
-            better-informed try; ``True`` at ``before_insert``, the last moment
-            the value can still be set. It does not govern a parent id that
-            reaches no row -- see ``Raises``.
+            inserted yet and foreign-key sync will fill the column during the
+            flush, once the ancestor's own INSERT has run; ``True`` at
+            ``before_insert``, the last moment this listener could set it. It
+            does not govern a parent id that reaches no row -- see ``Raises``.
 
     Returns:
         The governing ``ProjectID``, or ``None`` when the walk dead-ends on an
