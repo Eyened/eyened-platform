@@ -15,10 +15,7 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/server-ci.yml'
 
-# Neither job writes to the repository: `test` runs pytest and appends to
-# $GITHUB_STEP_SUMMARY (a file, not a token scope), and `schema-sync` reads the
-# checkout and writes DDL only to a throwaway database service that dies with
-# the run. Pin read-only rather than inherit the repository default.
+# Neither job writes to the repository.
 permissions:
   contents: read
 
@@ -52,13 +49,8 @@ jobs:
           pip install -r server/test-requirements.txt
       - run: pytest --cov --cov-report=xml --cov-report=term
 
-      # Alembic revision scripts under orm/migrations/alembic/versions/ are
-      # DDL, not unit-testable logic -- excluded from the gate rather than
-      # from coverage.run, because the schema-sync job below applies them to
-      # a real mysql:8.0.27 and diffs the result against the models, which is
-      # a stronger check than line coverage. Scoped to versions/ only: the
-      # rest of orm/migrations/ -- notably env.py, which holds the
-      # confirmation guard -- is hand-written logic the gate must still see.
+      # Revision scripts under versions/ are DDL, checked by schema-sync below,
+      # not by line coverage. Scoped to versions/ so env.py stays gated.
       - name: Patch coverage (80% floor on changed lines)
         # base_ref is empty on push events, which would make --compare-branch
         # origin/ and fail every push to development.
@@ -107,8 +99,6 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           pip install -e ./orm
-      # The service starts an empty eyened_database. Everything below has to
-      # come from the migration trail.
       - name: Build the schema from empty
         working-directory: orm/migrations
         run: alembic upgrade head

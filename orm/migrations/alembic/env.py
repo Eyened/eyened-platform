@@ -29,9 +29,8 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
 
-# Read before load_env_file() below. That call is load_dotenv(override=True), which
-# writes a file's contents into os.environ — so a read placed after it would let any
-# .env file switch off the confirmation guard. Read order is the whole protection.
+# Must be read before load_env_file(), which is load_dotenv(override=True):
+# otherwise any .env file could switch off the confirmation guard.
 assume_yes = env_flag_enabled(os.environ.get("EYENED_ALEMBIC_ASSUME_YES"))
 
 x_args = context.get_x_argument(as_dictionary=True)

@@ -1,13 +1,8 @@
 """env.py's confirmation guard and type comparison must stay wired as designed.
 
-env.py is an Alembic script, not an importable module, so this parses it.
-
-Scope, stated so the guard is not over-trusted: it checks the lexical position
-of module-level statements, not runtime order. Calls nested in a function or
-class body are deliberately excluded rather than trusted -- env.py runs top to
-bottom at import, so a read reached through a helper has no meaningful position
-and is rejected outright. Arbitrarily dynamic constructions are not modelled;
-review is the backstop for the general case.
+env.py is an Alembic script, not an importable module, so this parses it. It
+checks the lexical position of module-level statements, not runtime order:
+calls nested in a function or class body are rejected rather than trusted.
 """
 
 from __future__ import annotations

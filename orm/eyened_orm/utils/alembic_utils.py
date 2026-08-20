@@ -30,12 +30,9 @@ def get_current_alembic_revision(engine: Engine) -> str | None:
 def upgrade_to_head(engine: Engine) -> str:
     """Run the migration trail to head against ``engine``'s database.
 
-    The connection is injected through ``config.attributes`` so ``env.py``
-    skips its confirmation prompt: the caller has already confirmed the target.
-    That keeps ordinary initialization from having to set the
-    ``EYENED_ALEMBIC_ASSUME_YES`` bypass as a side effect.
-
-    A bare ``Config()`` is deliberate -- passing ``alembic.ini`` would set
+    The connection goes through ``config.attributes`` so ``env.py`` skips its
+    confirmation prompt -- the caller has already confirmed the target. A bare
+    ``Config()`` is deliberate: passing ``alembic.ini`` would set
     ``config_file_name`` and make ``env.py`` reconfigure global logging.
     """
     from alembic import command

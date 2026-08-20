@@ -17,35 +17,12 @@ testpaths = [
 # uniquely-named ORM file was correctly failed. Six paths collide this way,
 # including db.py and config.py. Rooting at "orm" keeps the eyened_orm/ prefix
 # and makes every name unique. Cost: orm/setup.py enters the denominator.
-# orm/notebooks/ does NOT, because it lacks an __init__.py (coverage's
-# directory walk skips it) and nothing imports it either. orm/migrations/ also
-# lacks an __init__.py, but that is not enough to keep it out: coverage
-# records any file that gets imported, walk or not, and
-# orm/eyened_orm/tests/test_migration_chain.py calls
-# ScriptDirectory.from_config(config).get_heads(), which imports every file
-# under versions/ to build the revision map. Each revision script's
-# module-level lines are therefore measured, even though its upgrade() body
-# never runs. That is why the Alembic-revision exclusion lives in the
-# diff-cover invocation in .github/workflows/server-ci.yml instead of in
-# `omit` here: `omit` controls what coverage.py *measures* -- an omitted file
-# is dropped from coverage.xml entirely, for every consumer of that report,
-# not just this one gate. diff-cover's `--exclude` instead filters
-# *findings*: coverage.xml still carries the file's real numbers, and only
-# the one patch-coverage step is told to ignore them when deciding whether a
-# PR passes. This is not because server/tests/test_coverage_omissions.py
-# would catch the omission: its direction 1 only rejects a module that
-# imports cleanly or fails on repo code. In CI, orm/ is never on sys.path
-# (the workflow sets no PYTHONPATH; the editable install maps only
-# `eyened_orm`), so `_module_name` reduces orm/migrations/**/*.py to
-# `migrations.*`, which fails with `ModuleNotFoundError('migrations')` -- a
-# missing top-level name that is not repo code, which direction 1 treats as
-# an absent third-party package and accepts. The guard would reject the
-# omission only in a shell that happens to have orm/ on sys.path (e.g. a
-# local `PYTHONPATH=$PWD/orm` run), which is not CI's condition. A
-# `*/orm/migrations/*` spelling instead fails the guard's own
-# `not glob.startswith("*")` check (test_coverage_omissions.py:96) before
-# direction 1 ever runs an import, in every environment. Verified by
-# replaying direction 1 against every file under orm/migrations/ both ways.
+# orm/notebooks/ does NOT: no __init__.py, and nothing imports it. orm/migrations/
+# has no __init__.py either, but that is not enough -- coverage also records what
+# gets imported, and test_migration_chain.py imports every revision script to build
+# the revision map. The alembic-revision exclusion therefore lives in the diff-cover
+# call in .github/workflows/server-ci.yml, not in `omit` here: `omit` would drop the
+# file from coverage.xml for every consumer, not just that one gate.
 source = ["server", "orm"]
 omit = [
     "*/tests/*",

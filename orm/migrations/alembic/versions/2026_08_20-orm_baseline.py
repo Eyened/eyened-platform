@@ -643,12 +643,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Refuse to downgrade: this revision is the root, and its inverse is total.
-
-    Autogenerate's inverse of ``upgrade()`` drops all 44 tables. Deployed
-    databases are stamped at this revision without it ever having run, so
-    ``alembic downgrade base`` against one would destroy a schema this
-    migration never created. Drop and recreate a throwaway database instead.
+    """Refuse to downgrade: the inverse of this root revision drops all 44 tables,
+    and deployed databases are stamped at it without ``upgrade()`` ever running.
     """
     raise NotImplementedError(
         "orm_baseline is the root revision; downgrading it would drop the entire schema."

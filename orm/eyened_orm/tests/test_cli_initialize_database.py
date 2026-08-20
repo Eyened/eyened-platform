@@ -1,8 +1,6 @@
 """`eorm initialize-database` runs the migration trail, not create_all().
 
-The old command created tables directly and stamped afterwards. Anything that
-reintroduces create_all() here puts a fresh database's schema back outside
-alembic's knowledge, which is what this whole change exists to stop.
+create_all() here would put a fresh database's schema outside alembic's knowledge.
 """
 
 from __future__ import annotations
