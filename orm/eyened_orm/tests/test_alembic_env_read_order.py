@@ -109,3 +109,12 @@ def test_the_confirmation_prompt_still_exists():
         "env.py no longer prompts before altering a database, so the assume-yes "
         "flag now guards nothing"
     )
+
+
+def test_online_configure_passes_render_item():
+    """A correct renderer that nothing calls is worth nothing."""
+    call = _configure_call(_module_ast(), "run_migrations_online")
+    assert any(kw.arg == "render_item" for kw in call.keywords), (
+        "run_migrations_online()'s context.configure(...) does not pass render_item; "
+        "OptionalEnum columns would autogenerate as code that cannot run"
+    )
