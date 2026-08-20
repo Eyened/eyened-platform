@@ -15,7 +15,7 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 - Do not stamp before upgrading — it claims tables whose DDL the squash deleted. If you already have, stop and contact `<contact>`.
 - Do not run `Base.metadata.create_all()` to recover — it creates missing tables but silently skips missing columns, so it looks like it worked.
 - Do not stamp any revision earlier than `b2e2800000b2` — the next `upgrade head` replays `CREATE TABLE AuditLog` against an existing table.
-- `upgrade` and `stamp` both prompt naming the target database, then `Proceed? [y/N]` — your last check you're pointed at the right one; `current` and `check` never do. Run them interactively, or set `EYENED_ALEMBIC_ASSUME_YES=1` for that one command, which skips that check — without a TTY the prompt raises an uncaught `EOFError` and the command aborts with a traceback.
+- `upgrade` always prompts naming the target database, then `Proceed? [y/N]`; `stamp` does too on this checkout, but not on the pre-cutover checkout used for rollback below — your last check you're pointed at the right one; `current` and `check` never do. Run them interactively, or set `EYENED_ALEMBIC_ASSUME_YES=1` for that one command, which skips that check — without a TTY the prompt raises an uncaught `EOFError` and the command aborts with a traceback.
 - Anything that does not match this document: stop before the next command and contact `<contact>`.
 
 ## Steps
@@ -57,5 +57,5 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 |---|---|
 | Deployed before step 1 ran; every command fails with `Can't locate revision identified by '<id>'` | Nothing is damaged. Check out `6c675e5` into an environment with `eyened_orm` installed, run `alembic upgrade head`, redeploy, then run step 4. |
 | Roll back code only; step 1 succeeded; before step 4 | If already deployed, redeploy the previous release; if not, there is nothing to undo. Change nothing in the database. |
-| Roll back code only; step 1 succeeded; after step 4 | Redeploy the previous release, then `alembic stamp --purge b2e2800000b2` from that checkout (it prompts; `--purge` is required — the database holds `orm_baseline`, which that checkout's map doesn't contain). If you are not certain step 2 printed the head, do not stamp — contact `<contact>`. |
+| Roll back code only; step 1 succeeded; after step 4 | Redeploy the previous release, then `alembic stamp --purge b2e2800000b2` from that checkout (this checkout does **not** prompt on `stamp` — confirm yourself you are pointed at the right database before running it; `--purge` is required — the database holds `orm_baseline`, which that checkout's map doesn't contain). If you are not certain step 2 printed the head, do not stamp — contact `<contact>`. |
 | Step 1's own DDL must be undone | Redeploy the previous release **first**, then restore the pre-step-1 backup — only while the maintenance window is still open. Once the new release has taken writes, restoring loses them: contact `<contact>` instead. |

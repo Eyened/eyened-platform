@@ -30,7 +30,7 @@ alembic -x env_file=<ddl.env> upgrade head   # c3f5a2b81d94, then b2e2800000b2
 `upgrade` prompts `Target database: ... Proceed? [y/N]`
 (`orm/migrations/alembic/env.py`), so it does not run unattended as written --
 only `revision`, `history`, `current`, `heads`, `branches`, `show`, `check`,
-`list_templates` and `stamp` skip the prompt.
+and `list_templates` skip the prompt; `stamp` no longer does.
 
 **The one visible change before step 5.** `c3f5a2b81d94` flips five `TagID`
 foreign keys from CASCADE to RESTRICT. The pre-cutover server has
