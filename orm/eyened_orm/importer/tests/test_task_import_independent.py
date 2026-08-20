@@ -79,8 +79,33 @@ def test_image_then_task_import_creates_tasks_subtasks_and_links(session):
     assert image_ids == {i0, i1, i2}
 
 
+def test_a_task_creating_row_with_no_resolvable_image_is_refused(session):
+    """A task this run creates must end up with a declaration -- empty is a dead end.
+
+    Mirrors Task 4 Step 1's test_a_task_that_would_declare_nothing_is_refused,
+    for the importer instead of create_from_imagesets: a task with no
+    declared project is visible to every authenticated user and can never
+    accept an image, because every image would fall outside its (empty)
+    declaration.
+    """
+    row = ImportTaskRow(
+        task_definition_name="td-none",
+        task_name="t-none",
+        creator_name="c-none",
+        subtask_anonymous_identity=1,
+    )
+    with pytest.raises(ValueError, match="no declared project"):
+        plan_import(session, [row], entity_specs=TASK_ENTITY_SPECS)
+
+
 def test_subtask_image_link_rejects_unknown_image_instance_id(session):
-    """Applying a task row whose ``image_instance_id`` does not exist violates the link FK."""
+    """Applying a task row whose ``image_instance_id`` does not exist violates the link FK.
+
+    The task also gets one resolvable image in the same run, so its
+    declaration is non-empty and the empty-declaration refusal (2026-08-20
+    amendment, Step 5) does not pre-empt this test -- the dangling id still
+    has to fail at the link's own foreign key, which is what this test is for.
+    """
     defaults = {
         "project_external": "Y",
         "manufacturer": "tm",
@@ -108,18 +133,21 @@ def test_subtask_image_link_rejects_unknown_image_instance_id(session):
     ).apply()
     session.commit()
 
+    good_id = session.scalar(
+        select(ImageInstance.ImageInstanceID).order_by(ImageInstance.ImageInstanceID.desc())
+    )
     bad_id = 9_999_999
     assert session.get(ImageInstance, bad_id) is None
 
-    row = ImportTaskRow(
-        task_definition_name="td-fk",
-        task_name="t-fk",
-        creator_name="c-fk",
-        subtask_anonymous_identity=1,
-        image_instance_id=bad_id,
-        subtask_image_index=0,
+    rows = expand_task_import_rows(
+        ImportTaskRow(
+            task_definition_name="td-fk",
+            task_name="t-fk",
+            creator_name="c-fk",
+        ),
+        [[good_id, bad_id]],
     )
-    run = plan_import(session, [row], entity_specs=TASK_ENTITY_SPECS)
+    run = plan_import(session, rows, entity_specs=TASK_ENTITY_SPECS)
     with pytest.raises(IntegrityError):
         run.apply()
 

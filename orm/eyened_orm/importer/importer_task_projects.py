@@ -23,24 +23,31 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..image_instance import ImageInstance
-from ..task import SubTaskImageLink, TaskProject
+from ..task import SubTaskImageLink, Task, TaskProject
 from .import_run import ImportCreate, ImportRun
 
 
 def declare_task_projects(session: Session, run: ImportRun) -> None:
     """Append the ``TaskProject`` rows an import's links require.
 
-    A no-op for image imports, which create no links.
+    A no-op only when the run creates neither a link nor a task -- the case
+    the original docstring meant by "image imports". A run that creates one
+    or more tasks must not leave any of them with an empty declaration: see
+    the refusal at the bottom, which is a different check from the
+    unresolvable-id pass-over just above it.
     """
-    created = {id(change.entity) for change in run.changes
-               if isinstance(change, ImportCreate)}
+    created_tasks = {
+        id(change.entity): change.entity
+        for change in run.changes
+        if isinstance(change, ImportCreate) and isinstance(change.entity, Task)
+    }
     links = [
         change.entity
         for change in run.changes
         if isinstance(change, ImportCreate)
         and isinstance(change.entity, SubTaskImageLink)
     ]
-    if not links:
+    if not links and not created_tasks:
         return
 
     image_ids = {link.ImageInstanceID for link in links}
@@ -75,7 +82,7 @@ def declare_task_projects(session: Session, run: ImportRun) -> None:
     under_declared: list[str] = []
     for marker, projects in wanted.items():
         task = tasks[marker]
-        if marker in created:
+        if marker in created_tasks:
             for project_id in sorted(projects):
                 run.add_create(TaskProject(Task=task, ProjectID=project_id), {})
             continue
@@ -88,11 +95,22 @@ def declare_task_projects(session: Session, run: ImportRun) -> None:
         if outside:
             under_declared.append(
                 f"task {task.TaskID} ({task.TaskName!r}) does not declare "
-                f"project(s) {sorted(outside)}; it declares {sorted(declared)}"
+                f"project(s) {sorted(outside)}; it declares {sorted(declared)}. "
+                "Extend the task's declaration before importing images from "
+                "those projects."
             )
+
+    # A task this run creates that never earned an entry in `wanted` resolved
+    # no project at all: either it carries no image_instance_id, or every id
+    # it carries is unresolvable. Both are the same dead end
+    # create_from_imagesets already refuses.
+    for marker, task in created_tasks.items():
+        if marker not in wanted:
+            under_declared.append(
+                f"task {task.TaskName!r} would be created with no declared "
+                "project: none of its image ids resolved to an existing "
+                "ImageInstance. Give it at least one resolvable image."
+            )
+
     if under_declared:
-        raise ValueError(
-            "; ".join(under_declared)
-            + ". Extend the task's declaration before importing images from "
-            "those projects."
-        )
+        raise ValueError("; ".join(under_declared))
