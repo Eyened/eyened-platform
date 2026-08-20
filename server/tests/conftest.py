@@ -198,7 +198,7 @@ def spanning(session):
     """
     from datetime import date
 
-    from eyened_orm import SubTask, Task, TaskDefinition
+    from eyened_orm import SubTask, Task, TaskDefinition, TaskProject
     from eyened_orm.task import SubTaskImageLink, SubTaskState, TaskState
     from eyened_orm.utils.factories import (
         make_device,
@@ -237,6 +237,21 @@ def spanning(session):
         session.add(task)
         session.flush()
         tasks[label] = task.TaskID
+
+    # Before the subtask/link loop, not after: that loop flushes *inside* each
+    # iteration and the link-less subtask below flushes after it, so by the end
+    # every link is already in the database. Declaring afterwards therefore
+    # lands behind the rows the declaration has to cover, and Task 6's foreign
+    # key rejects them. `empty` declares nothing on purpose -- it is the
+    # vacuity case the scoping tests turn on, and it holds no links.
+    for label, names in (
+        ("spanning", ("A", "B")),
+        ("a_only", ("A",)),
+        ("b_only", ("B",)),
+    ):
+        for name in names:
+            session.add(TaskProject(TaskID=tasks[label], ProjectID=projects[name]))
+    session.flush()
 
     subtasks = {}
     for label, names in (
@@ -301,7 +316,7 @@ def one_project(session):
     """
     from datetime import date
 
-    from eyened_orm import SubTask, Task, TaskDefinition
+    from eyened_orm import SubTask, Task, TaskDefinition, TaskProject
     from eyened_orm.task import SubTaskImageLink, SubTaskState, TaskState
     from eyened_orm.utils.factories import (
         make_creator,
@@ -340,6 +355,10 @@ def one_project(session):
         TaskState=TaskState.NotStarted,
     )
     session.add(task)
+    session.flush()
+    # Declared before the link exists, because Task 6's foreign key checks the
+    # declaration at the moment the link is inserted.
+    session.add(TaskProject(TaskID=task.TaskID, ProjectID=project.ProjectID))
     session.flush()
     subtask = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
     session.add(subtask)

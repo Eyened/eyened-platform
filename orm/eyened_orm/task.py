@@ -153,9 +153,60 @@ class Task(Base):
         task_name: str,
         imagesets: Iterable[Iterable[int | ImageInstance]],
         creator_name: str | None = None,
+        *,
+        projects: Iterable[int] | None = None,
     ) -> "Task":
+        """Build a task, its subtasks and its project declaration.
 
-        subtasks = [SubTask.create_from_images(imset) for imset in imagesets]
+        ``projects=None`` derives the declaration from the images given. That
+        is not the auto-extend the design rejects: at creation there is no
+        existing declaration to widen and no collaborator to evict, so
+        deriving here reproduces exactly today's visibility for a new task.
+        Passing an explicit list is stricter -- any image outside it is
+        refused by ``fk_SubTaskImageLink_TaskProject``.
+
+        Raises:
+            ValueError: if the declaration would be empty. A task declaring
+                nothing is visible to every authenticated user *and* cannot
+                accept an image, because every image would be outside its
+                declaration -- a state nothing in this codebase can undo until
+                declaration management ships.
+        """
+        from eyened_orm import ImageInstance as _ImageInstance
+
+        # ``imagesets`` is typed Iterable[Iterable[...]] and deriving the
+        # declaration needs a second pass over it; a generator argument would
+        # otherwise yield subtasks with images and a declaration of nothing.
+        materialised = [list(imset) for imset in imagesets]
+        subtasks = [SubTask.create_from_images(imset) for imset in materialised]
+
+        if projects is None:
+            # Reads the denormalized ImageInstance.ProjectID, so an image that
+            # is itself still pending contributes nothing. Callers pass ids or
+            # persistent instances; that is the contract.
+            image_ids = [
+                im.ImageInstanceID if isinstance(im, _ImageInstance) else im
+                for imset in materialised
+                for im in imset
+            ]
+            projects = (
+                set(
+                    session.scalars(
+                        select(_ImageInstance.ProjectID).where(
+                            _ImageInstance.ImageInstanceID.in_(image_ids)
+                        )
+                    ).all()
+                )
+                if image_ids
+                else set()
+            )
+
+        projects = set(projects)
+        if not projects:
+            raise ValueError(
+                "a task must declare at least one project: pass projects=[...], "
+                "or imagesets containing images whose project can be resolved"
+            )
 
         creator = None
         if creator_name is not None:
@@ -173,6 +224,7 @@ class Task(Base):
             TaskState=TaskState.NotStarted,
             SubTasks=subtasks,
             Creator=creator,
+            TaskProjects=[TaskProject(ProjectID=pid) for pid in sorted(projects)],
         )
 
     def get_form_annotations(self, schema_id: Optional[int] = None) -> List["FormAnnotation"]:

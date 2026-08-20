@@ -37,6 +37,21 @@ def _make_subtask(session, task_id: int, state: SubTaskState) -> SubTask:
     return st
 
 
+def _declare(session, task_id: int, image_id: int) -> None:
+    """Declare, on ``task_id``, the project the image sits in.
+
+    Read off the image rather than passed in, so the declaration cannot drift
+    from the project ``_make_image`` actually built. Task 6's foreign key
+    checks a link against its task's declaration at the moment the link is
+    inserted, so the declaration has to exist first.
+    """
+    from eyened_orm import ImageInstance, TaskProject
+
+    project_id = session.get(ImageInstance, image_id).ProjectID
+    session.add(TaskProject(TaskID=task_id, ProjectID=project_id))
+    session.flush()
+
+
 def test_list_all_orders_by_id_with_relations(session):
     """list_all returns every task in TaskID order, Creator/TaskDefinition eager."""
     creator = _creator(session)
@@ -235,6 +250,7 @@ def _seed_subtask_with_one_image(session) -> tuple[int, int]:
     task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
     st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     image_id = _make_image(session, "pub-1")
+    _declare(session, task.TaskID, image_id)
     session.add(
         SubTaskImageLink(
             SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=0
@@ -337,6 +353,7 @@ def test_next_image_index_starts_at_zero_then_increments(session):
 
     from eyened_orm import SubTaskImageLink
 
+    _declare(session, task.TaskID, image_id)
     session.add(
         SubTaskImageLink(SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=3)
     )

@@ -48,6 +48,7 @@ def _image_in(session, project_name, public_id, backend, device):
 def _task_over(session, images, *, name="T"):
     from eyened_orm import TaskDefinition
 
+    images = list(images)
     taskdef = TaskDefinition(TaskDefinitionName=f"def-{name}")
     session.add(taskdef)
     session.flush()
@@ -58,8 +59,14 @@ def _task_over(session, images, *, name="T"):
     subtask = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
     session.add(subtask)
     session.flush()
-    from eyened_orm import SubTaskImageLink
+    from eyened_orm import SubTaskImageLink, TaskProject
 
+    # Declared before the links, because Task 6's foreign key checks the
+    # declaration at the moment a link is inserted. An empty ``images``
+    # declares nothing, which is the no-images case one caller relies on.
+    for project_id in sorted({image.ProjectID for image in images}):
+        session.add(TaskProject(TaskID=task.TaskID, ProjectID=project_id))
+    session.flush()
     for index, image in enumerate(images):
         session.add(
             SubTaskImageLink(
@@ -112,7 +119,7 @@ def test_a_subtask_resolves_to_its_parent_tasks_projects(session):
     project_a, image_a = _image_in(session, "A", "img-a", backend, device)
     project_b, image_b = _image_in(session, "B", "img-b", backend, device)
 
-    from eyened_orm import SubTaskImageLink, TaskDefinition
+    from eyened_orm import SubTaskImageLink, TaskDefinition, TaskProject
 
     taskdef = TaskDefinition(TaskDefinitionName="def")
     session.add(taskdef)
@@ -124,6 +131,13 @@ def test_a_subtask_resolves_to_its_parent_tasks_projects(session):
     only_a = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
     only_b = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
     session.add_all([only_a, only_b])
+    session.flush()
+    # Declared before the links: Task 6's foreign key checks the declaration at
+    # the moment a link is inserted, and this task spans both projects.
+    session.add_all([
+        TaskProject(TaskID=task.TaskID, ProjectID=project_a.ProjectID),
+        TaskProject(TaskID=task.TaskID, ProjectID=project_b.ProjectID),
+    ])
     session.flush()
     session.add_all([
         SubTaskImageLink(SubTaskID=only_a.SubTaskID,
