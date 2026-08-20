@@ -15,10 +15,22 @@ fi
 
 # Generate SQL for migrations between the current revision and head
 if [ "$current_rev" != "$head_rev" ]; then
-  tmp_sql=$(mktemp)
+  # Temp file lives next to the destination, not $TMPDIR: that keeps the
+  # final mv a same-filesystem rename (atomic, all-or-nothing) instead of a
+  # cross-filesystem copy+unlink.
+  tmp_sql=$(mktemp sql/.latest_migration.sql.XXXXXX)
   if echo 'y' | alembic upgrade "$current_rev:$head_rev" --sql > "$tmp_sql"; then
-    mv "$tmp_sql" sql/latest_migration.sql
-    echo "SQL for the latest migration generated: sql/latest_migration.sql"
+    # mktemp creates the file mode 600; restore the tracked file's usual
+    # mode before the rename, so a regeneration doesn't leave it owner-only.
+    chmod 644 "$tmp_sql"
+    if mv "$tmp_sql" sql/latest_migration.sql; then
+      echo "SQL for the latest migration generated: sql/latest_migration.sql"
+    else
+      status=$?
+      rm -f "$tmp_sql"
+      echo "Error: mv failed (exit $status); sql/latest_migration.sql left unchanged." >&2
+      exit 1
+    fi
   else
     status=$?
     rm -f "$tmp_sql"
