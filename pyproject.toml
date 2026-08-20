@@ -27,9 +27,22 @@ testpaths = [
 # module-level lines are therefore measured, even though its upgrade() body
 # never runs. That is why the Alembic-revision exclusion lives in the
 # diff-cover invocation in .github/workflows/server-ci.yml instead of in
-# `omit` here -- adding orm/migrations/ to `omit` fails
-# server/tests/test_coverage_omissions.py, which rejects any entry that
-# imports cleanly.
+# `omit` here: `omit` controls what coverage.py *measures* -- an omitted file
+# is dropped from coverage.xml entirely, for every consumer of that report,
+# not just this one gate. diff-cover's `--exclude` instead filters
+# *findings*: coverage.xml still carries the file's real numbers, and only
+# the one patch-coverage step is told to ignore them when deciding whether a
+# PR passes. This is not because server/tests/test_coverage_omissions.py
+# would catch the omission: its direction 1 only rejects a module that
+# imports cleanly or fails on repo code. In CI, orm/ is never on sys.path
+# (the workflow sets no PYTHONPATH; the editable install maps only
+# `eyened_orm`), so `_module_name` reduces orm/migrations/**/*.py to
+# `migrations.*`, which fails with `ModuleNotFoundError('migrations')` -- a
+# missing top-level name that is not repo code, which direction 1 treats as
+# an absent third-party package and accepts. The guard would reject the
+# omission only in a shell that happens to have orm/ on sys.path (e.g. a
+# local `PYTHONPATH=$PWD/orm` run), which is not CI's condition. Verified by
+# replaying direction 1 against every file under orm/migrations/ both ways.
 source = ["server", "orm"]
 omit = [
     "*/tests/*",
