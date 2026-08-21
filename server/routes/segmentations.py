@@ -88,7 +88,7 @@ async def create_segmentation(
 
 
 @router.get("/segmentations/{segmentation_id}", response_model=SegmentationGET)
-async def get_segmentation(
+def get_segmentation(
     segmentation_id: int,
     service: SegmentationService = Depends(get_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -98,7 +98,7 @@ async def get_segmentation(
 
 
 @router.delete("/segmentations/{segmentation_id}", status_code=204)
-async def delete_segmentation(
+def delete_segmentation(
     segmentation_id: int,
     service: SegmentationService = Depends(get_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -133,7 +133,7 @@ async def update_segmentation_data(
 
 
 @router.get("/segmentations/{segmentation_id}/data")
-async def get_segmentation_data(
+def get_segmentation_data(
     segmentation_id: int,
     axis: Optional[int] = None,
     scan_nr: Optional[int] = None,
@@ -145,7 +145,7 @@ async def get_segmentation_data(
 
 
 @router.patch("/segmentations/{segmentation_id}", response_model=SegmentationGET)
-async def patch_segmentation(
+def patch_segmentation(
     segmentation_id: int,
     dto: SegmentationPATCH,
     service: SegmentationService = Depends(get_segmentation_service),
@@ -161,7 +161,7 @@ async def patch_segmentation(
 
 
 @router.post("/segmentations/{segmentation_id}/tags", response_model=TagMeta)
-async def tag_segmentation(
+def tag_segmentation(
     segmentation_id: int,
     body: ObjectTagPOST,
     service: SegmentationService = Depends(get_segmentation_service),
@@ -176,7 +176,7 @@ async def tag_segmentation(
 
 
 @router.delete("/segmentations/{segmentation_id}/tags/{tag_id}", status_code=204)
-async def untag_segmentation(
+def untag_segmentation(
     segmentation_id: int,
     tag_id: int,
     service: SegmentationService = Depends(get_segmentation_service),
@@ -191,7 +191,7 @@ async def untag_segmentation(
 
 
 @router.get("/model-segmentations/{model_segmentation_id}/data")
-async def get_model_segmentation_data(
+def get_model_segmentation_data(
     model_segmentation_id: int,
     axis: Optional[int] = None,
     scan_nr: Optional[int] = None,

@@ -229,7 +229,7 @@ def check_login(username: str, password: str, db: Session) -> Creator:
 
 # API endpoints
 @router.post("/auth/login", response_model=UserResponse)
-async def login(
+def login(
     user_data: TokenLoginRequest,  # Changed from UserLogin to TokenLoginRequest
     response: Response,
     session: Session = Depends(get_db),
@@ -276,7 +276,7 @@ async def login(
 
 
 @router.post("/auth/token", response_model=TokenResponse)
-async def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
+def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
     """Get access token for API clients."""
     creator = check_login(user_data.username, user_data.password, session)
 
@@ -291,7 +291,7 @@ async def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
 
 
 @router.get("/auth/me", response_model=UserResponse)
-async def get_current_user_info(
+def get_current_user_info(
     current_user: CurrentUser = Depends(get_current_user),
     session: Session = Depends(get_db),
 ):
@@ -300,7 +300,7 @@ async def get_current_user_info(
 
 
 @router.post("/auth/change-password", response_model=UserResponse)
-async def change_password(
+def change_password(
     change_password_data: ChangePasswordRequest,
     session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
@@ -328,7 +328,7 @@ async def change_password(
 
 
 @router.post("/auth/register", response_model=UserResponse)
-async def register_user(
+def register_user(
     user_data: UserLogin,
     session: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
@@ -358,7 +358,7 @@ async def register_user(
 
 
 @router.post("/auth/refresh", response_model=UserResponse)
-async def refresh_token(
+def refresh_token(
     response: Response,
     refresh_token: str = Cookie(None),
     session: Session = Depends(get_db),
@@ -424,7 +424,7 @@ async def refresh_token(
 
 # Update logout to clear both cookies
 @router.post("/auth/logout")
-async def logout(response: Response):
+def logout(response: Response):
     """Logout and clear both JWT cookies."""
     response.delete_cookie(settings.jwt_cookie_name)
     response.delete_cookie(settings.refresh_cookie_name)
