@@ -264,23 +264,40 @@ def test_the_task_predicate_compiles_inside_a_query_that_joins_taskproject(entit
     claim is about the predicate, and it has to be checkable without waiting
     for a caller to grow into it.
 
-    Compiling is the assertion; the two string checks are there so a predicate
-    that degenerated into something trivially compilable (an uncorrelated
-    subquery, or one keyed on the wrong table) fails rather than passes. They
-    also fire if the predicate stops reading ``TaskProject`` at all -- measured,
-    not intended, and not this test's job: the behavioural coverage for that
-    mechanism lives in ``server/tests/test_task_containment_routes.py``.
+    Compiling is the assertion; two string checks stop a predicate that
+    degenerated into something trivially compilable from passing. **Each has to
+    be read off a different query.** ``FROM "TaskProject"`` belongs on the
+    joined query, where auto-correlation is the thing that would remove it. The
+    correlation does not: the join written here emits
+    ``"TaskProject"."TaskID" = "<entity>"."TaskID"`` itself, so asserting that
+    string against this SQL holds whatever the predicate does -- which is what
+    the first version of this test asserted, and both degenerations named just
+    below passed it. Compiled without the join, the equality can only have come from
+    the predicate, so it discriminates: dropping the correlating ``WHERE``
+    (keyed on nothing) removes it, and keying ``TaskProject`` on itself
+    replaces it. Both verified failing, for both entities.
+
+    Both checks also fire if the predicate stops reading ``TaskProject`` at
+    all -- measured, not intended, and not this test's job: the behavioural
+    coverage for that mechanism lives in
+    ``server/tests/test_task_containment_routes.py``.
     """
-    outer = (
+    joined = (
         select(entity)
         .join(TaskProject, TaskProject.TaskID == entity.TaskID)
         .where(scope_criteria(entity, _grader_scope(1)))
     )
-    sql = str(outer.compile(dialect=sqlite.dialect()))
-    # The subquery kept a FROM of its own...
-    assert 'FROM "TaskProject"' in sql
-    # ...and is correlated to the outer entity's row, not to itself.
-    assert f'"TaskProject"."TaskID" = "{entity.__tablename__}"."TaskID"' in sql
+    # The subquery kept a FROM of its own, under an enclosing query holding the
+    # one table it has.
+    assert 'FROM "TaskProject"' in str(joined.compile(dialect=sqlite.dialect()))
+
+    # ...and it is keyed on the outer entity's row -- not on itself, and not on
+    # nothing. Read off a query that joins nothing, because there the only
+    # thing that can emit this equality is the predicate.
+    alone = select(entity).where(scope_criteria(entity, _grader_scope(1)))
+    assert f'"TaskProject"."TaskID" = "{entity.__tablename__}"."TaskID"' in str(
+        alone.compile(dialect=sqlite.dialect())
+    )
 
 
 @pytest.mark.parametrize(

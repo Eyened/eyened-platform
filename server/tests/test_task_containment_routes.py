@@ -145,13 +145,18 @@ def test_the_list_omits_a_task_declared_into_an_unheld_project(
 def test_the_subtask_of_such_a_task_is_hidden_on_its_own_merits(
     client_scoped, spanning, declared_beyond_images
 ):
-    """``SubTask``'s half of the predicate -- reached by no other test.
+    """``SubTask``'s half of the predicate, on the route that resolves an id.
 
     ``GET /subtasks/{id}`` resolves the subtask directly, with no task lookup
-    ahead of it, so this is the one route where the ``SubTask`` branch answers
-    alone. It matters because that branch is the per-click read the whole
-    change was made for, and a half-revert -- declaration for ``Task``, image
-    walk for ``SubTask`` -- left the suite fully green before this test.
+    ahead of it, so the ``SubTask`` branch answers alone here. It is **one of
+    two** such routes, not the only one: ``get_task_subtask`` behind
+    ``GET /task/{task_id}/subtask/{subtask_index}`` goes straight to
+    ``list_for_task`` with nothing resolved ahead of it either, and the test
+    below covers it. ``GET /task/{task_id}/subtasks`` is the contrast --
+    ``list_task_subtasks`` resolves the task first, so ``Task``'s branch
+    answers before ``SubTask``'s is reached. A half-revert -- declaration for
+    ``Task``, image walk for ``SubTask`` -- left the suite fully green before
+    these two tests.
 
     Under the walk the subtask's own image, and every sibling's, sits in ``A``,
     so an ``A``-only scope sees it. Under the declaration its parent task
@@ -165,6 +170,32 @@ def test_the_subtask_of_such_a_task_is_hidden_on_its_own_merits(
     assert (
         client.get(f"/subtasks/{spanning['subtasks']['a_only-A']}").status_code == 200
     )
+
+
+def test_the_by_index_route_hides_the_subtask_too(
+    client_scoped, spanning, declared_beyond_images
+):
+    """The same branch on the route the viewer actually navigates with.
+
+    ``get_task_subtask`` calls ``list_for_task`` with no task lookup ahead of
+    it, so ``apply_scope(..., SubTask, ...)`` is the only thing here that can
+    produce a 404 -- the ``SubTask`` branch answering alone, as in the test
+    above. Pinned separately because this is the route the client's
+    ``fetchSubTaskByIndex`` drives for viewer navigation, which makes it the
+    per-click read the measured win belongs to; covering only ``/subtasks/{id}``
+    would leave the hot path free to revert to the image walk unnoticed.
+
+    Same row and same scope as above: under the walk the subtask's own image
+    sits in ``A`` and an ``A``-only member is served it; under the declaration
+    its parent reaches into ``B`` and it is not.
+    """
+    client, set_scope = client_scoped
+    set_scope(scope_for(spanning["projects"]["A"]))
+    task = declared_beyond_images["task"]
+    assert client.get(f"/task/{task}/subtask/0").status_code == 404
+    # The control: the same route on a task whose declaration this scope covers,
+    # so a 404 that came from the index rather than the scope would show up.
+    assert client.get(f"/task/{spanning['a_only']}/subtask/0").status_code == 200
 
 
 def test_a_member_of_both_declared_projects_sees_the_task_and_its_subtask(
