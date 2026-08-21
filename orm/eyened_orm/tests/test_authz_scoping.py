@@ -181,7 +181,14 @@ def test_an_inactive_image_still_ties_its_project_to_the_task(session):
     }
 
 
-def test_a_task_with_no_images_touches_no_projects(session):
+def test_a_task_that_declares_nothing_touches_no_projects(session):
+    """The empty declaration -- the shape ``require`` fails closed on.
+
+    ``projects_of`` reads ``TaskProject``, so what produces the empty set is
+    the empty declaration and not the absence of images: ``_task_over``
+    declares one project per distinct image project, and an empty ``images``
+    list declares none.
+    """
     task, _ = _task_over(session, [])
     session.commit()
     assert projects_of(session, Task, task.TaskID) == set()

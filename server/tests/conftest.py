@@ -363,9 +363,12 @@ def one_project(session):
     subtask = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
     session.add(subtask)
     session.flush()
-    # The link is what makes the task *populated*: without it the task touches
-    # no projects and every floor on it fails closed, so the project-admin
-    # delete cell would pass for the wrong reason.
+    # A task's projects are its declaration, so the TaskProject row above is
+    # what keeps the floors on this task non-vacuous -- not this link. What the
+    # link still does is make the task *populated* in the data sense: the
+    # project-admin delete cell then has to cascade through a real link row as
+    # well as through the declaration. No assertion depends on it -- removing
+    # it leaves the whole suite green.
     session.add(
         SubTaskImageLink(
             SubTaskID=subtask.SubTaskID,
