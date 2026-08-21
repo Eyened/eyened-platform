@@ -45,11 +45,11 @@ implicitly, so the statements below commit one at a time and an interrupted run
 -- a crash, a timeout on the rebuild, or an operator recovery (`alembic stamp
 <down_revision>` then `alembic upgrade head`) -- can re-enter this function with
 any prefix already applied. Each step is guarded by the state it would produce.
-Nothing that can raise runs after the first ALTER: the gate and the
-single-column-FK discovery, the only two things here that can fail on a
-well-formed database, both happen before any DDL. Verified by killing the run at
-every statement boundary and re-running from each, upgrade and downgrade alike,
-with a negative control on an unguarded copy.
+Nothing that can raise runs after the first ALTER: the cascade-order guard, the
+gate and the single-column-FK discovery -- the three things here that can fail
+on a well-formed database -- all happen before any DDL. Verified by killing the
+run at every statement boundary and re-running from each, upgrade and downgrade
+alike, with a negative control on an unguarded copy.
 """
 from typing import Sequence, Union
 
@@ -266,7 +266,7 @@ def _require_strict_sql_mode(conn: Connection) -> None:
 
 
 def _require_subtask_cascade_first(conn: Connection) -> None:
-    """Refuse to run unless SubTask's key to Task sorts before TaskProject's.
+    """Refuse to run unless TaskProject's key to Task sorts last.
 
     `fk_SubTaskImageLink_TaskProject`, added below, is a RESTRICT key from the
     link rows to the declaration. `DELETE FROM Task` is a single statement:
@@ -277,38 +277,58 @@ def _require_subtask_cascade_first(conn: Connection) -> None:
     and a declaration.
 
     So the ordering is a correctness property of the schema, and it is spelled
-    entirely in two constraint NAMES. `fk_TaskProject_Task` is picked to lose
-    that race against every name SubTask's key has plausibly worn (see the
-    migration that creates TaskProject for the byte comparison), but only one
-    of the two is ours: SubTask's is whatever MySQL last auto-generated, and a
-    future migration that re-adds or tidies it can move it. Nothing else would
-    catch that -- the delete tests run on SQLite, where cascade ordering is a
-    different engine's choice -- so it is caught here, at the migration that
-    creates the dependency, before its first DDL.
+    entirely in constraint NAMES. `fk_TaskProject_Task` is picked to lose that
+    race against every name SubTask's key has plausibly worn (see the migration
+    that creates TaskProject for the byte comparison), but only that half is
+    ours: SubTask's is whatever MySQL last auto-generated, and a future
+    migration that re-adds or tidies it can move it.
 
-    Identified by child and referenced table, never by name: names changing is
-    the entire failure mode.
+    What this covers is THIS migration's own apply, and nothing after it. It
+    runs when revision 2db0e63195db runs; a rename applied by a LATER migration
+    -- or by hand -- to an already-upgraded database walks straight past it, and
+    the next task delete fails 1451 in production. Nothing in the repo closes
+    that gap today: the delete tests run on SQLite, where cascade ordering is a
+    different engine's choice and constraint names carry no ordering meaning at
+    all. Closing it would take a standing schema assertion in CI or a
+    MySQL-backed delete test; neither exists yet.
+
+    Asserted over EVERY constraint referencing Task rather than SubTask's
+    alone, and identified by child and referenced table rather than by name:
+    names changing is the entire failure mode, and a third child of Task added
+    later would otherwise slip past.
 
     Read from information_schema.REFERENTIAL_CONSTRAINTS rather than
     INNODB_FOREIGN, whose ID column is literally the InnoDB constraint id: the
     INNODB_* tables need the PROCESS privilege, which a DDL role has no other
-    reason to hold, and the id is `schema/name` with both constraints in the
-    same schema -- so comparing names is the same comparison. Verified against
-    INNODB_FOREIGN on 8.0.27.
+    reason to hold, and the id is `schema/name` with every row here pinned to
+    this schema on both sides -- so comparing names is the same comparison.
+    Verified against INNODB_FOREIGN on 8.0.27.
 
     The comparison is done in Python on UTF-8 bytes, not in SQL. MySQL's
     default collation here is utf8mb4_0900_ai_ci, which is case-INSENSITIVE,
-    and case is exactly what decides this: measured on 8.0.27, `AA_SubTask_Task`
-    sorts first and `aa_SubTask_Task` does not, while a ci collation calls them
-    equal. Python's `bytes` comparison is byte-wise by definition.
+    and case is exactly what decides this. Measured on 8.0.27 against the
+    deployed `fk_TaskProject_Task`, a ci comparison is wrong in BOTH
+    directions:
+
+        SubTask_ibfk_2   byte-wise sorts first, correctly ('S' 0x53 < 'f'
+                         0x66), but ci folds it to `subtask_ibfk_2` and puts
+                         it last -- a false alarm on the deployed schema.
+        fk_subTask_Task  byte-wise sorts last ('s' 0x73 > 'T' 0x54), so the
+                         delete really would fail -- but ci folds it to
+                         `fk_subtask_task` and waves it through.
+
+    Python's `bytes` comparison is byte-wise by definition.
     """
+    # UNIQUE_CONSTRAINT_SCHEMA is the REFERENCED side's schema in this view --
+    # there is no REFERENCED_TABLE_SCHEMA column -- so it is what stops a
+    # foreign key to some other schema's `Task` from being counted.
     rows = conn.execute(
         sa.text("""
             SELECT TABLE_NAME, CONSTRAINT_NAME
             FROM information_schema.REFERENTIAL_CONSTRAINTS
             WHERE CONSTRAINT_SCHEMA = DATABASE()
+              AND UNIQUE_CONSTRAINT_SCHEMA = DATABASE()
               AND REFERENCED_TABLE_NAME = 'Task'
-              AND TABLE_NAME IN ('SubTask', 'TaskProject')
         """)
     ).fetchall()
     by_child: dict[str, list[str]] = {}
@@ -325,22 +345,35 @@ def _require_subtask_cascade_first(conn: Connection) -> None:
             "written against."
         )
 
-    # Worst case on each side: EVERY SubTask key must sort before EVERY
-    # TaskProject key, since InnoDB walks all of them and any one of them
-    # taking the TaskProject branch early is enough to fail the delete.
-    last_subtask = max(by_child["SubTask"], key=str.encode)
-    first_taskproject = min(by_child["TaskProject"], key=str.encode)
-    if last_subtask.encode() >= first_taskproject.encode():
+    # TaskProject's key must sort LAST among every constraint referencing Task:
+    # InnoDB walks all of them, and any single one of them taking the
+    # TaskProject branch early is enough to fail the delete. `min` picks the
+    # worst case on the TaskProject side, should it ever grow a second key.
+    first_taskproject = min(by_child.pop("TaskProject"), key=str.encode)
+    late = sorted(
+        (
+            name
+            for names in by_child.values()
+            for name in names
+            if name.encode() >= first_taskproject.encode()
+        ),
+        key=str.encode,
+    )
+    if late:
         raise RuntimeError(
-            f"cascade order is wrong: SubTask's foreign key to Task is named "
-            f"{last_subtask!r}, which does NOT sort before TaskProject's "
-            f"{first_taskproject!r}. InnoDB walks a parent's referencing "
-            "constraints in constraint-id order, so DELETE FROM Task would take "
-            "the TaskProject branch first, withdrawing a declaration the link "
-            "rows still reference: deleting any task that has both images and a "
-            "declaration would fail with ERROR 1451 on "
-            "fk_SubTaskImageLink_TaskProject. Rename one of the two so the "
-            "SubTask key sorts first (byte-wise, case-sensitive), then re-run."
+            "cascade order is wrong: TaskProject's foreign key to Task is "
+            f"named {first_taskproject!r}, and {', '.join(map(repr, late))} "
+            "-- also referencing Task -- does not sort before it. InnoDB walks "
+            "a parent's referencing constraints in constraint-id order, so "
+            "DELETE FROM Task would take the TaskProject branch first, "
+            "withdrawing a declaration the link rows still reference: deleting "
+            "any task that has both images and a declaration would fail with "
+            "ERROR 1451 on fk_SubTaskImageLink_TaskProject. Rename the "
+            "constraint(s) just listed so they sort before "
+            f"{first_taskproject!r} (byte-wise, case-sensitive), then re-run. "
+            "Do NOT rename fk_TaskProject_Task instead: that name is declared "
+            "in the ORM model, so moving it here alone would leave "
+            "--autogenerate emitting a drop-and-add for it forever."
         )
 
 

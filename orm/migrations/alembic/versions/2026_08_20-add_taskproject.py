@@ -123,22 +123,30 @@ def upgrade() -> None:
             # InnoDB walks a parent's referencing constraints in constraint-id
             # order (`schema/name`), compared BYTE-WISE and case-sensitively --
             # measured, not assumed. So the SubTask branch has to sort first.
-            # We do not control SubTask's constraint name: 2025_09_15's
-            # `create_foreign_key(None, ...)` leaves MySQL to pick it, and it
-            # has already come out as both `SubTask_ibfk_1` (live) and
-            # `SubTask_ibfk_2` (built from orm_baseline). `fk_TaskProject_Task`
-            # loses to every name that key has plausibly worn:
+            # We do not control SubTask's constraint name:
+            # `versions_archive/2025_09_15-creatortag_table.py` dropped it and
+            # re-added the key with `create_foreign_key(None, ...)`, leaving
+            # MySQL to pick it, and it has already come out as both
+            # `SubTask_ibfk_1` (live) and `SubTask_ibfk_2` (built from
+            # orm_baseline). `fk_TaskProject_Task` loses to every name that key
+            # has plausibly worn:
             #
             #   vs SubTask_ibfk_1 / _2   'S' 0x53 < 'f' 0x66      SubTask first
             #   vs fk_SubTask_Task1      shared "fk_" prefix,
             #                            then 'S' 0x53 < 'T' 0x54  SubTask first
             #
-            # (`fk_SubTask_Task1` is the legacy name, still worn by the INDEX;
-            # under it an UNNAMED key here -- `TaskProject_ibfk_1` -- would put
-            # TaskProject first and fail 1451.) Renaming this constraint is a
-            # correctness change, not a cosmetic one. The containment migration
-            # asserts the ordering before its first DDL so a rename fails there
-            # rather than at delete time.
+            # `fk_SubTask_Task1` is in that table because it is the name this
+            # CONSTRAINT itself held until 2025_09_15 dropped it -- not a name
+            # someone might invent. The stem is still in the schema as the
+            # index `fk_SubTask_Task1_idx` on SubTask.TaskID, so a naming
+            # convention pass or a schema tidy-up restoring it to the
+            # constraint is a realistic event rather than a hypothetical one,
+            # and under an UNNAMED key here -- `TaskProject_ibfk_1` -- it would
+            # put TaskProject first and fail 1451. That is the strongest single
+            # reason this key is named at all. Renaming it is a correctness
+            # change, not a cosmetic one. The containment migration asserts the
+            # ordering before its first DDL so a rename fails there rather than
+            # at delete time.
             sa.ForeignKeyConstraint(
                 ["TaskID"],
                 ["Task.TaskID"],
