@@ -39,7 +39,18 @@ class Database:
     def __init__(
         self,
         database_settings: DatabaseSettings | str | PathLike[str] | None = None,
+        *,
+        pool_size: int = 5,
+        max_overflow: int = 10,
+        pool_recycle: int = 3600,
     ):
+        """Pool sizing is per *process role*, not per database.
+
+        The defaults are SQLAlchemy's own. They stay that way because the CLI,
+        the importer and every RQ job build their own Database -- and therefore
+        their own engine and pool -- so a tuned default here would multiply
+        connections in processes that need one. Only the API overrides them.
+        """
         if database_settings is None:
             self.database_settings = load_database_settings()
         elif isinstance(database_settings, DatabaseSettings):
@@ -48,7 +59,14 @@ class Database:
             self.database_settings = load_database_settings(database_settings)
 
         self.engine = create_engine(
-            create_connection_string(self.database_settings), pool_pre_ping=True
+            create_connection_string(self.database_settings),
+            pool_pre_ping=True,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            # pool_pre_ping already survives a connection dropped by MySQL's
+            # wait_timeout; recycling avoids paying its round-trip on
+            # connections already known to be too old.
+            pool_recycle=pool_recycle,
         )
         self._session_factory = sessionmaker(
             bind=self.engine,
