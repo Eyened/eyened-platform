@@ -3,6 +3,7 @@ import sys
 import traceback
 from contextlib import asynccontextmanager
 
+import anyio.to_thread
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -115,6 +116,13 @@ async def lifespan(app: FastAPI):
 
     # Audit events go to stdout as JSON; app/debug logs stay on stderr.
     configure_audit_logging()
+
+    # Sync handlers run here. anyio's default is 40, which would outnumber the
+    # connection pool; Settings validates the two against each other, and this
+    # is where the chosen number takes effect. Must run inside the loop.
+    anyio.to_thread.current_default_thread_limiter().total_tokens = (
+        settings.threadpool_limit
+    )
 
     yield
     # after shutdown
