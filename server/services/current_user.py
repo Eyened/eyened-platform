@@ -31,6 +31,13 @@ from eyened_orm.authz.bootstrap import ensure_admin
 from ..config import settings
 from ..db import get_db
 
+# The bypass bootstraps its account once per process. ensure_admin is a write
+# path, and repeating it per request does work no later request can need --
+# it also skews any local measurement taken against the bypass. The id is
+# cached; the *right* to use it is not, so the row is still read every request
+# and a deactivated account is still rejected.
+_BYPASS_CREATOR_ID: int | None = None
+
 
 class CurrentUser:
     def __init__(self, creator_id: int, username: str):
@@ -78,20 +85,24 @@ async def get_current_user(
     """Get the current authenticated user from either Authorization header or cookies."""
     # Bypass authentication if disabled (development mode)
     if settings.public_auth_disabled:
-        # ensure_admin, not a bare lookup: the account is a data superuser only
-        # if it is an administrator, and any dump taken before cutover has
-        # IsAdmin false on every row. No password is passed, though: the
-        # bypass never authenticates with one, and passing a password through
-        # would overwrite any password an operator set on this account on
-        # every single request.
-        creator, _ = ensure_admin(
-            session,
-            settings.admin_username,
-            None,
-        )
-        return CurrentUser(
-            creator_id=creator.CreatorID, username=creator.CreatorName
-        )
+        global _BYPASS_CREATOR_ID
+        if _BYPASS_CREATOR_ID is None:
+            # ensure_admin, not a bare lookup: the account is a data superuser
+            # only if it is an administrator, and any dump taken before cutover
+            # has IsAdmin false on every row. No password is passed: the
+            # bypass never authenticates with one, and passing one through
+            # would overwrite any password an operator set on this account on
+            # every single request.
+            creator, _ = ensure_admin(session, settings.admin_username, None)
+            _BYPASS_CREATOR_ID = creator.CreatorID
+        else:
+            creator = session.get(Creator, _BYPASS_CREATOR_ID)
+        if creator is None or creator.Inactive:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+        return CurrentUser(creator_id=creator.CreatorID, username=creator.CreatorName)
 
     # Try Authorization header first (for API clients)
     if authorization and authorization.startswith("Bearer "):

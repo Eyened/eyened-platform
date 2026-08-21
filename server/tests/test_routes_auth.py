@@ -209,6 +209,14 @@ def test_dev_bypass_promotes_the_configured_account_to_administrator(
         "server.services.current_user.settings",
         Settings(public_auth_disabled=True, admin_username="devadmin"),
     )
+    # The bypass caches the bootstrapped account's id at module scope to avoid
+    # re-running ensure_admin per request. That models one id surviving for
+    # the life of a process; this test's `session` fixture is a fresh
+    # database standing in for a fresh process, so the leftover id from
+    # another test must not leak in here.
+    monkeypatch.setattr(
+        "server.services.current_user._BYPASS_CREATOR_ID", None, raising=False
+    )
 
     with TestClient(app_api) as client:
         resp = client.get("/auth/me")
@@ -247,6 +255,13 @@ def test_dev_bypass_works_without_configuring_a_password(session, monkeypatch):
         # module's namespace, so this is the target that must be patched.
         "server.services.current_user.settings",
         Settings(public_auth_disabled=True, admin_username="devadmin"),
+    )
+    # See the identical comment in
+    # test_dev_bypass_promotes_the_configured_account_to_administrator: the
+    # bypass's process-scoped id cache must not survive into this test's own
+    # fresh database.
+    monkeypatch.setattr(
+        "server.services.current_user._BYPASS_CREATOR_ID", None, raising=False
     )
 
     with TestClient(app_api) as client:
@@ -295,6 +310,15 @@ def test_dev_bypass_never_forwards_a_password_to_ensure_admin(session, monkeypat
             public_auth_disabled=True,
             admin_username="devadmin",
         ),
+    )
+    # See the identical comment in
+    # test_dev_bypass_promotes_the_configured_account_to_administrator: the
+    # bypass's process-scoped id cache must not survive into this test's own
+    # fresh database. Without this reset the assertion below passes only by
+    # coincidence, because the seeded creator happens to land on the same id
+    # a prior test cached.
+    monkeypatch.setattr(
+        "server.services.current_user._BYPASS_CREATOR_ID", None, raising=False
     )
 
     with TestClient(app_api) as client:
