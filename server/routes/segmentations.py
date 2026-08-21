@@ -13,6 +13,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
+from starlette.concurrency import run_in_threadpool
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
@@ -68,7 +69,8 @@ async def create_segmentation(
 ):
     dto = SegmentationPOST.model_validate_json(metadata)
     array = await load_array(np_array)
-    segmentation = service.create(
+    segmentation = await run_in_threadpool(
+        service.create,
         image_id=dto.image_id,
         feature_id=dto.feature_id,
         subtask_id=dto.subtask_id,
@@ -123,13 +125,18 @@ async def update_segmentation_data(
         raise HTTPException(
             status_code=400, detail=f"Unsupported media type: {content_type}"
         )
-    np_image = np.load(io.BytesIO(await request.body()))
-    return service.write_data(
-        segmentation_id,
-        np_image,
-        axis=axis,
-        scan_nr=scan_nr,
-    )
+    body = await request.body()
+
+    def _write():
+        # np.load parses the whole array; it belongs off the loop with the write.
+        return service.write_data(
+            segmentation_id,
+            np.load(io.BytesIO(body)),
+            axis=axis,
+            scan_nr=scan_nr,
+        )
+
+    return await run_in_threadpool(_write)
 
 
 @router.get("/segmentations/{segmentation_id}/data")
@@ -216,7 +223,14 @@ async def update_model_segmentation_data(
         raise HTTPException(
             status_code=400, detail=f"Unsupported media type: {content_type}"
         )
-    np_image = np.load(io.BytesIO(await request.body()))
-    return service.write_data(
-        model_segmentation_id, np_image, axis=axis, scan_nr=scan_nr
-    )
+    body = await request.body()
+
+    def _write():
+        return service.write_data(
+            model_segmentation_id,
+            np.load(io.BytesIO(body)),
+            axis=axis,
+            scan_nr=scan_nr,
+        )
+
+    return await run_in_threadpool(_write)

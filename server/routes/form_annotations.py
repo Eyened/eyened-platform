@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Request, Response
+from starlette.concurrency import run_in_threadpool
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPATCH, ObjectTagPOST, TagMeta
@@ -110,7 +111,8 @@ async def update_form_annotation_value(
 ):
     """Overwrite a form annotation's FormData payload."""
     form_data = await request.json()
-    service.set_value(
+    await run_in_threadpool(
+        service.set_value,
         form_annotation_id,
         form_data,
     )
