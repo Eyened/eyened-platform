@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from eyened_orm import Creator
@@ -30,13 +31,6 @@ from eyened_orm.authz.bootstrap import ensure_admin
 
 from ..config import settings
 from ..db import get_db
-
-# The bypass bootstraps its account once per process. ensure_admin is a write
-# path, and repeating it per request does work no later request can need --
-# it also skews any local measurement taken against the bypass. The id is
-# cached; the *right* to use it is not, so the row is still read every request
-# and a deactivated account is still rejected.
-_BYPASS_CREATOR_ID: int | None = None
 
 
 class CurrentUser:
@@ -85,19 +79,24 @@ async def get_current_user(
     """Get the current authenticated user from either Authorization header or cookies."""
     # Bypass authentication if disabled (development mode)
     if settings.public_auth_disabled:
-        global _BYPASS_CREATOR_ID
-        if _BYPASS_CREATOR_ID is None:
-            # ensure_admin, not a bare lookup: the account is a data superuser
-            # only if it is an administrator, and any dump taken before cutover
-            # has IsAdmin false on every row. No password is passed: the
-            # bypass never authenticates with one, and passing one through
-            # would overwrite any password an operator set on this account on
-            # every single request.
+        # Read first, so the common case is a SELECT rather than ensure_admin's
+        # flush. ensure_admin is still what runs when the account is missing or
+        # is not an administrator: the bypass account is a data superuser only
+        # if it is one, and any dump taken before cutover has IsAdmin false on
+        # every row. No password is passed -- the bypass never authenticates
+        # with one, and passing one through would overwrite any password an
+        # operator set on this account.
+        #
+        # Deliberately not cached in a module global: caching the id saved no
+        # query (a fresh session per request means the lookup is a SELECT
+        # either way), stopped re-checking IsAdmin after the first request,
+        # and leaked across tests.
+        creator = session.scalars(
+            select(Creator).where(Creator.CreatorName == settings.admin_username)
+        ).first()
+        if creator is None or not creator.IsAdmin:
             creator, _ = ensure_admin(session, settings.admin_username, None)
-            _BYPASS_CREATOR_ID = creator.CreatorID
-        else:
-            creator = session.get(Creator, _BYPASS_CREATOR_ID)
-        if creator is None or creator.Inactive:
+        if creator.Inactive:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication required",

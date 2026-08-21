@@ -1,9 +1,5 @@
-"""The dev bypass bootstraps once, not once per request.
-
-ensure_admin is a write path. Running it per request skews any local
-measurement and does work the second request cannot need. The deactivation
-check must survive, so the cache holds an id and the per-request path stays a
-lookup.
+"""The dev bypass resolves the configured account by name every request,
+falling back to ensure_admin only when the row is missing or not an admin.
 """
 from __future__ import annotations
 
@@ -13,24 +9,35 @@ import pytest
 
 
 class _Creator:
-    def __init__(self, creator_id: int = 7, inactive: bool = False) -> None:
+    def __init__(
+        self, creator_id: int = 7, inactive: bool = False, is_admin: bool = True
+    ) -> None:
         self.CreatorID = creator_id
         self.CreatorName = "admin"
         self.Inactive = inactive
+        self.IsAdmin = is_admin
+
+
+class _Scalars:
+    def __init__(self, result) -> None:
+        self._result = result
+
+    def first(self):
+        return self._result
 
 
 class _Session:
-    def __init__(self, creator: _Creator) -> None:
+    def __init__(self, creator: _Creator | None) -> None:
         self._creator = creator
-        self.gets = 0
+        self.lookups = 0
 
-    def get(self, _model, _pk):
-        self.gets += 1
-        return self._creator
+    def scalars(self, _stmt):
+        self.lookups += 1
+        return _Scalars(self._creator)
 
 
 @pytest.fixture()
-def bypass(monkeypatch):
+def cu(monkeypatch):
     import server.services.current_user as cu
 
     # Settings sets model_config frozen=True, so a field cannot be patched --
@@ -41,22 +48,20 @@ def bypass(monkeypatch):
         "settings",
         SimpleNamespace(public_auth_disabled=True, admin_username="admin"),
     )
-    monkeypatch.setattr(cu, "_BYPASS_CREATOR_ID", None, raising=False)
-    calls = {"n": 0}
-    creator = _Creator()
-
-    def _fake_ensure_admin(session, username, password):
-        calls["n"] += 1
-        return creator, None
-
-    monkeypatch.setattr(cu, "ensure_admin", _fake_ensure_admin)
-    return cu, calls, _Session(creator)
+    return cu
 
 
-def test_ensure_admin_runs_once_across_many_requests(bypass):
-    """The write happens on the first request only."""
-    cu, calls, session = bypass
+def test_existing_active_admin_skips_ensure_admin_and_is_read_every_request(
+    cu, monkeypatch
+):
+    """No write path runs once the account already qualifies; the read repeats."""
     import anyio
+
+    def _fail_if_called(*_args, **_kwargs):
+        raise AssertionError("ensure_admin must not run for an existing admin")
+
+    monkeypatch.setattr(cu, "ensure_admin", _fail_if_called)
+    session = _Session(_Creator())
 
     async def call():
         return await cu.get_current_user(session=session)
@@ -65,19 +70,40 @@ def test_ensure_admin_runs_once_across_many_requests(bypass):
         user = anyio.run(call)
         assert user.id == 7
 
-    assert calls["n"] == 1, f"ensure_admin ran {calls['n']} times, expected 1"
-    assert session.gets == 4, "requests after the first must still look the row up"
+    assert session.lookups == 5
 
 
-def test_a_deactivated_bootstrap_account_is_rejected(bypass):
-    """Caching an id must not cache the right to use it."""
+def test_a_deactivated_account_is_rejected(cu, monkeypatch):
+    """Found and already admin, but Inactive still 401s."""
     import anyio
     from fastapi import HTTPException
 
-    cu, _, session = bypass
-    anyio.run(lambda: cu.get_current_user(session=session))  # populate the cache
-    session._creator.Inactive = True
+    def _fail_if_called(*_args, **_kwargs):
+        raise AssertionError("ensure_admin must not run for an already-admin account")
+
+    monkeypatch.setattr(cu, "ensure_admin", _fail_if_called)
+    session = _Session(_Creator(inactive=True))
 
     with pytest.raises(HTTPException) as exc:
         anyio.run(lambda: cu.get_current_user(session=session))
     assert exc.value.status_code == 401
+
+
+def test_a_missing_account_still_bootstraps(cu, monkeypatch):
+    """No row by that name yet: ensure_admin creates and promotes it."""
+    import anyio
+
+    calls = {"n": 0}
+    creator = _Creator()
+
+    def _fake_ensure_admin(session, username, password):
+        calls["n"] += 1
+        return creator, None
+
+    monkeypatch.setattr(cu, "ensure_admin", _fake_ensure_admin)
+    session = _Session(None)
+
+    user = anyio.run(lambda: cu.get_current_user(session=session))
+
+    assert calls["n"] == 1
+    assert user.id == creator.CreatorID
