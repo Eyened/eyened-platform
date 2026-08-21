@@ -6,7 +6,7 @@ from json import JSONDecodeError
 
 import httpxyz
 from eyened_orm.utils.pretty_settings import pretty_settings
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict, BaseSettings
 
 
@@ -142,6 +142,38 @@ class Settings(BaseSettings):
     jwt_cookie_name: str = "jwt_token"
     refresh_cookie_name: str = "refresh_token"
     gzip_minimum_size: int = 1024 * 1024
+
+    # Thread capacity is the binding constraint and the pool is sized to serve
+    # it, so a request never waits on pool checkout. anyio's own default is 40
+    # threads, which against SQLAlchemy's default 5+10 pool would queue 25 of
+    # them behind a 30s pool_timeout.
+    threadpool_limit: int = Field(
+        default=16,
+        ge=1,
+        description="Threads this API worker runs sync handlers in.",
+    )
+    pool_size: int = Field(
+        default=16,
+        ge=1,
+        description="Persistent DB connections per API worker.",
+    )
+    max_overflow: int = Field(
+        default=4,
+        ge=0,
+        description="Extra burst connections above pool_size, for dependency-time checkouts.",
+    )
+
+    @model_validator(mode="after")
+    def _threads_cannot_outnumber_connections(self) -> "Settings":
+        capacity = self.pool_size + self.max_overflow
+        if self.threadpool_limit > capacity:
+            raise ValueError(
+                f"threadpool_limit ({self.threadpool_limit}) exceeds pool capacity "
+                f"({self.pool_size} + {self.max_overflow} = {capacity}). The excess "
+                "threads would block in pool.connect() until pool_timeout. Raise "
+                "pool_size/max_overflow or lower threadpool_limit."
+            )
+        return self
 
     default_study_date: date = date(1970, 1, 1)
 
