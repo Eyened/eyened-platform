@@ -14,7 +14,7 @@ from collections.abc import Callable, Sequence
 from collections.abc import Set as AbstractSet
 
 from sqlalchemy import ColumnElement, Select, exists, select
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session
 from sqlalchemy.orm.util import AliasedClass
 
 from ..base import Base
@@ -273,6 +273,10 @@ def _subtask_images_to_patient(
     soft-deleted image still ties its project to the task, and excluding it
     would silently widen who can see the task -- the one direction this design
     must never move in by accident.
+
+    No callers left: ``project_ids_of_task``/``_subtask`` moved onto
+    ``TaskProject``, and so has ``_set_valued_predicate``. Kept only so its
+    deletion lands with the rest of the walk.
     """
     return _join_to_patient(
         select(Patient.ProjectID)
@@ -304,40 +308,29 @@ def project_ids_of_subtask(subtask_id: int) -> Select:
 def _set_valued_predicate(
     entity: type[Base], accessible: AbstractSet[int]
 ) -> ColumnElement[bool]:
-    """NOT EXISTS (a project of this row that is outside the accessible set).
+    """NOT EXISTS (a project this task declares that is outside the scope).
 
-    Gives vacuity for free: a task with no images produces no rows, so the
-    EXISTS is false and NOT EXISTS is true -- visible to everyone, which is what
-    v0.3 specifies. It also behaves correctly for an actor with no memberships:
-    ``NOT IN ()`` renders true, so any task with at least one project is
-    excluded and only the empty ones remain.
+    Reads the declaration rather than walking the image links, which is what
+    makes this O(projects per task) instead of O(links in the task). Both
+    entities key on their own ``TaskID`` column, so neither needs a join.
 
-    This is the **read** rule for ``Task``/``SubTask`` and it is image-derived:
-    it walks ``_subtask_images_to_patient`` -- every sibling subtask of the same
-    task, out to its image links, up ``_PARENT_OF`` to ``Patient.ProjectID``.
-    The **write** rule for those same two entities no longer does.
-    ``project_ids_of_task`` and ``project_ids_of_subtask``, which ``projects_of``
-    dispatches to, read ``TaskProject`` -- the task's *declaration*. So the two
-    paths answer different questions about one task: it is findable by the
-    projects its images occupy and writable by the projects it declares. They
-    were the same walk until the declaration became authoritative for writes,
-    and they converge again when this predicate moves onto ``TaskProject`` too.
-    Until then the declaration is the superset of the two, which is why the
-    divergence is fail-safe: writes are the tighter side.
+    Vacuity is unchanged: a task declaring nothing produces no rows, so the
+    EXISTS is false and NOT EXISTS is true -- visible to everyone. An actor
+    with no memberships still sees only those, since ``NOT IN ()`` renders
+    true and excludes any task with a declaration.
 
-    ``.correlate(entity)`` is explicit here for uniformity with
-    ``_single_project_predicate``, but **not** for the failure that motivates
-    it there. That failure needs a subquery whose entire FROM is a table the
-    enclosing query already has: ``_single_project_predicate(Study)``, whose
-    FROM is just ``Patient``, raises ``InvalidRequestError`` under a query that
-    joins ``Patient``, while this predicate compiles with or without the call --
-    its FROM is a six-table join tree auto-correlation cannot empty. Keep it
-    anyway: it pins exactly one outer table instead of leaving the choice to
-    auto-correlation as the enclosing shapes grow.
+    Read and write now answer the same question about a task: it is findable
+    by the projects it declares and writable by them too. ``projects_of``
+    dispatches to ``project_ids_of_task``/``_subtask``, which select from this
+    same table -- the selectable form of what is correlated here.
+
+    ``.correlate(entity)`` is load-bearing now, not the uniformity it was while
+    this walked six tables: the subquery's entire FROM is ``TaskProject``, so a
+    read that joins ``TaskProject`` itself would have auto-correlation strip it
+    and raise ``InvalidRequestError`` -- the failure that motivates the call in
+    ``_single_project_predicate``. Naming the outer entity pins exactly one
+    correlated table and turns auto-correlation off.
     """
-    sibling = aliased(SubTask)
-    # SubTask is scoped by its *parent task*, not only by its own images, so
-    # both branches walk every sibling subtask of the same task.
     if entity is Task:
         task_id_column = Task.TaskID
     elif entity is SubTask:
@@ -345,9 +338,10 @@ def _set_valued_predicate(
     else:
         raise KeyError(entity)
     inner = (
-        _subtask_images_to_patient(sibling)
-        .where(sibling.TaskID == task_id_column)
-        .where(Patient.ProjectID.notin_(accessible))
+        select(1)
+        .select_from(TaskProject)
+        .where(TaskProject.TaskID == task_id_column)
+        .where(TaskProject.ProjectID.notin_(accessible))
         .correlate(entity)
     )
     return ~exists(inner)
@@ -380,10 +374,10 @@ def projects_of(session: Session, entity: type[Base], entity_id: int) -> set[int
     """Execute the entity's rule and return its project set.
 
     Used by writes (``scope.require(projects_of(...), floor)``) and by the CLI's
-    ``grant-for-task``. For the single-project entities the read path correlates
-    these same definitions; for ``Task`` and ``SubTask`` it no longer does --
-    reads stay on the image walk, these two resolve the declaration. See
-    ``_set_valued_predicate``.
+    ``grant-for-task``. The read path correlates these same definitions for
+    every entity here, ``Task`` and ``SubTask`` included: the divergence that
+    stood while reads walked the image links closed when
+    ``_set_valued_predicate`` moved onto ``TaskProject``.
     """
     return set(session.scalars(PROJECT_IDS_OF[entity](entity_id)).all())
 

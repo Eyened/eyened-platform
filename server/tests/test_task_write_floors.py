@@ -113,11 +113,15 @@ def test_creating_a_task_declaring_an_unheld_project_is_refused(
 ):
     """The create floor's *refused* direction, which nothing else supplies.
 
-    ``create_task``'s ``scope.require`` is the only thing standing here. The
-    task it would otherwise write has no images yet, so the scoped re-read that
-    follows is vacuously true and would hand this actor back a task in a
-    project they cannot see -- neuter the ``require`` and this request answers
-    200.
+    ``create_task``'s ``scope.require`` is the only *authorization* standing
+    here, and it is what makes the refusal an answer rather than a crash. The
+    scoped re-read that follows was vacuously true while the read predicate
+    walked image links -- the task it would write has none -- and would have
+    handed this actor back a task in a project they cannot see. Now that the
+    predicate reads the declaration, that re-read refuses the row instead, so
+    neutering the ``require`` yields a 500 (``create_task`` dereferences the
+    ``None``), not a 200. Still discriminating: 404 is the only outcome here
+    that is a decision rather than a failure.
 
     404, not 403: the actor holds no role at all in B, so ``require`` raises
     ``NotVisibleError`` from its ``missing`` branch, and a 403 would confirm a
@@ -126,9 +130,9 @@ def test_creating_a_task_declaring_an_unheld_project_is_refused(
     from eyened_orm.utils.factories import make_creator
 
     # Seeded even though the refusal precedes the insert: without a Creator row
-    # the insert under a neutered ``require`` fails on Task.CreatorID's FK and
-    # answers 500, and a control that cannot reach 200 proves nothing about the
-    # check it is aimed at.
+    # a neutered ``require`` dies on Task.CreatorID's FK at the insert, never
+    # reaching the scoped re-read. The seed is what lets the control get that
+    # far, and so what shows which check is doing the refusing.
     creator_id = make_creator(session, "outsider").CreatorID
     session.commit()
 
