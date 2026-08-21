@@ -15,13 +15,16 @@ from eyened_orm import (
     Study,
     SubTask,
     Task,
+    TaskProject,
 )
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.authz.scoping import (
+    SET_VALUED_ENTITIES,
     SINGLE_PROJECT_ENTITIES,
     apply_scope,
     projects_of,
+    scope_criteria,
 )
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.utils.factories import (
@@ -222,10 +225,12 @@ def test_a_form_annotation_resolves_through_its_patient(session):
 
 # --- the correlated EXISTS predicate that apply_scope emits ------------------
 #
-# These three retarget Task 4's guards from the scalar-subquery form
+# These retarget Task 4's guards from the scalar-subquery form
 # (``project_id_of_column``, removed) onto the EXISTS form that replaced it.
 # The hazard they guard -- auto-correlation emptying the subquery's FROM -- is
 # unchanged by the shape of the subquery, so the coverage had to move, not go.
+# The set-valued case joined them once ``_set_valued_predicate`` moved onto
+# ``TaskProject``: a one-table FROM is the shape auto-correlation can empty.
 
 
 def _grader_scope(*project_ids: int) -> AccessScope:
@@ -235,6 +240,47 @@ def _grader_scope(*project_ids: int) -> AccessScope:
         is_admin=False,
         roles={p: ProjectRole.grader for p in project_ids},
     )
+
+
+@pytest.mark.parametrize(
+    "entity", sorted(SET_VALUED_ENTITIES, key=lambda e: e.__name__),
+    ids=lambda e: e.__name__,
+)
+def test_the_task_predicate_compiles_inside_a_query_that_joins_taskproject(entity):
+    """``_set_valued_predicate``'s ``.correlate(entity)`` is what makes this legal.
+
+    Since the predicate reads the declaration, the subquery's *entire* FROM is
+    ``TaskProject`` -- one table, which is exactly what auto-correlation can
+    empty. An enclosing query that joins ``TaskProject`` itself therefore
+    raises ``InvalidRequestError: ... returned no FROM clauses due to
+    auto-correlation`` the moment the call is dropped, on both branches.
+
+    Its docstring said so and nothing held it to that: deleting
+    ``.correlate(entity)`` used to leave the entire suite green, because no
+    read in the codebase reaches this shape today -- ``declared_projects``
+    puts the scoped ``select(Task.TaskID)`` in a subquery whose own FROM is
+    ``Task``, and ``projects_for_tasks`` scopes ``SubTask`` over the image
+    walk. So the shape is built here rather than borrowed from a caller: the
+    claim is about the predicate, and it has to be checkable without waiting
+    for a caller to grow into it.
+
+    Compiling is the assertion; the two string checks are there so a predicate
+    that degenerated into something trivially compilable (an uncorrelated
+    subquery, or one keyed on the wrong table) fails rather than passes. They
+    also fire if the predicate stops reading ``TaskProject`` at all -- measured,
+    not intended, and not this test's job: the behavioural coverage for that
+    mechanism lives in ``server/tests/test_task_containment_routes.py``.
+    """
+    outer = (
+        select(entity)
+        .join(TaskProject, TaskProject.TaskID == entity.TaskID)
+        .where(scope_criteria(entity, _grader_scope(1)))
+    )
+    sql = str(outer.compile(dialect=sqlite.dialect()))
+    # The subquery kept a FROM of its own...
+    assert 'FROM "TaskProject"' in sql
+    # ...and is correlated to the outer entity's row, not to itself.
+    assert f'"TaskProject"."TaskID" = "{entity.__tablename__}"."TaskID"' in sql
 
 
 @pytest.mark.parametrize(

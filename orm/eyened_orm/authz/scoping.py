@@ -324,6 +324,25 @@ def _set_valued_predicate(
     dispatches to ``project_ids_of_task``/``_subtask``, which select from this
     same table -- the selectable form of what is correlated here.
 
+    **Why leaving the walk cannot widen anything.** ``SubTaskImageLink``
+    carries ``(TaskID, ProjectID)`` under ``fk_SubTaskImageLink_TaskProject``,
+    so an image from an undeclared project cannot be linked at all: the
+    declaration is a *superset* of the projects a task's images sit in, held
+    there by the database rather than by any writer. Reading the superset can
+    only ever hide a task from someone the walk showed it to, never the
+    reverse. And on every row that predates the switch the two sets are
+    *equal*, because the migration that created ``TaskProject`` seeded it from
+    exactly this walk (``INSERT ... SELECT DISTINCT st.TaskID, p.ProjectID FROM
+    SubTask ... JOIN Patient``), which is why no pre-existing fixture or
+    production task can tell the two apart.
+
+    Narrowing is not nothing, though, and this is not a change that leaves
+    visibility untouched: a task declaring ``{A, B}`` whose images all sit in
+    ``A`` was visible to an ``A``-only member under the walk and is not under
+    the declaration. Extending a declaration (§6.3) produces exactly that
+    shape on purpose. Fail-safe, deliberate -- but a behaviour change, so do
+    not restate it as a pure optimisation.
+
     ``.correlate(entity)`` is load-bearing now, not the uniformity it was while
     this walked six tables: the subquery's entire FROM is ``TaskProject``, so a
     read that joins ``TaskProject`` itself would have auto-correlation strip it
