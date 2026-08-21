@@ -1,3 +1,22 @@
+# Unreleased
+
+Changes merged since v2026.08.0. This section is renamed to the version heading when
+the next release is cut.
+
+## Upgrade notes
+
+1. **Run `alembic upgrade head` on your *current* checkout before deploying this
+   release**, then deploy, then run `alembic stamp --purge orm_baseline`
+   (`--purge` is required — the squash drops the pre-cutover id from the
+   revision map). This release squashes the Alembic history to a single
+   baseline revision, so a database left behind head cannot be migrated
+   afterwards — the revisions it still needs (including the one adding
+   `AuditLog`) are no longer on the trail. Deploying first leaves Alembic
+   unable to resolve your current revision. Full procedure:
+   `docs/runbooks/2026-08-20-alembic-squash-cutover.md`.
+
+---
+
 # EyeNED Platform v2026.08.0
 
 Viewer bookmarks and enface overlays, a service/repository layer with an append-only audit log (RBAC prep), a CFI inference rewrite, CI on client and server, and several viewer/ORM reliability fixes.

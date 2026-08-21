@@ -17,10 +17,12 @@ testpaths = [
 # uniquely-named ORM file was correctly failed. Six paths collide this way,
 # including db.py and config.py. Rooting at "orm" keeps the eyened_orm/ prefix
 # and makes every name unique. Cost: orm/setup.py enters the denominator.
-# orm/migrations/ and orm/notebooks/ do NOT, but only because neither has an
-# __init__.py and coverage's directory walk skips such directories -- adding one
-# to migrations/ would silently admit 24 never-executed alembic files and redden
-# every migration PR.
+# orm/notebooks/ does NOT: no __init__.py, and nothing imports it. orm/migrations/
+# has no __init__.py either, but that is not enough -- coverage also records what
+# gets imported, and test_migration_chain.py imports every revision script to build
+# the revision map. The alembic-revision exclusion therefore lives in the diff-cover
+# call in .github/workflows/server-ci.yml, not in `omit` here: `omit` would drop the
+# file from coverage.xml for every consumer, not just that one gate.
 source = ["server", "orm"]
 omit = [
     "*/tests/*",

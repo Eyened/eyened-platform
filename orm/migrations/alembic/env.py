@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+import os
 import sys
 
 from sqlalchemy import engine_from_config
@@ -9,10 +10,13 @@ from alembic import context
 from eyened_orm import *
 from eyened_orm.base import Base
 from eyened_orm.config import load_database_settings
-from eyened_orm.utils.env import load_env_file
+from eyened_orm.utils.alembic_render import render_optional_enum
+from eyened_orm.utils.env import env_flag_enabled, load_env_file
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+injected_connection = config.attributes.get("connection", None)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -24,6 +28,10 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
+
+# Must be read before load_env_file(), which is load_dotenv(override=True):
+# otherwise any .env file could switch off the confirmation guard.
+assume_yes = env_flag_enabled(os.environ.get("EYENED_ALEMBIC_ASSUME_YES"))
 
 x_args = context.get_x_argument(as_dictionary=True)
 env_file = x_args.get("env_file")
@@ -51,18 +59,24 @@ no_prompt_cmds = {
     "show",
     "check",
     "list_templates",
-    "stamp",
 }
-if cmd not in no_prompt_cmds:
+if cmd not in no_prompt_cmds and injected_connection is None:
     confirm_target = (
         f"{db_settings.user}@{db_settings.host}:{db_settings.port}/{db_settings.database}"
     )
-    response = input(
-        f"Target database: {confirm_target}. Proceed? [y/N] "
-    ).strip().lower()
-    if response not in {"y", "yes"}:
-        print("Aborted by user.")
-        sys.exit(1)
+    if assume_yes:
+        print(
+            f"Target database: {confirm_target}. "
+            "Proceeding without confirmation (EYENED_ALEMBIC_ASSUME_YES).",
+            flush=True,
+        )
+    else:
+        response = input(
+            f"Target database: {confirm_target}. Proceed? [y/N] "
+        ).strip().lower()
+        if response not in {"y", "yes"}:
+            print("Aborted by user.")
+            sys.exit(1)
 config.set_main_option("sqlalchemy.url", db_url)
 
 
@@ -97,19 +111,27 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
 
-    with connectable.connect() as connection:
+    def _run(connection) -> None:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            render_item=render_optional_enum,
         )
-
         with context.begin_transaction():
             context.run_migrations()
+
+    if injected_connection is None:
+        connectable = engine_from_config(
+            config.get_section(config.config_ini_section, {}),
+            prefix="sqlalchemy.",
+            poolclass=pool.NullPool,
+        )
+        with connectable.connect() as connection:  # we own it
+            _run(connection)
+    else:
+        _run(injected_connection)  # borrowed -- do not close
 
 
 if context.is_offline_mode():
