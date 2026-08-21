@@ -312,9 +312,28 @@ def _set_valued_predicate(
     ``NOT IN ()`` renders true, so any task with at least one project is
     excluded and only the empty ones remain.
 
-    Built on the same ``_subtask_images_to_patient`` chain as
-    ``project_ids_of_task``, and correlated explicitly for the same reason as
-    ``_single_project_predicate``.
+    This is the **read** rule for ``Task``/``SubTask`` and it is image-derived:
+    it walks ``_subtask_images_to_patient`` -- every sibling subtask of the same
+    task, out to its image links, up ``_PARENT_OF`` to ``Patient.ProjectID``.
+    The **write** rule for those same two entities no longer does.
+    ``project_ids_of_task`` and ``project_ids_of_subtask``, which ``projects_of``
+    dispatches to, read ``TaskProject`` -- the task's *declaration*. So the two
+    paths answer different questions about one task: it is findable by the
+    projects its images occupy and writable by the projects it declares. They
+    were the same walk until the declaration became authoritative for writes,
+    and they converge again when this predicate moves onto ``TaskProject`` too.
+    Until then the declaration is the superset of the two, which is why the
+    divergence is fail-safe: writes are the tighter side.
+
+    ``.correlate(entity)`` is explicit here for uniformity with
+    ``_single_project_predicate``, but **not** for the failure that motivates
+    it there. That failure needs a subquery whose entire FROM is a table the
+    enclosing query already has: ``_single_project_predicate(Study)``, whose
+    FROM is just ``Patient``, raises ``InvalidRequestError`` under a query that
+    joins ``Patient``, while this predicate compiles with or without the call --
+    its FROM is a six-table join tree auto-correlation cannot empty. Keep it
+    anyway: it pins exactly one outer table instead of leaving the choice to
+    auto-correlation as the enclosing shapes grow.
     """
     sibling = aliased(SubTask)
     # SubTask is scoped by its *parent task*, not only by its own images, so
@@ -361,7 +380,10 @@ def projects_of(session: Session, entity: type[Base], entity_id: int) -> set[int
     """Execute the entity's rule and return its project set.
 
     Used by writes (``scope.require(projects_of(...), floor)``) and by the CLI's
-    ``grant-for-task``. Reads correlate the same definitions instead.
+    ``grant-for-task``. For the single-project entities the read path correlates
+    these same definitions; for ``Task`` and ``SubTask`` it no longer does --
+    reads stay on the image walk, these two resolve the declaration. See
+    ``_set_valued_predicate``.
     """
     return set(session.scalars(PROJECT_IDS_OF[entity](entity_id)).all())
 

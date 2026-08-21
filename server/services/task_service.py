@@ -305,7 +305,26 @@ class SubTaskService:
         self.audit = audit
 
     def _task_projects(self, subtask_id: int) -> set[int]:
-        """The parent task's project set -- what every subtask mutation is judged on."""
+        """The parent task's project set -- what every subtask mutation is judged on.
+
+        This now resolves the task's **declaration**, not the projects its
+        images occupy, so every floor built on it -- ``update_subtask``,
+        ``delete_subtask``, ``add_image`` and ``remove_image``, where the
+        docstrings say "every project the parent task touches" -- demands
+        ``grader`` in each *declared* project. Spec section 5.4 permits a
+        declaration to be broader than the images in use, so an actor holding
+        exactly the projects a task's images sit in can now be refused a write
+        on a task that over-declares.
+
+        Deliberate, and widened in the safe direction: the composite foreign
+        keys on ``SubTaskImageLink`` hold every link's project inside the
+        declaration, so the declaration is a superset of the image set and
+        these writes are strictly tighter than the reads that guard the same
+        rows -- never looser. Inert today, because the backfill left every
+        declaration equal to its task's image set and creating a task requires
+        ``grader`` in everything it declares; the widening becomes observable
+        only once a declaration is first extended past what its task holds.
+        """
         return self.subtasks.project_ids(subtask_id)
 
     def _reread_with_images(self, subtask_id: int) -> SubTask:

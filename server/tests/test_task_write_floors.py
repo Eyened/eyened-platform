@@ -58,11 +58,14 @@ def test_creating_a_task_is_authorized_against_its_declaration(
     projects; a task now declares its projects at creation, so creation is
     authorized against the declaration.
 
-    Both directions, because either alone is satisfiable by the wrong code: a
-    request declaring nothing is refused by the schema (422), and a creator who
-    holds the declared project at ``grader`` succeeds and gets it back.
+    The two requests here are the **schema's** directions, not the floor's:
+    declaring nothing is refused by ``Field(min_length=1)`` (422), and a
+    creator who holds the declared project at ``grader`` succeeds and gets it
+    back (200). Neither can fail if ``create_task``'s ``scope.require`` is
+    deleted -- both actors pass it. The floor's own two directions are the two
+    tests below.
 
-    The only ``POST /task`` test in the suite under a **non-admin** scope --
+    The first ``POST /task`` test in the suite under a **non-admin** scope --
     ``test_subtask_add_image_declaration.py`` covers the admin, which
     ``Creator.IsAdmin`` makes nobody in production.
     """
@@ -103,6 +106,84 @@ def test_creating_a_task_is_authorized_against_its_declaration(
     assert [p["id"] for p in declared.json()["projects"]] == [
         spanning["projects"]["A"]
     ]
+
+
+def test_creating_a_task_declaring_an_unheld_project_is_refused(
+    session, client_scoped, spanning
+):
+    """The create floor's *refused* direction, which nothing else supplies.
+
+    ``create_task``'s ``scope.require`` is the only thing standing here. The
+    task it would otherwise write has no images yet, so the scoped re-read that
+    follows is vacuously true and would hand this actor back a task in a
+    project they cannot see -- neuter the ``require`` and this request answers
+    200.
+
+    404, not 403: the actor holds no role at all in B, so ``require`` raises
+    ``NotVisibleError`` from its ``missing`` branch, and a 403 would confirm a
+    project this actor may not know exists.
+    """
+    from eyened_orm.utils.factories import make_creator
+
+    # Seeded even though the refusal precedes the insert: without a Creator row
+    # the insert under a neutered ``require`` fails on Task.CreatorID's FK and
+    # answers 500, and a control that cannot reach 200 proves nothing about the
+    # check it is aimed at.
+    creator_id = make_creator(session, "outsider").CreatorID
+    session.commit()
+
+    client, set_scope = client_scoped
+    set_scope(
+        scope_for(
+            spanning["projects"]["A"],
+            role=ProjectRole.grader,
+            actor_id=creator_id,
+        )
+    )
+    resp = client.post(
+        "/task",
+        json={
+            "name": "brand new",
+            "task_definition_id": spanning["task_definition"],
+            "projects": [spanning["projects"]["B"]],
+        },
+    )
+    assert resp.status_code == 404
+
+
+def test_read_only_in_the_declared_project_cannot_create_a_task(
+    session, client_scoped, spanning
+):
+    """The same check's other refusal: the project is held, but under ``grader``.
+
+    403, not 404 -- ``require`` resolves a role for A and falls through to its
+    ``under`` branch, raising ``PermissionDeniedError``. This is what pins the
+    ``ProjectRole.grader`` argument itself: lower it to ``read_only`` and the
+    test above still passes, because a project the actor cannot see is missing
+    at every floor.
+    """
+    from eyened_orm.utils.factories import make_creator
+
+    creator_id = make_creator(session, "reader").CreatorID
+    session.commit()
+
+    client, set_scope = client_scoped
+    set_scope(
+        scope_for(
+            spanning["projects"]["A"],
+            role=ProjectRole.read_only,
+            actor_id=creator_id,
+        )
+    )
+    resp = client.post(
+        "/task",
+        json={
+            "name": "brand new",
+            "task_definition_id": spanning["task_definition"],
+            "projects": [spanning["projects"]["A"]],
+        },
+    )
+    assert resp.status_code == 403
 
 
 def test_a_grader_in_a_cannot_add_an_image_from_b(client_scoped, spanning):
