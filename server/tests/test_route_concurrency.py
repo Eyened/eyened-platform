@@ -17,7 +17,7 @@ from __future__ import annotations
 import time
 
 import anyio
-import httpx
+import httpxyz as httpx
 import pytest
 
 # Long enough for a wide margin on a loaded CI box, short enough not to slow
