@@ -1,7 +1,7 @@
 """add ImageInstance.ProjectID
 
 Revision ID: d3ce100ab2b6
-Revises: b2e2800000b2
+Revises: orm_baseline
 Create Date: 2026-08-18 16:08:35.053634
 
 Denormalizes Patient.ProjectID onto ImageInstance so that authorization
@@ -22,7 +22,7 @@ from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision: str = 'd3ce100ab2b6'
-down_revision: Union[str, None] = 'b2e2800000b2'
+down_revision: Union[str, None] = 'orm_baseline'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
