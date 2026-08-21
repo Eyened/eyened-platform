@@ -286,11 +286,18 @@ def _require_subtask_cascade_first(conn: Connection) -> None:
     What this covers is THIS migration's own apply, and nothing after it. It
     runs when revision 2db0e63195db runs; a rename applied by a LATER migration
     -- or by hand -- to an already-upgraded database walks straight past it, and
-    the next task delete fails 1451 in production. Nothing in the repo closes
-    that gap today: the delete tests run on SQLite, where cascade ordering is a
-    different engine's choice and constraint names carry no ordering meaning at
-    all. Closing it would take a standing schema assertion in CI or a
-    MySQL-backed delete test; neither exists yet.
+    the next task delete fails 1451 in production.
+
+    Two things narrow that gap; neither closes it. Server CI's schema-sync job
+    builds the schema from empty on mysql:8.0.27 and runs `alembic check` on
+    every push or PR touching orm/**, so this guard is exercised on every such
+    change rather than only at deploy time -- but it still runs at THIS
+    revision, so a rename added downstream of it passes unseen. And because the
+    model declares fk_TaskProject_Task, renaming THAT half surfaces as
+    autogenerate drift in the same job. Renaming SubTask's half on a live
+    database is the case nothing catches: the delete tests run on SQLite, where
+    cascade ordering is a different engine's choice and constraint names carry
+    no ordering meaning at all. A MySQL-backed delete test would close it.
 
     Asserted over EVERY constraint referencing Task rather than SubTask's
     alone, and identified by child and referenced table rather than by name:
