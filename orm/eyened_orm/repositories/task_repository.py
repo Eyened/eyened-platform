@@ -13,6 +13,7 @@ from eyened_orm import (
     SubTask,
     SubTaskImageLink,
     Task,
+    TaskProject,
 )
 from eyened_orm.task import SubTaskState
 from eyened_orm.authz.scope import AccessScope
@@ -193,6 +194,36 @@ class TaskRepository:
         for task_id, project_id, project_name in rows:
             found.setdefault(int(task_id), []).append((int(project_id), project_name))
         return {tid: sorted(found.get(tid, [])) for tid in task_ids}
+
+    def declared_projects(self, task_id: int) -> list[tuple[int, str]]:
+        """The ``(id, name)`` pairs one task *declares*, for a response body.
+
+        Reads ``TaskProject`` rather than the image walk ``projects_for_tasks``
+        still performs, and the difference is the whole reason this exists: a
+        task that declares projects it holds no image in yet resolves to what
+        it declared instead of to nothing. Every task is in exactly that state
+        the moment it is created, so the create route cannot answer from the
+        walk.
+
+        The scope predicate is a backstop, not a path: the only caller has
+        already required the actor at ``grader`` in every project named here.
+        It is applied to the *task*, so an invisible task resolves to ``[]``
+        rather than leaking a project set.
+
+        ``apply_scope`` is called in this method's own body, for the same
+        reason ``projects_for_tasks`` documents: the read guard inspects the
+        body and does not follow calls.
+        """
+        visible = apply_scope(
+            select(Task.TaskID).where(Task.TaskID == task_id), Task, self._scope
+        )
+        rows = self._session.execute(
+            select(TaskProject.ProjectID, Project.ProjectName)
+            .join(Project, Project.ProjectID == TaskProject.ProjectID)
+            .where(TaskProject.TaskID == task_id)
+            .where(TaskProject.TaskID.in_(visible))
+        ).all()
+        return sorted((int(pid), name) for pid, name in rows)
 
 
 # Eager-load the subtask's images down to their storage backend (mirrors the

@@ -153,7 +153,16 @@ def test_a_subtask_resolves_to_its_parent_tasks_projects(session):
 
 
 def test_an_inactive_image_still_ties_its_project_to_the_task(session):
-    """Excluding soft-deleted images would silently *widen* who sees the task."""
+    """Excluding soft-deleted images would silently *widen* who sees the task.
+
+    No longer what this asserts. ``projects_of`` reads ``TaskProject``, so this
+    now only pins that ``_task_over`` wrote a declaration covering both
+    projects -- not that the resolution declines to filter ``Inactive``, which
+    it no longer walks at all. The behaviour named above moved to the
+    backfill's SQL, which is where it is guarded now. Kept rather than deleted
+    because the assertion is still true and still worth holding: a soft-deleted
+    image must not cost its task a declared project.
+    """
     backend = make_storage_backend(session)
     device = make_device(session, "d")
     project_a, image_a = _image_in(session, "A", "img-a", backend, device)

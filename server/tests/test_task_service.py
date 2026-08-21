@@ -7,7 +7,7 @@ from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepos
 from server.services.acting_user import ActingUser
 from server.services.exceptions import NotFoundError
 from server.services.task_service import TaskService
-from eyened_orm.utils.factories import admin_scope
+from eyened_orm.utils.factories import admin_scope, make_project
 
 
 class FakeAudit:
@@ -67,9 +67,10 @@ def test_create_task_persists_with_defaults(session):
     """create_task stores the task with the actor as owner and TaskState.NotStarted."""
     actor = _actor(session)
     td = _task_def(session)
+    project = make_project(session, "P")
 
-    task = _service(session, actor).create_task(
-        "New", "desc", None, td.TaskDefinitionID
+    task, declared = _service(session, actor).create_task(
+        "New", "desc", None, td.TaskDefinitionID, [project.ProjectID]
     )
 
     assert task.TaskName == "New"
@@ -78,6 +79,7 @@ def test_create_task_persists_with_defaults(session):
     assert task.TaskDefinitionID == td.TaskDefinitionID
     assert task.CreatorID == actor.id
     assert task.TaskState == TaskState.NotStarted
+    assert declared == [(project.ProjectID, "P")]
 
 
 def test_create_task_logs_insert(session):
@@ -85,8 +87,11 @@ def test_create_task_logs_insert(session):
     actor = _actor(session)
     td = _task_def(session)
     audit = FakeAudit()
+    project = make_project(session, "P")
 
-    _service(session, actor, audit=audit).create_task("New", None, None, td.TaskDefinitionID)
+    _service(session, actor, audit=audit).create_task(
+        "New", None, None, td.TaskDefinitionID, [project.ProjectID]
+    )
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"

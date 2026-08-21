@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Dict, List, Literal, Optional, get_origin
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from eyened_orm import TaskState, SubTaskState
 
 from .dtos_instances import ImageGET, ProjectMeta
@@ -37,7 +37,11 @@ class TaskBase(BaseModel):
     task_definition_id: int
 
 class TaskPUT(TaskBase):
-    pass
+    # On TaskPUT rather than TaskBase: TaskGET also extends TaskBase and
+    # already declares a `projects` of its own -- (id, name) pairs, optional --
+    # so putting it on the base would give one field name two types and two
+    # requirednesses depending on which class you read.
+    projects: List[int] = Field(min_length=1)
 
 
 class TaskPATCH(BaseModel):

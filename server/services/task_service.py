@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from eyened_orm import SubTask, Task
+from eyened_orm import SubTask, Task, TaskProject
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
 from eyened_orm.authz.errors import NotVisibleError
@@ -13,7 +13,7 @@ from ..db import get_db
 from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
-from .exceptions import NotFoundError
+from .exceptions import NotFoundError, OutOfDeclarationError
 
 
 class TaskService:
@@ -39,8 +39,21 @@ class TaskService:
         description: str | None,
         contact_id: int | None,
         task_definition_id: int,
-    ) -> Task:
-        """Create a task owned by the acting user (TaskState.NotStarted)."""
+        projects: list[int],
+    ) -> tuple[Task, list[tuple[int, str]]]:
+        """Create a task owned by the acting user (TaskState.NotStarted).
+
+        ``projects`` is the task's declaration and is written with the task, in
+        one flush. It is not optional: a task declaring nothing is visible to
+        every authenticated user and can never accept an image, because every
+        image is outside an empty declaration.
+
+        Raises:
+            NotVisibleError: If the actor cannot see a declared project.
+            PermissionDeniedError: If the actor is under ``grader`` in one.
+        """
+        declared_ids = sorted(set(projects))
+        self.scope.require(set(declared_ids), ProjectRole.grader, entity="Task")
         task = Task(
             TaskName=name,
             Description=description,
@@ -48,9 +61,11 @@ class TaskService:
             TaskDefinitionID=task_definition_id,
             CreatorID=self.scope.actor_id,
             TaskState=TaskState.NotStarted,
+            TaskProjects=[TaskProject(ProjectID=pid) for pid in declared_ids],
         )
         self.tasks.add(task)
         task = self.tasks.get_with_relations(task.TaskID)
+        declared = self.tasks.declared_projects(task.TaskID)
         if self.audit is not None:
             self.audit.record(
                 action="INSERT",
@@ -62,9 +77,10 @@ class TaskService:
                     "description": task.Description,
                     "contact_id": task.ContactID,
                     "task_definition_id": task.TaskDefinitionID,
+                    "projects": declared_ids,
                 },
             )
-        return task
+        return task, declared
 
     def list_tasks(
         self, *, include_projects: bool = False
@@ -428,6 +444,8 @@ class SubTaskService:
             NotFoundError: If the subtask or the image does not exist.
             NotVisibleError: If either side touches a project the actor lacks.
             PermissionDeniedError: If the actor is under the floor.
+            OutOfDeclarationError: If the image sits in a project the parent
+                task does not declare.
         """
         if self.subtasks.get_by_id(subtask_id) is None:
             raise NotFoundError(f"SubTask {subtask_id} not found")
@@ -445,6 +463,27 @@ class SubTaskService:
             entity="SubTask",
             entity_id=subtask_id,
         )
+
+        # Checked here rather than by catching IntegrityError off the flush:
+        # by then the violation has already poisoned the transaction, and the
+        # driver's error cannot be told apart from any other constraint on the
+        # statement. After ``require`` on purpose -- an actor with no rights to
+        # the image's project must get the authorization answer, not a message
+        # describing what the task declares. By this line ``require`` has
+        # cleared every project named below, so the body discloses nothing.
+        undeclared = projects_after - projects_before
+        if undeclared:
+            raise OutOfDeclarationError(
+                {
+                    "code": "image_outside_task_declaration",
+                    "message": (
+                        f"Image {image_public_id} is in a project this task does "
+                        "not declare. Extend the task's declaration first."
+                    ),
+                    "image_projects": sorted(undeclared),
+                    "declared_projects": sorted(projects_before),
+                }
+            )
 
         self.subtasks.add_link(
             subtask_id, image_instance_id, self.subtasks.next_image_index(subtask_id)

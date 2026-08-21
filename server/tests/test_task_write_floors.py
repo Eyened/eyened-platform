@@ -49,12 +49,22 @@ def test_read_only_cannot_update_task_status(client_scoped, spanning):
     ).status_code == 403
 
 
-def test_anyone_can_create_a_task(session, client_scoped, spanning):
-    """A new task holds no images and therefore touches no projects.
+def test_creating_a_task_is_authorized_against_its_declaration(
+    session, client_scoped, spanning
+):
+    """Superseded 2026-08-18 by the task->project containment plan.
 
-    v0.3's matrix marks create/delete tasks project-admin-only, but its own
-    project permission note says creation is unrestricted. The row is two cells,
-    and this is the create half asserting the vacuous behaviour, not the matrix.
+    v0.3's "creation is unrestricted" reading rested on a new task touching no
+    projects; a task now declares its projects at creation, so creation is
+    authorized against the declaration.
+
+    Both directions, because either alone is satisfiable by the wrong code: a
+    request declaring nothing is refused by the schema (422), and a creator who
+    holds the declared project at ``grader`` succeeds and gets it back.
+
+    The only ``POST /task`` test in the suite under a **non-admin** scope --
+    ``test_subtask_add_image_declaration.py`` covers the admin, which
+    ``Creator.IsAdmin`` makes nobody in production.
     """
     from eyened_orm.utils.factories import make_creator
 
@@ -64,15 +74,35 @@ def test_anyone_can_create_a_task(session, client_scoped, spanning):
     session.commit()
 
     client, set_scope = client_scoped
-    set_scope(scope_for(actor_id=creator_id))
-    resp = client.post(
+    set_scope(
+        scope_for(
+            spanning["projects"]["A"],
+            role=ProjectRole.grader,
+            actor_id=creator_id,
+        )
+    )
+
+    undeclared = client.post(
         "/task",
         json={
             "name": "brand new",
             "task_definition_id": spanning["task_definition"],
         },
     )
-    assert resp.status_code == 200
+    assert undeclared.status_code == 422
+
+    declared = client.post(
+        "/task",
+        json={
+            "name": "brand new",
+            "task_definition_id": spanning["task_definition"],
+            "projects": [spanning["projects"]["A"]],
+        },
+    )
+    assert declared.status_code == 200
+    assert [p["id"] for p in declared.json()["projects"]] == [
+        spanning["projects"]["A"]
+    ]
 
 
 def test_a_grader_in_a_cannot_add_an_image_from_b(client_scoped, spanning):

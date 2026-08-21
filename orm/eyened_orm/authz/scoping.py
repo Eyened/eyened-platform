@@ -32,7 +32,7 @@ from ..tag import (
     StudyTagLink,
     Tag,
 )
-from ..task import SubTask, SubTaskImageLink, Task
+from ..task import SubTask, SubTaskImageLink, Task, TaskProject
 from .scope import AccessScope
 
 __all__ = [
@@ -287,26 +287,18 @@ def _subtask_images_to_patient(
 
 
 def project_ids_of_task(task_id: int) -> Select:
-    """The projects every image of every subtask of this task sits in."""
-    return (
-        _subtask_images_to_patient(SubTask).where(SubTask.TaskID == task_id).distinct()
-    )
+    """The projects this task declares."""
+    return select(TaskProject.ProjectID).where(TaskProject.TaskID == task_id)
 
 
 def project_ids_of_subtask(subtask_id: int) -> Select:
-    """The **parent task's** project set, not only this subtask's own images.
+    """The **parent task's** declaration, not this subtask's own images.
 
-    A superset of its own, which collapses v0.3's two readings into the
-    stricter one and keeps a single mental model: you see a whole task or none
-    of it. See the spec's amendment note (section 12, item 3).
+    You get a whole task or none of it, so a subtask write is authorized
+    against the whole task too.
     """
     parent = select(SubTask.TaskID).where(SubTask.SubTaskID == subtask_id)
-    sibling = aliased(SubTask)
-    return (
-        _subtask_images_to_patient(sibling)
-        .where(sibling.TaskID.in_(parent))
-        .distinct()
-    )
+    return select(TaskProject.ProjectID).where(TaskProject.TaskID.in_(parent))
 
 
 def _set_valued_predicate(
