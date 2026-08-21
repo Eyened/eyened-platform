@@ -6,6 +6,7 @@ tests drive `app` and address routes under /api.
 from __future__ import annotations
 
 import gzip
+import os
 from datetime import datetime
 
 import pytest
@@ -41,8 +42,8 @@ def app_client():
         get_current_user: lambda: CurrentUser(creator_id=1, username="tester"),
     }
     app_api.dependency_overrides.update(overrides)
-    # No context manager: entering TestClient runs the lifespan, which this
-    # test neither needs nor has Redis for.
+    # No context manager: entering it would run `app`'s lifespan, which this
+    # test does not need.
     yield TestClient(app)
     for dep in overrides:
         app_api.dependency_overrides.pop(dep, None)
@@ -66,7 +67,9 @@ def test_a_pre_encoded_response_is_not_double_compressed():
 
     GZipMiddleware records content_encoding_set (starlette/middleware/gzip.py)
     and skips such a response. Pinned because lowering the threshold is exactly
-    what would expose a regression: this body is now well above the floor.
+    what would expose a regression: the payload is deliberately incompressible
+    so the ENCODED body clears the floor -- otherwise the size skip fires and
+    the test proves nothing.
     """
     from fastapi import FastAPI
     from starlette.middleware.gzip import GZipMiddleware
@@ -74,14 +77,22 @@ def test_a_pre_encoded_response_is_not_double_compressed():
 
     from server.config import settings
 
-    payload = b"x" * 5000
+    payload = os.urandom(5000)
     probe = FastAPI()
     probe.add_middleware(GZipMiddleware, minimum_size=settings.gzip_minimum_size)
+
+    # The middleware measures the ALREADY-COMPRESSED body, not the input.
+    # Random bytes are incompressible, so this stays above the floor. With a
+    # repetitive payload it compresses to ~40 bytes, the middleware skips on
+    # SIZE, and this test passes without ever reaching the content-encoding
+    # check it exists to verify.
+    body = gzip.compress(payload)
+    assert len(body) > settings.gzip_minimum_size
 
     @probe.get("/pre-encoded")
     def pre_encoded():
         return StarletteResponse(
-            content=gzip.compress(payload),
+            content=body,
             media_type="application/octet-stream",
             headers={"Content-Encoding": "gzip"},
         )
