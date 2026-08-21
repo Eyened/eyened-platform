@@ -28,3 +28,15 @@ def test_pool_parameters_reach_the_engine():
     db = Database(_settings(), pool_size=16, max_overflow=4)
     assert db.engine.pool.size() == 16
     assert db.engine.pool._max_overflow == 4
+
+
+def test_pool_recycle_default():
+    """An unparameterised Database keeps the 3600s default."""
+    db = Database(_settings())
+    assert db.engine.pool._recycle == 3600
+
+
+def test_pool_recycle_parameter_reaches_engine():
+    """Explicit recycle is applied, so the API can tune connection lifetime."""
+    db = Database(_settings(), pool_recycle=1800)
+    assert db.engine.pool._recycle == 1800
