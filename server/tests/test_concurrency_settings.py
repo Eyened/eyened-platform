@@ -20,7 +20,7 @@ def test_more_threads_than_connections_is_rejected():
     """A thread that cannot get a connection waits pool_timeout; refuse to boot."""
     with pytest.raises(ValidationError) as exc:
         Settings(pool_size=4, max_overflow=1, threadpool_limit=32)
-    assert "threadpool_limit" in str(exc.value)
+    assert "exceeds pool capacity" in str(exc.value)
 
 
 def test_threads_equal_to_capacity_is_accepted():
