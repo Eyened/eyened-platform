@@ -26,3 +26,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [`alembic upgrade --sql` writes the confirmation prompt into the generated SQL](2026-08-20-alembic-sql-mode-prompt-pollutes-stdout.md)
 - [A large `IN` list makes MySQL abandon the range optimizer](2026-08-20-large-in-list-defeats-range-optimizer.md)
 - [`docs/rbac-operations.md` is two documents in one file](2026-08-21-rbac-operations-doc-has-two-homes.md)
+- [`is_admin` makes `scope.require` vacuous, so an administrator gets 500 where anyone else gets 404](2026-08-21-admin-scope-vacuity-turns-404s-into-500s.md)
