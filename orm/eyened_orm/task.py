@@ -84,11 +84,22 @@ class TaskProject(Base):
         Index("ix_TaskProject_Project", "ProjectID"),
     )
 
+    # Both foreign keys are named rather than left to MySQL's
+    # `TaskProject_ibfk_N`. `fk_TaskProject_Task` in particular is load-bearing
+    # and not cosmetic: InnoDB walks a parent's referencing constraints in
+    # constraint-id order, and this name is chosen to lose that race against
+    # SubTask's key to `Task`. See the migration that creates this table for
+    # the byte comparison, and the guard in the containment migration that
+    # refuses to run if it ever stops holding.
     TaskID: Mapped[int] = mapped_column(
-        ForeignKey("Task.TaskID", ondelete="CASCADE"), primary_key=True
+        ForeignKey("Task.TaskID", ondelete="CASCADE", name="fk_TaskProject_Task"),
+        primary_key=True,
     )
     ProjectID: Mapped[int] = mapped_column(
-        ForeignKey("Project.ProjectID", ondelete="RESTRICT"), primary_key=True
+        ForeignKey(
+            "Project.ProjectID", ondelete="RESTRICT", name="fk_TaskProject_Project"
+        ),
+        primary_key=True,
     )
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 

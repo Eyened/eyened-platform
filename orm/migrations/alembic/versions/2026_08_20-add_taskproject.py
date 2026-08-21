@@ -109,9 +109,50 @@ def upgrade() -> None:
                 server_default=sa.text("CURRENT_TIMESTAMP"),
                 nullable=False,
             ),
-            sa.ForeignKeyConstraint(["TaskID"], ["Task.TaskID"], ondelete="CASCADE"),
+            # Named, and the name of the first one is load-bearing.
+            #
+            # Deleting a task emits ONE `DELETE FROM Task` and lets InnoDB
+            # cascade into two independent branches: SubTask -> its image
+            # links, and TaskProject. A later migration adds
+            # `fk_SubTaskImageLink_TaskProject`, a RESTRICT key from the link
+            # rows to this table, so if the TaskProject branch runs FIRST it
+            # withdraws a declaration the link rows still reference and the
+            # delete dies with ERROR 1451 -- on every task that has both
+            # images and a declaration, which is every real task.
+            #
+            # InnoDB walks a parent's referencing constraints in constraint-id
+            # order (`schema/name`), compared BYTE-WISE and case-sensitively --
+            # measured, not assumed. So the SubTask branch has to sort first.
+            # We do not control SubTask's constraint name: 2025_09_15's
+            # `create_foreign_key(None, ...)` leaves MySQL to pick it, and it
+            # has already come out as both `SubTask_ibfk_1` (live) and
+            # `SubTask_ibfk_2` (built from orm_baseline). `fk_TaskProject_Task`
+            # loses to every name that key has plausibly worn:
+            #
+            #   vs SubTask_ibfk_1 / _2   'S' 0x53 < 'f' 0x66      SubTask first
+            #   vs fk_SubTask_Task1      shared "fk_" prefix,
+            #                            then 'S' 0x53 < 'T' 0x54  SubTask first
+            #
+            # (`fk_SubTask_Task1` is the legacy name, still worn by the INDEX;
+            # under it an UNNAMED key here -- `TaskProject_ibfk_1` -- would put
+            # TaskProject first and fail 1451.) Renaming this constraint is a
+            # correctness change, not a cosmetic one. The containment migration
+            # asserts the ordering before its first DDL so a rename fails there
+            # rather than at delete time.
             sa.ForeignKeyConstraint(
-                ["ProjectID"], ["Project.ProjectID"], ondelete="RESTRICT"
+                ["TaskID"],
+                ["Task.TaskID"],
+                name="fk_TaskProject_Task",
+                ondelete="CASCADE",
+            ),
+            # Named only for symmetry and so `--autogenerate` sees the same
+            # name the model declares. It references Project, not Task, so it
+            # is not on the ordering path above.
+            sa.ForeignKeyConstraint(
+                ["ProjectID"],
+                ["Project.ProjectID"],
+                name="fk_TaskProject_Project",
+                ondelete="RESTRICT",
             ),
             sa.PrimaryKeyConstraint("TaskID", "ProjectID"),
         )
