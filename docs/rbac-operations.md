@@ -16,15 +16,21 @@ a file.
 
 ### 1. Deploy the two migrations, alone
 
-`c3f5a2b81d94` (tag deletes become RESTRICT) then `b2e2800000b2`
-(`ProjectMember`, `Creator.IsAdmin`, `Creator.Inactive` exist; nothing reads
-them). The server container runs as `eyened_wr`, which holds no DDL rights, so
+Two migrations: tag deletes become RESTRICT, then `ProjectMember`,
+`Creator.IsAdmin` and `Creator.Inactive` come into existence (nothing reads them
+yet). **The revision ids this step used to name no longer resolve.** The alembic
+squash folded every migration before it into a single `orm_baseline` revision and
+moved the originals to `versions_archive/`, which is off alembic's search path --
+see `docs/runbooks/2026-08-20-alembic-squash-cutover.md`. Take the target from
+`alembic heads`, never from this document. The server container runs as `eyened_wr`, which holds no DDL rights, so
 alembic needs the `eyened_ddl` credentials rather than the ambient environment:
 
 ```bash
 cd /app/orm/migrations
-alembic -x env_file=<ddl.env> current        # expect a1d1700000a1
-alembic -x env_file=<ddl.env> upgrade head   # c3f5a2b81d94, then b2e2800000b2
+alembic -x env_file=<ddl.env> current        # orm_baseline, on a database
+                                             # already taken through the squash
+alembic -x env_file=<ddl.env> heads          # the real target -- read it here
+alembic -x env_file=<ddl.env> upgrade head
 ```
 
 `upgrade` prompts `Target database: ... Proceed? [y/N]`
@@ -32,7 +38,7 @@ alembic -x env_file=<ddl.env> upgrade head   # c3f5a2b81d94, then b2e2800000b2
 only `revision`, `history`, `current`, `heads`, `branches`, `show`, `check`,
 and `list_templates` skip the prompt; `stamp` no longer does.
 
-**The one visible change before step 5.** `c3f5a2b81d94` flips five `TagID`
+**The one visible change before step 5.** The tag-RESTRICT migration flips five `TagID`
 foreign keys from CASCADE to RESTRICT. The pre-cutover server has
 `DELETE /tags/{id}` and no `IntegrityError` handling, so deleting a tag that is
 still applied returns **500** during this window; the enforcing server turns the

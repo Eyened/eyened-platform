@@ -25,3 +25,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [`eorm create-user` writes no `AuditLog` row](2026-08-13-create-user-cli-no-audit-row.md)
 - [`alembic upgrade --sql` writes the confirmation prompt into the generated SQL](2026-08-20-alembic-sql-mode-prompt-pollutes-stdout.md)
 - [A large `IN` list makes MySQL abandon the range optimizer](2026-08-20-large-in-list-defeats-range-optimizer.md)
+- [`docs/rbac-operations.md` is two documents in one file](2026-08-21-rbac-operations-doc-has-two-homes.md)
