@@ -8,6 +8,11 @@ What it proves, exactly: no decorated handler is an AsyncFunctionDef whose body
 contains no await. It does NOT prove that a synchronous call inside a
 legitimately-async handler is wrapped in run_in_threadpool -- that blind spot is
 covered by test_route_concurrency.py, not by this file.
+
+Scope: `server/routes/*.py`, non-recursively, and only decorators written on a
+name literally called `router`. `server/main.py`'s `@app.get("/health")` is an
+async handler that awaits nothing and is deliberately outside that reach -- its
+body is a literal dict return with no I/O, so it never blocks the loop.
 """
 from __future__ import annotations
 
@@ -29,9 +34,20 @@ def _is_router_decorated(node: ast.AST) -> bool:
 
 
 def _awaits_something(node: ast.AST) -> bool:
-    return any(
-        isinstance(x, (ast.Await, ast.AsyncFor, ast.AsyncWith)) for x in ast.walk(node)
-    )
+    """True if the handler's OWN body awaits something.
+
+    ast.walk descends into nested function bodies, so a nested `async def`
+    helper's await would otherwise clear a handler whose own body blocks.
+    A nested function's awaits belong to that function, not to this one.
+    """
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            continue
+        if isinstance(child, (ast.Await, ast.AsyncFor, ast.AsyncWith)):
+            return True
+        if _awaits_something(child):
+            return True
+    return False
 
 
 def _endpoints(tree: ast.AST):
@@ -59,7 +75,11 @@ def test_no_route_handler_is_async_without_awaiting():
 
     # Positive control: a walk that silently found nothing would pass an empty
     # offender list. Assert the scan actually reached the endpoints.
-    assert scanned >= 70, f"the walk only found {scanned} endpoints; it is not scanning"
+    assert scanned == 78, (
+        f"expected 78 router-decorated endpoints, found {scanned}. If a route was "
+        "deliberately added or removed, bump this number; if not, the walk is "
+        "missing files and the empty offender list below proves nothing."
+    )
 
     assert not offenders, (
         "these handlers are async but await nothing, so their synchronous work "
@@ -90,3 +110,14 @@ def test_the_guard_can_fail():
         "    return 1\n"
     )
     assert _offenders_in(good, "fixture.py") == []
+
+    # A nested async helper's await belongs to the helper, not to the handler.
+    nested = (
+        "router = object()\n"
+        "@router.get('/x')\n"
+        "async def handler():\n"
+        "    async def helper():\n"
+        "        await thing()\n"
+        "    return blocking_call()\n"
+    )
+    assert _offenders_in(nested, "fixture.py") == ["fixture.py:3 handler"]
