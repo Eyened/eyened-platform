@@ -1,8 +1,8 @@
 """The three concurrency limits are interdependent, so they are validated.
 
-An inconsistent triple does not misbehave loudly -- it reintroduces a 30-second
-pool_timeout stall with no error anywhere. Refusing to boot is the cheapest
-place to catch it.
+An inconsistent triple does not misbehave loudly -- threads pile up in
+pool.connect() and wait out the API's 5-second pool_timeout with no error
+anywhere. Refusing to boot is the cheapest place to catch it.
 """
 import pytest
 from pydantic import ValidationError
