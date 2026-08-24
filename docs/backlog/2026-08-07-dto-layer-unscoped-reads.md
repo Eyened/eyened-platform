@@ -10,7 +10,7 @@ repository method's return value, and confirmed by reading the call path.
 
 ## What
 
-`server/dtos/dto_converter.py:100` (`_registration_attr_to_public_ids`) calls
+`server/dtos/dto_converter.py:105` (`_registration_attr_to_public_ids`) calls
 `build_id_to_public` in `orm/eyened_orm/utils/registration.py:61`, which runs
 `ImageInstance.by_columns(session, ImageInstanceID=instance_ids)` on the raw
 request `Session` with no `AccessScope` anywhere in the chain. The ids come from
@@ -35,7 +35,7 @@ Two changes were wanted. **The second is done; the first is still open.**
    `sa.orm.object_session(x)` and converters that read through an injected
    repository.
 
-`server/dtos/dto_converter.py:74` (`sess.get(ImageInstance, instance_id)`) is the
+`server/dtos/dto_converter.py:79` (`sess.get(ImageInstance, instance_id)`) is the
 same shape but benign — it resolves the already-in-scope annotation's own image.
 Worth routing through the same helper when (1) is done, rather than leaving one
 converter scoped and one not.
@@ -57,7 +57,10 @@ The structural problem was larger than the leak: when this was written,
 read surface that satisfied every guard while reading whatever it liked.
 
 That structural hole is closed (see change 2). What remains is the specific
-leak: the guard is a **ratchet, not a fix** — it freezes the six session-touching
+leak: the guard is a **ratchet, not a fix** — it freezes the five session-touching
 converter methods that exist today so no new one is added silently, and records
-them as known and open rather than blessing them as safe. Closing this item
+them as known and open rather than blessing them as safe. (It was six;
+`form_annotation_to_get` came off the pin once it stopped resolving an image id
+itself, with a comment on the set explaining why a stale entry would read as a
+still-open hole.) Closing this item
 means doing change 1 and then shrinking that pinned set.
