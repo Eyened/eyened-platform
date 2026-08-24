@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Literal, Optional, get_origin
 from pydantic import BaseModel
 from eyened_orm import TaskState, SubTaskState
 
-from .dtos_instances import ImageGET, ProjectMeta
+from .dtos_instances import ImageGET
 from .dtos_aux import CreatorMeta
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -56,7 +56,6 @@ class TaskGET(TaskBase):
     creator: Optional[CreatorMeta] = None
     task_state: Optional[TaskState] = None
     task_definition: TaskDefinitionGET
-    projects: Optional[List[ProjectMeta]] = None
 
 
 # === SUB TASK ===

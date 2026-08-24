@@ -1,40 +1,31 @@
 import { goto } from "$app/navigation";
-import { resolve } from "$app/paths";
 import { page } from "$app/state";
 import { authClient, type UserResponse } from "../auth";
 
 export class UserManager {
+
     public user = $state<UserResponse>({
         id: -1,
-        username: "",
+        username: '',
         role: null,
-        starred_tags: [],
+        starred_tags: []
     });
     public loggedIn = $derived(this.user.id !== -1);
     public starredTagIds = $state<number[]>([]);
 
+
     async init(pathname: string) {
-        if (
-            pathname.startsWith("/users/login") ||
-            pathname.startsWith("/users/oidc-callback")
-        ) {
+        if (pathname.startsWith('/users/login') || pathname.startsWith('/users/oidc-callback')) {
             return;
         }
 
         const user = await authClient.me();
         if (user === null) {
-            console.log("User is not logged in");
+            console.log('User is not logged in');
             // Only redirect if we're not already on the login page
-            if (!page.url.pathname.startsWith("/users/login")) {
-                console.log(
-                    "redirecting to",
-                    encodeURIComponent(window.location.href),
-                );
-                await goto(
-                    resolve(
-                        `/users/login?next=${encodeURIComponent(window.location.href)}`,
-                    ),
-                );
+            if (!page.url.pathname.startsWith('/users/login')) {
+                console.log('redirecting to', encodeURIComponent(window.location.href));
+                await goto('/users/login?next=' + encodeURIComponent(window.location.href));
             }
             return;
         }
@@ -52,18 +43,13 @@ export class UserManager {
 
         // Get the 'next' URL from the query parameters
         const params = new URLSearchParams(window.location.search);
-        const nextUrl = params.get("next");
+        const nextUrl = params.get('next');
 
         // If there's a 'next' URL, go there, otherwise go to the root
         if (nextUrl) {
-            // nextUrl is an opaque redirect target captured earlier (e.g. from
-            // window.location.href) and round-tripped through the "next" query
-            // param; it is not a static route literal, so resolve() cannot
-            // validate it at compile time.
-            // eslint-disable-next-line svelte/no-navigation-without-resolve -- decoded redirect target, not a static route literal
             await goto(decodeURIComponent(nextUrl));
         } else {
-            await goto(resolve("/"));
+            await goto('/');
         }
     }
 
@@ -77,10 +63,9 @@ export class UserManager {
 
         // If there's a 'next' URL, go there, otherwise go to the root
         if (nextUrl) {
-            // eslint-disable-next-line svelte/no-navigation-without-resolve -- decoded redirect target, not a static route literal
             await goto(decodeURIComponent(nextUrl));
         } else {
-            await goto(resolve("/"));
+            await goto('/');
         }
     }
 
@@ -88,12 +73,12 @@ export class UserManager {
         await authClient.logout();
         this.user = {
             id: -1,
-            username: "",
+            username: '',
             role: null,
-            starred_tags: [],
+            starred_tags: []
         };
         this.starredTagIds = [];
-        goto(resolve("/users/login"));
+        goto('/users/login');
     }
 
     async changePassword(oldPassword: string, newPassword: string) {

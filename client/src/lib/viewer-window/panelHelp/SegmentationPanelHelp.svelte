@@ -293,9 +293,8 @@
                 mask. That is: the final segmentation is the intersection of
                 this segmentation and the reference segmentation. You can set or
                 update the reference via
-                <strong>Update reference mask</strong>; once a reference is
-                assigned, toggle masked vs unmasked display next to the
-                visibility icon (masked is on by default).
+                <strong>Update reference mask</strong>; toggle masked vs
+                unmasked display once a reference is assigned.
             </p>
         </div>
     </details>

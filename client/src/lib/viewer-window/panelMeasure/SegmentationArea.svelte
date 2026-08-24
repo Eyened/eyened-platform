@@ -11,8 +11,7 @@
     }
     let { segmentation, measureTool }: Props = $props();
     const viewerContext = getContext<ViewerContext>("viewerContext");
-    const mainViewerContext =
-        getContext<MainViewerContext>("mainViewerContext");
+    const mainViewerContext = getContext<MainViewerContext>("mainViewerContext");
     const { segmentationContext } = mainViewerContext;
 
     let area = $state<number | undefined>(undefined);
@@ -22,8 +21,7 @@
         const resX = measureTool.imageResX;
         const resY = measureTool.imageResY;
 
-        const segmentationItem =
-            segmentationContext.getSegmentationItem(segmentation);
+        const segmentationItem = segmentationContext.getSegmentationItem(segmentation);
         const mask = segmentationItem.getMask(index);
         if (!mask) {
             area = undefined;
@@ -38,7 +36,7 @@
 
         if (mask instanceof ProbabilityMask) {
             // pixelArea tracks data changes; threshold is applied at read time
-            const _pixelAreaDep = mask.pixelArea;
+            mask.pixelArea;
             const pixelArea = mask.computePixelArea(segmentationItem.threshold);
             area = (pixelArea * resX * resY) / 1e6;
             return;

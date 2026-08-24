@@ -5,31 +5,30 @@ import type { FormAnnotationGET, ImageGET } from "../../../types/openapi_types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 
-const strokeStyle = "rgba(0, 255, 0, 1)";
-const fillStyle = "rgba(255, 255, 255, 0.6)";
+const strokeStyle = 'rgba(0, 255, 0, 1)';
+const fillStyle = 'rgba(255, 255, 255, 0.6)';
 
 export type PointList = (Position2D | undefined)[];
 
 export class RegistrationTool implements Overlay {
-    private activePointIndex: number | undefined;
-    private hoverPointIndex: number | undefined;
 
-    toolName: ToolName = "registration";
-    name: string = "Registration";
+    private activePointIndex: number | undefined;
+    private hoverPointIndex: number | undefined
+
+    toolName: ToolName = 'registration';
+    name: string = 'Registration';
 
     constructor(
         private formAnnotation: FormAnnotationGET,
         private instance: ImageGET,
         private canEdit: boolean,
-        private pointStyle: "rect" | "cross" = "cross",
-        private radius: number = 16,
-    ) {}
+        private pointStyle: 'rect' | 'cross' = 'cross',
+        private radius: number = 16
+    ) {
+    }
 
     private update() {
-        setFormAnnotationValue(
-            this.formAnnotation.id,
-            this.formAnnotation.form_data,
-        );
+        setFormAnnotationValue(this.formAnnotation.id, this.formAnnotation.form_data);
     }
 
     get points(): PointList {
@@ -45,20 +44,22 @@ export class RegistrationTool implements Overlay {
     keyup(e: ViewerEvent<KeyboardEvent>) {
         const { event, viewerContext } = e;
         // if it's a number, zoom around the point
-        if (event.key >= "0" && event.key <= "9") {
+        if (event.key >= '0' && event.key <= '9') {
             const index = parseInt(event.key) - 1;
             const point = this.points?.[index];
             if (point) {
                 const w = viewerContext.viewerSize.width;
                 const w_image = viewerContext.image.width;
-                viewerContext.focusPoint(point.x, point.y, (1 * w_image) / w);
+                viewerContext.focusPoint(point.x, point.y, 1 * w_image / w);
             }
         }
     }
 
+
     pointerdown(pointerEvent: ViewerEvent<PointerEvent>) {
         const { event, viewerContext, cursor } = pointerEvent;
         if (event.shiftKey) return;
+
 
         if (event.button === 0) {
             if (this.hoverPointIndex === undefined) {
@@ -74,13 +75,13 @@ export class RegistrationTool implements Overlay {
     pointerup(pointerEvent: ViewerEvent<PointerEvent>) {
         const { event, viewerContext, cursor } = pointerEvent;
         if (event.shiftKey) return;
-
+        
         if (!this.canEdit) {
             this.activePointIndex = undefined;
             this.hoverPointIndex = this.findHit(cursor, viewerContext);
             return;
         }
-
+        
         if (event.button === 0) {
             if (this.activePointIndex !== undefined) {
                 this.update();
@@ -93,17 +94,19 @@ export class RegistrationTool implements Overlay {
             }
         }
         this.activePointIndex = undefined;
-        this.hoverPointIndex = this.findHit(cursor, viewerContext);
+        this.hoverPointIndex = this.findHit(cursor, viewerContext)
+
     }
 
     private addPoint(position: Position2D) {
         if (!this.canEdit) return;
-
-        if (!this.points) return;
+        
+        if (!this.points)
+            return
         for (let i = 0; i <= this.points.length; i++) {
             if (!this.points[i]) {
                 this.activePointIndex = i;
-                break;
+                break
             }
         }
         if (this.activePointIndex === undefined) {
@@ -114,8 +117,9 @@ export class RegistrationTool implements Overlay {
 
     private removePoint() {
         if (!this.canEdit) return;
-
-        if (!this.points) return;
+        
+        if (!this.points)
+            return;
         const index = this.hoverPointIndex!;
         if (index == this.points.length - 1) {
             this.points.splice(index, 1);
@@ -125,7 +129,8 @@ export class RegistrationTool implements Overlay {
     }
 
     pointermove(e: ViewerEvent<PointerEvent>) {
-        if (!this.points) return;
+        if (!this.points)
+            return;
         const { cursor, viewerContext } = e;
 
         if (this.activePointIndex !== undefined && this.canEdit) {
@@ -137,14 +142,15 @@ export class RegistrationTool implements Overlay {
         }
     }
 
-    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
-        if (!this.points) return;
+    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+        if (!this.points)
+            return;
 
         const { context2D } = viewerContext;
 
         context2D.strokeStyle = strokeStyle;
         context2D.fillStyle = strokeStyle;
-        context2D.font = "16px sans-serif";
+        context2D.font = '16px sans-serif';
 
         const r = this.radius;
 
@@ -152,15 +158,15 @@ export class RegistrationTool implements Overlay {
             if (!pt) continue;
             const p = viewerContext.imageToViewerCoordinates(pt);
 
-            if (this.pointStyle == "rect") {
+            if (this.pointStyle == 'rect') {
                 context2D.strokeRect(p.x - r, p.y - r, 2 * r, 2 * r);
             } else {
                 context2D.beginPath();
                 context2D.arc(p.x, p.y, r, 0, 2 * Math.PI);
-                context2D.moveTo(p.x - r, p.y);
-                context2D.lineTo(p.x + r, p.y);
-                context2D.moveTo(p.x, p.y - r);
-                context2D.lineTo(p.x, p.y + r);
+                context2D.moveTo(p.x - r, p.y)
+                context2D.lineTo(p.x + r, p.y)
+                context2D.moveTo(p.x, p.y - r)
+                context2D.lineTo(p.x, p.y + r)
 
                 context2D.stroke();
             }
@@ -173,25 +179,26 @@ export class RegistrationTool implements Overlay {
             const highlightPoint = this.points[highlightIndex]!;
             const p = viewerContext.imageToViewerCoordinates(highlightPoint);
 
-            if (this.pointStyle == "rect") {
+            if (this.pointStyle == 'rect') {
                 context2D.fillRect(p.x - r, p.y - r, 2 * r, 2 * r);
             } else {
                 context2D.beginPath();
                 context2D.arc(p.x, p.y, r, 0, 2 * Math.PI);
                 context2D.fill();
             }
+
         }
-        viewerContext.cursorStyle = highlightIndex ? "pointer" : "default";
+        viewerContext.cursorStyle = highlightIndex ? 'pointer' : 'default';
+
     }
 
-    private findHit(
-        cursor: Position2D,
-        viewerContext: ViewerContext,
-    ): number | undefined {
-        if (!this.points) return;
+
+    private findHit(cursor: Position2D, viewerContext: ViewerContext): number | undefined {
+        if (!this.points)
+            return;
 
         for (let i = 0; i < this.points.length; i++) {
-            const value = this.points[i];
+            const value = this.points[i]
             if (!value) {
                 continue;
             }
@@ -207,10 +214,11 @@ export class RegistrationTool implements Overlay {
     }
 
     private hit(dx: number, dy: number) {
-        if (this.pointStyle == "rect") {
+        if (this.pointStyle == 'rect') {
             return Math.abs(dx) < this.radius && Math.abs(dy) < this.radius;
-        } else {
-            return dx * dx + dy * dy < this.radius * this.radius;
+        }
+        else {
+            return (dx * dx + dy * dy) < (this.radius * this.radius);
         }
     }
 }

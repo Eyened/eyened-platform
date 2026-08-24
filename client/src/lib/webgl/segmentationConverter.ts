@@ -1,5 +1,5 @@
 // SimpleDataRepresentation is a subset of SegmentationDataRepresentation
-export type SimpleDataRepresentation = "Binary" | "DualBitMask" | "Probability";
+export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
 import type { DrawingArray } from "./mask.svelte";
 
 export interface ConversionRule {
@@ -26,19 +26,14 @@ function probabilityToBinary(i: number, threshold: number) {
     return i > threshold ? 1 : 0;
 }
 export const converters = {
-    "Binary->DualBitMask": binaryToQuestionable,
-    "Binary->Probability": binaryToProbability,
-    "DualBitMask->Binary": questionableToBinary,
-    "DualBitMask->Probability": questionableToProbability,
-    "Probability->Binary": probabilityToBinary,
-    "Probability->DualBitMask": probabilityToBinary, // same as binary
-};
-export function convert(
-    data: DrawingArray,
-    from: SimpleDataRepresentation,
-    to: SimpleDataRepresentation,
-    threshold: number = 127,
-) {
+    'Binary->DualBitMask': binaryToQuestionable,
+    'Binary->Probability': binaryToProbability,
+    'DualBitMask->Binary': questionableToBinary,
+    'DualBitMask->Probability': questionableToProbability,
+    'Probability->Binary': probabilityToBinary,
+    'Probability->DualBitMask': probabilityToBinary, // same as binary
+}
+export function convert(data: DrawingArray, from: SimpleDataRepresentation, to: SimpleDataRepresentation, threshold: number = 127) {
     if (from == to) {
         return data;
     }

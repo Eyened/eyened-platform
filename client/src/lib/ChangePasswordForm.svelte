@@ -23,10 +23,11 @@
             setTimeout(() => {
                 changed = false;
             }, 5000);
-        } catch (_e) {
+        } catch (e) {
             alert("Error changing password");
         }
     }
+    
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->

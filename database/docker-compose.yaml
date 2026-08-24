@@ -1,15 +1,17 @@
-name: eyened-platform-database-dev-bart
+name: eyeneed-bundle-database
 
 services:
   database:
-    env_file: .env
     image: mysql:8.0.27
-    command:
-      - --innodb-buffer-pool-size=${EYENED_DATABASE_BUFFER_POOL_SIZE:-2G}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-secure_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-eyened_database}
+      MYSQL_USER: ${MYSQL_USER:-eyened_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-secure_password}
     ports:
       - "${EYENED_DATABASE_PORT:-3306}:3306"
     volumes:
-      - db_data:/var/lib/mysql
+      - ${EYENED_DB_DATA_PATH:-./.local/mysql}:/var/lib/mysql
 
   # optional: adminer for simple database management in the browser
   adminer:
@@ -25,7 +27,4 @@ services:
     image: percona/percona-xtrabackup:8.0
     profiles: ["backup"]
     volumes:
-      - db_data:/var/lib/mysql
-
-volumes:
-  db_data:
+      - ${EYENED_DB_DATA_PATH:-./.local/mysql}:/var/lib/mysql

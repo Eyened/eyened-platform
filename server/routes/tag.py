@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, Response
+from eyened_orm import Creator, CreatorTagLink, Tag
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import select
+from sqlalchemy.orm import Session, load_only, noload, selectinload
 
+from ..db import get_db
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import TagGET, TagPATCH, TagPUT
-from ..services.tag_service import TagService, get_tag_service
+from ..utils.db_logging import get_db_logger
 from .auth import CurrentUser, get_current_user
 
 router = APIRouter()
@@ -11,78 +15,192 @@ router = APIRouter()
 @router.post("/tags", response_model=TagGET)
 async def create_tag(
     dto: TagPUT,
-    service: TagService = Depends(get_tag_service),
+    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Create a tag owned by the current user."""
-    tag = service.create_tag(
-        dto.name,
-        dto.description,
-        dto.tag_type,
+    tag = Tag(
+        TagName=dto.name,
+        TagDescription=dto.description,
+        TagType=dto.tag_type,
+        CreatorID=current_user.id,
     )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    
+    # Log tag creation
+    logger = get_db_logger()
+    if logger:
+        logger.log_insert(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint="POST /api/tags",
+            entity="Tag",
+            entity_id=tag.TagID,
+            fields={
+                "name": tag.TagName,
+                "description": tag.TagDescription,
+                "tag_type": str(tag.TagType),
+            },
+        )
+    
     return DTOConverter.tag_to_get(tag)
 
 
 @router.get("/tags", response_model=list[TagGET])
 async def list_tags(
-    service: TagService = Depends(get_tag_service),
-    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)
 ):
-    """Return all tags."""
-    return [DTOConverter.tag_to_get(t) for t in service.list_tags()]
+    # Tag has several lazy="selectin" link collections; disable them here since TagGET
+    # only needs Tag columns + Creator (id, name for CreatorMeta).
+    stmt = (
+        select(Tag)
+        .options(
+            load_only(
+                Tag.TagID,
+                Tag.TagName,
+                Tag.TagType,
+                Tag.TagDescription,
+                Tag.CreatorID,
+                Tag.DateInserted,
+            ),
+            noload(Tag.CreatorTagLinks),
+            noload(Tag.StudyTagLinks),
+            noload(Tag.ImageInstanceTagLinks),
+            noload(Tag.AnnotationTagLinks),
+            noload(Tag.SegmentationTagLinks),
+            noload(Tag.FormAnnotationTagLinks),
+            selectinload(Tag.Creator).load_only(Creator.CreatorID, Creator.CreatorName),
+        )
+    )
+    rows = db.scalars(stmt).all()
+    return [DTOConverter.tag_to_get(t) for t in rows]
 
 
 @router.patch("/tags/{tag_id}", response_model=TagGET)
 async def patch_tag(
     tag_id: int,
     dto: TagPATCH,
-    service: TagService = Depends(get_tag_service),
+    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Update a tag's name, description, and/or type."""
-    tag = service.update_tag(
-        tag_id,
-        dto.name,
-        dto.description,
-        dto.tag_type,
-    )
+    tag = db.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(404, "Tag not found")
+    changes = {}
+    if dto.name is not None:
+        changes["name"] = f"{tag.TagName} -> {dto.name}"
+        tag.TagName = dto.name
+    if dto.description is not None:
+        changes["description"] = f"{tag.TagDescription} -> {dto.description}"
+        tag.TagDescription = dto.description
+    if dto.tag_type is not None:
+        changes["tag_type"] = f"{tag.TagType} -> {dto.tag_type}"
+        tag.TagType = dto.tag_type
+    db.commit()
+    db.refresh(tag)
+    
+    # Log tag update
+    logger = get_db_logger()
+    if logger:
+        logger.log_update(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"PATCH /api/tags/{tag_id}",
+            entity="Tag",
+            entity_id=tag.TagID,
+            changes=changes if changes else None,
+        )
+    
     return DTOConverter.tag_to_get(tag)
 
 
 @router.delete("/tags/{tag_id}", status_code=204)
 async def delete_tag(
     tag_id: int,
-    service: TagService = Depends(get_tag_service),
+    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Delete a tag (409 if it is still applied to any record)."""
-    service.delete_tag(
-        tag_id,
-    )
+    tag = db.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(404, "Tag not found")
+    
+    # Save tag data for logging before deletion
+    deleted_data = {
+        "name": tag.TagName,
+        "description": tag.TagDescription,
+        "tag_type": str(tag.TagType),
+    }
+    
+    db.delete(tag)
+    db.commit()
+    
+    # Log tag deletion
+    logger = get_db_logger()
+    if logger:
+        logger.log_delete(
+            user=current_user.username,
+            user_id=current_user.id,
+            endpoint=f"DELETE /api/tags/{tag_id}",
+            entity="Tag",
+            entity_id=tag_id,
+            deleted_data=deleted_data,
+        )
+    
     return Response(status_code=204)
 
 
 @router.post("/tags/{tag_id}/star", status_code=204)
 async def star_tag(
     tag_id: int,
-    service: TagService = Depends(get_tag_service),
+    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Star a tag for the current user (idempotent)."""
-    service.star_tag(
-        tag_id,
-    )
+    tag = db.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(404, "Tag not found")
+    # idempotent insert
+    if not db.get(CreatorTagLink, {"TagID": tag_id, "CreatorID": current_user.id}):
+        db.add(CreatorTagLink(TagID=tag_id, CreatorID=current_user.id))
+        db.commit()
+        
+        # Log star creation
+        logger = get_db_logger()
+        if logger:
+            logger.log_insert(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint=f"POST /api/tags/{tag_id}/star",
+                entity="CreatorTagLink",
+                fields={
+                    "tag_id": tag_id,
+                    "creator_id": current_user.id,
+                },
+            )
+    
     return Response(status_code=204)
 
 
 @router.delete("/tags/{tag_id}/star", status_code=204)
 async def unstar_tag(
     tag_id: int,
-    service: TagService = Depends(get_tag_service),
+    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Remove the current user's star from a tag (idempotent)."""
-    service.unstar_tag(
-        tag_id,
-    )
+    link = db.get(CreatorTagLink, {"TagID": tag_id, "CreatorID": current_user.id})
+    if link:
+        db.delete(link)
+        db.commit()
+        
+        # Log star deletion
+        logger = get_db_logger()
+        if logger:
+            logger.log_delete(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint=f"DELETE /api/tags/{tag_id}/star",
+                entity="CreatorTagLink",
+                fields={"tag_id": tag_id, "creator_id": current_user.id},
+            )
+    
     return Response(status_code=204)

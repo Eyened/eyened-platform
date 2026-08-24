@@ -6,101 +6,95 @@ import { SegmentationTool, type DrawingExecutor } from "./segmentation";
 
 const lineWidth = 2;
 
+
 export class PolygonTool extends SegmentationTool {
-    constructor(
-        drawingExecutor: DrawingExecutor,
-        viewerContext: ViewerContext,
-        segmentationContext: SegmentationContext,
-    ) {
-        super(drawingExecutor, viewerContext, segmentationContext);
-    }
 
-    pointerdown(e: ViewerEvent<PointerEvent>) {
-        const { event } = e;
-        this.lastPosition = this.eventToSegmentation(e);
+	constructor(
+		drawingExecutor: DrawingExecutor,
+		viewerContext: ViewerContext,
+		segmentationContext: SegmentationContext,
+	) {
+		super(drawingExecutor, viewerContext, segmentationContext);
+	}
 
-        if (event.altKey || event.shiftKey) return;
+	pointerdown(e: ViewerEvent<PointerEvent>) {
+		const { event } = e;
+		this.lastPosition = this.eventToSegmentation(e);
 
-        if (event.button === 0) this.drawingState = "paint";
-        else if (event.button === 2) this.drawingState = "erase";
+		if (event.altKey || event.shiftKey) return;
 
-        this.startDraw(e.viewerContext);
-    }
+		if (event.button === 0) this.drawingState = 'paint';
+		else if (event.button === 2) this.drawingState = 'erase';
 
-    pointerup(e: ViewerEvent<PointerEvent>) {
-        const { viewerContext } = e;
-        this.endDraw(viewerContext);
-    }
+		this.startDraw(e.viewerContext);
+	}
 
-    pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
-        const { event } = pointerEvent;
-        if (event.altKey || event.shiftKey) {
-            return;
-        }
-        this.lastPosition = this.eventToSegmentation(pointerEvent);
+	pointerup(e: ViewerEvent<PointerEvent>) {
+		const { viewerContext } = e;
+		this.endDraw(viewerContext);
+	}
 
-        if (this.drawingState && this.currentPoints) {
-            this.currentPoints.push(this.eventToSegmentation(pointerEvent));
-        }
-    }
 
-    executeDraw(
-        ctx: CanvasRenderingContext2D,
-        _viewerContext: ViewerContext,
-    ): void {
-        ctx.fillStyle = "white";
+	pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
+		const { event } = pointerEvent;
+		if (event.altKey || event.shiftKey) {
+			return;
+		}
+		this.lastPosition = this.eventToSegmentation(pointerEvent);
 
-        ctx.beginPath();
-        const p = this.currentPoints![0];
-        ctx.moveTo(p.x, p.y);
-        for (let i = 1; i < this.currentPoints!.length; i++) {
-            ctx.lineTo(this.currentPoints![i].x, this.currentPoints![i].y);
-        }
-        ctx.lineTo(p.x, p.y);
-        ctx.fill();
-    }
+		if (this.drawingState && this.currentPoints) {
+			this.currentPoints.push(this.eventToSegmentation(pointerEvent));
+		}
+	}
 
-    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
+	executeDraw(ctx: CanvasRenderingContext2D, viewerContext: ViewerContext): void {
+		ctx.fillStyle = 'white';
+
+		ctx.beginPath();
+		let p = this.currentPoints![0];
+		ctx.moveTo(p.x, p.y);
+		for (let i = 1; i < this.currentPoints!.length; i++) {
+			ctx.lineTo(this.currentPoints![i].x, this.currentPoints![i].y);
+		}
+		ctx.lineTo(p.x, p.y);
+		ctx.fill();
+	}
+
+	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
         super.repaint(viewerContext, renderTarget);
-        const flipDrawErase = this.flipDrawErase;
-        if (
-            !this.drawingState ||
-            !this.currentPoints ||
-            this.currentPoints.length == 0
-        )
-            return;
+		const flipDrawErase = this.flipDrawErase;
+		if (!this.drawingState || !this.currentPoints || this.currentPoints.length == 0) return;
 
-        const ctx = viewerContext.context2D;
+		const ctx = viewerContext.context2D;
 
-        ctx.lineWidth = lineWidth;
+		ctx.lineWidth = lineWidth;
 
-        if ((this.drawingState === "paint") !== flipDrawErase) {
-            ctx.strokeStyle = this.paintColor;
-        } else {
-            ctx.strokeStyle = this.eraseColor;
-        }
-        ctx.fillStyle = this.fillColor;
-        ctx.setLineDash([]);
+		if ((this.drawingState === 'paint') !== flipDrawErase) {
+			ctx.strokeStyle = this.paintColor;
+		} else {
+			ctx.strokeStyle = this.eraseColor;
+		}
+		ctx.fillStyle = this.fillColor;
+		ctx.setLineDash([]);
 
-        ctx.beginPath();
-        let p = this.segmentationToViewer(this.currentPoints[0]);
-        ctx.moveTo(p.x, p.y);
-        for (let i = 1; i < this.currentPoints.length; i++) {
-            p = this.segmentationToViewer(this.currentPoints[i]);
-            ctx.lineTo(p.x, p.y);
-        }
-        ctx.fill();
-        ctx.stroke();
+		ctx.beginPath();
+		let p = this.segmentationToViewer(this.currentPoints[0]);
+		ctx.moveTo(p.x, p.y);
+		for (let i = 1; i < this.currentPoints.length; i++) {
+			p = this.segmentationToViewer(this.currentPoints[i]);
+			ctx.lineTo(p.x, p.y);
+		}
+		ctx.fill();
+		ctx.stroke();
 
-        ctx.setLineDash([5, 5]);
-        ctx.beginPath();
-        p = this.segmentationToViewer(this.currentPoints[0]);
-        ctx.moveTo(p.x, p.y);
-        p = this.segmentationToViewer(
-            this.currentPoints[this.currentPoints.length - 1],
-        );
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-    }
+		ctx.setLineDash([5, 5]);
+		ctx.beginPath();
+		p = this.segmentationToViewer(this.currentPoints[0]);
+		ctx.moveTo(p.x, p.y);
+		p = this.segmentationToViewer(this.currentPoints[this.currentPoints.length - 1]);
+		ctx.lineTo(p.x, p.y);
+		ctx.stroke();
+		ctx.setLineDash([]);
+	}
+
 }

@@ -2,55 +2,36 @@ import type { PixelShaderProgram } from "./FragmentShaderProgram";
 import type { DrawingArray } from "./mask.svelte";
 import type { RenderTarget } from "./types";
 
-export type TypedArray =
-    | Int8Array
-    | Uint8Array
-    | Uint8ClampedArray
-    | Int16Array
-    | Uint16Array
-    | Int32Array
-    | Uint32Array
-    | Float32Array
-    | Float64Array;
+export type TypedArray = Int8Array | Uint8Array | Uint8ClampedArray | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;
 export type ImageType = HTMLImageElement | HTMLCanvasElement | ImageBitmap;
 
 // Framebuffer tagging system to detect cross-context violations
-const framebufferOwners = new WeakMap<
-    WebGLFramebuffer,
-    WebGL2RenderingContext
->();
+const framebufferOwners = new WeakMap<WebGLFramebuffer, WebGL2RenderingContext>();
 
-export function tagFramebuffer(
-    gl: WebGL2RenderingContext,
-    framebuffer: WebGLFramebuffer,
-): void {
+export function tagFramebuffer(gl: WebGL2RenderingContext, framebuffer: WebGLFramebuffer): void {
     framebufferOwners.set(framebuffer, gl);
 }
 
-export function checkFramebufferContext(
-    gl: WebGL2RenderingContext,
-    framebuffer: WebGLFramebuffer | null,
-    label: string,
-): boolean {
+export function checkFramebufferContext(gl: WebGL2RenderingContext, framebuffer: WebGLFramebuffer | null, label: string): boolean {
     if (!framebuffer) return true; // null framebuffer is valid (default framebuffer)
-
+    
     const owner = framebufferOwners.get(framebuffer);
     if (owner && owner !== gl) {
         const error = new Error(
             `[WebGL Context Violation] Attempted to bind framebuffer from different context. ` +
-                `Label: ${label}. ` +
-                `This framebuffer was created in a different WebGL context and should be disposed.`,
+            `Label: ${label}. ` +
+            `This framebuffer was created in a different WebGL context and should be disposed.`
         );
         console.error(error);
-        console.trace("Framebuffer context violation stack trace:");
+        console.trace('Framebuffer context violation stack trace:');
         return false;
     }
-
+    
     // If framebuffer is not tagged, tag it now (for framebuffers created before tagging system)
     if (!owner) {
         framebufferOwners.set(framebuffer, gl);
     }
-
+    
     return true;
 }
 
@@ -80,19 +61,11 @@ class SwapTextureManager {
         tagFramebuffer(gl, this.framebuffer);
     }
 
-    private getTextureKey(
-        format: TextureFormat,
-        width: number,
-        height: number,
-    ): string {
+    private getTextureKey(format: TextureFormat, width: number, height: number): string {
         return `${format.internalFormat}_${width}_${height}_${format.filtering}`;
     }
 
-    getSwapTexture(
-        format: TextureFormat,
-        width: number,
-        height: number,
-    ): SwapTexture {
+    getSwapTexture(format: TextureFormat, width: number, height: number): SwapTexture {
         const key = this.getTextureKey(format, width, height);
         let swap = this.swapTextures.get(key);
         if (!swap) {
@@ -104,27 +77,14 @@ class SwapTextureManager {
     }
 }
 
-export function imageToTexture(
-    gl: WebGL2RenderingContext,
-    image: ImageType,
-): WebGLTexture {
+export function imageToTexture(gl: WebGL2RenderingContext, image: ImageType): WebGLTexture {
     let swapIO = swapIOCache.get(gl);
     if (!swapIO) {
         swapIO = createTextureIO(gl, image.width, image.height);
         swapIOCache.set(gl, swapIO);
     }
     gl.bindTexture(gl.TEXTURE_2D, swapIO);
-    gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        image.width,
-        image.height,
-        0,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        image,
-    );
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, image.width, image.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
     return swapIO;
 }
 function getSwapManager(gl: WebGL2RenderingContext): SwapTextureManager {
@@ -136,12 +96,7 @@ function getSwapManager(gl: WebGL2RenderingContext): SwapTextureManager {
     return manager;
 }
 
-export function createTexture(
-    gl: WebGL2RenderingContext,
-    format: TextureFormat,
-    width: number,
-    height: number,
-): WebGLTexture {
+export function createTexture(gl: WebGL2RenderingContext, format: TextureFormat, width: number, height: number): WebGLTexture {
     const texture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texStorage2D(gl.TEXTURE_2D, 1, format.internalFormat, width, height);
@@ -152,11 +107,7 @@ export function createTexture(
     return texture;
 }
 
-function createTextureIO(
-    gl: WebGL2RenderingContext,
-    _width: number,
-    _height: number,
-): WebGLTexture {
+function createTextureIO(gl: WebGL2RenderingContext, width: number, height: number): WebGLTexture {
     const texture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -167,24 +118,10 @@ function createTextureIO(
     return texture;
 }
 
-export function createTextureR8UI(
-    gl: WebGL2RenderingContext,
-    width: number,
-    height: number,
-): WebGLTexture {
+export function createTextureR8UI(gl: WebGL2RenderingContext, width: number, height: number): WebGLTexture {
     const texture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.R8UI,
-        width,
-        height,
-        0,
-        gl.RED_INTEGER,
-        gl.UNSIGNED_BYTE,
-        null,
-    );
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, width, height, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -194,107 +131,89 @@ export function createTextureR8UI(
 
 const INT_FORMAT = {
     format: WebGL2RenderingContext.RED_INTEGER,
-    filtering: WebGL2RenderingContext.NEAREST,
-};
+    filtering: WebGL2RenderingContext.NEAREST
+}
 const FLOAT_FORMAT = {
     format: WebGL2RenderingContext.RED,
     type: WebGL2RenderingContext.UNSIGNED_BYTE,
-    filtering: WebGL2RenderingContext.LINEAR,
-};
+    filtering: WebGL2RenderingContext.LINEAR
+}
 const FLOAT_FORMAT_2CH = {
     format: WebGL2RenderingContext.RG,
     type: WebGL2RenderingContext.FLOAT,
-    filtering: WebGL2RenderingContext.NEAREST,
-};
-const TEXTURE_FORMATS: Record<
-    "R8" | "R8UI" | "R16UI" | "R32UI" | "R32F" | "RG32F" | "RGBA",
-    TextureFormat
-> = {
+    filtering: WebGL2RenderingContext.NEAREST
+}
+const TEXTURE_FORMATS: Record<'R8' | 'R8UI' | 'R16UI' | 'R32UI' | 'R32F' | 'RG32F' | 'RGBA', TextureFormat> = {
     // Used for probability maps
     R8: {
         ...FLOAT_FORMAT,
-        internalFormat: WebGL2RenderingContext.R8,
+        internalFormat: WebGL2RenderingContext.R8
     },
     // Used for segmentation maps (8 bit)
     R8UI: {
         ...INT_FORMAT,
         type: WebGL2RenderingContext.UNSIGNED_BYTE,
-        internalFormat: WebGL2RenderingContext.R8UI,
+        internalFormat: WebGL2RenderingContext.R8UI
     },
     // Used for segmentation maps (16 bit)
     R16UI: {
         ...INT_FORMAT,
         type: WebGL2RenderingContext.UNSIGNED_SHORT,
-        internalFormat: WebGL2RenderingContext.R16UI,
+        internalFormat: WebGL2RenderingContext.R16UI
     },
     // Used for segmentation maps (32 bit)
     R32UI: {
         ...INT_FORMAT,
         type: WebGL2RenderingContext.UNSIGNED_INT,
-        internalFormat: WebGL2RenderingContext.R32UI,
+        internalFormat: WebGL2RenderingContext.R32UI
     },
-    // Used for float accumulation maps (enface projection, probability sums, etc.)
+    // Used for probability maps (higher precision alternative to R8)
     R32F: {
         ...FLOAT_FORMAT,
-        type: WebGL2RenderingContext.FLOAT,
-        internalFormat: WebGL2RenderingContext.R32F,
+        internalFormat: WebGL2RenderingContext.R32F
     },
     // Used for min/max pairs (R=min, G=max)
     RG32F: {
         ...FLOAT_FORMAT_2CH,
-        internalFormat: WebGL2RenderingContext.RG32F,
+        internalFormat: WebGL2RenderingContext.RG32F
     },
     RGBA: {
         format: WebGL2RenderingContext.RGBA,
         type: WebGL2RenderingContext.UNSIGNED_BYTE,
         filtering: WebGL2RenderingContext.LINEAR,
-        internalFormat: WebGL2RenderingContext.RGBA8,
-    },
+        internalFormat: WebGL2RenderingContext.RGBA8
+    }
 };
 
 export class TextureData {
-    private _texture: WebGLTexture | null = null;
 
-    private cpuData:
-        | Uint8Array
-        | Uint16Array
-        | Uint32Array
-        | Float32Array
-        | null = null;
+    private _texture: WebGLTexture | null = null;
+    
+    private cpuData: Uint8Array | Uint16Array | Uint32Array | Float32Array | null = null;
     private gpuDirty = false;
     private cpuDirty = false;
     readonly textureFormat: TextureFormat;
     readonly renderTarget: RenderTarget;
-    private arrayType: new (
-        length: number,
-    ) => Uint8Array | Uint16Array | Uint32Array | Float32Array;
+    private arrayType: new (length: number) => Uint8Array | Uint16Array | Uint32Array | Float32Array;
     private numChannels: number;
 
     constructor(
         private readonly gl: WebGL2RenderingContext,
         public readonly width: number,
         public readonly height: number,
-        private readonly format: keyof typeof TEXTURE_FORMATS,
+        private readonly format: keyof typeof TEXTURE_FORMATS
     ) {
         this.textureFormat = TEXTURE_FORMATS[this.format];
-        this.numChannels =
-            this.textureFormat.format === WebGL2RenderingContext.RGBA
-                ? 4
-                : this.textureFormat.format === WebGL2RenderingContext.RG
-                  ? 2
-                  : 1;
+        this.numChannels = this.textureFormat.format === WebGL2RenderingContext.RGBA ? 4 : 
+                          this.textureFormat.format === WebGL2RenderingContext.RG ? 2 : 1;
 
-        if (
-            this.format === "R8" ||
-            this.format === "R8UI" ||
-            this.format === "RGBA"
-        ) {
+        if (this.format === 'R8' || this.format === 'R8UI' || this.format === 'RGBA') {
             this.arrayType = Uint8Array;
-        } else if (this.format === "R16UI") {
+        } else if (this.format === 'R16UI') {
             this.arrayType = Uint16Array;
-        } else if (this.format === "R32UI") {
+        } else if (this.format === 'R32UI') {
             this.arrayType = Uint32Array;
-        } else if (this.format === "R32F" || this.format === "RG32F") {
+        } else if (this.format === 'R32F' || this.format === 'RG32F') {
             this.arrayType = Float32Array;
         } else {
             throw new Error(`Unsupported format: ${this.format}`);
@@ -305,27 +224,20 @@ export class TextureData {
             height: this.height,
             left: 0,
             bottom: 0,
-            attachments: [gl.COLOR_ATTACHMENT0],
+            attachments: [gl.COLOR_ATTACHMENT0]
         };
     }
 
     private _getTexture(): WebGLTexture {
         if (!this._texture) {
-            this._texture = createTexture(
-                this.gl,
-                this.textureFormat,
-                this.width,
-                this.height,
-            );
+            this._texture = createTexture(this.gl, this.textureFormat, this.width, this.height);
         }
         return this._texture;
     }
 
     private _getData(): DrawingArray {
         if (!this.cpuData) {
-            this.cpuData = new this.arrayType(
-                this.width * this.height * this.numChannels,
-            );
+            this.cpuData = new this.arrayType(this.width * this.height * this.numChannels);
         }
         return this.cpuData;
     }
@@ -336,17 +248,7 @@ export class TextureData {
             const gl = this.gl;
             const { format, type } = this.textureFormat;
             gl.bindTexture(gl.TEXTURE_2D, this._getTexture());
-            gl.texSubImage2D(
-                gl.TEXTURE_2D,
-                0,
-                0,
-                0,
-                this.width,
-                this.height,
-                format,
-                type,
-                this._getData(),
-            );
+            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.width, this.height, format, type, this._getData());
             this.gpuDirty = false;
         }
     }
@@ -358,35 +260,14 @@ export class TextureData {
             const { internalFormat } = this.textureFormat;
             const data = this._getData();
 
-            if (
-                !checkFramebufferContext(
-                    gl,
-                    this.renderTarget.framebuffer,
-                    "TextureData.updateCPU",
-                )
-            ) {
-                console.error(
-                    "Skipping updateCPU due to framebuffer context violation",
-                );
+            if (!checkFramebufferContext(gl, this.renderTarget.framebuffer, 'TextureData.updateCPU')) {
+                console.error('Skipping updateCPU due to framebuffer context violation');
                 return;
             }
 
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.renderTarget.framebuffer);
-            gl.framebufferTexture2D(
-                gl.FRAMEBUFFER,
-                gl.COLOR_ATTACHMENT0,
-                gl.TEXTURE_2D,
-                this._getTexture(),
-                0,
-            );
-            readDataFromFrameBuffer(
-                gl,
-                internalFormat,
-                this.width,
-                this.height,
-                this.numChannels,
-                data,
-            );
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this._getTexture(), 0);
+            readDataFromFrameBuffer(gl, internalFormat, this.width, this.height, this.numChannels, data);
             this.cpuDirty = false;
         }
     }
@@ -410,9 +291,9 @@ export class TextureData {
     }
 
     uploadCanvas(canvas: HTMLCanvasElement | ImageBitmap) {
-        if (this.format !== "RGBA") {
+        if (this.format !== 'RGBA') {
             // TODO: perhaps we could convert canvas to grayscale to support other formats
-            throw new Error("uploadCanvas is only supported for RGBA textures");
+            throw new Error('uploadCanvas is only supported for RGBA textures');
         }
         const gl = this.gl;
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
@@ -425,7 +306,7 @@ export class TextureData {
             canvas.height,
             gl.RGBA,
             gl.UNSIGNED_BYTE,
-            canvas,
+            canvas
         );
         this.gpuDirty = false;
         this.cpuDirty = true;
@@ -441,40 +322,22 @@ export class TextureData {
         // sync GPU data with CPU data if needed
         this.updateGPU();
         const gl = this.gl;
-        const swap = getSwapManager(gl).getSwapTexture(
-            this.textureFormat,
-            this.width,
-            this.height,
-        );
+        const swap = getSwapManager(gl).getSwapTexture(this.textureFormat, this.width, this.height);
 
         // Check framebuffer context before binding
-        if (
-            !checkFramebufferContext(
-                gl,
-                swap.framebuffer,
-                "TextureData.passShader",
-            )
-        ) {
-            console.error(
-                "Skipping passShader due to framebuffer context violation",
-            );
+        if (!checkFramebufferContext(gl, swap.framebuffer, 'TextureData.passShader')) {
+            console.error('Skipping passShader due to framebuffer context violation');
             return;
         }
 
         // Bind the framebuffer and attach the swap texture
         gl.bindFramebuffer(gl.FRAMEBUFFER, swap.framebuffer);
-        gl.framebufferTexture2D(
-            gl.FRAMEBUFFER,
-            gl.COLOR_ATTACHMENT0,
-            gl.TEXTURE_2D,
-            swap.texture,
-            0,
-        );
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, swap.texture, 0);
 
         // Execute the shader (renders to swap texture)
         shader.pass(this.renderTarget, uniforms);
 
-        // Swap textures
+        // Swap textures 
         const current = this.texture;
         // use swap texture as current texture
         this._texture = swap.texture;
@@ -490,16 +353,6 @@ export class TextureData {
         this.cpuDirty = false;
     }
 
-    markCPUDirty(): void {
-        this.cpuDirty = true;
-    }
-
-    /** GPU was written directly (e.g. FBO render); do not upload stale CPU on texture access. */
-    markGPUCurrent(): void {
-        this.gpuDirty = false;
-        this.cpuDirty = true;
-    }
-
     dispose(): void {
         if (this._texture) {
             this.gl.deleteTexture(this._texture);
@@ -513,10 +366,7 @@ export class BitMaskTexture {
     readonly bitmask: number;
     textureData: TextureData;
 
-    constructor(
-        readonly textureDataAllocation: TextureDataAllocation,
-        readonly index: number,
-    ) {
+    constructor(readonly textureDataAllocation: TextureDataAllocation, readonly index: number) {
         this.textureData = textureDataAllocation.textureData;
         this.bitmask = 1 << index;
     }
@@ -567,6 +417,7 @@ export class BitMaskTexture {
     dispose(): void {
         this.textureDataAllocation.freeMask(this);
     }
+
 }
 
 class TextureDataAllocation {
@@ -574,8 +425,8 @@ class TextureDataAllocation {
 
     constructor(
         private readonly manager: BinaryMaskManager,
-        public readonly textureData: TextureData,
-    ) {}
+        public readonly textureData: TextureData
+    ) { }
 
     allocateMask(): BitMaskTexture | null {
         for (let i = 0; i < this.masks.length; i++) {
@@ -596,27 +447,24 @@ class TextureDataAllocation {
     }
 
     isFull(): boolean {
-        return this.masks.every((mask) => mask !== null);
+        return this.masks.every(mask => mask !== null);
     }
 
     isEmpty(): boolean {
-        return this.masks.every((mask) => mask === null);
+        return this.masks.every(mask => mask === null);
     }
 }
 
 export class BinaryMaskManager {
     private allocations: Map<string, TextureDataAllocation[]> = new Map();
 
-    constructor(private readonly gl: WebGL2RenderingContext) {}
+    constructor(private readonly gl: WebGL2RenderingContext) { }
 
     private getKey(width: number, height: number): string {
         return `${width}_${height}`;
     }
 
-    private getAllocations(
-        width: number,
-        height: number,
-    ): TextureDataAllocation[] {
+    private getAllocations(width: number, height: number): TextureDataAllocation[] {
         const key = this.getKey(width, height);
         return this.allocations.get(key) || [];
     }
@@ -633,10 +481,7 @@ export class BinaryMaskManager {
         }
 
         // If all TextureData instances are full, create a new one
-        const newAllocation = new TextureDataAllocation(
-            this,
-            new TextureData(this.gl, width, height, "R8UI"),
-        );
+        const newAllocation = new TextureDataAllocation(this, new TextureData(this.gl, width, height, 'R8UI'));
         const key = this.getKey(width, height);
         this.allocations.set(key, [...allocations, newAllocation]);
         return newAllocation.allocateMask()!;
@@ -647,10 +492,7 @@ export class BinaryMaskManager {
      * Use BinaryMask.dispose() instead
      */
     freeAllocation(allocation: TextureDataAllocation): void {
-        const key = this.getKey(
-            allocation.textureData.width,
-            allocation.textureData.height,
-        );
+        const key = this.getKey(allocation.textureData.width, allocation.textureData.height);
         const allocations = this.allocations.get(key)!;
         const index = allocations.indexOf(allocation);
         if (index !== -1) {
@@ -666,15 +508,8 @@ export class BinaryMaskManager {
  * Reads data from a framebuffer and converts it to the correct number of channels
  * Writes to target, which must be a TypedArray with the correct number of channels
  */
-function readDataFromFrameBuffer(
-    gl: WebGL2RenderingContext,
-    internalFormat: number,
-    width: number,
-    height: number,
-    numChannels: number,
-    target: TypedArray,
-) {
-    // NOTE: We can only read RGBA_INTEGER, UNSIGNED_INTEGER for UI formats
+function readDataFromFrameBuffer(gl: WebGL2RenderingContext, internalFormat: number, width: number, height: number, numChannels: number, target: TypedArray) {
+    // NOTE: We can only read RGBA_INTEGER, UNSIGNED_INTEGER for UI formats 
     // or RGBA, UNSIGNED_BYTE for non-UI formats
     // see: https://webgl2fundamentals.org/webgl/lessons/webgl-readpixels.html
     let pixels;
@@ -683,28 +518,12 @@ function readDataFromFrameBuffer(
         case gl.R16UI:
         case gl.R32UI:
             pixels = new Uint32Array(width * height * 4);
-            gl.readPixels(
-                0,
-                0,
-                width,
-                height,
-                gl.RGBA_INTEGER,
-                gl.UNSIGNED_INT,
-                pixels,
-            );
+            gl.readPixels(0, 0, width, height, gl.RGBA_INTEGER, gl.UNSIGNED_INT, pixels);
             break;
         case gl.R8:
         case gl.RGBA8:
             pixels = new Uint8Array(width * height * 4);
-            gl.readPixels(
-                0,
-                0,
-                width,
-                height,
-                gl.RGBA,
-                gl.UNSIGNED_BYTE,
-                pixels,
-            );
+            gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
             break;
         case gl.R32F:
         case gl.RG32F:
@@ -718,7 +537,7 @@ function readDataFromFrameBuffer(
 
     // Now convert the pixels to the correct number of channels
     for (let i = 0; i < width * height; i++) {
-        const i_pixel = i * 4;
+        const i_pixel = i * 4;  
         for (let j = 0; j < numChannels; j++) {
             target[i * numChannels + j] = pixels[i_pixel + j];
         }

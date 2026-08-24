@@ -1,42 +1,33 @@
-import {
-    PixelShaderProgram,
-    TextureShaderProgram,
-} from "./FragmentShaderProgram";
+import { PixelShaderProgram, TextureShaderProgram, TextureShaderProgram3D } from "./FragmentShaderProgram";
 
-import fs_render_features from "$lib/viewer/overlays/fs_render_features.frag";
-import fs_render_probability from "$lib/viewer/overlays/fs_render_probability.frag";
-import fs_render_connected_components from "$lib/viewer/overlays/fs_render_connected_components.frag";
-import fs_render_multi_class from "$lib/viewer/overlays/fs_render_multi_class.frag";
-import fs_render_multi_label from "$lib/viewer/overlays/fs_render_multi_label.frag";
-import fs_render_binary from "$lib/viewer/overlays/fs_render_binary.frag";
-import segBoundsOutline from "$lib/viewer/overlays/seg_bounds_outline.inc.glsl?raw";
+import fs_render_features from '$lib/viewer/overlays/fs_render_features.frag';
+import fs_render_probability from '$lib/viewer/overlays/fs_render_probability.frag';
+import fs_render_connected_components from '$lib/viewer/overlays/fs_render_connected_components.frag';
+import fs_render_multi_class from '$lib/viewer/overlays/fs_render_multi_class.frag';
+import fs_render_multi_label from '$lib/viewer/overlays/fs_render_multi_label.frag';
+import fs_render_layers_enface from '$lib/viewer/overlays/fs_render_layers_enface.frag';
+import fs_render_binary from '$lib/viewer/overlays/fs_render_binary.frag';
+import segBoundsOutline from '$lib/viewer/overlays/seg_bounds_outline.inc.glsl?raw';
 
 import fs_draw_enhance from "$lib/webgl/glsl/fs_draw_enhance.frag";
 import fs_draw_probability_hard from "$lib/webgl/glsl/fs_draw_probability_hard.frag";
-import fs_import from "./glsl/fs_import.frag";
-import fs_import_probability from "./glsl/fs_import_probability.frag";
-import fs_draw from "./glsl/fs_draw.frag";
-import fs_erode_dilate from "./glsl/fs_erode_dilate.frag";
-import fs_export from "./glsl/fs_export.frag";
-import fs_clear from "./glsl/fs_clear.frag";
+import fs_import from './glsl/fs_import.frag';
+import fs_import_probability from './glsl/fs_import_probability.frag';
+import fs_draw from './glsl/fs_draw.frag';
+import fs_erode_dilate from './glsl/fs_erode_dilate.frag';
+import fs_export from './glsl/fs_export.frag';
+import fs_clear from './glsl/fs_clear.frag';
 
-import fs_enfaceProjection from "./glsl/fs_enface_projection.frag";
-import fs_enfaceProjectMask from "./glsl/fs_enface_project_mask.frag";
-import fs_enfaceProjectProbability from "./glsl/fs_enface_project_probability.frag";
-import fs_enfaceProjectMultiClass from "./glsl/fs_enface_project_multiclass.frag";
-import fs_enfaceProjectMultiLabel from "./glsl/fs_enface_project_multilabel.frag";
-import fs_minmax_reduction from "./glsl/fs_minmax_reduction.frag";
-import fs_normalize from "./glsl/fs_normalize.frag";
-import fs_extract_slice from "./glsl/fs_extract_slice.frag";
-import fs_extract_slice_array from "./glsl/fs_extract_slice_array.frag";
+import fs_calculate_boundaries from './glsl/fs_calculate_boundaries.frag';
+import fs_enfaceProjection from './glsl/fs_enface_projection.frag';
+import fs_minmax_reduction from './glsl/fs_minmax_reduction.frag';
+import fs_normalize from './glsl/fs_normalize.frag';
+import fs_extract_slice from './glsl/fs_extract_slice.frag';
 import type { WebGL } from "./webgl";
 
 /** Inject shared segmentation quad outline helpers before main(). */
 function withSegBoundsOutline(fragmentSource: string): string {
-    return fragmentSource.replace(
-        /^void main\(/m,
-        `${segBoundsOutline}\nvoid main(`,
-    );
+    return fragmentSource.replace(/^void main\(/m, `${segBoundsOutline}\nvoid main(`);
 }
 
 /**
@@ -44,12 +35,14 @@ function withSegBoundsOutline(fragmentSource: string): string {
  * This way they don't have to be recompiled every time they are used
  */
 export class Shaders {
+
     renderFeatures: TextureShaderProgram;
     renderBinary: TextureShaderProgram;
     renderProbability: TextureShaderProgram;
     renderConnectedComponents: TextureShaderProgram;
     renderMultiClass: TextureShaderProgram;
     renderMultiLabel: TextureShaderProgram;
+    renderLayersEnface: TextureShaderProgram;
     drawEnhance: PixelShaderProgram;
     drawHard: PixelShaderProgram;
 
@@ -60,81 +53,33 @@ export class Shaders {
     export: PixelShaderProgram;
     clear: PixelShaderProgram;
 
+    calculateBoundaries: PixelShaderProgram;
     enfaceProjection: PixelShaderProgram;
-    enfaceProjectBinary: PixelShaderProgram;
-    enfaceProjectProbability: PixelShaderProgram;
-    enfaceProjectMultiClass: PixelShaderProgram;
-    enfaceProjectMultiLabel: PixelShaderProgram;
     minMaxReduction: PixelShaderProgram;
     normalize: PixelShaderProgram;
     extractSlice: PixelShaderProgram;
-    extractSliceArray: PixelShaderProgram;
+    
 
     constructor(webgl: WebGL) {
-        this.renderFeatures = new TextureShaderProgram(
-            webgl,
-            fs_render_features,
-        );
-        this.renderBinary = new TextureShaderProgram(
-            webgl,
-            withSegBoundsOutline(fs_render_binary),
-        );
-        this.renderProbability = new TextureShaderProgram(
-            webgl,
-            withSegBoundsOutline(fs_render_probability),
-        );
-        this.renderConnectedComponents = new TextureShaderProgram(
-            webgl,
-            fs_render_connected_components,
-        );
-        this.renderMultiClass = new TextureShaderProgram(
-            webgl,
-            withSegBoundsOutline(fs_render_multi_class),
-        );
-        this.renderMultiLabel = new TextureShaderProgram(
-            webgl,
-            withSegBoundsOutline(fs_render_multi_label),
-        );
+        this.renderFeatures = new TextureShaderProgram(webgl, fs_render_features);
+        this.renderBinary = new TextureShaderProgram(webgl, withSegBoundsOutline(fs_render_binary));
+        this.renderProbability = new TextureShaderProgram(webgl, withSegBoundsOutline(fs_render_probability));
+        this.renderConnectedComponents = new TextureShaderProgram(webgl, fs_render_connected_components);
+        this.renderMultiClass = new TextureShaderProgram(webgl, withSegBoundsOutline(fs_render_multi_class));
+        this.renderMultiLabel = new TextureShaderProgram(webgl, withSegBoundsOutline(fs_render_multi_label));
+        this.renderLayersEnface = new TextureShaderProgram3D(webgl, fs_render_layers_enface);
 
         this.drawEnhance = new PixelShaderProgram(webgl, fs_draw_enhance);
         this.drawHard = new PixelShaderProgram(webgl, fs_draw_probability_hard);
 
-        this.enfaceProjection = new PixelShaderProgram(
-            webgl,
-            fs_enfaceProjection,
-        );
-        this.enfaceProjectBinary = new PixelShaderProgram(
-            webgl,
-            fs_enfaceProjectMask,
-        );
-        this.enfaceProjectProbability = new PixelShaderProgram(
-            webgl,
-            fs_enfaceProjectProbability,
-        );
-        this.enfaceProjectMultiClass = new PixelShaderProgram(
-            webgl,
-            fs_enfaceProjectMultiClass,
-        );
-        this.enfaceProjectMultiLabel = new PixelShaderProgram(
-            webgl,
-            fs_enfaceProjectMultiLabel,
-        );
-        this.minMaxReduction = new PixelShaderProgram(
-            webgl,
-            fs_minmax_reduction,
-        );
+        this.calculateBoundaries = new PixelShaderProgram(webgl, fs_calculate_boundaries);
+        this.enfaceProjection = new PixelShaderProgram(webgl, fs_enfaceProjection)
+        this.minMaxReduction = new PixelShaderProgram(webgl, fs_minmax_reduction);
         this.normalize = new PixelShaderProgram(webgl, fs_normalize);
         this.extractSlice = new PixelShaderProgram(webgl, fs_extract_slice);
-        this.extractSliceArray = new PixelShaderProgram(
-            webgl,
-            fs_extract_slice_array,
-        );
 
         this.import = new PixelShaderProgram(webgl, fs_import);
-        this.importProbability = new PixelShaderProgram(
-            webgl,
-            fs_import_probability,
-        );
+        this.importProbability = new PixelShaderProgram(webgl, fs_import_probability);
         this.draw = new PixelShaderProgram(webgl, fs_draw);
         this.erodeDilate = new PixelShaderProgram(webgl, fs_erode_dilate);
         this.export = new PixelShaderProgram(webgl, fs_export);

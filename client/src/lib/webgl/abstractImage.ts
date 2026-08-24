@@ -1,81 +1,57 @@
 import { Matrix } from "$lib/matrix";
-import type {
-    ImageGET,
-    ModelSegmentationGET,
-    SegmentationGET,
-} from "../../types/openapi_types";
+import type { ImageGET, ModelSegmentationGET, SegmentationGET } from "../../types/openapi_types";
 import type { Dimensions, RenderBounds } from "./types";
 import type { WebGL } from "./webgl";
 import { SvelteMap } from "svelte/reactivity";
 import { SegmentationItem } from "./segmentationItem.svelte";
 
 export abstract class AbstractImage {
+
     public readonly width: number;
     public readonly height: number;
     public readonly depth: number;
     abstract texture: WebGLTexture;
 
     // in micrometers / pixel
-    public readonly resolution: { x: number; y: number; z: number };
+    public readonly resolution: { x: number, y: number, z: number };
     transform: Matrix = Matrix.identity;
-
+    
     // Cache segmentation items per annotation type + id (ids can overlap across types)
-    public readonly segmentationItems = new SvelteMap<
-        string,
-        SegmentationItem
-    >();
-    public readonly orientation: "axial" | "enface";
+    public readonly segmentationItems = new SvelteMap<string, SegmentationItem>();
+    public readonly orientation: 'axial' | 'enface';
     constructor(
         public readonly instance: ImageGET,
         public readonly webgl: WebGL,
         public readonly image_id: string,
         public readonly dimensions: Dimensions,
-        public readonly meta: any,
-    ) {
-        const { width, height, depth, width_mm, height_mm, depth_mm } =
-            this.dimensions;
+        public readonly meta: any) {
+        const { width, height, depth, width_mm, height_mm, depth_mm } = this.dimensions;
         this.width = width;
         this.height = height;
         this.depth = depth;
 
-        // `_proj` is already enface (keeps mm world aspect via getAspectRatio).
-        // Axial = OCT B-scan volumes only (not square isotropic IR stacks tagged OCT).
-        if (image_id.endsWith("_proj")) {
-            this.orientation = "enface";
-        } else if (
-            instance.modality === "OCT" &&
-            instance.resolution_axial &&
-            instance.resolution_axial > 0
-        ) {
-            const { width, height, width_mm, height_mm } = this.dimensions;
-            const squareIso =
-                width_mm > 0 &&
-                height_mm > 0 &&
-                Math.max(width_mm / width, height_mm / height) /
-                    Math.min(width_mm / width, height_mm / height) <
-                    1.1 &&
-                Math.max(width, height) / Math.min(width, height) < 1.1;
-            this.orientation = squareIso ? "enface" : "axial";
+
+        if (instance.modality === 'OCT') {
+            if (instance.resolution_axial && instance.resolution_axial>0) {
+                this.orientation = 'axial';
+            } else {
+                this.orientation = 'enface';
+            }
         } else {
-            this.orientation = "enface";
+            this.orientation = 'enface';
         }
 
         this.resolution = {
-            x: (1000 * width_mm) / width,
-            y: (1000 * height_mm) / height,
-            z: (1000 * depth_mm) / depth,
+            x: 1000 * width_mm / width,
+            y: 1000 * height_mm / height,
+            z: 1000 * depth_mm / depth
         };
         this.initTransform();
     }
 
     abstract is3D: boolean;
     abstract is2D: boolean;
-
-    /**
-     * When false, only Original + CLAHE are offered (volumes / grayscale).
-     * Color fundus bitmaps set this true so CE / channels / etc. appear.
-     */
-    supportsColorRenderModes = false;
+    
 
     getAspectRatio() {
         const { width, height, width_mm, height_mm } = this.dimensions;
@@ -103,13 +79,14 @@ export abstract class AbstractImage {
         ) {
             return null; // it's off screen
         }
-        const width = rect.width + 1; //rect.right - rect.left + 1;
-        const height = rect.height; //rect.bottom - rect.top;
+        const width = rect.width + 1;//rect.right - rect.left + 1;
+        const height = rect.height;//rect.bottom - rect.top;
         const left = rect.left;
-        const bottom = canvas.clientHeight - rect.bottom; //canvas.clientHeight - rect.bottom + 1;
+        const bottom = canvas.clientHeight - rect.bottom;//canvas.clientHeight - rect.bottom + 1;
         const result = { left, bottom, width, height };
         return result;
     }
+
 
     /**
      * Get a canvas context that can be used to draw annotations or export the segmentation
@@ -119,10 +96,8 @@ export abstract class AbstractImage {
     _drawingContext: CanvasRenderingContext2D | null = null;
     getDrawingCtx(width: number = this.width, height: number = this.height) {
         if (!this._drawingContext) {
-            const canvas = document.createElement("canvas");
-            this._drawingContext = canvas.getContext("2d", {
-                willReadFrequently: true,
-            })!;
+            const canvas = document.createElement('canvas');
+            this._drawingContext = canvas.getContext('2d', { willReadFrequently: true })!;
         }
         const canvas = this._drawingContext.canvas;
         if (canvas.width !== width || canvas.height !== height) {
@@ -142,26 +117,20 @@ export abstract class AbstractImage {
     getIOCtx() {
         if (!this._ioContext) {
             // create empty canvas used from drawing annotations
-            const canvas = document.createElement("canvas");
+            const canvas = document.createElement('canvas');
             canvas.width = this.width;
             canvas.height = this.height;
-            this._ioContext = canvas.getContext("2d", {
-                willReadFrequently: true,
-            })!;
+            this._ioContext = canvas.getContext('2d', { willReadFrequently: true })!;
         }
         this._ioContext.clearRect(0, 0, this.width, this.height);
         return this._ioContext;
     }
 
-    private segmentationItemKey(
-        segmentation: SegmentationGET | ModelSegmentationGET,
-    ): string {
+    private segmentationItemKey(segmentation: SegmentationGET | ModelSegmentationGET): string {
         return `${segmentation.annotation_type}_${segmentation.id}`;
     }
 
-    getOrCreateSegmentationItem(
-        segmentation: SegmentationGET | ModelSegmentationGET,
-    ): SegmentationItem {
+    getOrCreateSegmentationItem(segmentation: SegmentationGET | ModelSegmentationGET): SegmentationItem {
         const key = this.segmentationItemKey(segmentation);
         const cached = this.segmentationItems.get(key);
         if (cached) {
@@ -184,9 +153,10 @@ export abstract class AbstractImage {
             segmentationItem.dispose();
         }
         this.segmentationItems.clear();
-
+        
         // Clear canvas contexts
         this._drawingContext = null;
         this._ioContext = null;
     }
+
 }

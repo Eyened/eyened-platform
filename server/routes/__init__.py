@@ -1,4 +1,6 @@
 from . import segmentations
+from . import cvi
+from . import management
 from . import auth
 from . import form_annotations
 from . import instances
@@ -8,3 +10,4 @@ from . import tag
 from . import form_schema
 from . import task
 from . import devices
+from . import semi_auto_segmentation

@@ -4,7 +4,7 @@
     import { getContext } from "svelte";
     import type { Segmentation } from "./segmentationContext.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
-
+    
     const globalContext = getContext<GlobalContext>("globalContext");
 
     interface Props {
@@ -19,11 +19,10 @@
     async function onUpdateThreshold() {
         if (canEdit) {
             await pendingUpdate;
-            pendingUpdate = updateSegmentation(segmentation.id, {
-                threshold: segmentationItem.threshold,
-            });
+            pendingUpdate = updateSegmentation(segmentation.id, { threshold: segmentationItem.threshold });
         }
     }
+
 </script>
 
 <label>

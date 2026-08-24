@@ -1,51 +1,28 @@
-import {
-    getSegmentationData,
-    getModelSegmentationData,
-    updateSegmentationData,
-} from "$lib/data/helpers";
+import { getSegmentationData, getModelSegmentationData, updateSegmentationData } from "$lib/data/helpers";
 import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
-import type {
-    ModelSegmentationGET,
-    SegmentationGET,
-    SegmentationDataRepresentation,
-} from "../../types/openapi_types";
+import type { ModelSegmentationGET, SegmentationGET, SegmentationDataRepresentation } from "../../types/openapi_types";
 // SimpleDataRepresentation is a subset of SegmentationDataRepresentation
-export type SimpleDataRepresentation = "Binary" | "DualBitMask" | "Probability";
+export type SimpleDataRepresentation = 'Binary' | 'DualBitMask' | 'Probability';
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
-import {
-    BinaryMask,
-    MultiClassMask,
-    MultiLabelMask,
-    ProbabilityMask,
-    QuestionableMask,
-    type DrawingArray,
-    type Mask,
-    type PaintSettings,
-} from "./mask.svelte";
+import { BinaryMask, MultiClassMask, MultiLabelMask, ProbabilityMask, QuestionableMask, type DrawingArray, type Mask, type PaintSettings } from "./mask.svelte";
 import { convert } from "./segmentationConverter";
 import type { SegmentationItem } from "./segmentationItem.svelte";
 import { segmentationPlaneSize } from "./segmentationProjection";
 
 function isNavigationTimeFetchFailure(error: unknown): boolean {
-    return error instanceof TypeError && error.message === "Failed to fetch";
+    return error instanceof TypeError && error.message === 'Failed to fetch';
 }
 
-type MaskConstructor = new (
-    image: AbstractImage,
-    segmentation: SegmentationGET,
-) => Mask;
-export const constructors: Record<
-    "Binary" | "DualBitMask" | "Probability" | "MultiClass" | "MultiLabel",
-    MaskConstructor
-> = {
-    Binary: BinaryMask,
-    DualBitMask: QuestionableMask,
-    Probability: ProbabilityMask,
-    MultiClass: MultiClassMask,
-    MultiLabel: MultiLabelMask,
-};
+type MaskConstructor = new (image: AbstractImage, segmentation: SegmentationGET) => Mask;
+export const constructors: Record<'Binary' | 'DualBitMask' | 'Probability' | 'MultiClass' | 'MultiLabel', MaskConstructor> = {
+    'Binary': BinaryMask,
+    'DualBitMask': QuestionableMask,
+    'Probability': ProbabilityMask,
+    'MultiClass': MultiClassMask,
+    'MultiLabel': MultiLabelMask,
+}
 
 /** Flush pending segmentation PUTs when the tab is hidden or unloaded (best-effort). */
 const segmentationSaveFlushCallbacks = new Set<() => void>();
@@ -54,8 +31,7 @@ const segmentationUnloadWarnCheckers = new Set<() => boolean>();
 let segmentationSaveLifecycleInstalled = false;
 
 function installSegmentationSaveLifecycle() {
-    if (typeof window === "undefined" || segmentationSaveLifecycleInstalled)
-        return;
+    if (typeof window === 'undefined' || segmentationSaveLifecycleInstalled) return;
     segmentationSaveLifecycleInstalled = true;
     const flushAll = () => {
         for (const cb of segmentationSaveFlushCallbacks) {
@@ -66,15 +42,15 @@ function installSegmentationSaveLifecycle() {
             }
         }
     };
-    window.addEventListener("pagehide", flushAll);
-    document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden") flushAll();
+    window.addEventListener('pagehide', flushAll);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') flushAll();
     });
     // Warn before closing (browser shows a generic "Leave site?" dialog).
     // Do not fetch here: the browser tears down in-flight requests during beforeunload, which
     // causes Failed to fetch, stuck "pending" in devtools, and a false error state. Saves run
     // from pagehide / visibilitychange instead, or after the user chooses Stay and sync finishes.
-    window.addEventListener("beforeunload", (e: BeforeUnloadEvent) => {
+    window.addEventListener('beforeunload', (e: BeforeUnloadEvent) => {
         let shouldWarn = false;
         for (const check of segmentationUnloadWarnCheckers) {
             try {
@@ -88,7 +64,7 @@ function installSegmentationSaveLifecycle() {
         }
         if (shouldWarn) {
             e.preventDefault();
-            e.returnValue = "";
+            e.returnValue = '';
         }
     });
 }
@@ -115,6 +91,7 @@ function unregisterSegmentationUnloadWarn(check: () => boolean) {
 export type SyncState = "synced" | "saving" | "error";
 
 export class SegmentationState {
+
     protected history: DrawingHistory<string>;
     public readonly mask: Mask;
 
@@ -136,24 +113,15 @@ export class SegmentationState {
         initialData?: DrawingArray,
         readonly segmentationItem?: SegmentationItem,
     ) {
-        this.mask = new constructors[segmentation.data_representation](
-            image,
-            segmentation as SegmentationGET,
-        );
+        this.mask = new constructors[segmentation.data_representation](image, segmentation as SegmentationGET);
         const plane = segmentationPlaneSize(segmentation, image);
-        this.history = new DrawingHistory<string>(
-            new Base64Serializer(
-                segmentation.data_type,
-                plane.width,
-                plane.height,
-            ),
-        );
+        this.history = new DrawingHistory<string>(new Base64Serializer(segmentation.data_type, plane.width, plane.height));
         if (initialData) {
             this.mask.importData(initialData);
         } else {
             this.isDrawing = this.initialize();
         }
-        if (typeof window !== "undefined") {
+        if (typeof window !== 'undefined') {
             registerSegmentationSaveFlush(this.flushOnHide);
             registerSegmentationUnloadWarn(this.checkUnsavedForUnload);
         }
@@ -166,26 +134,16 @@ export class SegmentationState {
         }
     }
 
-    private notifySliceChanged(): void {
-        this.segmentationItem?.notifySliceChanged(this.scanNr);
-    }
-
     private async initialize() {
         // Load a single slice from the server
         const sparse_axis = this.segmentation.sparse_axis ?? undefined;
         const scan_nr = this.scanNr;
 
         let npyArray: NPYArray | null;
-        if (this.segmentation.annotation_type == "model_segmentation") {
-            npyArray = await getModelSegmentationData(this.segmentation.id, {
-                sparse_axis,
-                scan_nr,
-            });
+        if (this.segmentation.annotation_type == 'model_segmentation') {
+            npyArray = await getModelSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
         } else {
-            npyArray = await getSegmentationData(this.segmentation.id, {
-                sparse_axis,
-                scan_nr,
-            });
+            npyArray = await getSegmentationData(this.segmentation.id, { sparse_axis, scan_nr });
         }
         if (npyArray == null) {
             this.isEmptyForSlice = true;
@@ -193,14 +151,12 @@ export class SegmentationState {
         }
         this.mask.importData(npyArray.data as DrawingArray);
         this.segmentationItem?.addSavedScanIndex(scan_nr);
-        this.notifySliceChanged();
     }
 
     async draw(drawing: HTMLCanvasElement, settings: PaintSettings) {
         await this.isDrawing; // wait for previous drawing to finish
         this.ensureInitialCheckpoint();
         this.mask.draw(drawing, settings);
-        this.notifySliceChanged();
         this.isDrawing = this.checkpoint();
     }
 
@@ -210,36 +166,23 @@ export class SegmentationState {
 
         const data = other.exportData();
 
-        const thisType = this.segmentation
-            .data_representation as SegmentationDataRepresentation;
-        const otherType = other.segmentation
-            .data_representation as SegmentationDataRepresentation;
-        const threshold = 255 * (other.segmentation.threshold ?? 0.5);
+        const thisType = this.segmentation.data_representation as SegmentationDataRepresentation;
+        const otherType = other.segmentation.data_representation as SegmentationDataRepresentation;
+        const threshold = (255 * (other.segmentation.threshold ?? 0.5));
 
-        function isSimpleRepresentation(
-            t: SegmentationDataRepresentation,
-        ): t is SimpleDataRepresentation {
-            return t === "Binary" || t === "DualBitMask" || t === "Probability";
+        function isSimpleRepresentation(t: SegmentationDataRepresentation): t is SimpleDataRepresentation {
+            return t === 'Binary' || t === 'DualBitMask' || t === 'Probability';
         }
 
-        if (
-            isSimpleRepresentation(thisType) &&
-            isSimpleRepresentation(otherType)
-        ) {
+        if (isSimpleRepresentation(thisType) && isSimpleRepresentation(otherType)) {
             const dataConverted = convert(data, otherType, thisType, threshold);
             this.mask.importData(dataConverted);
         } else if (thisType === otherType) {
             this.mask.importData(data);
         } else {
-            console.warn(
-                "SegmentationState.importOther: conversion not supported",
-                otherType,
-                "->",
-                thisType,
-            );
+            console.warn("SegmentationState.importOther: conversion not supported", otherType, "->", thisType);
         }
 
-        this.notifySliceChanged();
         this.isDrawing = this.checkpoint();
     }
 
@@ -261,7 +204,6 @@ export class SegmentationState {
         const data = await this.history.undo();
         if (data) {
             this.mask.importData(data);
-            this.notifySliceChanged();
             await this.updateServer();
         }
     }
@@ -270,7 +212,6 @@ export class SegmentationState {
         const data = await this.history.redo();
         if (data) {
             this.mask.importData(data);
-            this.notifySliceChanged();
             await this.updateServer();
         }
     }
@@ -313,36 +254,28 @@ export class SegmentationState {
             const data = this.mask.exportData();
             const { planeHeight, planeWidth } = this.mask;
             const expectedLen = planeHeight * planeWidth;
-            if (
-                data.length !== expectedLen &&
-                data.length !== expectedLen * 4
-            ) {
-                console.error("Segmentation save: data length mismatch", {
-                    got: data.length,
-                    expected: expectedLen,
-                    planeWidth,
-                    planeHeight,
-                });
+            if (data.length !== expectedLen && data.length !== expectedLen * 4) {
+                console.error(
+                    "Segmentation save: data length mismatch",
+                    { got: data.length, expected: expectedLen, planeWidth, planeHeight },
+                );
             }
             const buffer = encodeNpy(data, [planeHeight, planeWidth]);
             const sparse_axis = this.segmentation.sparse_axis ?? undefined;
             let scan_nr: number | undefined = this.scanNr;
-            if (this.image.image_id.endsWith("proj")) {
+            if (this.image.image_id.endsWith('proj')) {
                 scan_nr = undefined;
             }
             if (scan_nr !== undefined) {
                 this.segmentationItem?.addSavedScanIndex(scan_nr);
             }
-            const resp = await updateSegmentationData(
-                this.segmentation.id,
-                buffer,
-                {
-                    sparse_axis,
-                    scan_nr,
-                    keepalive: options?.keepalive,
-                },
-            );
+            const resp = await updateSegmentationData(this.segmentation.id, buffer, {
+                sparse_axis,
+                scan_nr,
+                keepalive: options?.keepalive,
+            });
             await resp.json();
+
 
             this.syncState = "synced";
         } catch (error) {
@@ -351,8 +284,7 @@ export class SegmentationState {
             if (
                 options?.keepalive &&
                 (isNavigationTimeFetchFailure(error) ||
-                    (error instanceof DOMException &&
-                        error.name === "AbortError"))
+                    (error instanceof DOMException && error.name === 'AbortError'))
             ) {
                 return;
             }
@@ -381,7 +313,7 @@ export class SegmentationState {
     }
 
     dispose() {
-        if (typeof window !== "undefined") {
+        if (typeof window !== 'undefined') {
             unregisterSegmentationSaveFlush(this.flushOnHide);
             unregisterSegmentationUnloadWarn(this.checkUnsavedForUnload);
         }

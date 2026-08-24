@@ -12,6 +12,7 @@ export class OCTToProj implements RegistrationItem {
 
     mapping(p: Position): Position {
         return { x: p.x, y: p.index + 0.5, index: 0 };
+
     }
 
     get glslMapping(): string {
@@ -22,6 +23,7 @@ export class OCTToProj implements RegistrationItem {
     get inverse(): RegistrationItem {
         return new ProjToOCT(this.instance);
     }
+
 }
 export class ProjToOCT implements RegistrationItem {
     public readonly source: string;
@@ -35,10 +37,8 @@ export class ProjToOCT implements RegistrationItem {
         return {
             x: p.x,
             y: 0,
-            index: Math.round(
-                Math.max(0, Math.min(p.y, this.instance.nr_of_frames - 1)),
-            ),
-        };
+            index: Math.round(Math.max(0, Math.min(p.y, this.instance.nr_of_frames - 1)))
+        }
     }
 
     get glslMapping(): string {
@@ -46,7 +46,7 @@ export class ProjToOCT implements RegistrationItem {
         return ``;
     }
 
-    get inverse(): RegistrationItem {
+    get inverse(): RegistrationItem {   
         return new OCTToProj(this.instance);
     }
 }

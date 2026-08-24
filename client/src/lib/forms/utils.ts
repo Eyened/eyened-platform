@@ -1,12 +1,8 @@
 export function deepEquals(a: any, b: any): boolean {
     if (a === b) return true;
 
-    if (
-        a === null ||
-        b === null ||
-        typeof a !== "object" ||
-        typeof b !== "object"
-    ) {
+    if (a === null || b === null ||
+        typeof a !== 'object' || typeof b !== 'object') {
         return a === b;
     }
 
@@ -20,18 +16,16 @@ export function deepEquals(a: any, b: any): boolean {
 
     if (keysA.length !== keysB.length) return false;
 
-    return keysA.every(
-        (key) => keysB.includes(key) && deepEquals(a[key], b[key]),
-    );
+    return keysA.every(key => keysB.includes(key) && deepEquals(a[key], b[key]));
 }
 
 export function deepcopy<T>(obj: T): T {
-    if (obj === null || typeof obj !== "object") {
+    if (obj === null || typeof obj !== 'object') {
         return obj;
     }
 
     if (Array.isArray(obj)) {
-        return obj.map((item) => deepcopy(item)) as unknown as T;
+        return obj.map(item => deepcopy(item)) as unknown as T;
     }
 
     if (obj instanceof Map) {
@@ -44,7 +38,7 @@ export function deepcopy<T>(obj: T): T {
 
     if (obj instanceof Set) {
         const copy = new Set();
-        obj.forEach((value) => {
+        obj.forEach(value => {
             copy.add(deepcopy(value));
         });
         return copy as unknown as T;

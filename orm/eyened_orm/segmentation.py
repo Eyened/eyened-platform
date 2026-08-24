@@ -722,12 +722,6 @@ class Feature(Base):
         return {assoc.FeatureIndex: assoc.Child.FeatureName for assoc in assocs}
 
     @property
-    def subfeature_ids_list(self) -> List[int]:
-        """Child feature ids ordered by FeatureIndex (drives FeatureGET.subfeature_ids)."""
-        assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
-        return [assoc.ChildFeatureID for assoc in assocs]
-
-    @property
     def json(self) -> Dict[str, Any]:
         assocs = sorted(self.FeatureAssociations, key=lambda x: x.FeatureIndex)
         subfeatures = [

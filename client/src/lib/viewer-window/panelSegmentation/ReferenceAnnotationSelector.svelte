@@ -2,6 +2,7 @@
     import { segmentations } from "$lib/data/stores.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import type { SegmentationGET } from "../../../types/openapi_types";
+    
 
     interface Props {
         image: AbstractImage;
@@ -13,15 +14,14 @@
     let { image, segmentation, resolve, close }: Props = $props();
 
     const referenceAnnotations = $derived(
-        segmentations
-            .filter((s) => s.image_id === image.instance.id)
+        segmentations.filter(s => s.image_id === image.instance.id)
             .filter(
                 (a) =>
                     a.data_representation == "Binary" ||
                     a.data_representation == "DualBitMask",
-            ),
+            )
     );
-
+    
     function _resolve(segmentation: SegmentationGET) {
         resolve(segmentation);
         close();
@@ -35,8 +35,7 @@
     {:else}
         <ul>
             {#each referenceAnnotations as reference}
-                {@const current =
-                    reference.id == segmentation.reference_segmentation_id}
+                {@const current = reference.id == segmentation.reference_segmentation_id}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                 <li onclick={() => _resolve(reference)} class:current>

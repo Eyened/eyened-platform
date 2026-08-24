@@ -1,35 +1,28 @@
-import { resolve } from "$app/paths";
-import type { ResolvedPathname } from "$app/types";
-import { UserManager } from "$lib/usermanager.svelte";
+import { UserManager } from '$lib/usermanager.svelte';
 
-import type {
-    FormAnnotationGET,
-    ModelSegmentationGET,
-    SearchCondition,
-    SegmentationGET,
-    StudySearchCondition,
-} from "../../types/openapi_types";
-import { fetchFeatures, fetchFormSchemas, fetchTags } from "./api";
+import type { FormAnnotationGET, ModelSegmentationGET, SearchCondition, SegmentationGET, StudySearchCondition } from '../../types/openapi_types';
+import { fetchFeatures, fetchFormSchemas, fetchTags } from './api';
 
 export type ComponentDef = {
-    component: any;
-    props?: any;
-};
+    component: any,
+    props?: any
+}
 
 export class GlobalContext {
+
     public userManager: UserManager;
     public popupComponent: ComponentDef | null = $state(null);
     public dialogue: ComponentDef | string | null = $state(null);
     public showUserMenu: boolean = $state(false);
 
-    public formShortcut: string | null = $state("WARMGS");
+    public formShortcut: string | null = $state('WARMGS');
     public config: any = $state({
         showOtherAnnotationsHuman: true,
         showOtherAnnotationsMachine: true,
     });
 
     constructor() {
-        this.userManager = new UserManager();
+        this.userManager = new UserManager()
     }
 
     async init(pathname: string) {
@@ -43,12 +36,12 @@ export class GlobalContext {
                 await Promise.all([
                     fetchTags(),
                     fetchFormSchemas(),
-                    fetchFeatures({ with_counts: true }),
+                    fetchFeatures({ with_counts: true })
                 ]);
             } catch (error) {
                 // Log error but don't throw - let pages handle errors individually
                 // Authentication errors are already handled by fetchWithAuthRetry
-                console.error("Failed to fetch initial data:", error);
+                console.error('Failed to fetch initial data:', error);
                 // If it's an auth error, the redirect has already happened
                 // Otherwise, we'll let individual pages handle the errors
             }
@@ -63,10 +56,8 @@ export class GlobalContext {
         this.popupComponent = component;
     }
 
-    canEdit(
-        annotation: SegmentationGET | FormAnnotationGET | ModelSegmentationGET,
-    ) {
-        if (annotation.annotation_type == "model_segmentation") {
+    canEdit(annotation: SegmentationGET | FormAnnotationGET | ModelSegmentationGET) {
+        if (annotation.annotation_type == 'model_segmentation') {
             return false;
         }
         return annotation.creator.id == this.userManager.user.id;
@@ -79,76 +70,56 @@ export class GlobalContext {
     /**
      * Build a Browser URL for a studies query using a single StudySearchCondition.
      */
-    makeStudiesBrowserURL(condition: StudySearchCondition): ResolvedPathname {
+    makeStudiesBrowserURL(condition: StudySearchCondition): string {
         const params = new URLSearchParams();
-        params.set("page", "0");
-        params.set("limit", "10");
-        params.set("conditions", this._encodeSingleCondition(condition));
-        params.set("order_by", "Study Date");
-        params.set("order", "ASC");
-        params.set("queryMode", "studies");
-        params.set("displayMode", "study");
-        params.set("filterMode", "advanced");
-        return resolve(`/?${params.toString()}`);
+        params.set('page', '0');
+        params.set('limit', '10');
+        params.set('conditions', this._encodeSingleCondition(condition));
+        params.set('order_by', 'Study Date');
+        params.set('order', 'ASC');
+        params.set('queryMode', 'studies');
+        params.set('displayMode', 'study');
+        params.set('filterMode', 'advanced');
+        return `/?${params.toString()}`;
     }
 
     /**
      * Build a Browser URL for an instances query using a single SearchCondition.
      */
-    makeInstancesBrowserURL(condition: SearchCondition): ResolvedPathname {
+    makeInstancesBrowserURL(condition: SearchCondition): string {
         const params = new URLSearchParams();
-        params.set("page", "0");
-        params.set("limit", "100");
-        params.set(
-            "conditions",
-            this._encodeSingleConditionExtended(condition as any),
-        );
-        params.set("order_by", "Study Date");
-        params.set("order", "ASC");
-        params.set("queryMode", "instances");
-        params.set("displayMode", "instance");
-        params.set("filterMode", "advanced");
-        return resolve(`/?${params.toString()}`);
+        params.set('page', '0');
+        params.set('limit', '100');
+        params.set('conditions', this._encodeSingleConditionExtended(condition as any));
+        params.set('order_by', 'Study Date');
+        params.set('order', 'ASC');
+        params.set('queryMode', 'instances');
+        params.set('displayMode', 'instance');
+        params.set('filterMode', 'advanced');
+        return `/?${params.toString()}`;
     }
 
     // Private helper, compatible with both condition types
-    private _encodeSingleCondition(condition: {
-        variable: string;
-        operator: string;
-        value: string | number | string[] | null;
-    }): string {
-        const serializeValue = (v: string | number | string[] | null) =>
-            JSON.stringify(v);
+    private _encodeSingleCondition(
+        condition: { variable: string; operator: string; value: string | number | string[] | null }
+    ): string {
+        const serializeValue = (v: string | number | string[] | null) => JSON.stringify(v);
         const encodedVariable = encodeURIComponent(condition.variable);
         const encodedOperator = encodeURIComponent(condition.operator);
-        const encodedValue = encodeURIComponent(
-            serializeValue(condition.value ?? null),
-        );
+        const encodedValue = encodeURIComponent(serializeValue(condition.value ?? null));
         return `${encodedVariable}:${encodedOperator}:${encodedValue}`;
     }
 
-    private _encodeSingleConditionExtended(condition: {
-        variable: string;
-        operator: string;
-        value: string | number | string[] | null;
-        type?: "default" | "attribute";
-        model?: string;
-        feature?: string;
-    }): string {
-        const serializeValue = (v: string | number | string[] | null) =>
-            JSON.stringify(v);
+    private _encodeSingleConditionExtended(
+        condition: { variable: string; operator: string; value: string | number | string[] | null; type?: 'default' | 'attribute'; model?: string; feature?: string }
+    ): string {
+        const serializeValue = (v: string | number | string[] | null) => JSON.stringify(v);
         const encodedVariable = encodeURIComponent(condition.variable);
         const encodedOperator = encodeURIComponent(condition.operator);
-        const encodedValue = encodeURIComponent(
-            serializeValue(condition.value ?? null),
-        );
-        const encodedType = encodeURIComponent(condition.type ?? "default");
-        const encodedModel = encodeURIComponent(
-            condition.type === "attribute" ? (condition.model ?? "") : "",
-        );
-        const encodedFeature = encodeURIComponent(
-            condition.type === "attribute" ? (condition.feature ?? "") : "",
-        );
+        const encodedValue = encodeURIComponent(serializeValue(condition.value ?? null));
+        const encodedType = encodeURIComponent(condition.type ?? 'default');
+        const encodedModel = encodeURIComponent((condition.type === 'attribute' ? condition.model ?? '' : ''));
+        const encodedFeature = encodeURIComponent((condition.type === 'attribute' ? condition.feature ?? '' : ''));
         return `${encodedVariable}:${encodedOperator}:${encodedValue}:${encodedType}:${encodedModel}:${encodedFeature}`;
     }
 }

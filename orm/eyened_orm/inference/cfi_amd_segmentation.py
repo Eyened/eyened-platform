@@ -31,17 +31,6 @@ def _log(msg: str, *, minimal: bool = False) -> None:
         print(f"[cfi-amd] {msg}", flush=True)
 
 
-def image_projection_matrix_from_cfi_roi(image: ImageInstance) -> List[List[float]]:
-    """Segmentation→image matrix from stored CFI_ROI bounds (1024-crop)."""
-    matrix = image.cropping_matrix_inverse
-    if matrix is None:
-        raise ValueError(
-            f"ImageInstance {image.ImageInstanceID} has no CFI_ROI bounds; "
-            "cannot store native-resolution segmentation"
-        )
-    return np.asarray(matrix, dtype=float).tolist()
-
-
 def cfi_amd_maps_only(result: Dict[str, Any]) -> Dict[str, np.ndarray]:
     """Drop non-array entries (e.g. ``bounds``) so npz round-trips without pickle."""
     maps: Dict[str, np.ndarray] = {}
@@ -138,11 +127,7 @@ class CFI_AMD(BaseInferencePipeline):
                     },
                     update_values={"Description": description},
                 )
-                for output_key, (
-                    name,
-                    version,
-                    description,
-                ) in self.model_configs.items()
+                for output_key, (name, version, description) in self.model_configs.items()
             }
 
     def _load_models(self) -> None:
@@ -163,12 +148,7 @@ class CFI_AMD(BaseInferencePipeline):
             self._models_loaded = True
 
     def _get_model_segmentation(
-        self,
-        instance_id: int,
-        model: SegmentationModel,
-        h: int,
-        w: int,
-        image_projection_matrix: List[List[float]] | None = None,
+        self, instance_id: int, model: SegmentationModel, h: int, w: int
     ) -> ModelSegmentation:
         return ModelSegmentation.get_or_create(
             self.session,
@@ -184,7 +164,6 @@ class CFI_AMD(BaseInferencePipeline):
                 "DataType": self.datatype,
                 "DataRepresentation": self.data_representation,
                 "Threshold": self.threshold,
-                "ImageProjectionMatrix": image_projection_matrix,
             },
         )
 
@@ -212,20 +191,8 @@ class CFI_AMD(BaseInferencePipeline):
             segmentation_array: Segmentation array (h, w) with values in [0, 1]
         """
         h, w = segmentation_array.shape
-        image_projection_matrix = None
-        if not self.undo_transform:
-            image = ImageInstance.by_id(self.session, image_id)
-            if image is None:
-                raise ValueError(f"ImageInstance {image_id} not found")
-            image_projection_matrix = image_projection_matrix_from_cfi_roi(image)
 
-        m = self._get_model_segmentation(
-            image_id,
-            model,
-            h=h,
-            w=w,
-            image_projection_matrix=image_projection_matrix,
-        )
+        m = self._get_model_segmentation(image_id, model, h=h, w=w)
         try:
             # Only save if above threshold, or always save depending on configuration
             if not self.save_only_above_threshold or np.any(
@@ -343,16 +310,7 @@ class CFI_AMD(BaseInferencePipeline):
             if segmentation_array is None:
                 print(f"Image {image_id}, model {model.ModelName} failed to process")
                 continue
-            model_name = model.ModelName
-            try:
-                self._save_result(image_id, model, segmentation_array)
-            except ValueError as e:
-                self.session.rollback()
-                print(
-                    f"ImageInstanceID {image_id}, model {model_name}: {e}",
-                    flush=True,
-                )
-                continue
+            self._save_result(image_id, model, segmentation_array)
 
 
 def run_for_image_ids(
@@ -363,41 +321,27 @@ def run_for_image_ids(
     batch_size: int = 8,
     n_workers: int = 12,
     overwrite: bool = False,
-    upscale: bool = False,
 ) -> None:
     """Entry point for CLI and RQ worker (``cfi-amd`` queue)."""
-    from eyened_orm.commands.targets import iter_image_id_chunks
-
     image_ids = set(image_ids)
     processor = CFI_AMD(
         session,
         device=device,
         n_workers=n_workers,
         batch_size=batch_size,
-        undo_transform=upscale,
     )
-    total_processed = 0
-    chunks = list(iter_image_id_chunks(image_ids))
-    for chunk_idx, chunk in enumerate(chunks, start=1):
-        if overwrite:
-            filtered = chunk
-        else:
-            filtered = processor.filter_image_ids(chunk)
-        if not filtered:
-            continue
-        print(
-            f"Processing {len(filtered)} images "
-            f"(chunk {chunk_idx}/{len(chunks)}"
-            f"{', overwrite' if overwrite else ', after filtering existing'})"
-        )
-        processor.run(filtered)
-        session.commit()
-        total_processed += len(filtered)
-
-    if total_processed == 0:
+    if overwrite:
+        filtered = image_ids
+        print(f"Processing {len(filtered)} images (overwrite)")
+    else:
+        filtered = processor.filter_image_ids(image_ids)
+        print(f"Processing {len(filtered)} images (after filtering existing)")
+    if not filtered:
         print("No images to process")
         return
-    print(f"Completed processing {total_processed} images")
+    processor.run(filtered)
+    session.commit()
+    print(f"Completed processing {len(filtered)} images")
 
 
 def predict_image(

@@ -388,31 +388,19 @@ def run_for_image_ids(
     overwrite: bool = False,
 ) -> None:
     """Entry point for CLI and RQ worker (``layer-segmentation`` queue)."""
-    from eyened_orm.commands.targets import iter_image_id_chunks
-
     image_ids = set(image_ids)
     processor = LayerSegmentation(session, device=device or auto_device())
-    total_processed = 0
-    chunks = list(iter_image_id_chunks(image_ids))
-    for chunk_idx, chunk in enumerate(chunks, start=1):
-        if overwrite:
-            filtered = chunk
-        else:
-            filtered = processor.filter_image_ids(chunk)
-        if not filtered:
-            continue
-        print(
-            f"Processing {len(filtered)} images "
-            f"(chunk {chunk_idx}/{len(chunks)}"
-            f"{', overwrite' if overwrite else ', after filtering existing'})"
-        )
-        processor.run(filtered)
-        total_processed += len(filtered)
-
-    if total_processed == 0:
+    if overwrite:
+        filtered = image_ids
+        print(f"Processing {len(filtered)} images (overwrite)")
+    else:
+        filtered = processor.filter_image_ids(image_ids)
+        print(f"Processing {len(filtered)} images (after filtering existing)")
+    if not filtered:
         print("No images to process")
         return
-    print(f"Completed processing {total_processed} images")
+    processor.run(filtered)
+    print(f"Completed processing {len(filtered)} images")
 
 
 def predict_volume(

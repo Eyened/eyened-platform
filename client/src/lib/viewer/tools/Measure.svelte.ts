@@ -6,18 +6,14 @@ import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { SvelteSet } from "svelte/reactivity";
 
 const radius = 12;
-const strokeStyle = "rgba(255, 255, 255, 1)";
-const fillStyle = "rgba(255, 255, 255, 1)";
+const strokeStyle = 'rgba(255, 255, 255, 1)';
+const fillStyle = 'rgba(255, 255, 255, 1)';
 
 export class Line {
     start = $state({ x: 0, y: 0 });
     end = $state({ x: 0, y: 0 });
 
-    constructor(
-        start: Position2D,
-        end: Position2D,
-        public readonly index: number,
-    ) {
+    constructor(start: Position2D, end: Position2D, public readonly index: number) {
         this.start = start;
         this.end = end;
     }
@@ -25,13 +21,16 @@ export class Line {
         yield this.start;
         yield this.end;
     }
+
 }
 
 export class MeasureTool implements Overlay {
-    hover: { line: Line; point: Position2D } | undefined = undefined;
+
+    hover: { line: Line, point: Position2D } | undefined = undefined;
     dragging: Position2D | undefined = undefined;
     lines = new SvelteSet<Line>();
-    highligtLine: Line | undefined = undefined;
+    highligtLine: Line | undefined = undefined
+
 
     imageResX = $state(0);
     imageResY = $state(0);
@@ -59,6 +58,7 @@ export class MeasureTool implements Overlay {
     }
 
     findHit(cursor: Position2D, viewerContext: ViewerContext) {
+
         for (const line of this.lines) {
             for (const point of line) {
                 if (line.index != viewerContext.index) {
@@ -69,12 +69,13 @@ export class MeasureTool implements Overlay {
                 const dy = pt.y - cursor.y;
 
                 if (dx * dx + dy * dy < radius * radius) {
-                    viewerContext.cursorStyle = "pointer";
+                    viewerContext.cursorStyle = 'pointer';
                     return { point, line };
                 }
             }
         }
-        viewerContext.cursorStyle = "crosshair";
+        viewerContext.cursorStyle = 'crosshair';
+
     }
 
     pointerdown(pointerEvent: ViewerEvent<PointerEvent>) {
@@ -92,6 +93,7 @@ export class MeasureTool implements Overlay {
             } else {
                 this.dragging = this.hover.point;
             }
+
         } else {
             const index = viewerContext.index;
             const line = new Line({ ...position }, { ...position }, index);
@@ -119,7 +121,7 @@ export class MeasureTool implements Overlay {
         }
     }
 
-    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
+    repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
         const ctx = viewerContext.context2D;
         ctx.lineWidth = 1;
 
@@ -130,20 +132,16 @@ export class MeasureTool implements Overlay {
             }
         }
         if (this.hover) {
-            viewerContext.cursorStyle = "pointer";
+            viewerContext.cursorStyle = 'pointer';
         } else {
-            viewerContext.cursorStyle = "crosshair";
+            viewerContext.cursorStyle = 'crosshair';
         }
     }
 
     paintLine(line: Line, viewerContext: ViewerContext) {
         const ctx = viewerContext.context2D;
-        const { x: x0, y: y0 } = viewerContext.imageToViewerCoordinates(
-            line.start,
-        );
-        const { x: x1, y: y1 } = viewerContext.imageToViewerCoordinates(
-            line.end,
-        );
+        const { x: x0, y: y0 } = viewerContext.imageToViewerCoordinates(line.start);
+        const { x: x1, y: y1 } = viewerContext.imageToViewerCoordinates(line.end);
         const cx = (x0 + x1) / 2;
         const cy = (y0 + y1) / 2;
 
@@ -153,8 +151,8 @@ export class MeasureTool implements Overlay {
         const nx = -dy / l;
         const ny = dx / l;
         if (this.highligtLine == line) {
-            ctx.strokeStyle = "yellow";
-            ctx.fillStyle = "yellow";
+            ctx.strokeStyle = 'yellow';
+            ctx.fillStyle = 'yellow';
             ctx.lineWidth = 2;
         } else {
             ctx.strokeStyle = strokeStyle;
@@ -171,6 +169,7 @@ export class MeasureTool implements Overlay {
         ctx.lineTo(x1 + nx, y1 + ny);
         ctx.stroke();
         ctx.fillText(this.getDistance(line), cx + 3 * nx, cy - ny);
+
     }
 
     getDistance(line: Line) {
@@ -189,5 +188,6 @@ export class MeasureTool implements Overlay {
         } else {
             return `${l.toFixed(2)} µm`;
         }
+
     }
 }

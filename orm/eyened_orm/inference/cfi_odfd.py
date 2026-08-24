@@ -1,30 +1,26 @@
+import os
+from os import PathLike
 from typing import Any, Iterable, List, Optional, Tuple
 
 import numpy as np
 import torch
 
-from eyened_orm import AttributeDataType, Modality
-from eyened_orm.inference.attribute_inference import (
-    InferenceItem,
-    TorchAttributeInferencePipeline,
-)
-from eyened_orm.inference.cfi_preprocess import cfi_roi_from_input_values, crop_fundus_from_roi
-from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
-from eyened_orm.inference.model_versions import huggingface_artifact_version
+from eyened_orm import AttributeDataType
+from eyened_orm.inference.attribute_inference import TorchAttributeInferencePipeline
+from eyened_orm.inference.utils import preprocess_image
 from rtnls_inference import RegressionEnsemble
 
 
 class CFI_ODFD(TorchAttributeInferencePipeline):
     """CFI Optic Disc to Fovea Distance estimation pipeline."""
 
-    HF_ARTIFACT = "Eyened/vascx:odfd/odfd_march25.pt"
-
     model_name = "CFI_ODFD"
-    model_description = "Eyened/vascx:odfd/odfd_march25.pt"
+    model_version = "odfd_march25"
+    model_description = (
+        "Estimates the distance from the fovea to optic disc border in pixels"
+    )
     attribute_name = "CFI_ODFD"
     attribute_data_type = AttributeDataType.Float
-    supported_modalities = (Modality.ColorFundus,)
-    required_inputs = (CFI_ROI_INPUT,)
 
     def __init__(
         self,
@@ -34,7 +30,6 @@ class CFI_ODFD(TorchAttributeInferencePipeline):
         batch_size: int = 8,
         **kwargs,
     ):
-        self.model_version = huggingface_artifact_version(self.HF_ARTIFACT)
         super().__init__(
             session,
             n_workers=n_workers,
@@ -46,22 +41,18 @@ class CFI_ODFD(TorchAttributeInferencePipeline):
 
     def _load_models(self) -> None:
         """Load regression ensemble model."""
-        self.ensemble = RegressionEnsemble.from_huggingface(self.HF_ARTIFACT).to(
+        # print(
+        #     f"Loading model {self.model_version} from {os.getenv('RTNLS_MODEL_RELEASES')}"
+        # )
+        self.ensemble = RegressionEnsemble.from_release(f"{self.model_version}.pt").to(
             self.device
         )
         assert self.ensemble.config["datamodule"]["test_transform"]["resize"] == 512
         self.resize = 512
 
-    def preprocess(self, item: InferenceItem | None) -> Tuple[Any, np.ndarray] | None:
-        """Preprocess image for ODFD estimation using stored CFI_ROI."""
-        if item is None or item.image_rgb is None:
-            return None
-        return crop_fundus_from_roi(
-            item.image_rgb,
-            cfi_roi_from_input_values(item.input_values),
-            resize=self.resize,
-            apply_ce=False,
-        )
+    def preprocess(self, image_path: PathLike[str]) -> Tuple[Any, np.ndarray]:
+        """Preprocess image for ODFD estimation."""
+        return preprocess_image(image_path, resize=self.resize)
 
     def process_batch(
         self, prep_batch: List[Tuple[Any, np.ndarray]]

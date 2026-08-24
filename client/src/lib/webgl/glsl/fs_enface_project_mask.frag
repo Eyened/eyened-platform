@@ -1,11 +1,12 @@
 #version 300 es
 precision highp float;
+precision highp sampler3D;
 precision highp usampler2D;
 
+uniform sampler3D u_volume;
 uniform usampler2D u_mask;
 uniform uint u_mask_bitmask;
 uniform int height;
-uniform float u_inv_height;
 
 out float sum;
 
@@ -20,5 +21,4 @@ void main() {
             sum += 1.0;
         }
     }
-    sum *= u_inv_height;
 }

@@ -13,18 +13,16 @@ export class Image3D extends AbstractImage {
     is3D = true;
     is2D = false;
     texture: WebGLTexture;
-
+    
     // Cache for CLAHE-processed slices
     private claheSliceCache = new Map<number, TextureData>();
-    private claheInflight = new Map<number, Promise<TextureData | undefined>>();
 
-    constructor(
-        instance: ImageGET,
+    constructor(instance: ImageGET,
         webgl: WebGL,
         img_id: string,
         public readonly data: Uint8Array,
         dimensions: Dimensions, // w: horizontal, h: axial, d: vertical
-        meta: any,
+        meta: any
     ) {
         super(instance, webgl, img_id, dimensions, meta);
         this.texture = initTexture3D(webgl.gl, dimensions, data);
@@ -34,19 +32,19 @@ export class Image3D extends AbstractImage {
         const { webgl, width, depth, height } = this;
 
         // Accumulate along z into float texture (R32F)
-        const textureData = new TextureData(webgl.gl, width, depth, "R32F");
+        const textureData = new TextureData(webgl.gl, width, depth, 'R32F');
 
         // top and bottom are the top and bottom of the slab (entire volume)
-        const top = new TextureData(webgl.gl, width, depth, "R16UI");
-        const bottom = new TextureData(webgl.gl, width, depth, "R16UI");
+        const top = new TextureData(webgl.gl, width, depth, 'R16UI');
+        const bottom = new TextureData(webgl.gl, width, depth, 'R16UI');
 
         top.uploadData(new Uint16Array(width * depth).fill(0));
         bottom.uploadData(new Uint16Array(width * depth).fill(height));
-
+        
         const uniforms = {
             u_volume: this.texture,
             u_top: top.texture,
-            u_bottom: bottom.texture,
+            u_bottom: bottom.texture
         };
         textureData.passShader(this.webgl.shaders.enfaceProjection, uniforms);
 
@@ -64,18 +62,11 @@ export class Image3D extends AbstractImage {
 
             width_mm: this.dimensions.width_mm,
             height_mm: this.dimensions.depth_mm,
-            depth_mm: -1,
+            depth_mm: -1
         };
         const meta = this.meta;
 
-        const result = new Image2D(
-            this.instance,
-            this.webgl,
-            proj_img_id,
-            normalizedTexture,
-            proj_dimensions,
-            meta,
-        );
+        const result = new Image2D(this.instance, this.webgl, proj_img_id, normalizedTexture, proj_dimensions, meta);
         this.setOrientation(result);
 
         textureData.dispose();
@@ -87,33 +78,31 @@ export class Image3D extends AbstractImage {
     }
 
     private setOrientation(result: Image2D) {
-        if (this.instance.scan?.mode == "Vertical 3DSCAN") {
+        if (this.instance.scan?.mode == 'Vertical 3DSCAN') {
             // rotate 90 degrees around center
             const { width, height } = result.dimensions;
-            result.transform = result.transform.rotate(
-                Math.PI / 2,
-                width / 2,
-                height / 2,
-            );
+            result.transform = result.transform.rotate(Math.PI / 2, width / 2, height / 2);
 
             // flip vertically
-            const flip = new Matrix(1, 0, 0, 0, -1, 0);
+            const flip = new Matrix(
+                1, 0, 0,
+                0, -1, 0
+            );
             result.transform = flip.multiply(result.transform);
         }
 
         // Heidelberg normally stores B-scans from bottom to top
         const photoLocators = getPrivateEyeRegistrationHeidelberg(this);
-        const allLines = photoLocators.filter(
-            (loc) => loc instanceof LinePhotoLocator,
-        );
+        const allLines = photoLocators.filter(loc => loc instanceof LinePhotoLocator);
         if (allLines.length) {
-            const yCoordinates = allLines.map(
-                (loc) => (loc as LinePhotoLocator).start.y,
-            );
+            const yCoordinates = allLines.map(loc => (loc as LinePhotoLocator).start.y);
             //if they are all decreasing order, flip vertically
             if (yCoordinates.every((v, i, a) => i === 0 || v < a[i - 1])) {
                 // flip vertically
-                const flip = new Matrix(1, 0, 0, 0, -1, 0);
+                const flip = new Matrix(
+                    1, 0, 0,
+                    0, -1, 0
+                );
                 result.transform = flip.multiply(result.transform);
             }
         }
@@ -126,20 +115,20 @@ export class Image3D extends AbstractImage {
         // Create ping-pong textures for reduction
         let w = input.width;
         let h = input.height;
-
+        
         // Calculate size for first reduction level (maximum size needed)
         const maxW = Math.max(1, Math.floor((w + 1) / 2));
         const maxH = Math.max(1, Math.floor((h + 1) / 2));
-
+        
         // Create both ping and pong textures upfront at maximum size
-        let ping = new TextureData(gl, maxW, maxH, "RG32F");
-        let pong = new TextureData(gl, maxW, maxH, "RG32F");
+        let ping = new TextureData(gl, maxW, maxH, 'RG32F');
+        let pong = new TextureData(gl, maxW, maxH, 'RG32F');
 
         // First pass: convert R32F to RG32F (both min and max are the same value)
         const firstUniforms = {
             u_input: input.texture,
             u_srcSize: [w, h],
-            u_firstPass: true,
+            u_firstPass: true
         };
         ping.passShader(reduce, firstUniforms);
 
@@ -149,19 +138,19 @@ export class Image3D extends AbstractImage {
         while (w > 1 || h > 1) {
             const nextW = Math.max(1, Math.floor((w + 1) / 2));
             const nextH = Math.max(1, Math.floor((h + 1) / 2));
-
+            
             const uniforms = {
                 u_input: ping.texture,
                 u_srcSize: [w, h],
-                u_firstPass: false,
+                u_firstPass: false
             };
             pong.passShader(reduce, uniforms);
-
+            
             // Swap ping and pong
             const temp = ping;
             ping = pong;
             pong = temp;
-
+            
             w = nextW;
             h = nextH;
         }
@@ -173,15 +162,12 @@ export class Image3D extends AbstractImage {
         return ping;
     }
 
-    private normalizeGPU(
-        input: TextureData,
-        minmaxTexture: TextureData,
-    ): TextureData {
+    private normalizeGPU(input: TextureData, minmaxTexture: TextureData): TextureData {
         const gl = this.webgl.gl;
-        const outTex = new TextureData(gl, input.width, input.height, "RGBA");
+        const outTex = new TextureData(gl, input.width, input.height, 'RGBA');
         const uniforms = {
             u_input: input.texture,
-            u_minmax: minmaxTexture.texture,
+            u_minmax: minmaxTexture.texture
         };
         outTex.passShader(this.webgl.shaders.normalize, uniforms);
         return outTex;
@@ -194,22 +180,22 @@ export class Image3D extends AbstractImage {
      */
     extractSlice(index: number): TextureData {
         const { webgl, width, height, depth } = this;
-
+        
         // Clamp index to valid range
         const clampedIndex = Math.max(0, Math.min(index, depth - 1));
-
+        
         // Create output texture for the slice
-        const sliceTexture = new TextureData(webgl.gl, width, height, "RGBA");
-
+        const sliceTexture = new TextureData(webgl.gl, width, height, 'RGBA');
+        
         // Extract the slice using the shader
         const uniforms = {
             u_volume: this.texture,
             u_image_size: [width, height, depth],
-            u_index: clampedIndex,
+            u_index: clampedIndex
         };
-
+        
         sliceTexture.passShader(webgl.shaders.extractSlice, uniforms);
-
+        
         return sliceTexture;
     }
 
@@ -218,81 +204,59 @@ export class Image3D extends AbstractImage {
      * @param index The slice index (0 to depth-1)
      * @returns A TextureData containing the CLAHE-processed slice, or undefined if processing fails
      */
-    async getClaheSliceTexture(
-        index: number,
-    ): Promise<TextureData | undefined> {
+    async getClaheSliceTexture(index: number): Promise<TextureData | undefined> {
         const { depth } = this;
-        const clampedIndex = Math.max(
-            0,
-            Math.min(Math.round(index), depth - 1),
-        );
-
+        const clampedIndex = Math.max(0, Math.min(index, depth - 1));
+        
         // Check cache first
         const cached = this.getClaheSliceTextureSync(clampedIndex);
         if (cached) {
             return cached;
         }
-
-        const inflight = this.claheInflight.get(clampedIndex);
-        if (inflight) {
-            return inflight;
-        }
-
-        const promise = this.computeClaheSlice(clampedIndex).finally(() => {
-            this.claheInflight.delete(clampedIndex);
-        });
-        this.claheInflight.set(clampedIndex, promise);
-        return promise;
-    }
-
-    private async computeClaheSlice(
-        clampedIndex: number,
-    ): Promise<TextureData | undefined> {
+        
+        // Extract the slice
         const sliceTexture = this.extractSlice(clampedIndex);
-
-        try {
-            const claheInput: ClaheInput = {
-                width: this.width,
-                height: this.height,
-                webgl: this.webgl,
-                texture: sliceTexture.texture,
-                instance: this.instance,
-            };
-
-            const claheResult =
-                await this.webgl.cfImageProcessing.apply_CLAHE(claheInput);
-
-            if (claheResult) {
-                this.claheSliceCache.set(clampedIndex, claheResult);
-                return claheResult;
-            }
-
-            return undefined;
-        } finally {
-            sliceTexture.dispose();
+        
+        // Create a ClaheInput wrapper for the slice
+        const claheInput: ClaheInput = {
+            width: this.width,
+            height: this.height,
+            webgl: this.webgl,
+            texture: sliceTexture.texture,
+            instance: this.instance
+        };
+        
+        // Apply CLAHE processing
+        const claheResult = await this.webgl.cfImageProcessing.apply_CLAHE(claheInput);
+        
+        // Dispose the intermediate slice texture
+        sliceTexture.dispose();
+        
+        // If CLAHE processing succeeded, cache and return the result
+        if (claheResult) {
+            this.claheSliceCache.set(clampedIndex, claheResult);
+            return claheResult;
         }
+        
+        return undefined;
     }
 
     getClaheSliceTextureSync(index: number): TextureData | undefined {
         const { depth } = this;
-        const clampedIndex = Math.max(
-            0,
-            Math.min(Math.round(index), depth - 1),
-        );
+        const clampedIndex = Math.max(0, Math.min(index, depth - 1));
         return this.claheSliceCache.get(clampedIndex);
     }
 
     dispose(): void {
         // Call parent dispose to clean up segmentations
         super.dispose();
-
+        
         // Dispose all cached CLAHE slice textures
         for (const texture of this.claheSliceCache.values()) {
             texture.dispose();
         }
         this.claheSliceCache.clear();
-        this.claheInflight.clear();
-
+        
         // Dispose 3D texture
         if (this.texture) {
             this.webgl.gl.deleteTexture(this.texture);
@@ -300,11 +264,8 @@ export class Image3D extends AbstractImage {
     }
 }
 
-function initTexture3D(
-    gl: WebGL2RenderingContext,
-    dimensions: Dimensions,
-    data: Uint8Array,
-): WebGLTexture {
+function initTexture3D(gl: WebGL2RenderingContext, dimensions: Dimensions, data: Uint8Array): WebGLTexture {
+
     const texture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_3D, texture);
 
@@ -324,7 +285,7 @@ function initTexture3D(
         0,
         gl.RED,
         gl.UNSIGNED_BYTE,
-        data,
+        data
     );
     return texture;
 }

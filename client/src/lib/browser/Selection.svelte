@@ -14,35 +14,25 @@
     // staying visible while taking up flow space so it never overlaps content.
     let { placement = "bottom" }: { placement?: "top" | "bottom" } = $props();
 
-    const intersectionTagIds = $derived(
-        (() => {
-            const selected = browserContext.selectedInstances;
-            if (selected.length === 0) return new Set<number>();
+    const intersectionTagIds = $derived((() => {
+        const selected = browserContext.selectedInstances;
+        if (selected.length === 0) return new Set<number>();
 
-            let ids = new Set<number>(
-                (selected[0].tags ?? []).map((t: TagMeta) => t.id),
-            );
-            for (let i = 1; i < selected.length; i++) {
-                const current = new Set<number>(
-                    (selected[i].tags ?? []).map((t: TagMeta) => t.id),
-                );
-                ids = new Set([...ids].filter((id) => current.has(id)));
-                if (ids.size === 0) break;
-            }
-            return ids;
-        })(),
-    );
+        let ids = new Set<number>((selected[0].tags ?? []).map((t: TagMeta) => t.id));
+        for (let i = 1; i < selected.length; i++) {
+            const current = new Set<number>((selected[i].tags ?? []).map((t: TagMeta) => t.id));
+            ids = new Set([...ids].filter((id) => current.has(id)));
+            if (ids.size === 0) break;
+        }
+        return ids;
+    })());
 
-    const intersectionTags: TagMeta[] = $derived(
-        (() => {
-            const selected = browserContext.selectedInstances;
-            if (selected.length === 0) return [];
-            const ids = intersectionTagIds;
-            return (selected[0].tags ?? []).filter((t: TagMeta) =>
-                ids.has(t.id),
-            );
-        })(),
-    );
+    const intersectionTags: TagMeta[] = $derived((() => {
+        const selected = browserContext.selectedInstances;
+        if (selected.length === 0) return [];
+        const ids = intersectionTagIds;
+        return (selected[0].tags ?? []).filter((t: TagMeta) => ids.has(t.id));
+    })());
 
     function clear() {
         browserContext.selectedIds = [];
@@ -54,9 +44,7 @@
 
     async function bulkTagSelection(tagId: number, comment?: string) {
         for (const inst of browserContext.selectedInstances) {
-            const isAlreadyTagged = inst.tags?.some(
-                (t: TagMeta) => t.id === tagId,
-            );
+            const isAlreadyTagged = inst.tags?.some((t: TagMeta) => t.id === tagId);
             if (!isAlreadyTagged) {
                 await tagInstance(inst, tagId, comment);
             }
@@ -73,11 +61,11 @@
 </script>
 
 <div
-    class="right-0 left-0 z-50 w-full bg-black/90 {placement === 'top'
+    class="left-0 right-0 w-full z-50 bg-black/90 {placement === 'top'
         ? 'sticky top-0'
         : 'fixed bottom-0'}"
 >
-    <div class="flex items-start gap-4 p-2">
+    <div class="flex gap-4 items-start p-2">
         <div class="button-container flex flex-col gap-1">
             <div>
                 {browserContext.selectedIds.length}
@@ -106,7 +94,7 @@
             />
         </div>
 
-        <div class="flex gap-2 overflow-x-auto">
+        <div class="flex overflow-x-auto gap-2">
             {#each browserContext.selectedInstances as instance (instance.id)}
                 <InstanceComponent {instance} />
             {/each}

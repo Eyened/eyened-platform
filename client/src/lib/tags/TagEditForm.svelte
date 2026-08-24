@@ -1,40 +1,26 @@
 <script lang="ts">
-    import type { TagType } from "../../types/openapi_types";
+	import type { TagType } from "../../types/openapi_types";
 
     // icons from: https://fontawesome.com/v6/icons?o=r&m=free&s=solid
-    let {
-        tagType,
-        initTagName = "",
-        initTagDescription = "",
-        add,
-    }: {
+    let { tagType, initTagName = '', initTagDescription = '', add }: { 
         tagType: TagType;
         initTagName?: string;
         initTagDescription?: string;
-        add: (payload: {
-            name: string;
-            description: string;
-            tagType: TagType;
-        }) => void;
+        add: (payload: { name: string; description: string; tagType: TagType }) => void;
     } = $props();
-
+    
     let newTagName = $state(initTagName);
     let newTagDescription = $state(initTagDescription);
-    console.log("TagEditForm", tagType, initTagName, initTagDescription);
-
+    console.log('TagEditForm', tagType, initTagName, initTagDescription);
+    
     function addTag() {
-        if (newTagName.trim() !== "") {
-            add({
-                name: newTagName,
-                description: newTagDescription,
-                tagType: tagType,
-            });
-            newTagName = "";
-            newTagDescription = "";
+        if (newTagName.trim() !== '') {
+            add({ name: newTagName, description: newTagDescription, tagType: tagType });
+            newTagName = '';
+            newTagDescription = '';
         }
     }
 </script>
-
 <div class="new-tag-input">
     <input
         type="text"
@@ -42,29 +28,26 @@
         maxlength="256"
         bind:value={newTagName}
         onkeydown={(e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                e.stopPropagation();
-                addTag();
-            }
-        }}
-    />
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            addTag();
+        }
+        }}/>
     <input
         type="text"
         placeholder="Short tag description"
         maxlength="256"
         bind:value={newTagDescription}
         onkeydown={(e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                e.stopPropagation();
-                addTag();
-            }
-        }}
-    />
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            addTag();
+        }
+        }} />
     <button onclick={addTag}>Add</button>
 </div>
-
 <style>
     .new-tag-input {
         margin-top: 1em;

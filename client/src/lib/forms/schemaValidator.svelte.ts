@@ -1,18 +1,14 @@
 import { deepEquals } from "./utils";
 
 export class SchemaValidator {
+
     value: any = $state();
-    validation_result = $derived.by(() =>
-        run_validation(this.schema, this.value),
-    );
+    validation_result = $derived.by(() => run_validation(this.schema, this.value));
     errors = $derived(this.validation_result.errors);
     requiredAbsent = $derived(this.validation_result.absent_keys);
     isValid = $derived(this.errors.length === 0);
 
-    constructor(
-        private schema: any,
-        value: any,
-    ) {
+    constructor(private schema: any, value: any) {
         this.value = value;
     }
 
@@ -57,13 +53,9 @@ export class SchemaValidator {
     get keysSorted() {
         console.log(this.schema);
         if (this.schema.properties) {
-            const keys_sorted = Object.keys(this.schema.properties);
+            let keys_sorted = Object.keys(this.schema.properties);
             if (this.schema._order) {
-                keys_sorted.sort(
-                    (a, b) =>
-                        this.schema._order!.indexOf(a) -
-                        this.schema._order!.indexOf(b),
-                );
+                keys_sorted.sort((a, b) => this.schema._order!.indexOf(a) - this.schema._order!.indexOf(b));
             }
             return keys_sorted;
         }
@@ -71,18 +63,20 @@ export class SchemaValidator {
     }
 
     get inputType() {
-        if (this.schema.type === "number" || this.schema.type === "integer") {
-            return "number";
+        if (this.schema.type === 'number' || this.schema.type === 'integer') {
+            return 'number';
         }
-        if (this.schema.type === "boolean") {
-            return "checkbox";
+        if (this.schema.type === 'boolean') {
+            return 'checkbox';
         }
-        return "text";
+        return 'text';
     }
 
     get default() {
         return this.schema.default;
     }
+
+
 }
 
 interface ValidationError {
@@ -96,24 +90,19 @@ function run_validation(schema: any, value: any) {
     const errors = validate(schema, value, "", absent_keys);
     return {
         errors,
-        absent_keys,
+        absent_keys
     };
 }
 
-function validate(
-    schema: any,
-    value: any,
-    path: string = "",
-    absent_keys: string[] = [],
-): ValidationError[] {
+function validate(schema: any, value: any, path: string = "", absent_keys: string[] = []): ValidationError[] {
     if (schema === false) {
-        return [{ path, type: "", message: "value not allowed" }];
+        return [{ path, type: '', message: "value not allowed" }];
     }
     if (schema === true) {
         return [];
     }
     if (typeof schema !== "object" || schema === null) {
-        return [{ path, type: "", message: "invalid schema" }];
+        return [{ path, type: '', message: "invalid schema" }];
     }
 
     const errors: ValidationError[] = [];
@@ -124,8 +113,8 @@ function validate(
     // Const validation
     if (schema.const !== undefined) {
         if (!deepEquals(value, schema.const)) {
-            const message = `${path || "value"}: Value must be ${schema.const}`;
-            const error = { path, type: "const", message };
+            const message = `${path || "value"}: Value must be ${schema.const}`
+            const error = { path, type: 'const', message };
             errors.push(error);
         }
     }
@@ -134,7 +123,7 @@ function validate(
     if (schema.enum && Array.isArray(schema.enum)) {
         if (!schema.enum.some((item: any) => deepEquals(value, item))) {
             const message = `${path || "value"}: Invalid value: ${value}`;
-            const error = { path, type: "enum", message };
+            const error = { path, type: 'enum', message };
             errors.push(error);
         }
     }
@@ -144,11 +133,7 @@ function validate(
         for (const key of schema.required) {
             if (!(key in value)) {
                 const message = `${path}.${key}: Missing required property`;
-                const error = {
-                    path: `${path}.${key}`,
-                    type: "required",
-                    message,
-                };
+                const error = { path: `${path}.${key}`, type: 'required', message };
                 errors.push(error);
             }
         }
@@ -158,14 +143,7 @@ function validate(
     if (schema.properties && typeof value === "object") {
         for (const key in schema.properties) {
             if (key in value) {
-                errors.push(
-                    ...validate(
-                        schema.properties[key],
-                        value[key],
-                        `${path}.${key}`,
-                        absent_keys,
-                    ),
-                );
+                errors.push(...validate(schema.properties[key], value[key], `${path}.${key}`, absent_keys));
             }
         }
     }
@@ -173,9 +151,7 @@ function validate(
     // Array validation (recursive)
     if (schema.items && Array.isArray(value)) {
         for (const [i, item] of value.entries()) {
-            errors.push(
-                ...validate(schema.items, item, `${path}[${i}]`, absent_keys),
-            );
+            errors.push(...validate(schema.items, item, `${path}[${i}]`, absent_keys));
         }
     }
 
@@ -187,27 +163,23 @@ function validate(
     }
     // anyOf validation (must satisfy at least one sub-schema)
     if (schema.anyOf && Array.isArray(schema.anyOf)) {
-        const anyOfErrors = schema.anyOf.map((subSchema: any) =>
-            validate(subSchema, value, path),
-        );
-        const allFailed = anyOfErrors.every(
-            (errList: ValidationError[]) => errList.length > 0,
-        );
+        const anyOfErrors = schema.anyOf.map((subSchema: any) => validate(subSchema, value, path));
+        const allFailed = anyOfErrors.every((errList: ValidationError[]) => errList.length > 0);
         if (allFailed) {
             const message = `${path || "value"}: Value does not match any of the required schemas`;
-            errors.push({ path, type: "anyOf", message });
+            errors.push({ path, type: 'anyOf', message });
         }
     }
 
     // oneOf validation (must satisfy exactly one sub-schema)
     if (schema.oneOf && Array.isArray(schema.oneOf)) {
-        const validSchemas = schema.oneOf.filter(
-            (subSchema: any) => validate(subSchema, value, path).length === 0,
+        const validSchemas = schema.oneOf.filter((subSchema: any) =>
+            validate(subSchema, value, path).length === 0
         );
 
         if (validSchemas.length !== 1) {
             const message = `${path || "value"}: Value must match exactly one schema but matched ${validSchemas.length}`;
-            errors.push({ path, type: "oneOf", message });
+            errors.push({ path, type: 'oneOf', message });
         }
     }
 
@@ -216,9 +188,13 @@ function validate(
         const notErrors = validate(schema.not, value, path);
         if (notErrors.length === 0) {
             const message = `${path || "value"}: Value should not match the schema`;
-            errors.push({ path, type: "not", message });
+            errors.push({ path, type: 'not', message });
         }
     }
+
+
+
+
 
     // Conditional validation (if-then-else)
     if (schema.if) {
@@ -234,7 +210,7 @@ function validate(
                 message = `If NOT ${formatSatisfies(schema.if)} then ${formatCondition(schema.else, absent_keys)}.`;
             }
             if (subErrors.length > 0) {
-                errors.push({ path, type: "if", message });
+                errors.push({ path, type: 'if', message });
                 errors.push(...subErrors);
             }
         }
@@ -242,10 +218,7 @@ function validate(
     return errors;
 }
 
-function formatCondition(
-    schema: Record<string, any>,
-    absent_keys: string[],
-): string {
+function formatCondition(schema: Record<string, any>, absent_keys: string[]): string {
     const conditions: string[] = [];
 
     // Handle required fields
@@ -259,26 +232,22 @@ function formatCondition(
 
     // Handle property conditions
     if (schema.properties && Object.keys(schema.properties).length) {
-        const propConditions = Object.entries(schema.properties).map(
-            ([key, prop]) => {
-                switch (true) {
-                    case prop === false:
-                        absent_keys.push(key);
-                        return `'${key}' should be absent`;
-                    case Array.isArray(prop.enum):
-                        return `'${key}' in (${prop.enum.map((v: string) => `"${v}"`).join(", ")})`;
-                    default:
-                        return `'${key}' must satisfy conditions`;
-                }
-            },
-        );
+        const propConditions = Object.entries(schema.properties).map(([key, prop]) => {
+            switch (true) {
+                case prop === false:
+                    absent_keys.push(key);
+                    return `'${key}' should be absent`;
+                case Array.isArray(prop.enum):
+                    return `'${key}' in (${prop.enum.map((v: string) => `"${v}"`).join(", ")})`;
+                default:
+                    return `'${key}' must satisfy conditions`;
+            }
+        });
 
         conditions.push(...propConditions);
     }
 
-    return conditions.length
-        ? conditions.join(" and ")
-        : "conditions must be met";
+    return conditions.length ? conditions.join(" and ") : "conditions must be met";
 }
 
 function formatSatisfies(schema: any): string {

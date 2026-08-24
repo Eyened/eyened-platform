@@ -13,8 +13,8 @@ export class SetBrushRadiusTool implements Overlay {
 
     constructor(
         private readonly viewerContext: ViewerContext,
-        private readonly segmentationContext: SegmentationContext,
-    ) {}
+        private readonly segmentationContext: SegmentationContext) {
+    }
 
     wheel(e: ViewerEvent<WheelEvent>) {
         if (e.event.altKey) {
@@ -36,9 +36,8 @@ export class SetBrushRadiusTool implements Overlay {
                 const x_current = position.x + this.radiusStart;
                 const dx = x_start - x_current;
 
-                this.segmentationContext.brushRadius = Math.abs(
-                    this.radiusStart - dx,
-                );
+                this.segmentationContext.brushRadius = Math.abs(this.radiusStart - dx);
+
             } else {
                 this.positionStart = position;
                 this.radiusStart = this.segmentationContext.brushRadius;
@@ -51,24 +50,21 @@ export class SetBrushRadiusTool implements Overlay {
     }
 
     keydown(keyEvent: ViewerEvent<KeyboardEvent>) {
-        const {
-            event: { repeat, key },
-        } = keyEvent;
+        const { event: { repeat, key } } = keyEvent;
         if (repeat) return;
-        if (key >= "1" && key <= "9") {
+        if (key >= '1' && key <= '9') {
             this.segmentationContext.brushRadius = Math.log(parseInt(key));
         }
+
     }
 
     keyup(keyEvent: ViewerEvent<KeyboardEvent>) {
-        const {
-            event: { key },
-        } = keyEvent;
+        const { event: { key } } = keyEvent;
 
-        if (key === "=" || key === "+") {
+        if (key === '=' || key === '+') {
             this.segmentationContext.brushRadius *= this.wheelFactor;
         }
-        if (key === "-") {
+        if (key === '-') {
             this.segmentationContext.brushRadius /= this.wheelFactor;
         }
     }
@@ -76,20 +72,14 @@ export class SetBrushRadiusTool implements Overlay {
     repaint(viewerContext: ViewerContext) {
         const ctx = viewerContext.context2D;
         ctx.lineWidth = this.lineWidth;
-        ctx.strokeStyle = "white";
+        ctx.strokeStyle = 'white';
 
         const radius = this.segmentationContext.brushRadius;
 
-        const center = this.lastPosition;
-        const c = viewerContext.imageToViewerCoordinates(center);
-        const crx = viewerContext.imageToViewerCoordinates({
-            x: center.x + radius,
-            y: center.y,
-        });
-        const cry = viewerContext.imageToViewerCoordinates({
-            x: center.x,
-            y: center.y + radius,
-        });
+        const centre = this.lastPosition;
+        const c = viewerContext.imageToViewerCoordinates(centre);
+        const crx = viewerContext.imageToViewerCoordinates({ x: centre.x + radius, y: centre.y });
+        const cry = viewerContext.imageToViewerCoordinates({ x: centre.x, y: centre.y + radius });
         const radiusX = crx.x - c.x;
         const radiusY = (cry.y - c.y) * this.viewerContext.aspectRatio;
         const { x, y } = c;
@@ -99,7 +89,7 @@ export class SetBrushRadiusTool implements Overlay {
         ctx.stroke(path);
 
         if (this.positionStart && this.radiusStart) {
-            ctx.strokeStyle = "green";
+            ctx.strokeStyle = 'green';
             const path = new Path2D();
             const d = 5;
             path.moveTo(c.x, c.y);
@@ -113,10 +103,12 @@ export class SetBrushRadiusTool implements Overlay {
             path.lineTo(crx.x - d, c.y - d);
 
             ctx.stroke(path);
+
         }
 
-        if (viewerContext.cursorStyle !== "wait") {
-            viewerContext.cursorStyle = "none";
+        if (viewerContext.cursorStyle !== 'wait') {
+            viewerContext.cursorStyle = 'none';
         }
+
     }
 }

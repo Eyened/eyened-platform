@@ -4,11 +4,10 @@
 </p>
 
 <section>
-    <h2>Color images</h2>
+    <h2>Enface render modes</h2>
     <p>
-        Available for color enface images (e.g. fundus photographs). Press the
-        shortcut key while the viewer has focus, or select a mode in the
-        Rendering panel.
+        Available for 2D enface images. Press the shortcut key while the viewer
+        has focus, or select a mode in the Rendering panel.
     </p>
     <table class="help-table">
         <thead>
@@ -106,11 +105,8 @@
 </section>
 
 <section>
-    <h2>Grayscale images (OCT / IR / volumes)</h2>
-    <p>
-        Volumes and single-channel images only offer Original and CLAHE. Color
-        modes (contrast enhanced, channels, etc.) are not available.
-    </p>
+    <h2>OCT volumes (axial view)</h2>
+    <p>Only a subset of render modes is available when viewing OCT B-scans.</p>
     <table class="help-table">
         <thead>
             <tr>
@@ -123,15 +119,12 @@
             <tr>
                 <td>Original</td>
                 <td class="shortcut"><kbd>R</kbd></td>
-                <td>Original intensities.</td>
+                <td>Original B-scan intensities.</td>
             </tr>
             <tr>
                 <td>CLAHE</td>
                 <td class="shortcut"><kbd>H</kbd></td>
-                <td
-                    >Local contrast enhancement (computed per slice for
-                    volumes).</td
-                >
+                <td>Local contrast enhancement.</td>
             </tr>
         </tbody>
     </table>

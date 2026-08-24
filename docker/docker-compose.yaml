@@ -1,10 +1,10 @@
-name: eyened-platform
+name: eyened-bundle
 
 services:
 
   redis:
     image: redis:7-alpine
-    env_file: .env
+    env_file: ../.env
     environment:
       REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?}
     ports:
@@ -21,15 +21,19 @@ services:
     build:
       context: ../
       dockerfile: ./docker/Dockerfile.server
-    env_file: .env
+    env_file: ../.env
     environment:
       EYENED_REDIS_HOST: redis
       EYENED_REDIS_PORT: "6379"
       EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?}
+      EYENED_MEDSAM_URL: http://medsam:8010
+      WORKERS: "1"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       redis:
+        condition: service_healthy
+      medsam:
         condition: service_healthy
     healthcheck:
       test:
@@ -43,6 +47,27 @@ services:
       start_period: 20s
     volumes:
       - ${EYENED_STORAGE_ROOT}:${EYENED_STORAGE_ROOT}
+      - ${EYENED_QNAP_ROOT:-/mnt/qnap-rc-02/Eyened-temp-for-test}:${EYENED_QNAP_ROOT:-/mnt/qnap-rc-02/Eyened-temp-for-test}
+      - ${EYENED_QNAP_ROOT:-/mnt/qnap-rc-02/Eyened-temp-for-test}/pdfs:/mnt/qnap-rc-02/Eyened-temp-for-test/pdfs
+      - ${EYENED_QNAP_ROOT:-/mnt/qnap-rc-02/Eyened-temp-for-test}/storage/segmentations.zarr:/mnt/qnap-rc-02/Eyened-temp-for-test/storage/segmentations.zarr
+      - ${EYENED_QNAP_ROOT:-/mnt/qnap-rc-02/Eyened-temp-for-test}/storage/thumbnails:/mnt/qnap-rc-02/Eyened-temp-for-test/storage/thumbnails
+
+  medsam:
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile.medsam
+    ports:
+      - "8010:8010"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8010/health', timeout=2).read()
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
 
   client:
     build:
@@ -50,7 +75,7 @@ services:
       dockerfile: ./docker/Dockerfile.client
 
   fileserver:
-    env_file: .env
+    env_file: ../.env
     image: nginx:latest
     ports:
       - "${PORT:-80}:80"
@@ -61,7 +86,9 @@ services:
         condition: service_started
     volumes:
       # nginx configuration
-      - ./nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      - ./nginx.conf:/etc/nginx/templates/default.conf.template
+      # Full dataset root for serving image backends via X-Accel-Redirect
+      - ${EYENED_QNAP_ROOT:-/mnt/qnap-rc-02/Eyened-temp-for-test}:${EYENED_QNAP_ROOT:-/mnt/qnap-rc-02/Eyened-temp-for-test}
       # Thumbnail directory served by nginx
-      - ${EYENED_STORAGE_ROOT}/thumbnails:/storage/thumbnails:ro
+      - ${EYENED_QNAP_ROOT:-/mnt/qnap-rc-02/Eyened-temp-for-test}/storage/thumbnails:/storage/thumbnails
       # Add other read-only mounts for local datasets here

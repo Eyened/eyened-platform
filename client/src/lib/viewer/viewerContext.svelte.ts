@@ -1,90 +1,40 @@
-import { Matrix } from "$lib/matrix";
-import type { Position2D } from "$lib/types";
-import type { AbstractImage } from "$lib/webgl/abstractImage";
-import { BaseImageRenderer } from "$lib/webgl/imageRenderer";
-import type { Shaders } from "$lib/webgl/shaders";
-import { SvelteSet } from "svelte/reactivity";
-import type { ImageGET } from "../../types/openapi_types";
-import type { Registration } from "../registration/registration.svelte";
-import type { ViewerWindowContext } from "../viewer-window/viewerWindowContext.svelte";
-import { HotKeys } from "./controls/hotkeys";
-import { ScrollOCT } from "./controls/scrollOCT";
-import { UpdatePosition } from "./controls/updatePosition";
-import { ZoomPan } from "./controls/zoomPan";
-import { CursorOverlay } from "./overlays/CursorOverlay";
-import type { MeasureTool } from "./tools/Measure.svelte.js";
-import type {
-    EventName,
-    EnfaceProjectionMode,
-    Overlay,
-    PanelName,
-    RenderMode,
-    ViewerEvent,
-    ViewerEventListener,
-    WindowLevel,
-} from "./viewer-utils";
+import { Matrix } from '$lib/matrix';
+import type { Position2D } from '$lib/types';
+import type { AbstractImage } from '$lib/webgl/abstractImage';
+import { BaseImageRenderer } from '$lib/webgl/imageRenderer';
+import type { Shaders } from '$lib/webgl/shaders';
+import { SvelteSet } from 'svelte/reactivity';
+import type { ImageGET } from '../../types/openapi_types';
+import type { Registration } from '../registration/registration';
+import type { ViewerWindowContext } from '../viewer-window/viewerWindowContext.svelte';
+import { HotKeys } from './controls/hotkeys';
+import { ScrollOCT } from './controls/scrollOCT';
+import { UpdatePosition } from './controls/updatePosition';
+import { ZoomPan } from './controls/zoomPan';
+import { CursorOverlay } from './overlays/CursorOverlay';
+import type { MeasureTool } from './tools/Measure.svelte.js';
+import type { EventName, Overlay, PanelName, RenderMode, ViewerEvent, ViewerEventListener, WindowLevel } from './viewer-utils';
 
-export type cursorStyle =
-    | "default"
-    | "none"
-    | "help"
-    | "pointer"
-    | "progress"
-    | "wait"
-    | "crosshair"
-    | "text"
-    | "vertical-text"
-    | "alias"
-    | "copy"
-    | "move"
-    | "no-drop"
-    | "not-allowed"
-    | "grab"
-    | "grabbing"
-    | "all-scroll"
-    | "col-resize"
-    | "row-resize"
-    | "n-resize"
-    | "e-resize"
-    | "s-resize"
-    | "w-resize"
-    | "ne-resize"
-    | "nw-resize"
-    | "se-resize"
-    | "sw-resize"
-    | "ew-resize"
-    | "ns-resize"
-    | "nesw-resize"
-    | "nwse-resize"
-    | "zoom-in"
-    | "zoom-out";
+export type cursorStyle = 'default' | 'none' | 'help' | 'pointer' | 'progress' | 'wait' | 'crosshair' | 'text' | 'vertical-text' | 'alias' | 'copy' | 'move' | 'no-drop' | 'not-allowed' | 'grab' | 'grabbing' | 'all-scroll' | 'col-resize' | 'row-resize' | 'n-resize' | 'e-resize' | 's-resize' | 'w-resize' | 'ne-resize' | 'nw-resize' | 'se-resize' | 'sw-resize' | 'ew-resize' | 'ns-resize' | 'nesw-resize' | 'nwse-resize' | 'zoom-in' | 'zoom-out';
 
 export class ViewerContext {
+
     // perhaps the typing should be improved here
     // using the same interface for repaint (Overlay) and controls (ViewerEventListener)
     private overlays = new Map<symbol, ViewerEventListener | Overlay>();
 
     hideOverlays: boolean = $state(false);
-    renderMode: RenderMode = $state("Original");
-    enfaceProjectionMode: EnfaceProjectionMode = $state("off");
-    /** Per-OCT enface overlay mode for non-_proj top-row images. */
-    enfaceProjectionModesByOct: Map<string, EnfaceProjectionMode> = $state(
-        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
-        new Map(),
-    );
+    renderMode: RenderMode = $state('Original');
     lockScroll: boolean = $state(false);
     windowLevel: WindowLevel = $state({ min: 0, max: 255 });
-    cursorStyle: cursorStyle = $state("default");
+    cursorStyle: cursorStyle = $state('default');
     active: boolean = $state(false);
     updatePosition: boolean = $state(true);
     axis: 0 | 1 | 2 = $state(0);
 
     index = $state(0);
 
-    viewerSize: { width: number; height: number } = $state({
-        width: 100,
-        height: 100,
-    });
+    viewerSize: { width: number, height: number } = $state({ width: 100, height: 100 });
     viewingRect: DOMRect = $state(new DOMRect(0, 0, 0, 0));
 
     imageTransform: Matrix = $state(Matrix.identity);
@@ -95,26 +45,11 @@ export class ViewerContext {
 
     // image coordinates (pixels) => viewer coordinates (viewer pixels)
     // takes both local image transform and viewer transform into account
-    imageViewerTransform: Matrix = $derived(
-        this.transform.multiply(
-            this.imageTransform.multiply(this.stretchMatrix),
-        ),
-    );
+    imageViewerTransform: Matrix = $derived(this.transform.multiply(this.imageTransform.multiply(this.stretchMatrix)));
     // viewer space to webgl clip space [-1, 1] x [-1, 1]
-    scaleViewerMatrix = $derived(
-        new Matrix(
-            2 / this.viewerSize.width,
-            0,
-            -1,
-            0,
-            -2 / this.viewerSize.height,
-            1,
-        ),
-    );
+    scaleViewerMatrix = $derived(new Matrix(2 / this.viewerSize.width, 0, -1, 0, -2 / this.viewerSize.height, 1));
     // image coordinates to clip space
-    webglTransform = $derived(
-        this.scaleViewerMatrix.multiply(this.imageViewerTransform),
-    );
+    webglTransform = $derived(this.scaleViewerMatrix.multiply(this.imageViewerTransform));
 
     measureTool: MeasureTool | undefined;
 
@@ -131,6 +66,8 @@ export class ViewerContext {
 
     public instance: ImageGET;
 
+    
+
     constructor(
         public readonly image: AbstractImage,
         // public readonly registration: Registration,
@@ -138,8 +75,9 @@ export class ViewerContext {
     ) {
         this.registration = viewerWindowContext.registration;
         this.instance = image.instance;
+        
 
-        if (image.image_id.endsWith("proj")) {
+        if (image.image_id.endsWith('proj')) {
             // TODO: cleaner implementation of this
             this.axis = 1;
         }
@@ -147,87 +85,45 @@ export class ViewerContext {
         this.shaders = image.webgl.shaders;
         this.imageRenderer = new BaseImageRenderer(image);
 
-        this.canvas2D = document.createElement("canvas");
-        this.context2D = this.canvas2D.getContext("2d")!;
+        this.canvas2D = document.createElement('canvas');
+        this.context2D = this.canvas2D.getContext('2d')!;
 
         this.windowLevel = { min: 0, max: 255 };
         if (image.is3D) {
             this.index = Math.round(image.depth / 2);
-            if (
-                image.instance.device.model == "3D OCT-1000" ||
-                image.instance.device.model == "3D OCT-1000 MARK II" ||
-                image.instance.device.model == "3D OCT-2000 FA Plus"
+            if (image.instance.device.model == '3D OCT-1000' ||
+                image.instance.device.model == '3D OCT-1000 MARK II' ||
+                image.instance.device.model == '3D OCT-2000 FA Plus'
             ) {
                 this.windowLevel = { min: 30, max: 225 };
             }
-            // B-scan exaggeration only for axial OCT volumes (not enface stacks)
-            if (
-                image.orientation === "axial" &&
-                image.resolution.z &&
-                image.resolution.x > 0
-            ) {
-                this.stretch = (8 * image.resolution.y) / image.resolution.x;
+            // aspect ratio for OCT
+            if (image.resolution.z && image.resolution.x > 0) {
+                this.stretch = 8 * image.resolution.y / image.resolution.x;
             }
         }
         this.transform = this.getInitTransform();
         this.imageTransform = image.transform;
 
-        if (image.is3D && image.depth > 1) {
+        if (image.is3D) {
             this.addOverlay(new ScrollOCT());
         }
         this.addOverlay(new UpdatePosition());
         this.addOverlay(new ZoomPan());
         this.addOverlay(new CursorOverlay());
         this.addOverlay(new HotKeys());
-
-        if (image.is3D && image.depth > 1) {
-            const pending = this.viewerWindowContext.viewState?.peekIndex(
-                this.image.image_id,
-                image.depth,
-            );
-            // Apply pending on viewer.index only. setIndex() writes the global
-            // registration pointer, which cannot hold per-viewer frames
-            // (known limitation for multiple open volumes).
-            this.index = pending ?? Math.round(image.depth / 2);
-        } else if (image.is3D) {
-            this.index = 0;
-        }
     }
 
     setIndex(i: number) {
-        const p = this.viewerWindowContext.registration.getPosition(
-            this.image.image_id,
-        );
-        let x = 0;
+        const p = this.viewerWindowContext.registration.getPosition(this.image.image_id);
+        let x = 0
         let y = 0;
         if (p) {
             x = p.x;
             y = p.y;
         }
-        this.viewerWindowContext.registration.setPosition(this.image.image_id, {
-            x,
-            y,
-            index: i,
-        });
+        this.viewerWindowContext.registration.setPosition(this.image.image_id, { x, y, index: i });
         this.index = i;
-        if (this.image.is3D && this.image.depth > 1) {
-            this.viewerWindowContext.viewState?.recordIndex(
-                this.image.image_id,
-                i,
-                this.image.depth,
-            );
-        }
-    }
-
-    cycleEnfaceProjectionModeForOct(octPublicId: string): void {
-        const modes: EnfaceProjectionMode[] = ["off", "binary", "heatmap"];
-        const current =
-            this.enfaceProjectionModesByOct.get(octPublicId) ?? "off";
-        const next = modes[(modes.indexOf(current) + 1) % modes.length];
-        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
-        const map = new Map(this.enfaceProjectionModesByOct);
-        map.set(octPublicId, next);
-        this.enfaceProjectionModesByOct = map;
     }
 
     initTransform() {
@@ -240,40 +136,35 @@ export class ViewerContext {
      * @returns transform that fits the image into the viewer
      */
     getInitTransform() {
+
         let x_min = 0;
         let x_max = this.image.width;
         let y_min = 0;
         let y_max = this.image.height;
-        const instance = this.image.instance;
+        const instance = this.image.instance
         if (instance.cf_roi) {
             let center;
-            let cx: number;
-            let cy: number;
-            let min_x: number;
-            let max_x: number;
-            let min_y: number;
-            let max_y: number;
-            let radius: number;
+            let cx = this.image.width / 2;
+            let cy = this.image.height / 2;
+            let min_x = 0;
+            let max_x = this.image.width;
+            let min_y = 0;
+            let max_y = this.image.height;
+            let radius = Math.min(this.image.width, this.image.height) / 2;
             try {
-                ({ center, radius, min_x, max_x, min_y, max_y } =
-                    instance.cf_roi as any);
-                [cx, cy] = center as [number, number];
+                ({ center, radius, min_x, max_x, min_y, max_y } = instance.cf_roi as any);
+                ([cx, cy] = center as [number, number]);
                 x_min = Math.max(x_min, cx - radius, min_x);
                 x_max = Math.min(x_max, cx + radius, max_x);
                 y_min = Math.max(y_min, cy - radius, min_y);
                 y_max = Math.min(y_max, cy + radius, max_y);
             } catch (e) {
-                console.warn("Error in cfROI", e);
+                console.warn('Error in cfROI', e);
             }
+            
         }
-        const { x: x0, y: y0 } = this.image.transform.apply({
-            x: x_min,
-            y: y_min,
-        });
-        const { x: x1, y: y1 } = this.image.transform.apply({
-            x: x_max,
-            y: y_max,
-        });
+        const { x: x0, y: y0 } = this.image.transform.apply({ x: x_min, y: y_min });
+        const { x: x1, y: y1 } = this.image.transform.apply({ x: x_max, y: y_max });
         x_max = Math.max(x0, x1);
         x_min = Math.min(x0, x1);
         y_max = Math.max(y0, y1);
@@ -289,8 +180,9 @@ export class ViewerContext {
 
         const tx = (w - scale * roiWidth) / 2 - x_min * scale;
         const ty = (h - this.stretch * scale * roiHeight) / 2 - y_min * scale;
-
+        
         return Matrix.from_translate_scale(tx, ty, scale, scale);
+
     }
 
     /**
@@ -306,15 +198,15 @@ export class ViewerContext {
         this.transform = this.transform.zoom(x, y, factor);
     }
     /**
-     * zoom around point in image coordinates	 *
+     * zoom around point in image coordinates	 * 
      */
     focusPoint(x: number, y: number, scale: number) {
+
         const w = this.viewerSize.width;
         const h = this.viewerSize.height;
         const w_image = this.image.width;
         const h_image = this.image.height;
-        const factor =
-            (Math.max(w / w_image, h / h_image) * scale) / this.transform.scale;
+        const factor = Math.max(w / w_image, h / h_image) * scale / this.transform.scale;
         const p = this.imageToViewerCoordinates({ x, y });
 
         let transform = this.transform.pan(p, { x: w / 2, y: h / 2 });
@@ -344,14 +236,14 @@ export class ViewerContext {
     }
 
     /**
-     * Add overlay to viewer. An overlay receives pointer events and can draw on top of the image	 *
-     * @param overlay
+     * Add overlay to viewer. An overlay receives pointer events and can draw on top of the image	 * 
+     * @param overlay 
      * @returns function that removes overlay when called
      */
     addOverlay(overlay: ViewerEventListener | Overlay) {
         for (const existing of this.overlays.values()) {
             if (existing === overlay) {
-                console.warn("Overlay already added");
+                console.warn('Overlay already added');
             }
         }
         const id = Symbol();
@@ -367,31 +259,28 @@ export class ViewerContext {
         if (!renderBounds) {
             return;
         }
-        const p = this.viewerWindowContext.registration.getPosition(
-            this.image.image_id,
-        );
+        const p = this.viewerWindowContext.registration.getPosition(this.image.image_id);
         if (p) {
             this.index = p.index;
+        } else {
+            // this.index = Math.round(this.image.depth / 2);
+            this.index = this.image.depth === 1 ? 0 : Math.round(this.image.depth / 2);
         }
-        // else keep this.index (mid-slice / restored pending / last setIndex)
 
         const renderTarget = { ...renderBounds, framebuffer: null };
 
         this.imageRenderer.renderImage(this, renderTarget);
 
-        this.context2D.clearRect(
-            0,
-            0,
-            this.canvas2D.width,
-            this.canvas2D.height,
-        );
+        this.context2D.clearRect(0, 0, this.canvas2D.width, this.canvas2D.height);
 
-        this.cursorStyle = "default";
+        this.cursorStyle = 'default';
         if (!this.hideOverlays) {
             for (const overlay of this.overlays.values()) {
                 overlay.repaint?.(this, renderTarget);
             }
         }
         this.canvas2D.style.cursor = this.cursorStyle;
+
     }
+
 }

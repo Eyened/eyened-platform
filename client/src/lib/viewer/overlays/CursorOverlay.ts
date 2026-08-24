@@ -1,76 +1,68 @@
-import type { Overlay } from "../viewer-utils";
-import type { ViewerContext } from "../viewerContext.svelte";
-import type { RenderTarget } from "$lib/webgl/types";
+import type { Overlay } from '../viewer-utils';
+import type { ViewerContext } from '../viewerContext.svelte';
+import type { RenderTarget } from '$lib/webgl/types';
 
 export class CursorOverlay implements Overlay {
-    lineWidth = 1;
-    strokeStyle = "rgba(255,255,255,0.5)";
-    opening = 10;
+	lineWidth = 1;
+	strokeStyle = 'rgba(255,255,255,0.5)';
+	opening = 10;
 
-    name: string = "Cursor";
-    annotationID: number = 0;
-    crosshairLen = 10000;
+	name: string = 'Cursor';
+	annotationID: number = 0;
+	crosshairLen = 10000;
 
-    constructor() {}
+	constructor() { }
 
-    repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
-        if (viewerContext.active) {
-            return; // do not show if cursor is over this image
-        }
+	repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
 
-        const { image, context2D, registration } = viewerContext;
-        // const position = registration.pointer[image.image_id];
-        const position = registration.getPosition(image.image_id);
-        if (!position) return;
+		if (viewerContext.active) {
+			return; // do not show if cursor is over this image
+		}
 
-        context2D.lineWidth = this.lineWidth;
-        context2D.strokeStyle = this.strokeStyle;
+		const { image, context2D, registration } = viewerContext;
+		// const position = registration.pointer[image.image_id];
+		const position = registration.getPosition(image.image_id);
+		if (!position) return;
 
-        if (image.is3D) {
-            const p_top = viewerContext.imageToViewerCoordinates({
-                x: position.x,
-                y: 0,
-            });
-            const p_bottom = viewerContext.imageToViewerCoordinates({
-                x: position.x,
-                y: image.height,
-            });
-            const p_left = viewerContext.imageToViewerCoordinates({
-                x: 0,
-                y: position.y,
-            });
-            const p_right = viewerContext.imageToViewerCoordinates({
-                x: this.crosshairLen,
-                y: position.y,
-            });
+		context2D.lineWidth = this.lineWidth;
+		context2D.strokeStyle = this.strokeStyle;
 
-            context2D.beginPath();
-            context2D.moveTo(p_top.x, p_top.y);
-            context2D.lineTo(p_bottom.x, p_bottom.y);
+		if (image.is3D) {
+			const p_top = viewerContext.imageToViewerCoordinates({ x: position.x, y: 0 });
+			const p_bottom = viewerContext.imageToViewerCoordinates({
+				x: position.x,
+				y: image.height
+			});
+			const p_left = viewerContext.imageToViewerCoordinates({ x: 0, y: position.y });
+			const p_right = viewerContext.imageToViewerCoordinates({ x: this.crosshairLen, y: position.y });
 
-            context2D.moveTo(p_left.x, p_left.y);
-            context2D.lineTo(p_right.x, p_right.y);
-            context2D.stroke();
-        } else {
-            const p = viewerContext.imageToViewerCoordinates(position);
+			context2D.beginPath();
+			context2D.moveTo(p_top.x, p_top.y);
+			context2D.lineTo(p_bottom.x, p_bottom.y);
 
-            const r0 = this.crosshairLen;
-            const r1 = this.opening;
+			context2D.moveTo(p_left.x, p_left.y);
+			context2D.lineTo(p_right.x, p_right.y);
+			context2D.stroke();
+		} else {
+			const p = viewerContext.imageToViewerCoordinates(position);
 
-            context2D.beginPath();
-            context2D.moveTo(p.x - r0, p.y);
-            context2D.lineTo(p.x - r1, p.y);
+			const r0 = this.crosshairLen;
+			const r1 = this.opening;
 
-            context2D.moveTo(p.x + r0, p.y);
-            context2D.lineTo(p.x + r1, p.y);
+			context2D.beginPath();
+			context2D.moveTo(p.x - r0, p.y);
+			context2D.lineTo(p.x - r1, p.y);
 
-            context2D.moveTo(p.x, p.y - r0);
-            context2D.lineTo(p.x, p.y - r1);
+			context2D.moveTo(p.x + r0, p.y);
+			context2D.lineTo(p.x + r1, p.y);
 
-            context2D.moveTo(p.x, p.y + r0);
-            context2D.lineTo(p.x, p.y + r1);
+			context2D.moveTo(p.x, p.y - r0);
+			context2D.lineTo(p.x, p.y - r1);
 
-            context2D.stroke();
-        }
-    }
+			context2D.moveTo(p.x, p.y + r0);
+			context2D.lineTo(p.x, p.y + r1);
+
+			context2D.stroke();
+		}
+	}
 }

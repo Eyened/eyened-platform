@@ -81,7 +81,7 @@ class ETDRSModelProcessor:
         self.model = AttributesModel.get_or_create(
             session,
             match_by={"ModelName": model_name, "Version": version},
-            update_values={"Description": description},
+            create_kwargs={"Description": description},
         )
 
         self.attribute_definition = AttributeDefinition.get_or_create(
@@ -93,38 +93,22 @@ class ETDRSModelProcessor:
         )
 
     def get_processed_image_ids(
-        self,
-        segmentation_model_id: int,
-        image_ids: Set[int],
-        *,
-        chunk_size: int | None = None,
+        self, segmentation_model_id: int, image_ids: Set[int]
     ) -> Set[int]:
         from sqlalchemy import select
 
-        from eyened_orm.commands.targets import (
-            PIPELINE_IMAGE_CHUNK_SIZE,
-            iter_image_id_chunks,
-        )
-
-        ids = set(image_ids)
-        if not ids:
-            return set()
-
-        size = PIPELINE_IMAGE_CHUNK_SIZE if chunk_size is None else chunk_size
-        found: Set[int] = set()
-        for chunk in iter_image_id_chunks(ids, chunk_size=size):
-            stmt = (
-                select(ModelSegmentation.ImageInstanceID)
-                .join(AttributeValue)
-                .where(
-                    ModelSegmentation.ModelID == segmentation_model_id,
-                    ModelSegmentation.ImageInstanceID.in_(chunk),
-                    AttributeValue.AttributeID == self.attribute_definition.AttributeID,
-                    AttributeValue.ModelID == self.model.ModelID,
-                )
+        stmt = (
+            select(ModelSegmentation.ImageInstanceID)
+            .join(AttributeValue)
+            .where(
+                ModelSegmentation.ModelID == segmentation_model_id,
+                ModelSegmentation.ImageInstanceID.in_(image_ids),
+                AttributeValue.AttributeID == self.attribute_definition.AttributeID,
+                AttributeValue.ModelID == self.model.ModelID,
             )
-            found.update(self.session.scalars(stmt).all())
-        return found
+        )
+        result = self.session.execute(stmt)
+        return set(result.scalars().all())
 
     def process(
         self,

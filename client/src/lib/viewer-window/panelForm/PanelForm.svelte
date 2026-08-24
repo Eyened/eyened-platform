@@ -1,23 +1,17 @@
 <script lang="ts">
-    import {
-        formAnnotations,
-        formSchemas,
-        formSchemasByName,
-        createFormAnnotation,
-    } from "$lib/data";
+    import { formAnnotations, formSchemas, formSchemasByName, createFormAnnotation, instances } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+    import type { TaskContext } from '$lib/tasks/TaskContext.svelte';
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import type {
-        FormAnnotationGET,
-        FormSchemaGET,
-    } from "../../../types/openapi_types";
+    import type { FormAnnotationGET, FormSchemaGET } from "../../../types/openapi_types";
+    import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import { HIDE_FROM_FORM_PANEL_NAMES } from "$lib/config/builtinFormSchemas";
     import FormItem from "./FormItem.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
+    const viewerWindowContext = getContext<ViewerWindowContext>("viewerWindowContext");
     const { formShortcut } = globalContext;
 
     const {
@@ -33,21 +27,18 @@
             const schema = formSchemas.get(annotation.form_schema_id);
             return !schema || !HIDE_FROM_FORM_PANEL_NAMES.has(schema.name);
         },
-        (annotation: FormAnnotationGET) =>
-            annotation.patient_id === instance.patient.id, //same patient
+        (annotation: FormAnnotationGET) => annotation.patient_id === instance.patient.id, //same patient
         (annotation: FormAnnotationGET) => {
             const schema = formSchemas.get(annotation.form_schema_id);
             if (!schema) return false;
-            if (schema.entity_type == "StudyEye") {
-                return (
-                    annotation.study_id == instance.study?.id &&
-                    annotation.laterality == instance.laterality
-                );
+            if (schema.entity_type == 'StudyEye') {
+                return annotation.study_id == instance.study?.id && annotation.laterality == instance.laterality;
             }
 
             //TODO: check for other entity types
-            return annotation.image_id == instance.id;
-        },
+            return annotation.image_id == instance.id;     
+        }
+        
     ];
 
     const taskConfig = taskContext?.task.task_definition.config;
@@ -59,28 +50,21 @@
     }
     if (taskConfig?.form_image_scope) {
         filters.push(
-            (annotation: FormAnnotationGET) =>
-                annotation.image_id == instance.id,
+            (annotation: FormAnnotationGET) => annotation.image_id == instance.id,
         );
     }
 
     const forms = $derived(
-        formAnnotations
-            .filter((annotation) =>
-                filters.every((filter) => filter(annotation)),
-            )
-            .sort((a, b) => a.id - b.id),
-    );
+        formAnnotations.filter((annotation) => filters.every((filter) => filter(annotation)))        
+        .sort((a, b) => a.id - b.id)
+    )
 
     const selectableSchemas = $derived(
-        [...formSchemas.values()].filter(
-            (schema) => !HIDE_FROM_FORM_PANEL_NAMES.has(schema.name),
-        ),
+        [...formSchemas.values()].filter((schema) => !HIDE_FROM_FORM_PANEL_NAMES.has(schema.name))
     );
 
     const formShortcutSchema = $derived.by(() => {
-        if (!formShortcut || HIDE_FROM_FORM_PANEL_NAMES.has(formShortcut))
-            return undefined;
+        if (!formShortcut || HIDE_FROM_FORM_PANEL_NAMES.has(formShortcut)) return undefined;
         return formSchemasByName.get(formShortcut);
     });
 
@@ -98,13 +82,13 @@
     }
 </script>
 
+
+
 <div class="main">
     <div class="new-form">
         <div>
             <select class="schema-select" bind:value={selectedSchema}>
-                <option value={undefined} disabled
-                    >-- select form type --</option
-                >
+                <option value={undefined} disabled>-- select form type --</option>
                 {#each selectableSchemas as schema}
                     <option value={schema}>{schema.name}</option>
                 {/each}
@@ -112,18 +96,15 @@
         </div>
 
         <div>
-            <button
-                onclick={() => addFormWithSchema(selectedSchema)}
-                disabled={!selectedSchema}
-            >
+            <button onclick={() => addFormWithSchema(selectedSchema)} disabled={!selectedSchema}>
                 Create new form
             </button>
         </div>
 
         {#if formShortcutSchema}
             <div>
-                <button onclick={() => addFormWithSchema(formShortcutSchema)}>
-                    Create {formShortcut}
+                <button onclick={() => addFormWithSchema(formShortcutSchema)}> 
+                    Create {formShortcut} 
                 </button>
             </div>
         {/if}

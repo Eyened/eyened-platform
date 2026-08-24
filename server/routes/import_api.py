@@ -15,16 +15,8 @@ import uuid
 from rq.job import Job
 from rq.exceptions import NoSuchJobError
 
-from eyened_orm.authz.scope import AccessScope
-
 from ..db import get_db
-from ..services.access_scope import get_access_scope
-from ..services.acting_user import ActingUser
-from ..services.audit_service import AuditService, get_audit_service
-from ..services.image_instance_service import (
-    ImageInstanceService,
-    get_image_instance_service,
-)
+from ..utils.db_logging import get_db_logger
 from ..utils.tasks import (
     layer_segmentation_job_timeout,
     run_cfi_amd_for_image_ids,
@@ -119,17 +111,12 @@ async def import_single_image(
     request: ImportRequest,
     session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
-    audit: AuditService = Depends(get_audit_service),
-    scope: AccessScope = Depends(get_access_scope),
 ):
-    # Source data is admin-only (spec 4.4). Outside the try: below, whose
-    # except returns a 200 with success=False -- a denial swallowed into that
-    # would read as a failed import rather than a refusal.
-    scope.require_admin(entity="ImageInstance")
     try:
         # Run the new importer on a single row
         import_run = plan_image_import(session=session, rows=[request.data])
         import_run.apply()
+        session.commit()
         # Count created image instances for logging/response
         image_creates = [
             change
@@ -139,22 +126,20 @@ async def import_single_image(
         ]
         image_count = len(image_creates)
 
-        audit.record(
-            action="INSERT",
-            entity="Import",
-            actor=ActingUser(id=current_user.id, username=current_user.username),
-            changes={
-                "project_name": request.data.project_name,
-                "images_created": image_count,
-            },
-        )
+        logger = get_db_logger()
+        if logger:
+            logger.log_insert(
+                user=current_user.username,
+                user_id=current_user.id,
+                endpoint="POST /api/import/image",
+                entity="Import",
+                summary={
+                    "project_name": request.data.project_name,
+                    "images_created": image_count,
+                },
+            )
 
     except Exception as e:
-        # A caught exception here means the request still returns normally (200,
-        # success=False below), so get_db would otherwise commit whatever
-        # import_run.apply() staged before failing. Roll back first so a failed
-        # import leaves nothing.
-        session.rollback()
         include_stack_trace = request.options.include_stack_trace
         error_message = str(e)
         stack_trace = traceback.format_exc() if include_stack_trace else None
@@ -211,15 +196,8 @@ def _queue_rq_job(
 async def enqueue_run_cfi_models(
     body: RunCfiModelsRequest,
     current_user: CurrentUser = Depends(get_current_user),
-    images: ImageInstanceService = Depends(get_image_instance_service),
 ):
     """Queue one RQ job per CFI attribute model (``cfi-roi``, ``cfi-quality``, ...)."""
-    # Before the try:, never inside it -- the except below turns any raise into
-    # a 200 with success=False, so a gate moved in there would report a denial
-    # as a queue failure and the status assertions would pass for the wrong
-    # reason.
-    images.require_grader_on_images(body.image_ids)
-
     from ..main import get_rq_queue
 
     try:
@@ -256,9 +234,7 @@ async def enqueue_run_cfi_models(
 async def enqueue_run_cfi_amd(
     body: RunCfiAmdRequest,
     current_user: CurrentUser = Depends(get_current_user),
-    images: ImageInstanceService = Depends(get_image_instance_service),
 ):
-    images.require_grader_on_images(body.image_ids)
     return _queue_rq_job(
         "cfi-amd",
         run_cfi_amd_for_image_ids,
@@ -274,9 +250,7 @@ async def enqueue_run_cfi_amd(
 async def enqueue_run_layer_segmentation(
     body: RunImageIdsJobRequest,
     current_user: CurrentUser = Depends(get_current_user),
-    images: ImageInstanceService = Depends(get_image_instance_service),
 ):
-    images.require_grader_on_images(body.image_ids)
     job_timeout = layer_segmentation_job_timeout(len(body.image_ids))
     return _queue_rq_job(
         "layer-segmentation",
@@ -302,14 +276,8 @@ async def post_import_update_thumbnails(
         description="Print per-image errors on the worker, like ``eorm update-thumbnails --print-errors``.",
     ),
     current_user: CurrentUser = Depends(get_current_user),
-    scope: AccessScope = Depends(get_access_scope),
 ):
     """Queue a job that scans the DB for missing thumbnails (CLI-equivalent)."""
-    # A whole-database sweep is a maintenance operation over every project's
-    # images, so it sits at admin rather than at a per-project floor. Outside
-    # the try: for the same reason as every other gate in this module.
-    scope.require_admin(entity="ImageInstance")
-
     from ..main import queue
 
     try:
@@ -337,11 +305,8 @@ async def post_import_update_thumbnails(
 async def post_import_update_thumbnails_for_image_ids(
     body: UpdateThumbnailsForImageIdsRequest,
     current_user: CurrentUser = Depends(get_current_user),
-    images: ImageInstanceService = Depends(get_image_instance_service),
 ):
     """Queue thumbnail generation for the given ``image_ids`` only."""
-    images.require_grader_on_images(body.image_ids)
-
     from ..main import queue
 
     try:
@@ -366,19 +331,7 @@ async def post_import_update_thumbnails_for_image_ids(
 
 
 @router.get("/import/status/{task_id}")
-def get_status(
-    task_id: str,
-    current_user: CurrentUser = Depends(get_current_user),
-):
-    """Return a queued job's status and result.
-
-    Authenticated, but not scope-aware, and that is not an oversight: every RQ
-    entrypoint returns a bare bool (pinned by
-    test_every_rq_entrypoint_returns_a_bare_bool), so there is no project data
-    in the response to filter. Job ids are uuid4 and not enumerable here, so
-    this is a capability control -- but a capability that leaks through a log
-    line or a screenshot would otherwise need no credential at all.
-    """
+def get_status(task_id: str):
     from ..main import redis_conn
 
     try:

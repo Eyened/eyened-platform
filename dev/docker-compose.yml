@@ -43,6 +43,8 @@ services:
       EYENED_REDIS_HOST: redis
       EYENED_REDIS_PORT: "6379"
       EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?}
+      EYENED_MEDSAM_URL: http://medsam:8010
+      WORKERS: "1"
     volumes:
       - ../server:/app/server
       - ../orm:/app/orm
@@ -51,6 +53,26 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      medsam:
+        condition: service_healthy
+
+  medsam:
+    env_file: .env
+    build:
+      context: ..
+      dockerfile: dev/Dockerfile.medsam
+    ports:
+      - "8010:8010"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8010/health', timeout=2).read()
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
 
   client:
     build:

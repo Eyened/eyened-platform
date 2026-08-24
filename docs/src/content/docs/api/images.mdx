@@ -31,6 +31,14 @@ Thumbnail via nginx redirect.
 
 **Query parameters:** `size` (int, default `144`) — `144` or `540`.
 
+### GET /api/instances/images/\{dataset_identifier:path\}
+
+**Legacy.** Serve image by deprecated `DatasetIdentifier` path (`/files/…` redirect).
+
+### GET /api/instances/thumbnails/\{thumbnail_identifier:path\}
+
+**Legacy.** Serve thumbnail by path under `thumbnails/`. Prefer `GET /api/images/{image_id}/thumbnail`.
+
 ### POST /api/instances/\{instance_id\}/tags
 
 Attach a tag to an image. **`instance_id` is the image `PublicID`**.

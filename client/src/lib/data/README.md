@@ -7,7 +7,7 @@ A minimal reactive data management layer using plain objects and SvelteMaps.
 ```
 data/
 ├── stores.svelte.ts   # ReactiveMap stores + ingest functions
-├── helpers.ts         # CRUD helper functions
+├── helpers.ts         # CRUD helper functions  
 ├── api.ts             # API fetch functions
 └── index.ts           # Re-exports
 ```
@@ -20,13 +20,13 @@ The data layer extends Svelte's `SvelteMap` with a custom `ReactiveMap` class th
 
 ```typescript
 class ReactiveMap<K, V> extends SvelteMap<K, V> {
-    filter(predicate: (value: V, key: K) => boolean): V[];
-    map<U>(callback: (value: V, key: K) => U): U[];
-    find(predicate: (value: V, key: K) => boolean): V | undefined;
-    some(predicate: (value: V, key: K) => boolean): boolean;
-    every(predicate: (value: V, key: K) => boolean): boolean;
-    reduce<U>(callback: (acc: U, value: V, key: K) => U, initial: U): U;
-    forEach(callback: (value: V, key: K) => void): void;
+  filter(predicate: (value: V, key: K) => boolean): V[]
+  map<U>(callback: (value: V, key: K) => U): U[]
+  find(predicate: (value: V, key: K) => boolean): V | undefined
+  some(predicate: (value: V, key: K) => boolean): boolean
+  every(predicate: (value: V, key: K) => boolean): boolean
+  reduce<U>(callback: (acc: U, value: V, key: K) => U, initial: U): U
+  forEach(callback: (value: V, key: K) => void): void
 }
 ```
 
@@ -36,26 +36,23 @@ All data is stored in global `ReactiveMap` instances keyed by ID:
 
 ```typescript
 // Primary stores
-export const instances = new ReactiveMap<number, InstanceGET>();
-export const instanceMetas = new ReactiveMap<number, InstanceMeta>(); // Lightweight references
-export const studies = new ReactiveMap<number, StudyGET>();
-export const tags = new ReactiveMap<number, TagGET>();
-export const features = new ReactiveMap<number, FeatureGET>();
-export const formSchemas = new ReactiveMap<number, FormSchemaGET>();
-export const segmentations = new ReactiveMap<number, SegmentationGET>();
-export const modelSegmentations = new ReactiveMap<
-    number,
-    ModelSegmentationGET
->();
-export const formAnnotations = new ReactiveMap<number, FormAnnotationGET>();
-export const patients = new ReactiveMap<number, PatientDetailGET>();
-export const tasks = new ReactiveMap<number, TaskGET>();
-export const subtasks = new ReactiveMap<number, SubTaskWithImagesGET>();
+export const instances = new ReactiveMap<number, InstanceGET>()
+export const instanceMetas = new ReactiveMap<number, InstanceMeta>()  // Lightweight references
+export const studies = new ReactiveMap<number, StudyGET>()
+export const tags = new ReactiveMap<number, TagGET>()
+export const features = new ReactiveMap<number, FeatureGET>()
+export const formSchemas = new ReactiveMap<number, FormSchemaGET>()
+export const segmentations = new ReactiveMap<number, SegmentationGET>()
+export const modelSegmentations = new ReactiveMap<number, ModelSegmentationGET>()
+export const formAnnotations = new ReactiveMap<number, FormAnnotationGET>()
+export const patients = new ReactiveMap<number, PatientDetailGET>()
+export const tasks = new ReactiveMap<number, TaskGET>()
+export const subtasks = new ReactiveMap<number, SubTaskWithImagesGET>()
 
 // Secondary indexes for name-based lookups
-export const formSchemasByName = new ReactiveMap<string, FormSchemaGET>();
-export const featuresByName = new ReactiveMap<string, FeatureGET>();
-export const tagsByName = new ReactiveMap<string, TagGET>();
+export const formSchemasByName = new ReactiveMap<string, FormSchemaGET>()
+export const featuresByName = new ReactiveMap<string, FeatureGET>()
+export const tagsByName = new ReactiveMap<string, TagGET>()
 ```
 
 ## Data Types and Relationships
@@ -63,29 +60,26 @@ export const tagsByName = new ReactiveMap<string, TagGET>();
 ### InstanceGET vs InstanceMeta
 
 **InstanceGET** - Full instance object with all properties:
-
 - Contains: `sop_instance_uid`, `rows`, `columns`, `study: StudyMeta`, `series: SeriesMeta`
 - Optional embedded data: `segmentations?`, `form_annotations?`, `model_segmentations?` (requires `with_*` flags)
 - Full metadata: `project: ProjectMeta`, `patient: PatientMeta`, `device: DeviceMeta`, `scan: ScanMeta`
 - Attributes: `attributes: Dict[str, Dict[str, Any]]`
 
 **InstanceMeta** - Lightweight reference with minimal fields:
-
 - Contains only: `id`, `thumbnail_path`, `modality`, `dicom_modality`, `etdrs_field`, `laterality`, `anatomic_region`, `device: DeviceMeta`, `tags: TagMeta[]`
 - Used in search responses when full data isn't needed
 
 **Example:**
-
 ```typescript
 // From /instances/search - returns InstanceGET[]
 const instance = instances.get(123)!;
-console.log(instance.sop_instance_uid); // ✅ Available
-console.log(instance.rows); // ✅ Available
+console.log(instance.sop_instance_uid);  // ✅ Available
+console.log(instance.rows);              // ✅ Available
 
 // From /studies/search - returns InstanceMeta[]
 const meta = instanceMetas.get(123)!;
-console.log(meta.sop_instance_uid); // ❌ Not available
-console.log(meta.modality); // ✅ Available
+console.log(meta.sop_instance_uid);      // ❌ Not available
+console.log(meta.modality);              // ✅ Available
 ```
 
 ### StudyGET with Embedded Series
@@ -94,27 +88,27 @@ console.log(meta.modality); // ✅ Available
 
 ```typescript
 type StudyGET = {
-    id: number;
-    description?: string | null;
-    date: string;
-    age?: number | null;
-    project: ProjectMeta;
-    patient: PatientMeta;
-    series?: SeriesGET[] | null; // Full SeriesGET objects!
-    tags: TagMeta[];
-};
+  id: number;
+  description?: string | null;
+  date: string;
+  age?: number | null;
+  project: ProjectMeta;
+  patient: PatientMeta;
+  series?: SeriesGET[] | null;  // Full SeriesGET objects!
+  tags: TagMeta[];
+}
 ```
 
 **SeriesGET** contains `instance_ids?: number[]` (references to instances):
 
 ```typescript
 type SeriesGET = {
-    id: number;
-    laterality?: "L" | "R" | null;
-    series_number?: number | null;
-    series_instance_uid: string;
-    instance_ids?: number[]; // References to instances
-};
+  id: number;
+  laterality?: 'L' | 'R' | null;
+  series_number?: number | null;
+  series_instance_uid: string;
+  instance_ids?: number[];  // References to instances
+}
 ```
 
 ### Meta Types
@@ -136,17 +130,17 @@ Relationships are traversed via Meta references:
 ```typescript
 // InstanceGET has study: StudyMeta (just ID + date)
 const instance = instances.get(123)!;
-const studyId = instance.study.id; // Get ID from Meta
+const studyId = instance.study.id;  // Get ID from Meta
 
 // Look up full StudyGET from stores
-const study = studies.get(studyId); // May be undefined!
+const study = studies.get(studyId);  // May be undefined!
 
 // StudyGET has embedded series (full objects)
-const series = study?.series; // SeriesGET[] | null | undefined
+const series = study?.series;  // SeriesGET[] | null | undefined
 
 // SeriesGET has instance_ids (array of IDs)
 const instanceIds = series?.[0]?.instance_ids ?? [];
-const instanceRefs = instanceIds.map((id) => instanceMetas.get(id));
+const instanceRefs = instanceIds.map(id => instanceMetas.get(id));
 ```
 
 ## Usage Examples
@@ -157,15 +151,15 @@ const instanceRefs = instanceIds.map((id) => instanceMetas.get(id));
 
 ```svelte
 <script lang="ts">
-    import { fetchTasks } from "$lib/data/api";
-
-    const loading = fetchTasks();
+  import { fetchTasks } from "$lib/data/api";
+  
+  const loading = fetchTasks();
 </script>
 
 {#await loading}
-    <p>Loading tasks...</p>
+  <p>Loading tasks...</p>
 {:then tasks}
-    <TasksTable rows={tasks} />
+  <TasksTable rows={tasks} />
 {/await}
 ```
 
@@ -173,10 +167,10 @@ The `fetchTasks()` function automatically ingests data into stores:
 
 ```typescript
 export async function fetchTasks(): Promise<TaskGET[]> {
-    const res = await api.GET("/task", {});
-    const data = (res.data ?? []) as TaskGET[];
-    ingestTasks(data); // Auto-ingests into tasks store
-    return data;
+  const res = await api.GET('/task', {});
+  const data = (res.data ?? []) as TaskGET[];
+  ingestTasks(data);  // Auto-ingests into tasks store
+  return data;
 }
 ```
 
@@ -186,16 +180,15 @@ export async function fetchTasks(): Promise<TaskGET[]> {
 
 ```typescript
 // StudyGET has embedded series
-const allInstanceIds =
-    study.series?.flatMap((series) => series.instance_ids ?? []) ?? [];
+const allInstanceIds = study.series?.flatMap((series) => series.instance_ids ?? []) ?? [];
 
 // Look up instance metas from store
 const allInstances = allInstanceIds.map((id) => instanceMetas.get(id));
 
 // Filter by laterality
 const eyeInstanceIds = allInstances
-    .filter((instance) => instance?.laterality == laterality)
-    .map((instance) => instance!.id);
+  .filter((instance) => instance?.laterality == laterality)
+  .map((instance) => instance!.id);
 ```
 
 ### Fetching Instance with Optional Data
@@ -203,44 +196,41 @@ const eyeInstanceIds = allInstances
 **Example from `api.ts`:**
 
 ```typescript
-export async function fetchInstance(
-    id: number,
-    options?: {
-        with_segmentations?: boolean;
-        with_form_annotations?: boolean;
-        with_model_segmentations?: boolean;
-        with_tag_metadata?: boolean;
-    },
-) {
-    const res = await api.GET("/instances/{instance_id}", {
-        params: {
-            path: { instance_id: id },
-            query: {
-                with_tag_metadata: true,
-                ...options,
-            },
-        },
-    });
-
-    if (res.data) {
-        const instance = res.data as InstanceGET;
-
-        // Ingest the instance
-        ingestInstances([instance]);
-
-        // Ingest embedded data if present
-        if (instance.form_annotations) {
-            ingestFormAnnotations(instance.form_annotations);
-        }
-        if (instance.segmentations) {
-            ingestSegmentations(instance.segmentations);
-        }
-        if (instance.model_segmentations) {
-            ingestModelSegmentations(instance.model_segmentations);
-        }
+export async function fetchInstance(id: number, options?: {
+  with_segmentations?: boolean;
+  with_form_annotations?: boolean;
+  with_model_segmentations?: boolean;
+  with_tag_metadata?: boolean;
+}) {
+  const res = await api.GET('/instances/{instance_id}', {
+    params: { 
+      path: { instance_id: id },
+      query: { 
+        with_tag_metadata: true,
+        ...options
+      }
     }
-
-    return res.data;
+  });
+  
+  if (res.data) {
+    const instance = res.data as InstanceGET;
+    
+    // Ingest the instance
+    ingestInstances([instance]);
+    
+    // Ingest embedded data if present
+    if (instance.form_annotations) {
+      ingestFormAnnotations(instance.form_annotations);
+    }
+    if (instance.segmentations) {
+      ingestSegmentations(instance.segmentations);
+    }
+    if (instance.model_segmentations) {
+      ingestModelSegmentations(instance.model_segmentations);
+    }
+  }
+  
+  return res.data;
 }
 ```
 
@@ -250,31 +240,27 @@ export async function fetchInstance(
 
 ```typescript
 // Tag an instance
-export async function tagInstance(
-    instance: InstanceGET | InstanceMeta,
-    tagId: number,
-    comment?: string,
-) {
-    const { data } = await api.POST("/instances/{instance_id}/tags", {
-        params: { path: { instance_id: instance.id } },
-        body: { tag_id: tagId, comment },
+export async function tagInstance(instance: InstanceGET | InstanceMeta, tagId: number, comment?: string) {
+  const { data } = await api.POST('/instances/{instance_id}/tags', {
+    params: { path: { instance_id: instance.id } },
+    body: { tag_id: tagId, comment }
+  });
+  
+  // Update both stores when present
+  if (instanceMetas.has(instance.id)) {
+    const meta = instanceMetas.get(instance.id)!;
+    instanceMetas.set(instance.id, {
+      ...meta,
+      tags: [...meta.tags, data]
     });
-
-    // Update both stores when present
-    if (instanceMetas.has(instance.id)) {
-        const meta = instanceMetas.get(instance.id)!;
-        instanceMetas.set(instance.id, {
-            ...meta,
-            tags: [...meta.tags, data],
-        });
-    }
-    if (instances.has(instance.id)) {
-        const inst = instances.get(instance.id)!;
-        instances.set(instance.id, {
-            ...inst,
-            tags: [...inst.tags, data],
-        });
-    }
+  }
+  if (instances.has(instance.id)) {
+    const inst = instances.get(instance.id)!;
+    instances.set(instance.id, {
+      ...inst,
+      tags: [...inst.tags, data]
+    });
+  }
 }
 ```
 
@@ -284,19 +270,16 @@ export async function tagInstance(
 
 ```typescript
 const loadPromise = (async () => {
-    const [task, subTask] = await Promise.all([
-        fetchTask(Number(taskid)),
-        fetchSubTaskByIndex(Number(taskid), Number(subTaskIndex), {
-            with_images: true,
-        }),
-    ]);
-
-    if (!subTask) throw new Error("Subtask not found");
-    if (!("images" in subTask))
-        throw new Error("Subtask missing images; ensure with_images=true");
-
-    const instanceIDs = subTask.images.map((img) => img.id);
-    return { task, subTask, instanceIDs };
+  const [task, subTask] = await Promise.all([
+    fetchTask(Number(taskid)),
+    fetchSubTaskByIndex(Number(taskid), Number(subTaskIndex), { with_images: true }),
+  ]);
+  
+  if (!subTask) throw new Error("Subtask not found");
+  if (!("images" in subTask)) throw new Error("Subtask missing images; ensure with_images=true");
+  
+  const instanceIDs = subTask.images.map(img => img.id);
+  return { task, subTask, instanceIDs };
 })();
 ```
 
@@ -306,27 +289,27 @@ const loadPromise = (async () => {
 
 ```svelte
 <script lang="ts">
-    import { tasks } from "$lib/data";
-
-    let { rows }: { rows: TaskGET[] } = $props();
-
-    // Direct access to plain objects
-    const columns: ColumnDef<TaskGET>[] = [
-        {
-            accessorKey: "name",
-            header: "Task",
-            cell: ({ row }) => {
-                const r = row.original as TaskGET;
-                const url = `/tasks/${r.id}${typeof window !== "undefined" ? window.location.search : ""}`;
-                return renderComponent(TaskNameCell, { task: r, url });
-            },
-        },
-        {
-            accessorKey: "task_state",
-            header: "State",
-            cell: ({ row }) => row.original.task_state ?? "-",
-        },
-    ];
+  import { tasks } from "$lib/data";
+  
+  let { rows }: { rows: TaskGET[] } = $props();
+  
+  // Direct access to plain objects
+  const columns: ColumnDef<TaskGET>[] = [
+    {
+      accessorKey: "name",
+      header: "Task",
+      cell: ({ row }) => {
+        const r = row.original as TaskGET;
+        const url = `/tasks/${r.id}${typeof window !== "undefined" ? window.location.search : ""}`;
+        return renderComponent(TaskNameCell, { task: r, url });
+      },
+    },
+    {
+      accessorKey: "task_state",
+      header: "State",
+      cell: ({ row }) => row.original.task_state ?? "-",
+    },
+  ];
 </script>
 ```
 
@@ -338,23 +321,20 @@ const loadPromise = (async () => {
 
 ```typescript
 export function ingestInstances(instancesData: InstanceGET[]) {
-    for (const inst of instancesData) {
-        // Validation: Only ingest full InstanceGET objects
-        if (!("sop_instance_uid" in inst) || !("rows" in inst)) {
-            console.error(
-                "ingestInstances() expects InstanceGET, got InstanceMeta. Use ingestInstanceMetas() instead:",
-                inst,
-            );
-            continue;
-        }
-        instances.set(inst.id, inst);
+  for (const inst of instancesData) {
+    // Validation: Only ingest full InstanceGET objects
+    if (!('sop_instance_uid' in inst) || !('rows' in inst)) {
+      console.error('ingestInstances() expects InstanceGET, got InstanceMeta. Use ingestInstanceMetas() instead:', inst);
+      continue;
     }
+    instances.set(inst.id, inst);
+  }
 }
 
 export function ingestInstanceMetas(metasData: InstanceMeta[]) {
-    for (const meta of metasData) {
-        instanceMetas.set(meta.id, meta);
-    }
+  for (const meta of metasData) {
+    instanceMetas.set(meta.id, meta);
+  }
 }
 ```
 
@@ -363,12 +343,10 @@ export function ingestInstanceMetas(metasData: InstanceMeta[]) {
 ### Search Response Types
 
 **`/instances/search`** returns:
-
 - `instances: InstanceGET[]` - Full objects
 - `studies: StudyGET[]` - With embedded series
 
 **`/studies/search`** returns:
-
 - `studies: StudyGET[]` - With embedded series
 - `instances: InstanceMeta[]` - Lightweight references (not full objects!)
 
@@ -396,14 +374,14 @@ result.instances.forEach(meta => {
 ```typescript
 const instance = instances.get(123);
 if (!instance) {
-    // Instance not in store - may need to fetch it
-    await fetchInstance(123);
+  // Instance not in store - may need to fetch it
+  await fetchInstance(123);
 }
 
 const study = studies.get(instance?.study.id);
 if (!study) {
-    // Study not in store - may need to fetch it
-    await fetchStudy(instance.study.id);
+  // Study not in store - may need to fetch it
+  await fetchStudy(instance.study.id);
 }
 ```
 
@@ -411,14 +389,12 @@ if (!study) {
 
 ```svelte
 <script lang="ts">
-    import { instances, studies } from "$lib/data";
-
-    const instanceId = 123;
-    const instance = $derived(instances.get(instanceId));
-    const study = $derived(
-        instance ? studies.get(instance.study.id) : undefined,
-    );
-    const patient = $derived(study?.patient);
+  import { instances, studies } from "$lib/data";
+  
+  const instanceId = 123;
+  const instance = $derived(instances.get(instanceId));
+  const study = $derived(instance ? studies.get(instance.study.id) : undefined);
+  const patient = $derived(study?.patient);
 </script>
 
 {instance?.modality}
@@ -431,29 +407,26 @@ if (!study) {
 **Tag operations update both `instances` and `instanceMetas` stores when present:**
 
 ```typescript
-export async function untagInstance(
-    instance: InstanceGET | InstanceMeta,
-    tagId: number,
-) {
-    await api.DELETE("/instances/{instance_id}/tags/{tag_id}", {
-        params: { path: { instance_id: instance.id, tag_id: tagId } },
+export async function untagInstance(instance: InstanceGET | InstanceMeta, tagId: number) {
+  await api.DELETE('/instances/{instance_id}/tags/{tag_id}', {
+    params: { path: { instance_id: instance.id, tag_id: tagId } }
+  });
+  
+  // Update both stores when present
+  if (instanceMetas.has(instance.id)) {
+    const meta = instanceMetas.get(instance.id)!;
+    instanceMetas.set(instance.id, {
+      ...meta,
+      tags: meta.tags.filter(t => t.id !== tagId)
     });
-
-    // Update both stores when present
-    if (instanceMetas.has(instance.id)) {
-        const meta = instanceMetas.get(instance.id)!;
-        instanceMetas.set(instance.id, {
-            ...meta,
-            tags: meta.tags.filter((t) => t.id !== tagId),
-        });
-    }
-    if (instances.has(instance.id)) {
-        const inst = instances.get(instance.id)!;
-        instances.set(instance.id, {
-            ...inst,
-            tags: inst.tags.filter((t) => t.id !== tagId),
-        });
-    }
+  }
+  if (instances.has(instance.id)) {
+    const inst = instances.get(instance.id)!;
+    instances.set(instance.id, {
+      ...inst,
+      tags: inst.tags.filter(t => t.id !== tagId)
+    });
+  }
 }
 ```
 
@@ -467,12 +440,12 @@ const instance = await fetchInstance(123, { with_segmentations: true });
 
 // Check if data is present
 if (instance.segmentations) {
-    // Ingest segmentations into store
-    ingestSegmentations(instance.segmentations);
+  // Ingest segmentations into store
+  ingestSegmentations(instance.segmentations);
 }
 
 // Access from store (segmentations use public image_id string, same as ImageGET.id)
-const segs = segmentations.filter((s) => s.image_id === instance.id);
+const segs = segmentations.filter(s => s.image_id === instance.id);
 ```
 
 ### SubTask With Images
@@ -485,7 +458,7 @@ export const subtasks = new ReactiveMap<number, SubTaskWithImagesGET>();
 // All subtasks have images included
 const subtask = subtasks.get(123);
 if (subtask) {
-    const instanceIds = subtask.images.map((img) => img.id);
+  const instanceIds = subtask.images.map(img => img.id);
 }
 ```
 
@@ -505,18 +478,16 @@ if (subtask) {
 const annotation = formAnnotations.get(123)!;
 
 const instance = annotation.image_id
-    ? instances.get(annotation.image_id)
-    : undefined;
+  ? instances.get(annotation.image_id)
+  : undefined;
 const patient = instance?.patient ?? patients.get(annotation.patient_id);
 const study =
-    instance?.study ??
-    (annotation.study_id != null
-        ? studies.get(annotation.study_id)
-        : undefined);
+  instance?.study ??
+  (annotation.study_id != null ? studies.get(annotation.study_id) : undefined);
 
-console.log(patient?.identifier); // human-readable patient ID
+console.log(patient?.identifier);  // human-readable patient ID
 console.log(study?.date);
-console.log(annotation.image_id); // public image ID when image-scoped
+console.log(annotation.image_id);  // public image ID when image-scoped
 ```
 
 **`form_data` may be stored separately and requires separate fetch:**
@@ -533,7 +504,7 @@ await setFormAnnotationValue(123, newFormData);
 
 // Store is updated automatically
 const updated = formAnnotations.get(123);
-console.log(updated.form_data); // Updated value
+console.log(updated.form_data);  // Updated value
 ```
 
 ### Segmentation Data
@@ -543,7 +514,7 @@ console.log(updated.form_data); // Updated value
 ```typescript
 // SegmentationGET contains metadata only
 const seg = segmentations.get(123);
-console.log(seg.width, seg.height, seg.depth); // ✅ Available
+console.log(seg.width, seg.height, seg.depth);  // ✅ Available
 
 // Actual data requires separate fetch
 const data = await getSegmentationData(123, { scan_nr: 5, sparse_axis: 1 });
@@ -564,26 +535,26 @@ await fetchFormSchemas();
 await fetchTasks();
 
 // Entity fetches
-await fetchInstance(id, {
-    with_segmentations: true,
-    with_form_annotations: true,
-    with_model_segmentations: true,
-    with_tag_metadata: true,
+await fetchInstance(id, { 
+  with_segmentations: true,
+  with_form_annotations: true,
+  with_model_segmentations: true,
+  with_tag_metadata: true
 });
 await fetchStudy(id);
 
 // Task fetches
 await fetchTask(id);
 await fetchSubTasks({
-    task_id: id,
-    with_images: true,
-    limit: 20,
-    page: 0,
-    subtask_status: "Ready",
+  task_id: id,
+  with_images: true,
+  limit: 20,
+  page: 0,
+  subtask_status: 'Ready'
 });
-await fetchSubTaskByIndex(taskId, subtaskIndex, {
-    with_images: true,
-    with_next: false,
+await fetchSubTaskByIndex(taskId, subtaskIndex, { 
+  with_images: true,
+  with_next: false
 });
 ```
 
@@ -594,27 +565,27 @@ Search functions automatically ingest results:
 ```typescript
 // Instance search
 const result = await searchInstances({
-    conditions: [
-        { type: "default", variable: "Laterality", operator: "==", value: "L" },
-    ],
-    limit: 100,
-    page: 0,
-    order_by: "Study Date",
-    order: "ASC",
-    include_count: true,
+  conditions: [
+    { type: 'default', variable: 'Laterality', operator: '==', value: 'L' }
+  ],
+  limit: 100,
+  page: 0,
+  order_by: 'Study Date',
+  order: 'ASC',
+  include_count: true
 });
 // Returns: { instances: InstanceGET[], studies: StudyGET[], result_ids: number[], count?: number, has_more: boolean }
 
 // Study search
 const result = await searchStudies({
-    conditions: [
-        { variable: "Study Date", operator: "==", value: "2024-01-01" },
-    ],
-    limit: 50,
-    page: 0,
-    order_by: "Study Date",
-    order: "DESC",
-    include_count: true,
+  conditions: [
+    { variable: 'Study Date', operator: '==', value: '2024-01-01' }
+  ],
+  limit: 50,
+  page: 0,
+  order_by: 'Study Date',
+  order: 'DESC',
+  include_count: true
 });
 // Returns: { studies: StudyGET[], instances: InstanceMeta[], result_ids: number[], count?: number, has_more: boolean }
 ```
@@ -622,7 +593,6 @@ const result = await searchStudies({
 ### CRUD Helper Functions
 
 **Tag operations:**
-
 ```typescript
 await tagInstance(instance, tagId, comment);
 await updateTagInstance(instanceId, tagId, comment);
@@ -641,18 +611,9 @@ await untagFormAnnotation(annotation, tagId);
 ```
 
 **Segmentation operations:**
-
 ```typescript
 await createSegmentation(metadata, np_array);
-await createSegmentationFrom(
-    image,
-    feature_id,
-    data_representation,
-    data_type,
-    threshold,
-    sparse_axis,
-    subtask_id,
-);
+await createSegmentationFrom(image, feature_id, data_representation, data_type, threshold, sparse_axis, subtask_id);
 await fetchSegmentation(id);
 await updateSegmentation(id, { threshold, reference_segmentation_id });
 await deleteSegmentation(id);
@@ -662,25 +623,24 @@ await getModelSegmentationData(id, { axis, scan_nr, sparse_axis });
 ```
 
 **Form annotation operations:**
-
 ```typescript
 await fetchFormAnnotation(id);
 await fetchFormAnnotations({
-    patient_id,
-    study_id,
-    image_id, // public image ID string (ImageGET.id)
-    form_schema_id,
-    sub_task_id,
+  patient_id,
+  study_id,
+  image_id,        // public image ID string (ImageGET.id)
+  form_schema_id,
+  sub_task_id,
 });
 await createFormAnnotation({
-    form_schema_id,
-    patient_id,
-    study_id, // optional; required for study/image scope per schema
-    image_id, // optional; public image ID when annotating an image
-    laterality, // optional; 'L' | 'R' for StudyEye-style forms
-    sub_task_id,
-    form_data,
-    form_annotation_reference_id,
+  form_schema_id,
+  patient_id,
+  study_id,        // optional; required for study/image scope per schema
+  image_id,        // optional; public image ID when annotating an image
+  laterality,      // optional; 'L' | 'R' for StudyEye-style forms
+  sub_task_id,
+  form_data,
+  form_annotation_reference_id,
 });
 await deleteFormAnnotation(id);
 await getFormAnnotationValue(id);
@@ -688,7 +648,6 @@ await setFormAnnotationValue(id, form_data);
 ```
 
 **Feature operations:**
-
 ```typescript
 await createFeature({ name, subfeature_ids });
 await updateFeature(featureId, { name, subfeature_ids });
@@ -696,7 +655,6 @@ await deleteFeature(featureId);
 ```
 
 **Tag operations:**
-
 ```typescript
 await createTag(name, tagType, description);
 await deleteTag(tagId);
@@ -705,16 +663,9 @@ await unstarTag(tagId);
 ```
 
 **Task operations:**
-
 ```typescript
 await createTask({ name, description, contact_id, task_definition_id });
-await updateTask(id, {
-    name,
-    description,
-    contact_id,
-    task_definition_id,
-    task_state,
-});
+await updateTask(id, { name, description, contact_id, task_definition_id, task_state });
 await deleteTask(id);
 await updateSubTask(subtaskId, { task_state, comments });
 await addSubTaskImage(subtaskId, instanceId);
@@ -723,7 +674,6 @@ await updateSubTaskComments(subtaskId, comments);
 ```
 
 **Lookup functions:**
-
 ```typescript
 getInstanceBySOPInstanceUID(SOPInstanceUid: string): InstanceGET | undefined
 getInstanceByDataSetIdentifier(datasetIdentifier: string): InstanceGET | undefined
@@ -757,27 +707,23 @@ if with_segmentations:
 ### Response Patterns
 
 **`/instances/search`** returns:
-
 - `instances: InstanceGET[]` - Full objects with all metadata
 - `studies: StudyGET[]` - With embedded `series: SeriesGET[]` (full objects)
 - Both are ingested into their respective stores
 
 **`/studies/search`** returns:
-
 - `studies: StudyGET[]` - With embedded `series: SeriesGET[]` (full objects)
 - `instances: InstanceMeta[]` - Lightweight references (not full objects!)
 - Studies are ingested into `studies` store
 - Instance metas are ingested into `instanceMetas` store
 
 **`/instances/{id}`** supports optional flags:
-
 - `with_segmentations: bool` - Include `segmentations: SegmentationGET[]`
 - `with_form_annotations: bool` - Include `form_annotations: FormAnnotationGET[]`
 - `with_model_segmentations: bool` - Include `model_segmentations: ModelSegmentationGET[]`
 - `with_tag_metadata: bool` - Include full tag metadata (default: true)
 
 **`/task/{task_id}/subtasks`** supports:
-
 - `with_images: bool` - Include `images: InstanceGET[]` in response (returns `SubTaskWithImagesGET[]`)
 
 ### DTO Pattern
@@ -808,21 +754,18 @@ def image_instance_to_get(
 ### Embedded vs Referenced Data
 
 **Embedded data** (full objects in response):
-
 - `StudyGET.series: SeriesGET[]` - Full series objects with `instance_ids`
 - `SubTaskWithImagesGET.images: InstanceGET[]` - Full instance objects
 - `InstanceGET.segmentations?: SegmentationGET[]` - When `with_segmentations=true`
 - `InstanceGET.form_annotations?: FormAnnotationGET[]` - When `with_form_annotations=true`
 
 **Referenced data** (Meta objects with just IDs):
-
 - `InstanceGET.study: StudyMeta` - Just `{ id: number, date: string }`
 - `InstanceGET.series: SeriesMeta` - Just `{ id: number }`
 - `InstanceGET.patient: PatientMeta` - Just `{ id: number, identifier: string, birth_date?: string }`
 - `SeriesGET.instance_ids?: number[]` - Just array of IDs, not full objects
 
 **Relationship traversal:**
-
 1. Get ID from Meta reference: `instance.study.id`
 2. Look up full object from store: `studies.get(instance.study.id)`
 3. Access embedded data: `study.series` (full objects)
@@ -845,10 +788,10 @@ def image_instance_to_get(
 ### Use $derived for Reactive Lookups
 
 - In Svelte components, use `$derived` for reactive lookups:
-    ```svelte
-    const instance = $derived(instances.get(instanceId)); const study =
-    $derived(instance ? studies.get(instance.study.id) : undefined);
-    ```
+  ```svelte
+  const instance = $derived(instances.get(instanceId));
+  const study = $derived(instance ? studies.get(instance.study.id) : undefined);
+  ```
 
 ### Tag Operations Update Stores Immediately
 

@@ -8,11 +8,7 @@ export class CLAHE {
         this.clipLimit = clipLimit; // Clip limit for histogram
     }
 
-    public applyClahe(
-        data: Uint8ClampedArray,
-        width: number,
-        height: number,
-    ): Uint8ClampedArray {
+    public applyClahe(data: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
         const tileWidth = Math.ceil(width / this.tileSize);
         const tileHeight = Math.ceil(height / this.tileSize);
 
@@ -21,53 +17,26 @@ export class CLAHE {
         for (let ty = 0; ty < this.tileSize; ty++) {
             histograms[ty] = [];
             for (let tx = 0; tx < this.tileSize; tx++) {
-                histograms[ty][tx] = this.computeHistogram(
-                    data,
-                    width,
-                    height,
-                    tx,
-                    ty,
-                    tileWidth,
-                    tileHeight,
-                );
+                histograms[ty][tx] = this.computeHistogram(data, width, height, tx, ty, tileWidth, tileHeight);
                 this.clipHistogram(histograms[ty][tx]);
             }
         }
 
         // Step 2: Compute cumulative distribution function (CDF) for each histogram
-        const cdfs: Uint8ClampedArray[][] = histograms.map((row) =>
-            row.map((hist) => this.computeCdf(hist)),
-        );
+        const cdfs: Uint8ClampedArray[][] = histograms.map(row => row.map(hist => this.computeCdf(hist)));
 
         // Step 3: Apply interpolation and remap pixel values
         const output = new Uint8ClampedArray(data.length);
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                output[y * width + x] = this.interpolate(
-                    x,
-                    y,
-                    width,
-                    height,
-                    data,
-                    cdfs,
-                    tileWidth,
-                    tileHeight,
-                );
+                output[y * width + x] = this.interpolate(x, y, width, height, data, cdfs, tileWidth, tileHeight);
             }
         }
 
         return output;
     }
 
-    private computeHistogram(
-        data: Uint8ClampedArray,
-        width: number,
-        height: number,
-        tx: number,
-        ty: number,
-        tileWidth: number,
-        tileHeight: number,
-    ): Uint32Array {
+    private computeHistogram(data: Uint8ClampedArray, width: number, height: number, tx: number, ty: number, tileWidth: number, tileHeight: number): Uint32Array {
         const hist = new Uint32Array(256);
         const startX = tx * tileWidth;
         const startY = ty * tileHeight;
@@ -84,10 +53,7 @@ export class CLAHE {
     }
 
     private clipHistogram(hist: Uint32Array): void {
-        const excess = hist.reduce(
-            (sum, count) => sum + Math.max(0, count - this.clipLimit),
-            0,
-        );
+        const excess = hist.reduce((sum, count) => sum + Math.max(0, count - this.clipLimit), 0);
         const distribute = Math.floor(excess / 256);
         const remainder = excess % 256;
 
@@ -116,16 +82,7 @@ export class CLAHE {
         return cdf;
     }
 
-    private interpolate(
-        x: number,
-        y: number,
-        width: number,
-        height: number,
-        data: Uint8ClampedArray,
-        cdfs: Uint8ClampedArray[][],
-        tileWidth: number,
-        tileHeight: number,
-    ): number {
+    private interpolate(x: number, y: number, width: number, height: number, data: Uint8ClampedArray, cdfs: Uint8ClampedArray[][], tileWidth: number, tileHeight: number): number {
         const fx = x / tileWidth - 0.5;
         const fy = y / tileHeight - 0.5;
 
@@ -144,18 +101,14 @@ export class CLAHE {
 
         return Math.round(
             (1 - dx) * (1 - dy) * v00 +
-                dx * (1 - dy) * v10 +
-                (1 - dx) * dy * v01 +
-                dx * dy * v11,
+            dx * (1 - dy) * v10 +
+            (1 - dx) * dy * v01 +
+            dx * dy * v11
         );
     }
 
     // Convert RGB to HSL (with L in range [0, 255])
-    public rgbToHsl(
-        r: number,
-        g: number,
-        b: number,
-    ): { h: number; s: number; l: number } {
+    public rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
         r /= 255;
         g /= 255;
         b /= 255;
@@ -186,19 +139,11 @@ export class CLAHE {
             h /= 6;
         }
 
-        return {
-            h: Math.round(h * 360),
-            s: Math.round(s * 100),
-            l: Math.round(l),
-        };
+        return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l) };
     }
 
     // Convert HSL (with L in range [0, 255]) to RGB
-    public hslToRgb(
-        h: number,
-        s: number,
-        l: number,
-    ): { r: number; g: number; b: number } {
+    public hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
         l /= 255;
         s /= 100;
         h /= 360;

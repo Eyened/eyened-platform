@@ -1,9 +1,5 @@
 <script lang="ts">
-    import {
-        loadDataSource,
-        resolveURL,
-        resolveValue,
-    } from "$lib/browser/dataSources";
+    import { loadDataSource, resolveURL, resolveValue } from "$lib/browser/dataSources";
     import ExternalData from "./ExternalData.svelte";
 
     interface Props {
@@ -11,7 +7,7 @@
         additional_data_sources: AdditionalDataSource[];
     }
     let { context, additional_data_sources }: Props = $props();
-
+    
     type AdditionalDataSource = {
         name: string;
         url: string;

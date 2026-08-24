@@ -29,9 +29,6 @@ class CreatorTagLink(Base):
         ForeignKeyIndex(__tablename__, "Creator", "CreatorID"),
     )
     TagID: Mapped[int] = mapped_column(
-        # Deliberately CASCADE, unlike the five annotation links: a star is a
-        # personal preference, not annotation data, so it must never *block* a
-        # tag delete -- it just goes with it (spec §3.2.1).
         ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
     )
     CreatorID: Mapped[int] = mapped_column(
@@ -114,10 +111,7 @@ class StudyTagLink(Base):
         Index("ix_StudyTag_Study_Tag", "StudyID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
-        # RESTRICT, not CASCADE: deleting a tag must never destroy applied-tag
-        # annotation data (spec §3.2.1). Adopts the Segmentation.FeatureID
-        # precedent, so every path is covered, not just the HTTP API.
-        ForeignKey("Tag.TagID", ondelete="RESTRICT"), primary_key=True
+        ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
     )
     StudyID: Mapped[int] = mapped_column(
         ForeignKey("Study.StudyID", ondelete="CASCADE"), primary_key=True
@@ -147,10 +141,7 @@ class ImageInstanceTagLink(Base):
         Index("ix_ImageInstanceTag_Image_Tag", "ImageInstanceID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
-        # RESTRICT, not CASCADE: deleting a tag must never destroy applied-tag
-        # annotation data (spec §3.2.1). Adopts the Segmentation.FeatureID
-        # precedent, so every path is covered, not just the HTTP API.
-        ForeignKey("Tag.TagID", ondelete="RESTRICT"), primary_key=True
+        ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
     )
     ImageInstanceID: Mapped[int] = mapped_column(
         ForeignKey("ImageInstance.ImageInstanceID", ondelete="CASCADE"),
@@ -182,10 +173,7 @@ class AnnotationTagLink(Base):
         Index("ix_AnnotationTag_Annotation_Tag", "AnnotationID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
-        # RESTRICT, not CASCADE: deleting a tag must never destroy applied-tag
-        # annotation data (spec §3.2.1). Adopts the Segmentation.FeatureID
-        # precedent, so every path is covered, not just the HTTP API.
-        ForeignKey("Tag.TagID", ondelete="RESTRICT"), primary_key=True
+        ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
     )
     AnnotationID: Mapped[int] = mapped_column(
         ForeignKey("Annotation.AnnotationID", ondelete="CASCADE"), primary_key=True
@@ -211,10 +199,7 @@ class SegmentationTagLink(Base):
         Index("ix_SegmentationTag_Segmentation_Tag", "SegmentationID", "TagID"),
     )
     TagID: Mapped[int] = mapped_column(
-        # RESTRICT, not CASCADE: deleting a tag must never destroy applied-tag
-        # annotation data (spec §3.2.1). Adopts the Segmentation.FeatureID
-        # precedent, so every path is covered, not just the HTTP API.
-        ForeignKey("Tag.TagID", ondelete="RESTRICT"), primary_key=True
+        ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
     )
     SegmentationID: Mapped[int] = mapped_column(
         ForeignKey("Segmentation.SegmentationID", ondelete="CASCADE"), primary_key=True
@@ -248,10 +233,7 @@ class FormAnnotationTagLink(Base):
         ),
     )
     TagID: Mapped[int] = mapped_column(
-        # RESTRICT, not CASCADE: deleting a tag must never destroy applied-tag
-        # annotation data (spec §3.2.1). Adopts the Segmentation.FeatureID
-        # precedent, so every path is covered, not just the HTTP API.
-        ForeignKey("Tag.TagID", ondelete="RESTRICT"), primary_key=True
+        ForeignKey("Tag.TagID", ondelete="CASCADE"), primary_key=True
     )
     FormAnnotationID: Mapped[int] = mapped_column(
         ForeignKey("FormAnnotation.FormAnnotationID", ondelete="CASCADE"),
@@ -272,31 +254,3 @@ class FormAnnotationTagLink(Base):
     Creator: Mapped["Creator"] = relationship(
         "eyened_orm.creator.Creator", lazy="selectin"
     )
-
-
-#: Every ``Tag`` relationship whose target's primary key contains ``TagID``.
-#:
-#: Loading one of these makes the ORM's dependency processor try to blank out a
-#: primary-key column when the tag is deleted, raising ``AssertionError`` before
-#: any SQL is emitted -- which pre-empts the foreign keys and turns the intended
-#: 409 into a 500 (spec §3.2.1). Every read that may precede a delete must
-#: ``noload`` all of them; each one only protects its own collection.
-#:
-#: ``Tag.Creator`` is deliberately absent: its primary key is ``CreatorID``, it
-#: is not a link collection, and ``DTOConverter.tag_to_get`` reads it.
-#:
-#: Bare attributes, deliberately -- **not** pre-built ``noload()`` options. Class
-#: attribute access does not configure mappers, but constructing a loader option
-#: does, and ``eyened_orm/__init__.py`` imports ``.tag`` at ``:13`` while
-#: ``.segmentation`` (which ``SegmentationTagLink.Segmentation`` targets by
-#: string) only arrives at ``:15``. A ``TAG_LINK_NOLOADS = (noload(...), ...)``
-#: "optimisation" therefore raises ``InvalidRequestError`` at import time and
-#: breaks the whole package. Verified empirically 2026-07-31.
-TAG_LINK_COLLECTIONS = (
-    Tag.CreatorTagLinks,
-    Tag.StudyTagLinks,
-    Tag.ImageInstanceTagLinks,
-    Tag.AnnotationTagLinks,
-    Tag.SegmentationTagLinks,
-    Tag.FormAnnotationTagLinks,
-)

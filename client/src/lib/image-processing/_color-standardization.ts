@@ -3,24 +3,22 @@ import type { Image2D } from "$lib/webgl/image2D";
 import { RenderTexture } from "$lib/webgl/renderTexture";
 import { TextureData } from "$lib/webgl/texture";
 
-export function colorStandardization(image: Image2D): {
-    muSigma: TextureData;
-    hist: TextureData;
-} {
+
+
+
+
+export function colorStandardization(image: Image2D): { muSigma: TextureData, hist: TextureData } {
+
+
     const muSigma = calculateMuSigma(image, histogram);
     const hist = calculateHist(image, histogram);
 
     return { muSigma, hist };
 }
 
+
 function calculateHist(image: Image2D, hist: Histogram) {
-    const result = new RenderTexture(
-        image.webgl,
-        image.width,
-        image.height,
-        "RGBA",
-        null,
-    );
+    const result = new RenderTexture(image.webgl, image.width, image.height, 'RGBA', null);
 
     const { r, g, b } = hist;
     const [histR, histG, histB] = getTargetHistograms();
@@ -38,21 +36,20 @@ function calculateHist(image: Image2D, hist: Histogram) {
 
     const shader = new PixelShaderProgram(image.webgl, fs_lut);
 
-    const renderTarget = result.getRenderTarget();
+    const renderTarget = result.getRenderTarget()
     const uniforms = {
         u_source: image.texture,
         u_resolution: [image.width, image.height],
-        u_lut: lut,
+        u_lut: lut
     };
 
     shader.pass(renderTarget, uniforms);
     return result;
 }
 
-function matchHistogram(
-    sourceCounts: Int32Array,
-    templCounts: Int32Array | number[],
-): Uint8ClampedArray {
+
+
+function matchHistogram(sourceCounts: Int32Array, templCounts: Int32Array | number[]): Uint8ClampedArray {
     // https://github.com/scikit-image/scikit-image/blob/main/skimage/exposure/histogram_matching.py#L6
 
     const tmpl_values = [];
@@ -71,12 +68,13 @@ function matchHistogram(
 
     const lut = [];
     for (let i = 0; i < 256; i++) {
-        lut[i] = interp(
-            src_quantiles[i],
-            tmpl_quantiles,
-            new Float32Array(tmpl_values),
-        );
+        lut[i] = interp(src_quantiles[i], tmpl_quantiles, new Float32Array(tmpl_values))
     }
 
     return new Uint8ClampedArray(lut);
 }
+
+
+
+
+

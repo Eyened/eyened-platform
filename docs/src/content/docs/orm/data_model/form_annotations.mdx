@@ -92,7 +92,7 @@ Set `TaskDefinition.TaskConfig` with `form_schema_name` (and optional `form_imag
 | `Eye` | `PatientID`, `Laterality` | Registration — see **[Registration](/eyened-platform/orm/registration)** |
 
 :::note
-**ETDRS:** AI landmarks live in `CFI_Keypoints` (`AttributeValue`), with a fallback to legacy `ImageInstance.CFKeypoints`; manual grids use `FormAnnotation.FormData` under schema **`ETDRS-grid coordinates`**. See **[ETDRS panel](/eyened-platform/client/panels/etdrs)**.
+**ETDRS:** AI landmarks live in `ImageInstance.CFKeypoints`; manual grids use `FormAnnotation.FormData` under schema **`ETDRS-grid coordinates`**. See **[ETDRS panel](/eyened-platform/client/panels/etdrs)**.
 :::
 
 ## Related

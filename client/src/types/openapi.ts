@@ -219,10 +219,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Instance
-         * @description Get a single image instance by id, with optional related graphs.
-         */
+        /** Get Instance */
         get: operations["get_instance_instances__instance_id__get"];
         put?: never;
         post?: never;
@@ -239,10 +236,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Public Image
-         * @description Get a single image instance by PublicID, with optional related graphs.
-         */
+        /** Get Public Image */
         get: operations["get_public_image_images__image_id__get"];
         put?: never;
         post?: never;
@@ -259,10 +253,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Public Image Data
-         * @description Redirect to the stored image data for an instance (by PublicID).
-         */
+        /** Get Public Image Data */
         get: operations["get_public_image_data_images__image_id__data_get"];
         put?: never;
         post?: never;
@@ -279,11 +270,42 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Public Image Thumbnail
-         * @description Redirect to the stored thumbnail for an instance (by PublicID).
-         */
+        /** Get Public Image Thumbnail */
         get: operations["get_public_image_thumbnail_images__image_id__thumbnail_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/instances/images/{dataset_identifier}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get File */
+        get: operations["get_file_instances_images__dataset_identifier__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/instances/thumbnails/{thumbnail_identifier}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Thumb */
+        get: operations["get_thumb_instances_thumbnails__thumbnail_identifier__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -566,17 +588,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Status
-         * @description Return a queued job's status and result.
-         *
-         *     Authenticated, but not scope-aware, and that is not an oversight: every RQ
-         *     entrypoint returns a bare bool (pinned by
-         *     test_every_rq_entrypoint_returns_a_bare_bool), so there is no project data
-         *     in the response to filter. Job ids are uuid4 and not enumerable here, so
-         *     this is a capability control -- but a capability that leaks through a log
-         *     line or a screenshot would otherwise need no credential at all.
-         */
+        /** Get Status */
         get: operations["get_status_import_status__task_id__get"];
         put?: never;
         post?: never;
@@ -593,16 +605,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Form Annotations
-         * @description List active form annotations, optionally filtered.
-         */
+        /** Get Form Annotations */
         get: operations["get_form_annotations_form_annotations_get"];
         put?: never;
-        /**
-         * Create Form Annotation
-         * @description Create a form annotation.
-         */
+        /** Create Form Annotation */
         post: operations["create_form_annotation_form_annotations_post"];
         delete?: never;
         options?: never;
@@ -617,24 +623,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Form Annotation
-         * @description Get a single form annotation by id.
-         */
+        /** Get Form Annotation */
         get: operations["get_form_annotation_form_annotations__annotation_id__get"];
         put?: never;
         post?: never;
-        /**
-         * Delete Form Annotation
-         * @description Soft-delete a form annotation.
-         */
+        /** Delete Form Annotation */
         delete: operations["delete_form_annotation_form_annotations__annotation_id__delete"];
         options?: never;
         head?: never;
-        /**
-         * Update Form Annotation
-         * @description Partially update a form annotation.
-         */
+        /** Update Form Annotation */
         patch: operations["update_form_annotation_form_annotations__annotation_id__patch"];
         trace?: never;
     };
@@ -645,15 +642,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Form Annotation Value
-         * @description Get a form annotation's raw FormData payload.
-         */
+        /** Get Form Annotation Value */
         get: operations["get_form_annotation_value_form_annotations__form_annotation_id__value_get"];
-        /**
-         * Update Form Annotation Value
-         * @description Overwrite a form annotation's FormData payload.
-         */
+        /** Update Form Annotation Value */
         put: operations["update_form_annotation_value_form_annotations__form_annotation_id__value_put"];
         post?: never;
         delete?: never;
@@ -787,10 +778,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List Form Schemas
-         * @description Return all form schemas.
-         */
+        /** List Form Schemas */
         get: operations["list_form_schemas_form_schemas_get"];
         put?: never;
         post?: never;
@@ -826,14 +814,11 @@ export interface paths {
         };
         /**
          * List Features
-         * @description Return all features (optionally with a per-feature segmentation count).
+         * @description Return all features.
          */
         get: operations["list_features_features_get"];
         put?: never;
-        /**
-         * Create Feature
-         * @description Create a feature and set its subfeature links.
-         */
+        /** Create Feature */
         post: operations["create_feature_features_post"];
         delete?: never;
         options?: never;
@@ -848,24 +833,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Feature
-         * @description Return a single feature by id.
-         */
+        /** Get Feature */
         get: operations["get_feature_features__feature_id__get"];
         put?: never;
         post?: never;
-        /**
-         * Delete Feature
-         * @description Delete a feature (409 if it has segmentations or is a child of another).
-         */
+        /** Delete Feature */
         delete: operations["delete_feature_features__feature_id__delete"];
         options?: never;
         head?: never;
-        /**
-         * Patch Feature
-         * @description Update a feature's name and/or subfeature links.
-         */
+        /** Patch Feature */
         patch: operations["patch_feature_features__feature_id__patch"];
         trace?: never;
     };
@@ -876,16 +852,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List Tags
-         * @description Return all tags.
-         */
+        /** List Tags */
         get: operations["list_tags_tags_get"];
         put?: never;
-        /**
-         * Create Tag
-         * @description Create a tag owned by the current user.
-         */
+        /** Create Tag */
         post: operations["create_tag_tags_post"];
         delete?: never;
         options?: never;
@@ -903,17 +873,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /**
-         * Delete Tag
-         * @description Delete a tag (409 if it is still applied to any record).
-         */
+        /** Delete Tag */
         delete: operations["delete_tag_tags__tag_id__delete"];
         options?: never;
         head?: never;
-        /**
-         * Patch Tag
-         * @description Update a tag's name, description, and/or type.
-         */
+        /** Patch Tag */
         patch: operations["patch_tag_tags__tag_id__patch"];
         trace?: never;
     };
@@ -926,15 +890,9 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Star Tag
-         * @description Star a tag for the current user (idempotent).
-         */
+        /** Star Tag */
         post: operations["star_tag_tags__tag_id__star_post"];
-        /**
-         * Unstar Tag
-         * @description Remove the current user's star from a tag (idempotent).
-         */
+        /** Unstar Tag */
         delete: operations["unstar_tag_tags__tag_id__star_delete"];
         options?: never;
         head?: never;
@@ -951,18 +909,10 @@ export interface paths {
         /**
          * List Tasks
          * @description List all tasks (no pagination).
-         *
-         *     ``include_projects`` is off by default: resolving the projects each task
-         *     spans walks every image link of every task, and no client renders the
-         *     field today. Omitted, ``projects`` is ``null`` rather than ``[]`` --
-         *     "not requested", not "spans nothing".
          */
         get: operations["list_tasks_task_get"];
         put?: never;
-        /**
-         * Create Task
-         * @description Create a task owned by the current user.
-         */
+        /** Create Task */
         post: operations["create_task_task_post"];
         delete?: never;
         options?: never;
@@ -977,24 +927,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Task
-         * @description Get a single task with its subtask counts.
-         */
+        /** Get Task */
         get: operations["get_task_task__task_id__get"];
         put?: never;
         post?: never;
-        /**
-         * Delete Task
-         * @description Delete a task.
-         */
+        /** Delete Task */
         delete: operations["delete_task_task__task_id__delete"];
         options?: never;
         head?: never;
-        /**
-         * Patch Task
-         * @description Update a task's name/description/contact/definition/state.
-         */
+        /** Patch Task */
         patch: operations["patch_task_task__task_id__patch"];
         trace?: never;
     };
@@ -1007,10 +948,10 @@ export interface paths {
         };
         /**
          * List Subtasks
-         * @description List subtasks of a task (pagination, optional images, optional status filter).
+         * @description List subtasks of a task with optional pagination, image inclusion, and status filter.
          *
-         *     ``index`` is the 0-based position within all subtasks of the task ordered by
-         *     SubTaskID (computed before any subtask_status filtering).
+         *     index is the 0-based position within all subtasks for the task ordered by SubTaskID
+         *     (computed before any subtask_status filtering).
          */
         get: operations["list_subtasks_task__task_id__subtasks_get"];
         put?: never;
@@ -1030,7 +971,7 @@ export interface paths {
         };
         /**
          * Get Subtask
-         * @description Get a single subtask by index, optionally with images and the next subtask.
+         * @description Get a single subtask by index with optional image inclusion and next task.
          */
         get: operations["get_subtask_task__task_id__subtask__subtask_index__get"];
         put?: never;
@@ -1048,24 +989,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Subtask
-         * @description Get a single subtask, optionally with its images.
-         */
+        /** Get Subtask */
         get: operations["get_subtask_subtasks__subtaskid__get"];
         put?: never;
         post?: never;
-        /**
-         * Delete Subtask
-         * @description Delete a subtask.
-         */
+        /** Delete Subtask */
         delete: operations["delete_subtask_subtasks__subtaskid__delete"];
         options?: never;
         head?: never;
-        /**
-         * Patch Subtask
-         * @description Update a subtask's comments and/or state.
-         */
+        /** Patch Subtask */
         patch: operations["patch_subtask_subtasks__subtaskid__patch"];
         trace?: never;
     };
@@ -1078,10 +1010,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Add Subtask Image
-         * @description Link an image to a subtask at the next available index.
-         */
+        /** Add Subtask Image */
         post: operations["add_subtask_image_subtasks__subtaskid__images_post"];
         delete?: never;
         options?: never;
@@ -1099,10 +1028,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /**
-         * Remove Subtask Image
-         * @description Unlink an image from a subtask.
-         */
+        /** Remove Subtask Image */
         delete: operations["remove_subtask_image_subtasks__subtaskid__images__instance_id__delete"];
         options?: never;
         head?: never;
@@ -2277,7 +2203,8 @@ export interface components {
         SubTaskPATCH: {
             /** Comments */
             comments?: string | null;
-            task_state?: components["schemas"]["SubTaskState"] | null;
+            /** Task State */
+            task_state?: string | null;
         };
         /**
          * SubTaskState
@@ -2427,8 +2354,6 @@ export interface components {
             creator?: components["schemas"]["CreatorMeta"] | null;
             task_state?: components["schemas"]["TaskState"] | null;
             task_definition: components["schemas"]["TaskDefinitionGET"];
-            /** Projects */
-            projects?: components["schemas"]["ProjectMeta"][] | null;
         };
         /** TaskPATCH */
         TaskPATCH: {
@@ -3069,7 +2994,6 @@ export interface operations {
             };
             cookie?: {
                 jwt_token?: string;
-                refresh_token?: string;
             };
         };
         requestBody?: never;
@@ -3107,7 +3031,76 @@ export interface operations {
             };
             cookie?: {
                 jwt_token?: string;
-                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_file_instances_images__dataset_identifier__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                dataset_identifier: string;
+            };
+            cookie?: {
+                jwt_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_thumb_instances_thumbnails__thumbnail_identifier__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                thumbnail_identifier: string;
+            };
+            cookie?: {
+                jwt_token?: string;
             };
         };
         requestBody?: never;
@@ -3859,16 +3852,11 @@ export interface operations {
     get_status_import_status__task_id__get: {
         parameters: {
             query?: never;
-            header?: {
-                authorization?: string;
-            };
+            header?: never;
             path: {
                 task_id: string;
             };
-            cookie?: {
-                jwt_token?: string;
-                refresh_token?: string;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -4880,9 +4868,7 @@ export interface operations {
     };
     list_tasks_task_get: {
         parameters: {
-            query?: {
-                include_projects?: boolean;
-            };
+            query?: never;
             header?: {
                 authorization?: string;
             };

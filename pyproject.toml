@@ -1,42 +1,7 @@
-[tool.pytest.ini_options]
+[tool.pytest]
+minversion = "9.0"
 pythonpath = ["."]
 testpaths = [
     "server",
     "orm",
-]
-
-[tool.coverage.run]
-# "orm", NOT "orm/eyened_orm" -- do not narrow this, however much it looks like
-# an imprecision. The XML report names each file relative to whichever `source`
-# root contains it, so with "orm/eyened_orm" both server/db.py and
-# orm/eyened_orm/db.py are written as "db.py". Cobertura keeps one of the pair,
-# and diff-cover then registers that single entry under BOTH source-joined
-# paths -- so it answers questions about the ORM file with the server file's
-# coverage. Measured: a change to orm/eyened_orm/db.py reported "No lines with
-# coverage information in this diff" and passed, while an identical change to a
-# uniquely-named ORM file was correctly failed. Six paths collide this way,
-# including db.py and config.py. Rooting at "orm" keeps the eyened_orm/ prefix
-# and makes every name unique. Cost: orm/setup.py enters the denominator.
-# orm/migrations/ and orm/notebooks/ do NOT, but only because neither has an
-# __init__.py and coverage's directory walk skips such directories -- adding one
-# to migrations/ would silently admit 24 never-executed alembic files and redden
-# every migration PR.
-source = ["server", "orm"]
-omit = [
-    "*/tests/*",
-    "*/conftest.py",
-    # These six cannot be imported without torch, which CI deliberately does not
-    # install. Five import it at module scope; docker_runner.py fails
-    # transitively, through cfi_amd_segmentation and layer_segmentation -- its
-    # own "import torch" is a string it runs inside a container, not an import.
-    # Their siblings under inference/ import
-    # cleanly and are therefore NOT omitted -- the criterion is "fails to
-    # import because an external package is absent", enforced by
-    # server/tests/test_coverage_omissions.py.
-    "orm/eyened_orm/inference/cfi_amd_segmentation.py",
-    "orm/eyened_orm/inference/cfi_keypoints.py",
-    "orm/eyened_orm/inference/cfi_odfd.py",
-    "orm/eyened_orm/inference/cfi_quality.py",
-    "orm/eyened_orm/inference/docker_runner.py",
-    "orm/eyened_orm/inference/layer_segmentation.py",
 ]

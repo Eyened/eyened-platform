@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { getContext } from "svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte"
+    import { getContext } from "svelte"
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
@@ -20,7 +20,7 @@
         try {
             await userManager.signup(username, password);
             status = "done";
-        } catch (_error) {
+        } catch (error) {
             alert("Failed to create user");
             status = "not started";
             return;

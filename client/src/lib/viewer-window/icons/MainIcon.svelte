@@ -28,12 +28,12 @@
 <div class="tooltip" class:link={onclick !== undefined}>
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <span
-        class="icon"
-        class:active
-        {onclick}
+    <span 
+        class="icon" 
+        class:active 
+        {onclick} 
         class:dark={theme == "dark"}
-        style={hoverColor ? `--custom-hover-color: ${hoverColor};` : ""}
+        style={hoverColor ? `--custom-hover-color: ${hoverColor};` : ''}
     >
         {#if iconSnippet}
             {@render iconSnippet?.()}

@@ -1,6 +1,8 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { type PointList } from "$lib/viewer/tools/Registration";
+    import {
+    	type PointList
+    } from "$lib/viewer/tools/Registration";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
@@ -12,24 +14,26 @@
         onactivate: (annotation: FormAnnotationGET) => void;
         onremove: (annotation: FormAnnotationGET) => void;
     }
-    let { formAnnotation, active, onactivate, onremove }: Props = $props();
+    let {
+        formAnnotation,
+        active,
+        onactivate,
+        onremove
+    }: Props = $props();
     const globalContext = getContext<GlobalContext>("globalContext");
     const canEditForm = globalContext.canEdit(formAnnotation);
-
+    
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const instance = viewerContext.image.instance;
 
     // Create a reactive derived value that will update when form_data changes
     const formDataEntries = $derived(() => {
-        return Object.entries(formAnnotation.form_data || {}).map(
-            ([instanceID, pointSet]) => [
-                instanceID,
-                (pointSet as PointList).map((point) =>
-                    point ? { ...point } : point,
-                ),
-            ],
-        );
+        return Object.entries(formAnnotation.form_data || {}).map(([instanceID, pointSet]) => [
+            instanceID, 
+            (pointSet as PointList).map(point => point ? { ...point } : point)
+        ]);
     });
+
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -41,11 +45,7 @@
         </span>
         <span class="annotationID">[{formAnnotation.id}]</span>
         {#if canEditForm}
-            <PanelIcon
-                onclick={() => onremove(formAnnotation)}
-                tooltip="Remove"
-                Icon={Trash}
-            />
+            <PanelIcon onclick={() => onremove(formAnnotation)} tooltip="Remove" Icon={Trash} />
         {/if}
     </div>
     {#if active}
@@ -56,9 +56,7 @@
                     {#each pointSet as PointList as point, index}
                         {#if point}
                             <li class="point">
-                                [{index + 1}]: [{point.x.toFixed(2)}, {point.y.toFixed(
-                                    2,
-                                )}]
+                                [{index + 1}]: [{point.x.toFixed(2)}, {point.y.toFixed(2)}]
                             </li>
                         {:else}
                             <li class="point">No point</li>

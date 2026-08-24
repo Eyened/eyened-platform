@@ -56,20 +56,14 @@ export class ZoomPan implements ViewerEventListener {
 
         if (!wheel?.zoomIntent) return;
 
-        const zoomFactor = this.calculateZoomFactor(
-            event,
-            wheel.primaryDeltaPx,
-        );
+        const zoomFactor = this.calculateZoomFactor(event, wheel.primaryDeltaPx);
         viewerContext.zoom(cursor.x, cursor.y, zoomFactor);
     }
 
     /**
      * Calculates the zoom factor based on wheel event details
      */
-    private calculateZoomFactor(
-        event: WheelEvent,
-        pixelDeltaY?: number,
-    ): number {
+    private calculateZoomFactor(event: WheelEvent, pixelDeltaY?: number): number {
         pixelDeltaY = pixelDeltaY ?? this.normalizeWheelDelta(event);
         const direction = -Math.sign(pixelDeltaY);
         const magnitude = 1 + Math.abs(pixelDeltaY) / 100;
@@ -97,7 +91,7 @@ export class ZoomPan implements ViewerEventListener {
      */
     keydown(e: ViewerEvent<KeyboardEvent>): void {
         const { viewerContext, event } = e;
-        if (event.code === "Escape") {
+        if (event.code === 'Escape') {
             viewerContext.initTransform();
         }
     }

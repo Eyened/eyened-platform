@@ -82,32 +82,18 @@ class ETDRS_masks:
         include_largest=True,
         skip_zero=True,
     ):
+        masked_images = {field: getattr(self, field) & binary_image for field in fields}
         result = {}
-        regions = None
-        if include_count or include_largest:
-            # One connected-component pass on the full mask; each field then
-            # intersects those regions. Equivalent to per-field label/regionprops
-            # for compact lesions that do not re-enter a field through another.
-            regions = measure.regionprops(measure.label(binary_image))
-
-        for field in fields:
-            field_mask = getattr(self, field)
+        for field, masked_image in masked_images.items():
             if include_area:
-                result[f"{field}_area"] = self.calculate_area(
-                    field_mask & binary_image
-                )
-            if include_count or include_largest:
-                inter_areas = []
-                for region in regions:
-                    coords = region.coords
-                    area_in_field = int(field_mask[coords[:, 0], coords[:, 1]].sum())
-                    if area_in_field:
-                        inter_areas.append(area_in_field)
+                result[f"{field}_area"] = self.calculate_area(masked_image)
+            if include_largest or include_count:
+                labeled_image = measure.label(masked_image)
                 if include_count:
-                    result[f"{field}_count"] = len(inter_areas)
+                    result[f"{field}_count"] = self._calculate_count(labeled_image)
                 if include_largest:
-                    result[f"{field}_largest"] = float(
-                        max(inter_areas, default=0) * self.pixel_area
+                    result[f"{field}_largest"] = self.calculate_largest_area(
+                        labeled_image
                     )
         if skip_zero:
             result = {k: v for k, v in result.items() if v}

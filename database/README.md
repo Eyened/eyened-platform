@@ -7,8 +7,6 @@ cp .env.example .env
 ```
 
 Optionally override `EYENED_DATABASE_PORT` and `EYENED_ADMINER_PORT` in `.env`.
-`EYENED_DATABASE_BUFFER_POOL_SIZE` controls the InnoDB buffer pool size and
-defaults to `2G`.
 
 Run:
 

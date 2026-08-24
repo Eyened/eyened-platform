@@ -1,5 +1,7 @@
 {
     "tabWidth": 4,
-    "plugins": ["prettier-plugin-svelte", "prettier-plugin-tailwindcss"],
+    "plugins": [
+        "prettier-plugin-tailwindcss"
+    ],
     "tailwindStylesheet": "./src/app.css"
 }

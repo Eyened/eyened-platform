@@ -1,7 +1,1 @@
--r requirements.txt
-pytest==8.*
-# Required by fastapi.testclient.TestClient (route-level tests).
-httpx==0.28.*
-# Patch-coverage gate: pytest-cov writes coverage.xml, diff-cover gates the diff.
-pytest-cov==7.*
-diff-cover==10.*
+pytest

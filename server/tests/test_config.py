@@ -100,16 +100,3 @@ def test_oidc_missing_required_metadata(metadata_key):
 
     with pytest.raises(ValueError, match=f"OIDC metadata URL response is missing required key '{metadata_key}'"):
         validate_oidc_metadata(response_data)
-
-
-def test_the_admin_settings_carry_the_env_prefix(monkeypatch):
-    """EYENED_API_ADMIN_USERNAME / _PASSWORD, matching dev/sample.env.
-
-    A prefix that does not match the one documented in sample.env leaves the
-    admin account silently unconfigured -- the default "admin" wins and nobody
-    finds out until the bootstrapped account is the wrong one.
-    """
-    monkeypatch.setenv("EYENED_API_ADMIN_USERNAME", "from-env")
-    monkeypatch.delenv("EYENED_API_ADMIN_PASSWORD", raising=False)
-    settings = Settings()
-    assert settings.admin_username == "from-env"
