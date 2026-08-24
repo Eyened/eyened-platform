@@ -432,6 +432,18 @@ def test_apply_scope_compiles_inside_a_query_that_holds_every_route_table(entity
     stmt = select(entity).select_from(entity, *reached)
     unscoped = str(stmt.compile(dialect=sqlite.dialect()))
     assert "WHERE " not in unscoped, unscoped
+    # Anti-vacuity for the derivation itself: prove this entity's parent really
+    # entered the enclosing FROM. With ``reached`` empty every assertion below
+    # still passes -- even with ``.correlate(entity)`` dropped -- so the test
+    # could fall from catching five exposures to catching none, silently.
+    #
+    # Matched against the FROM clause, and quoted. A bare ``ImageInstance in
+    # unscoped`` is satisfied by ``"Segmentation"."ImageInstanceID"`` in the
+    # SELECT list, so it holds under an empty ``reached`` for all seven -- an
+    # anti-vacuity check that is itself vacuous.
+    if entity in _ONE_HOP_TO:
+        from_clause = unscoped.rpartition("FROM ")[2]
+        assert f'"{_ONE_HOP_TO[entity][0].__tablename__}"' in from_clause, unscoped
 
     scoped = apply_scope(stmt, entity, _grader_scope(1))
     sql = str(scoped.compile(dialect=sqlite.dialect()))
