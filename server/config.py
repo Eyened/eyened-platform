@@ -162,6 +162,15 @@ class Settings(BaseSettings):
         ge=0,
         description="Extra burst connections above pool_size, for dependency-time checkouts.",
     )
+    # Not part of the relation the validator below checks: it does not change
+    # how many connections exist, only how long a request waits for one before
+    # giving up. SQLAlchemy's own default is 30s, which for an API is a hang;
+    # 5s turns pool exhaustion into a fast, visible error.
+    pool_timeout: int = Field(
+        default=5,
+        ge=1,
+        description="Seconds a request waits for a free DB connection before failing.",
+    )
 
     @model_validator(mode="after")
     def _threads_cannot_outnumber_connections(self) -> "Settings":

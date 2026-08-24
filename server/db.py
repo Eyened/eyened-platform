@@ -9,6 +9,7 @@ from server.config import settings
 database = Database(
     pool_size=settings.pool_size,
     max_overflow=settings.max_overflow,
+    pool_timeout=settings.pool_timeout,
 )
 
 

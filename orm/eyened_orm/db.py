@@ -42,6 +42,7 @@ class Database:
         *,
         pool_size: int = 5,
         max_overflow: int = 10,
+        pool_timeout: int = 30,
     ):
         """Pool sizing is per *process role*, not per database.
 
@@ -49,6 +50,11 @@ class Database:
         the importer and every RQ job build their own Database -- and therefore
         their own engine and pool -- so a tuned default here would multiply
         connections in processes that need one. Only the API overrides them.
+
+        ``pool_timeout`` is how long ``pool.connect()`` waits for a free
+        connection before raising ``TimeoutError``. Its default is SQLAlchemy's
+        30 for the same reason: a batch process waiting is fine, whereas the
+        API would rather fail a request fast than hold it for half a minute.
         """
         if database_settings is None:
             self.database_settings = load_database_settings()
@@ -62,6 +68,7 @@ class Database:
             pool_pre_ping=True,
             pool_size=pool_size,
             max_overflow=max_overflow,
+            pool_timeout=pool_timeout,
         )
         self._session_factory = sessionmaker(
             bind=self.engine,
