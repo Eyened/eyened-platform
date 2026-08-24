@@ -17,12 +17,15 @@ from eyened_orm import (
     Task,
     TaskProject,
 )
+from eyened_orm.authz import scoping
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.authz.scoping import (
     SET_VALUED_ENTITIES,
     SINGLE_PROJECT_ENTITIES,
+    _ONE_HOP_TO,
     apply_scope,
+    image_project_pairs,
     projects_of,
     scope_criteria,
 )
@@ -223,6 +226,69 @@ def test_a_form_annotation_resolves_through_its_patient(session):
     }
 
 
+def test_the_batch_image_gate_follows_the_route_declaration(monkeypatch):
+    """Fork ``ImageInstance``'s route in the map; ``image_project_pairs`` moves.
+
+    The batch gate is the one selectable that could plausibly be hand-written
+    -- it is the only one taking a list and returning pairs, so it does not fit
+    ``_project_ids_from`` -- and it was, once. A hand-written
+    ``select(ImageInstance.ImageInstanceID, ImageInstance.ProjectID)`` emits
+    byte-identical SQL to the derived form on the map as declared, since
+    ``_hops_to_column(ImageInstance)`` returns no hops and exactly that column.
+    Moving the route is the only thing that separates them, so this test moves
+    it.
+
+    Why that drift matters rather than merely offending the module docstring:
+    these pairs feed ``AccessScope.require`` in the import-enqueue gate, and a
+    gate reading a stale route can *widen*. Should the shared route ever leave
+    the denormalized copy -- the one change a reader of this module would
+    expect, the copy existing precisely because it might be found unreliable --
+    every read filter follows it and a hand-written gate does not. An image
+    whose stale ``ProjectID`` names a project the caller holds would be
+    enqueued while ``apply_scope`` hid it from the same caller's reads.
+
+    What the suite has otherwise, and why neither sees this: the AST guard in
+    ``server/tests/test_import_enqueue_gate.py`` reads the *repository*, so it
+    pins which helper is called and never what the helper is built from; and
+    ``test_project_ids_for_images_agrees_with_the_shared_resolver`` is
+    behavioural but blind here, because the composite foreign keys hold
+    ``Series.ProjectID`` equal to ``ImageInstance.ProjectID`` on every row that
+    can exist, so a forked route still returns the same answer. Measured
+    against the hand-written body this replaced: it is the only test in the
+    suite that fails, out of 934.
+    """
+    ids = [11, 22]
+    before = str(image_project_pairs(ids).compile(dialect=sqlite.dialect()))
+    # Anti-vacuity for the three assertions at the end: on the map as declared
+    # the route ends on the image's own row, so neither string they look for is
+    # present yet and the fork is the only thing that can introduce them.
+    assert '"ImageInstance"."ProjectID"' in before, before
+    assert '"Series"' not in before, before
+
+    monkeypatch.setattr(
+        scoping,
+        "_OWN_PROJECT_COLUMN",
+        {
+            entity: column
+            for entity, column in scoping._OWN_PROJECT_COLUMN.items()
+            if entity is not ImageInstance
+        },
+    )
+    monkeypatch.setattr(
+        scoping,
+        "_ONE_HOP_TO",
+        {
+            **scoping._ONE_HOP_TO,
+            ImageInstance: (Series, lambda: ImageInstance.SeriesID == Series.SeriesID),
+        },
+    )
+
+    after = str(image_project_pairs(ids).compile(dialect=sqlite.dialect()))
+    assert 'JOIN "Series"' in after, after
+    assert '"Series"."ProjectID"' in after, after
+    assert '"ImageInstance"."ProjectID"' not in after, after
+
+
 # --- the correlated EXISTS predicate that apply_scope emits ------------------
 #
 # These retarget Task 4's guards from the scalar-subquery form
@@ -304,8 +370,8 @@ def test_the_task_predicate_compiles_inside_a_query_that_joins_taskproject(entit
     "entity", sorted(SINGLE_PROJECT_ENTITIES, key=lambda e: e.__name__),
     ids=lambda e: e.__name__,
 )
-def test_apply_scope_compiles_inside_a_query_that_also_joins_patient(entity):
-    """Every entry must survive an enclosing query that already selects Patient.
+def test_apply_scope_compiles_inside_a_query_that_holds_every_route_table(entity):
+    """Every entry must survive an enclosing query that already holds its FROM.
 
     Without this: SQLAlchemy *auto*-correlation strips from a subquery's FROM
     every table the enclosing query already has. The Study and FormAnnotation
@@ -322,9 +388,9 @@ def test_apply_scope_compiles_inside_a_query_that_also_joins_patient(entity):
     longer applies uniformly, so read the paragraph above as history for four
     of the eleven cases. The ``_OWN_PROJECT_COLUMN`` entities -- Patient,
     Study, Series, ImageInstance -- emit a bare ``ProjectID IN (...)`` with no
-    subquery at all, and auto-correlation has nothing to strip; they pass this
-    trivially. Study is one of them, so the shape the search layer builds can
-    no longer bite the entry it is named after.
+    subquery at all, and auto-correlation has nothing to strip. Study is one of
+    them, so the shape the search layer builds can no longer bite the entry
+    that first motivated this test.
 
     The exposure moved rather than went away, and for the seven one-hop entries
     it got *sharper*: five of them (Segmentation, ModelSegmentation,
@@ -334,14 +400,44 @@ def test_apply_scope_compiles_inside_a_query_that_also_joins_patient(entity):
     SegmentationTagLink and FormAnnotationTagLink still have one.
     ``.correlate(entity)`` is the only thing holding the seven up.
 
+    So the enclosing query is derived from ``_ONE_HOP_TO`` rather than
+    hardcoding Patient: it holds every table some entry hops to -- Patient
+    among them today, and kept explicitly so the original shape survives a map
+    that stops hopping there -- which is what it takes for one shape to reach
+    all five. Hardcoding Patient reached only
+    FormAnnotation -- the other four select FROM ImageInstance or Study, which
+    that query never held, so the guard covered one of the five exposures the
+    paragraph above describes. **Five is the ceiling**, not a gap: the FROM of
+    SegmentationTagLink and FormAnnotationTagLink is a multi-table ``Join``
+    object, which auto-correlation cannot match against an enclosing table by
+    identity, so those two are *structurally immune* and no enclosing shape can
+    make them fail. Dropping ``.correlate(entity)`` fails exactly the five and
+    leaves those two green; do not read that as something left to cover.
+
+    The assertion is read off the WHERE clause rather than off the whole
+    statement, because ``"ProjectID" in sql`` is already true of
+    ``select(Patient|Study|Series|ImageInstance)`` with no predicate at all --
+    the column is in the SELECT list, so for those four an ``apply_scope`` that
+    returned the statement untouched used to pass. The unscoped compile is the
+    control: the enclosing query contributes no WHERE of its own, so a WHERE
+    mentioning ProjectID can only have come from the predicate.
+
     Parametrized over the registry so a future entity is covered without anyone
     remembering to add a case.
     """
-    outer = apply_scope(
-        select(entity).select_from(entity, Patient), entity, _grader_scope(1)
+    reached = sorted(
+        ({parent for parent, _ in _ONE_HOP_TO.values()} | {Patient}) - {entity},
+        key=lambda e: e.__name__,
     )
-    sql = str(outer.compile(dialect=sqlite.dialect()))
-    assert "ProjectID" in sql
+    stmt = select(entity).select_from(entity, *reached)
+    unscoped = str(stmt.compile(dialect=sqlite.dialect()))
+    assert "WHERE " not in unscoped, unscoped
+
+    scoped = apply_scope(stmt, entity, _grader_scope(1))
+    sql = str(scoped.compile(dialect=sqlite.dialect()))
+    _, keyword, where = sql.partition("WHERE ")
+    assert keyword, sql
+    assert "ProjectID" in where, sql
 
 
 def test_apply_scope_filters_a_study_to_one_project(session):

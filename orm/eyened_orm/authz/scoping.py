@@ -1,10 +1,16 @@
 """Which projects does this object touch?
 
 ``Patient.ProjectID`` is the schema's only project *authority*, but it is no
-longer the only place the answer lives: ``Study``, ``Series``, ``ImageInstance``
-and ``SubTaskImageLink`` each carry a copy that composite foreign keys hold
-equal to it, and a task's project set is declared outright in ``TaskProject``.
-So an entity reaches its project either on its own column or in one hop.
+longer the only place the answer lives: ``Study``, ``Series`` and
+``ImageInstance`` each carry a copy that composite foreign keys hold equal to
+it, and a task's project set is declared outright in ``TaskProject``. So an
+entity reaches its project either on its own column or in one hop.
+
+``SubTaskImageLink`` carries a fourth copy, and it is *not* one of these
+routes: it is there for containment -- ``(TaskID, ProjectID)`` references
+``TaskProject``, which is what refuses an image from a project its task never
+declared. It appears in none of the registries below, so a scoped read of it
+raises rather than resolving a route.
 
 That route is declared **once**, in ``_OWN_PROJECT_COLUMN`` and ``_ONE_HOP_TO``,
 and everything consumes that one definition: ``apply_scope`` correlates it into
@@ -162,7 +168,7 @@ def _hops_to_column(
         node = parent
     raise ValueError(
         f"{entity.__name__}'s _ONE_HOP_TO chain did not reach a ProjectID column "
-        f"within {len(_ONE_HOP_TO)} hops -- it is likely cyclic"
+        f"in {len(joins)} hops -- it is likely cyclic"
     )
 
 
@@ -256,7 +262,11 @@ def image_project_pairs(image_instance_ids: Sequence[int]) -> Select:
     """``(ImageInstanceID, ProjectID)`` for a batch of images, in one query.
 
     The batched sibling of ``project_ids_of_image``, for a gate that must judge
-    a whole list of caller-supplied ids at once.
+    a whole list of caller-supplied ids at once. It is built from
+    ``_hops_to_column`` like every other consumer, so a change to the route --
+    a denormalized column, an anchor move, a predicate added to a hop --
+    reaches this gate with the read filters instead of leaving it resolving
+    projects by a stale route with nothing red.
 
     Named for its rows rather than ``project_ids_of_images``: every
     ``project_ids_of_*`` selects one column and is consumed through
@@ -266,14 +276,20 @@ def image_project_pairs(image_instance_ids: Sequence[int]) -> Select:
     because the caller needs to tell *which* id resolved to nothing: an id
     absent from the result is what its 404 is built on.
 
-    One row per image is now guaranteed by construction -- ``ProjectID`` is a
-    column on the row itself -- rather than resting on every hop of a join
-    chain being many-to-one. The caller builds a dict off these rows, and that
-    is what depended on it.
+    No ``.distinct()``: today the route is zero hops -- ``ProjectID`` is a
+    column on the image row itself -- so one image yields one row. What depends
+    on that is not the wasted row (a duplicate pair is harmless) but the caller
+    building a ``dict`` off these rows, where last-row-wins would silently keep
+    one project per image. Should ``ImageInstance``'s route ever pass through a
+    one-to-many hop, the gate would then judge a *subset* of an image's
+    projects while ``apply_scope``'s ``EXISTS`` still considers all of them;
+    the caller must key by image differently before that route changes.
     """
-    return select(ImageInstance.ImageInstanceID, ImageInstance.ProjectID).where(
-        ImageInstance.ImageInstanceID.in_(image_instance_ids)
-    )
+    joins, column = _hops_to_column(ImageInstance)
+    stmt = select(ImageInstance.ImageInstanceID, column).select_from(ImageInstance)
+    for parent, onclause in joins:
+        stmt = stmt.join(parent, onclause())
+    return stmt.where(ImageInstance.ImageInstanceID.in_(image_instance_ids))
 
 
 def project_ids_of_segmentation(segmentation_id: int) -> Select:
