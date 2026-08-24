@@ -13,7 +13,6 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from starlette.concurrency import run_in_threadpool
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
@@ -69,8 +68,7 @@ async def create_segmentation(
 ):
     dto = SegmentationPOST.model_validate_json(metadata)
     array = await load_array(np_array)
-    segmentation = await run_in_threadpool(
-        service.create,
+    segmentation = service.create(
         image_id=dto.image_id,
         feature_id=dto.feature_id,
         subtask_id=dto.subtask_id,
@@ -125,22 +123,17 @@ async def update_segmentation_data(
         raise HTTPException(
             status_code=400, detail=f"Unsupported media type: {content_type}"
         )
-    body = await request.body()
-
-    def _write():
-        # np.load parses the whole array; it belongs off the loop with the write.
-        return service.write_data(
-            segmentation_id,
-            np.load(io.BytesIO(body)),
-            axis=axis,
-            scan_nr=scan_nr,
-        )
-
-    return await run_in_threadpool(_write)
+    np_image = np.load(io.BytesIO(await request.body()))
+    return service.write_data(
+        segmentation_id,
+        np_image,
+        axis=axis,
+        scan_nr=scan_nr,
+    )
 
 
 @router.get("/segmentations/{segmentation_id}/data")
-def get_segmentation_data(
+async def get_segmentation_data(
     segmentation_id: int,
     axis: Optional[int] = None,
     scan_nr: Optional[int] = None,
@@ -198,7 +191,7 @@ def untag_segmentation(
 
 
 @router.get("/model-segmentations/{model_segmentation_id}/data")
-def get_model_segmentation_data(
+async def get_model_segmentation_data(
     model_segmentation_id: int,
     axis: Optional[int] = None,
     scan_nr: Optional[int] = None,
@@ -223,14 +216,7 @@ async def update_model_segmentation_data(
         raise HTTPException(
             status_code=400, detail=f"Unsupported media type: {content_type}"
         )
-    body = await request.body()
-
-    def _write():
-        return service.write_data(
-            model_segmentation_id,
-            np.load(io.BytesIO(body)),
-            axis=axis,
-            scan_nr=scan_nr,
-        )
-
-    return await run_in_threadpool(_write)
+    np_image = np.load(io.BytesIO(await request.body()))
+    return service.write_data(
+        model_segmentation_id, np_image, axis=axis, scan_nr=scan_nr
+    )
