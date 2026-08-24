@@ -141,11 +141,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     jwt_cookie_name: str = "jwt_token"
     refresh_cookie_name: str = "refresh_token"
-    # Starlette's own default. The previous 1 MB meant task lists, search
-    # results and every other JSON list response shipped uncompressed.
-    # Pre-gzipped bodies are unaffected: GZipMiddleware skips a response that
-    # already carries Content-Encoding.
-    gzip_minimum_size: int = 500
+    gzip_minimum_size: int = 1024 * 1024
 
     # Thread capacity is the binding constraint and the pool is sized to serve
     # it, so a request never waits on pool checkout. anyio's own default is 40
