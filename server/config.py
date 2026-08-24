@@ -150,7 +150,7 @@ class Settings(BaseSettings):
     # Thread capacity is the binding constraint and the pool is sized to serve
     # it, so a request never waits on pool checkout. anyio's own default is 40
     # threads, which against SQLAlchemy's default 5+10 pool would queue 25 of
-    # them behind a 30s pool_timeout.
+    # them behind that pool's default 30s pool_timeout.
     threadpool_limit: int = Field(
         default=16,
         ge=1,
