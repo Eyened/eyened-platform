@@ -38,6 +38,15 @@ def test_adding_an_undeclared_image_returns_409(client, spanning):
     detail = response.json()["detail"]
     assert detail["code"] == "image_outside_task_declaration"
     assert detail["image_projects"] == [spanning["projects"]["B"]]
+    # The client reads all four keys straight off this body -- the 409 is not in
+    # the generated OpenAPI spec and its detail has no schema, so a rename here
+    # would pass every suite and then throw inside the browser's catch block,
+    # silently. ``declared_projects`` is pinned exactly; ``message`` only has to
+    # stay a non-empty sentence naming the image, so rewording stays free.
+    assert detail["declared_projects"] == [spanning["projects"]["A"]]
+    message = detail["message"]
+    assert isinstance(message, str) and message.strip()
+    assert spanning["public_ids"]["B"] in message
 
 
 def test_creating_a_task_without_projects_is_refused(client, spanning, acting_creator):

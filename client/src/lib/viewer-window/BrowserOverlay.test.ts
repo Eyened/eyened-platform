@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/svelte";
 import { ApiError } from "$lib/api/client";
 import { addSubTaskImage } from "$lib/data/helpers";
 import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+import { toast } from "svelte-sonner";
 import BrowserOverlay from "./BrowserOverlay.svelte";
 import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
@@ -77,6 +78,11 @@ async function renderOverlay() {
 describe("BrowserOverlay teardown", () => {
     beforeEach(() => {
         browserContexts.length = 0;
+        // toast.error is a module-level spy shared by every test in the file,
+        // and the negative test waits on it. A call left over from a
+        // neighbouring test would satisfy that wait immediately and put the
+        // timing hole below straight back.
+        vi.clearAllMocks();
     });
 
     it("does not persist an image link the server refused", async () => {
@@ -88,10 +94,17 @@ describe("BrowserOverlay teardown", () => {
         // one way the app ever reaches it.
         unmount();
 
-        // onDestroy does not await, so flush microtasks before reading the spy.
-        await vi.waitFor(() =>
-            expect(addSubTaskImage).toHaveBeenCalledWith(31, REFUSED_ID),
-        );
+        // onDestroy does not await, so flush microtasks before reading the
+        // spies. Wait on the toast, not on addSubTaskImage: the request goes
+        // out on close()'s first tick, so waiting on it returns before the
+        // rejection has even propagated back and the assertion below would
+        // read a spy that has not yet had its chance to fire -- which lets a
+        // component that toasts and then persists anyway pass. toast.error and
+        // setInstanceIDs sit in the same synchronous continuation, so once the
+        // toast is observable the write either happened or never will.
+        await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
+
+        expect(addSubTaskImage).toHaveBeenCalledWith(31, REFUSED_ID);
 
         // The defect this test exists for: the overlay used to write the
         // refused id into the view state regardless, so the UI showed an image
