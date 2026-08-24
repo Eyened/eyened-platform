@@ -70,7 +70,7 @@ def verify_token(token: str) -> dict:
     return _decode_token_or_401(token)
 
 
-async def get_current_user(
+def get_current_user(
     authorization: str = Header(None),
     jwt_token: str = Cookie(None),
     refresh_token: str = Cookie(None),

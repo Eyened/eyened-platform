@@ -55,7 +55,6 @@ def test_existing_active_admin_skips_ensure_admin_and_is_read_every_request(
     cu, monkeypatch
 ):
     """No write path runs once the account already qualifies; the read repeats."""
-    import anyio
 
     def _fail_if_called(*_args, **_kwargs):
         raise AssertionError("ensure_admin must not run for an existing admin")
@@ -63,11 +62,8 @@ def test_existing_active_admin_skips_ensure_admin_and_is_read_every_request(
     monkeypatch.setattr(cu, "ensure_admin", _fail_if_called)
     session = _Session(_Creator())
 
-    async def call():
-        return await cu.get_current_user(session=session)
-
     for _ in range(5):
-        user = anyio.run(call)
+        user = cu.get_current_user(session=session)
         assert user.id == 7
 
     assert session.lookups == 5
@@ -75,7 +71,6 @@ def test_existing_active_admin_skips_ensure_admin_and_is_read_every_request(
 
 def test_a_deactivated_account_is_rejected(cu, monkeypatch):
     """Found and already admin, but Inactive still 401s."""
-    import anyio
     from fastapi import HTTPException
 
     def _fail_if_called(*_args, **_kwargs):
@@ -85,14 +80,12 @@ def test_a_deactivated_account_is_rejected(cu, monkeypatch):
     session = _Session(_Creator(inactive=True))
 
     with pytest.raises(HTTPException) as exc:
-        anyio.run(lambda: cu.get_current_user(session=session))
+        cu.get_current_user(session=session)
     assert exc.value.status_code == 401
 
 
 def test_a_missing_account_still_bootstraps(cu, monkeypatch):
     """No row by that name yet: ensure_admin creates and promotes it."""
-    import anyio
-
     calls = {"n": 0}
     creator = _Creator()
 
@@ -103,7 +96,7 @@ def test_a_missing_account_still_bootstraps(cu, monkeypatch):
     monkeypatch.setattr(cu, "ensure_admin", _fake_ensure_admin)
     session = _Session(None)
 
-    user = anyio.run(lambda: cu.get_current_user(session=session))
+    user = cu.get_current_user(session=session)
 
     assert calls["n"] == 1
     assert user.id == creator.CreatorID
