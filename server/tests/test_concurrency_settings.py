@@ -7,7 +7,7 @@ anywhere. Refusing to boot is the cheapest place to catch it.
 import pytest
 from pydantic import ValidationError
 
-from server.config import Settings
+from server.config import Settings, settings
 
 
 def test_defaults_are_consistent():
@@ -27,3 +27,18 @@ def test_threads_equal_to_capacity_is_accepted():
     """The boundary is allowed: every thread can hold a connection."""
     s = Settings(pool_size=8, max_overflow=2, threadpool_limit=10)
     assert s.threadpool_limit == 10
+
+
+def test_api_engine_honours_the_configured_pool():
+    """The tuned values must reach the API's engine, not merely validate in Settings.
+
+    Settings validation and the ORM constructor are covered separately; the wiring
+    between them was not, so server/db.py could stop passing them -- or pass
+    constants -- with nothing failing.
+    """
+    from server.db import database
+
+    pool = database.engine.pool
+    assert pool.size() == settings.pool_size
+    assert pool._max_overflow == settings.max_overflow
+    assert pool._timeout == settings.pool_timeout
