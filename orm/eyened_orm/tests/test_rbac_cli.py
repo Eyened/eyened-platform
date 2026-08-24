@@ -18,12 +18,13 @@ import pytest
 from click.testing import CliRunner
 from sqlalchemy import select
 
-from eyened_orm import AuditLog, Creator, ProjectMember
+from eyened_orm import AuditLog, Creator, ProjectMember, TaskProject
 from eyened_orm.authz.administration import grant
 from eyened_orm.authz.bootstrap import ensure_admin
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.commands import rbac as rbac_module
 from eyened_orm.commands.rbac import (
+    check_declarations,
     deactivate_cmd,
     grant_all_cmd,
     grant_cmd,
@@ -144,6 +145,41 @@ def test_check_declarations_is_registered_on_the_eorm_group():
     from eyened_orm.cli import eorm
 
     assert "check-declarations" in eorm.commands
+
+
+def test_check_declarations_reports_nothing_when_every_declaration_is_used(
+    session, stub_database, spanning
+):
+    """The empty branch, against a fixture that does declare projects: every
+    one of `spanning`'s declarations carries a link, so a shell that printed
+    the declarations instead of the unused ones would not reach this line."""
+    result = CliRunner().invoke(check_declarations, [])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == "No unused declarations."
+
+
+def test_check_declarations_names_the_task_and_the_project_of_an_unused_row(
+    session, stub_database, spanning
+):
+    """The rows branch and its format. `a_only` holds links in A only, so
+    declaring B gives it exactly one unused pair -- and an operator needs both
+    ids to act on it, not a count."""
+    session.add(
+        TaskProject(TaskID=spanning["a_only"], ProjectID=spanning["projects"]["B"])
+    )
+    session.commit()
+
+    result = CliRunner().invoke(check_declarations, [])
+
+    assert result.exit_code == 0
+    assert (
+        f"task {spanning['a_only']}\tproject {spanning['projects']['B']}"
+        in result.output
+    )
+    # The empty-case line and a row list are alternatives: printing both would
+    # mean the shell never consulted the query it is shelling.
+    assert "No unused declarations." not in result.output
 
 
 def _memberships(session):

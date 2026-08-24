@@ -510,6 +510,19 @@ def unused_declarations(session: Session) -> list[tuple[int, int]]:
     only be broader than its links, never narrower. Broader is fail-safe -- it
     makes a task harder to see, not easier -- which is why this is a report
     rather than a reconciliation job.
+
+    Rows here are expected, not faults. Two ordinary kinds occupy it. A task
+    declares its projects at creation and acquires its links afterwards, so
+    ``POST /task`` puts every task it creates in this report until something
+    populates it. And removing a task's links -- by removing images, or by
+    deleting a subtask, whose links cascade away under
+    ``fk_SubTaskImageLink_SubTask_Task`` -- leaves the declaration standing,
+    because ``fk_SubTaskImageLink_TaskProject`` carries no ``ondelete``.
+
+    Spec §5.4 says as much, and asks ``eorm`` for a shrink-to-actual operation
+    to clear such a row. That operation does not exist: nothing outside the
+    ``Task``-delete cascade removes a ``TaskProject`` row, so this report names
+    rows it offers no way to act on.
     """
     return [
         (int(t), int(p))

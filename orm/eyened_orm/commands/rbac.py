@@ -1,9 +1,11 @@
 """RBAC administration commands.
 
 v0.3 places the CLI and ``eorm`` outside RBAC enforcement as trusted paths, so
-these commands do not authorize their operator. They **do** attribute: every one
-writes an ``AuditLog`` row with ``TrustedPath`` set and ``ActorID`` NULL, which
-is what the AuditLog model documents that combination for.
+these commands do not authorize their operator. They **do** attribute: every
+state change writes an ``AuditLog`` row with ``TrustedPath`` set and ``ActorID``
+NULL, which is what the AuditLog model documents that combination for. What
+changes nothing writes nothing: a no-op branch (an already-revoked membership,
+an already-inactive user) and read-only reports such as ``check-declarations``.
 """
 from __future__ import annotations
 
