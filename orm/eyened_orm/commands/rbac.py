@@ -23,6 +23,7 @@ from ..authz.administration import (
     revoke,
     set_admin,
     set_password,
+    unused_declarations,
 )
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
 from ..authz.roles import ProjectRole
@@ -357,8 +358,21 @@ def set_password_cmd(username: str, password: str):
     click.echo(f"{username}: password set")
 
 
+@click.command("check-declarations")
+def check_declarations() -> None:
+    """List (task, project) declarations no image link uses."""
+    database = get_database()
+    with database.get_session() as session:
+        rows = unused_declarations(session)
+    if not rows:
+        click.echo("No unused declarations.")
+        return
+    for task_id, project_id in rows:
+        click.echo(f"task {task_id}\tproject {project_id}")
+
+
 rbac_commands = [
     init_admin, grant_cmd, revoke_cmd, grant_for_task_cmd,
     grant_all_cmd, deactivate_cmd, reactivate_cmd, set_admin_cmd,
-    set_password_cmd,
+    set_password_cmd, check_declarations,
 ]

@@ -137,6 +137,15 @@ def test_grant_all_is_registered_on_the_eorm_group():
     assert "grant-all" in eorm.commands
 
 
+def test_check_declarations_is_registered_on_the_eorm_group():
+    """Same reason as grant-all: the query is tested in
+    test_authz_administration.py and the shell can be invoked directly, so
+    nothing else would notice it missing from rbac_commands."""
+    from eyened_orm.cli import eorm
+
+    assert "check-declarations" in eorm.commands
+
+
 def _memberships(session):
     return session.query(ProjectMember).count()
 
