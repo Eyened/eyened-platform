@@ -323,10 +323,12 @@ def test_the_task_predicate_compiles_inside_a_query_that_joins_taskproject(entit
 
     Its docstring said so and nothing held it to that: deleting
     ``.correlate(entity)`` used to leave the entire suite green, because no
-    read in the codebase reaches this shape today -- ``declared_projects``
-    puts the scoped ``select(Task.TaskID)`` in a subquery whose own FROM is
-    ``Task``, and ``projects_for_tasks`` scopes ``SubTask`` over the image
-    walk. So the shape is built here rather than borrowed from a caller: the
+    read in the codebase reaches this shape today -- ``declared_projects`` and
+    ``projects_for_tasks`` both select FROM ``TaskProject`` in their outer
+    query now, but both reach the predicate through a subquery whose own FROM
+    is ``Task``, and auto-correlation does not cross that level: compiling
+    ``projects_for_tasks``'s statement with the correlation removed still
+    succeeds. So the shape is built here rather than borrowed from a caller: the
     claim is about the predicate, and it has to be checkable without waiting
     for a caller to grow into it.
 

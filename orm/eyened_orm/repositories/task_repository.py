@@ -6,10 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 from eyened_orm import (
     ImageInstance,
     ImageStorage,
-    Patient,
     Project,
-    Series,
-    Study,
     SubTask,
     SubTaskImageLink,
     Task,
@@ -120,76 +117,71 @@ class TaskRepository:
         counts = {int(tid): (int(n), int(r)) for tid, n, r in rows}
         return {tid: counts.get(tid, (0, 0)) for tid in task_ids}
 
-    def _project_pairs_select(self, task_ids: list[int]) -> Select:
-        """The walk to ``(task_id, project_id)`` pairs, de-duplicated, unscoped.
+    def _declared_projects_select(self, task_ids: list[int]) -> Select:
+        """Declared ``(task, project, name)`` rows for the given ids, unscoped.
 
-        ``Project`` is deliberately absent: joining it here puts a 44-row table
-        in the same SELECT as ``apply_scope``'s correlated antijoin, and MySQL
-        answers that by cross-joining the two and deferring the join condition
-        to the last filter in the plan -- 933,108 driving rows instead of
-        21,207, and every hop below it 44x wide. Measured at 12.2s versus 2.2s
-        for the identical result. Names are joined to this subquery instead.
+        Successor to the five-hop walk to ``Patient``. What changed is scale,
+        not shape: ``Project`` is still joined in the same SELECT the caller
+        adds its scope predicate to, and that arrangement is what MySQL used to
+        answer by cross-joining the 44-row table against the scoped walk --
+        933,108 driving rows instead of 21,207, 12.2s versus 2.2s, measured.
+        What is gone is the thing it multiplied: this drives off ~108
+        ``TaskProject`` rows keyed by ``TaskID`` rather than a walk over ~87k
+        image links, so there is far less for such a plan to cost. That is a
+        reason to expect it cheap, not a proof the plan cannot recur, and it
+        has not been re-measured -- no database was available to do so.
+
+        No ``.distinct()``, and that part is safe by construction rather than
+        by expectation: ``TaskProject``'s primary key is the composite
+        ``(TaskID, ProjectID)`` and ``Project`` contributes exactly one row per
+        project, so no pair can repeat. The old ``.distinct()`` carried a
+        second job -- stopping MySQL merging the derived table into the outer
+        query -- and there is no derived table here for it to protect.
 
         Unscoped on purpose: the caller applies the scope, so that the call
         stays inside the public read method where the AST guard in
         ``server/tests/test_repository_reads_are_scoped.py`` can see it.
-
-        ``.distinct()`` is load-bearing beyond de-duplication: it stops MySQL
-        merging the derived table into the outer query, which would restore the
-        plan this function exists to avoid.
         """
         return (
-            select(
-                SubTask.TaskID.label("task_id"),
-                Patient.ProjectID.label("project_id"),
-            )
-            .select_from(SubTask)
-            .join(SubTaskImageLink, SubTaskImageLink.SubTaskID == SubTask.SubTaskID)
-            .join(
-                ImageInstance,
-                ImageInstance.ImageInstanceID == SubTaskImageLink.ImageInstanceID,
-            )
-            .join(Series, Series.SeriesID == ImageInstance.SeriesID)
-            .join(Study, Study.StudyID == Series.StudyID)
-            .join(Patient, Patient.PatientID == Study.PatientID)
-            .where(SubTask.TaskID.in_(task_ids))
-            .distinct()
+            select(TaskProject.TaskID, TaskProject.ProjectID, Project.ProjectName)
+            .select_from(TaskProject)
+            .join(Project, Project.ProjectID == TaskProject.ProjectID)
+            .where(TaskProject.TaskID.in_(task_ids))
         )
-
-    @staticmethod
-    def _names_for(pairs) -> Select:
-        """Project names joined to an already-scoped pairs subquery."""
-        return select(
-            pairs.c.task_id, pairs.c.project_id, Project.ProjectName
-        ).join(Project, Project.ProjectID == pairs.c.project_id)
 
     def projects_for_tasks(
         self, task_ids: list[int]
     ) -> dict[int, list[tuple[int, str]]]:
         """Return {task_id: [(project_id, project_name), ...]} for the given ids.
 
-        Walks the same join path enforcement uses, re-expressed for batching
-        and names: ``projects_of`` answers for one entity and returns bare ids,
-        which cannot back a grouped, name-carrying query. The two must not
-        drift -- grant-for-task and this endpoint are the two sides of one
-        promise -- so a test pins them to the same answer.
+        Reads the declaration -- the same ``TaskProject`` rows ``projects_of``
+        and ``eorm grant-for-task`` answer from -- instead of walking the image
+        links, so the batched, name-carrying query and the enforcement path
+        cannot drift. A test still pins them to the same answer.
 
         Every requested id is present in the result, and an empty list means
-        one of *two* things: the task genuinely has no images, or the caller's
-        scope cannot see the subtasks that carry them. Callers must not read
-        ``[]`` as "spans nothing" on its own; the routes are safe because they
-        404 an invisible task before the field is read.
+        one of *two* things: the task declares no project, or the caller's
+        scope cannot see the task. Callers must not read ``[]`` as "spans
+        nothing" on its own; the routes are safe because they 404 an invisible
+        task before the field is read. A task that declares nothing is visible
+        to everyone under vacuity rather than hidden -- the create route
+        declares a project set for every task it makes, but rows predating that
+        can still be in this state.
 
-        ``apply_scope`` is called here rather than inside ``_project_pairs_select``
-        so that the repository read guard, which inspects this method's own body
-        and does not follow calls, can see it.
+        ``apply_scope`` is called here rather than inside
+        ``_declared_projects_select`` so that the repository read guard, which
+        inspects this method's own body and does not follow calls, can see it.
         """
         if not task_ids:
             return {}
-        pairs = apply_scope(
-            self._project_pairs_select(task_ids), SubTask, self._scope
-        ).subquery()
-        rows = self._session.execute(self._names_for(pairs)).all()
+        visible = apply_scope(
+            select(Task.TaskID).where(Task.TaskID.in_(task_ids)), Task, self._scope
+        )
+        rows = self._session.execute(
+            self._declared_projects_select(task_ids).where(
+                TaskProject.TaskID.in_(visible)
+            )
+        ).all()
         found: dict[int, list[tuple[int, str]]] = {}
         for task_id, project_id, project_name in rows:
             found.setdefault(int(task_id), []).append((int(project_id), project_name))
@@ -198,32 +190,30 @@ class TaskRepository:
     def declared_projects(self, task_id: int) -> list[tuple[int, str]]:
         """The ``(id, name)`` pairs one task *declares*, for a response body.
 
-        Reads ``TaskProject`` rather than the image walk ``projects_for_tasks``
-        still performs, and the difference is the whole reason this exists: a
-        task that declares projects it holds no image in yet resolves to what
-        it declared instead of to nothing. Every task is in exactly that state
-        the moment it is created, so the create route cannot answer from the
-        walk.
+        The single-task form of ``projects_for_tasks``, sharing its builder so
+        the join is written once. It existed because that method walked the
+        image links and this one read ``TaskProject``: a task that declares
+        projects it holds no image in yet -- which every task is the moment it
+        is created -- resolved to nothing through the walk. Both read the
+        declaration now, so the two agree by construction; what keeps this a
+        method of its own is that the create route wants one task's list rather
+        than a dict, and that a thin delegation would move ``apply_scope`` out
+        of this body, where the read guard has to see it.
 
         The scope predicate is a backstop, not a path: the only caller has
         already required the actor at ``grader`` in every project named here.
         It is applied to the *task*, so an invisible task resolves to ``[]``
         rather than leaking a project set.
-
-        ``apply_scope`` is called in this method's own body, for the same
-        reason ``projects_for_tasks`` documents: the read guard inspects the
-        body and does not follow calls.
         """
         visible = apply_scope(
             select(Task.TaskID).where(Task.TaskID == task_id), Task, self._scope
         )
         rows = self._session.execute(
-            select(TaskProject.ProjectID, Project.ProjectName)
-            .join(Project, Project.ProjectID == TaskProject.ProjectID)
-            .where(TaskProject.TaskID == task_id)
-            .where(TaskProject.TaskID.in_(visible))
+            self._declared_projects_select([task_id]).where(
+                TaskProject.TaskID.in_(visible)
+            )
         ).all()
-        return sorted((int(pid), name) for pid, name in rows)
+        return sorted((int(pid), name) for _, pid, name in rows)
 
 
 # Eager-load the subtask's images down to their storage backend (mirrors the
