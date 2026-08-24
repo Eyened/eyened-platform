@@ -16,6 +16,7 @@ from eyened_orm import Creator, CreatorTagLink
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.repositories.creator_repository import CreatorRepository
 from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
+from server.services.password_hashing import password_hash_capacity
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
 from fastapi.params import Query
 
@@ -199,9 +200,12 @@ def check_login(username: str, password: str, db: Session) -> Creator:
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
 
-    # Verify password using Argon2 hash
-    if creator.PasswordHash and verify_password(password, creator.PasswordHash):
-        return creator
+    # Verify password using Argon2 hash. Gated: this is the one hashing site an
+    # unauthenticated caller reaches, so it is the one that can be amplified.
+    if creator.PasswordHash:
+        with password_hash_capacity():
+            if verify_password(password, creator.PasswordHash):
+                return creator
 
     # Legacy password hash support (for migration)
     if creator.Password:
@@ -211,7 +215,8 @@ def check_login(username: str, password: str, db: Session) -> Creator:
         if old_hash == creator.Password:
             # Migrate to new hash. The mutation stays pending here; get_db commits
             # it at the request boundary.
-            creator.PasswordHash = hash_password(password)
+            with password_hash_capacity():
+                creator.PasswordHash = hash_password(password)
             creator.Password = None
             AuditService(db, enabled=settings.db_log.enabled).record(
                 action="UPDATE",
@@ -313,7 +318,8 @@ def change_password(
 
     # Set new password using Argon2. The mutation stays pending here; get_db
     # commits it at the request boundary.
-    creator.PasswordHash = hash_password(change_password_data.new_password)
+    with password_hash_capacity():
+        creator.PasswordHash = hash_password(change_password_data.new_password)
     creator.Password = None  # Clear old hash if it exists
 
     audit.record(
@@ -335,7 +341,12 @@ def register_user(
 ):
     """Register a new user."""
     try:
-        new_user = create_user(session, user_data.username, user_data.password)
+        # The gate spans create_user's uniqueness query as well as its hash,
+        # because the hash happens inside it. Register is a rare write path, so
+        # holding a hashing slot across one indexed SELECT is not worth
+        # restructuring the ORM helper to avoid.
+        with password_hash_capacity():
+            new_user = create_user(session, user_data.username, user_data.password)
     except ValueError as err:
         # create_user only rejects an already-taken username. Uncaught, this
         # reached main.py's blanket handler as a 500, which made an

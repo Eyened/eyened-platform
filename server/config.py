@@ -175,6 +175,19 @@ class Settings(BaseSettings):
         description="Seconds a request waits for a free DB connection before failing.",
     )
 
+    # Argon2 is memory-hard by design: this deployment's parameters cost 64 MiB
+    # and ~75ms per hash. While handlers ran on the event loop that cost was
+    # serialized by accident -- one hash at a time per worker. The threadpool
+    # removes that accident, and /auth/login and /auth/token need no credentials
+    # to reach, so without a bound an anonymous caller multiplies 64 MiB by
+    # threadpool_limit. 4 is ~256 MiB per worker, ~1 GiB at WORKERS=4. A value
+    # above threadpool_limit can never be reached.
+    password_hash_concurrency: int = Field(
+        default=4,
+        ge=1,
+        description="Concurrent Argon2 password hashes per API worker.",
+    )
+
     @model_validator(mode="after")
     def _threads_cannot_outnumber_connections(self) -> "Settings":
         """Kept because it still catches a grossly undersized pool. It does not
