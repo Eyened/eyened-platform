@@ -120,16 +120,18 @@ class TaskRepository:
     def _declared_projects_select(self, task_ids: list[int]) -> Select:
         """Declared ``(task, project, name)`` rows for the given ids, unscoped.
 
-        Successor to the five-hop walk to ``Patient``. What changed is scale,
-        not shape: ``Project`` is still joined in the same SELECT the caller
-        adds its scope predicate to, and that arrangement is what MySQL used to
-        answer by cross-joining the 44-row table against the scoped walk --
-        933,108 driving rows instead of 21,207, 12.2s versus 2.2s, measured.
-        What is gone is the thing it multiplied: this drives off ~108
-        ``TaskProject`` rows keyed by ``TaskID`` rather than a walk over ~87k
-        image links, so there is far less for such a plan to cost. That is a
+        Successor to the five-hop walk to ``Patient``, and it deliberately
+        takes on the arrangement that walk avoided: ``Project`` is joined in
+        the same SELECT the caller adds its scope predicate to, where the
+        predecessor kept it out and joined names to an already-scoped subquery
+        instead. That arrangement is what MySQL answered by cross-joining the
+        44-row table against the scoped walk -- 933,108 driving rows instead of
+        21,207, 12.2s versus 2.2s, measured. What is gone is the thing it
+        multiplied: this drives off ~108 ``TaskProject`` rows keyed by
+        ``TaskID`` rather than a walk over ~87k image links, so there is far
+        less for such a plan to cost. That is structure traded for scale -- a
         reason to expect it cheap, not a proof the plan cannot recur, and it
-        has not been re-measured -- no database was available to do so.
+        has not been re-measured, no database being available to do so.
 
         No ``.distinct()``, and that part is safe by construction rather than
         by expectation: ``TaskProject``'s primary key is the composite
