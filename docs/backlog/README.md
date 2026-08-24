@@ -24,3 +24,5 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [`eorm create-user --is-human` can never be false](2026-08-13-create-user-cli-is-human-flag.md)
 - [`eorm create-user` writes no `AuditLog` row](2026-08-13-create-user-cli-no-audit-row.md)
 - [`alembic upgrade --sql` writes the confirmation prompt into the generated SQL](2026-08-20-alembic-sql-mode-prompt-pollutes-stdout.md)
+- [The segmentation zarr store has no write lock](2026-08-24-zarr-storage-write-lock.md)
+- [API pool sizing assumes one connection per thread; a request takes several](2026-08-24-api-pool-sizing-multi-hop-checkout.md)
