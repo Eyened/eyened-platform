@@ -314,10 +314,28 @@ def test_apply_scope_compiles_inside_a_query_that_also_joins_patient(entity):
     SQLAlchemy raised ``InvalidRequestError: ... returned no FROM clauses due to
     auto-correlation``. The search layer builds exactly that shape
     (``join_from(Study, Patient, ...)``), so the read path would 500. The other
-    entries only survived by accident -- their FROM is a single Join object that
-    never matches an enclosing table by identity -- which an innocuous edit to
-    any helper would remove. Parametrized over the registry so a future entity
-    is covered without anyone remembering to add a case.
+    entries only survived by accident -- their FROM was a single Join object
+    that never matches an enclosing table by identity -- which an innocuous
+    edit to any helper would remove.
+
+    Since the route moved onto the denormalized ``ProjectID``, that danger no
+    longer applies uniformly, so read the paragraph above as history for four
+    of the eleven cases. The ``_OWN_PROJECT_COLUMN`` entities -- Patient,
+    Study, Series, ImageInstance -- emit a bare ``ProjectID IN (...)`` with no
+    subquery at all, and auto-correlation has nothing to strip; they pass this
+    trivially. Study is one of them, so the shape the search layer builds can
+    no longer bite the entry it is named after.
+
+    The exposure moved rather than went away, and for the seven one-hop entries
+    it got *sharper*: five of them (Segmentation, ModelSegmentation,
+    FormAnnotation, StudyTagLink, ImageInstanceTagLink) now select FROM a bare
+    table, which is exactly what auto-correlation matches by identity, where
+    before all but FormAnnotation hid behind a multi-table Join object. Only
+    SegmentationTagLink and FormAnnotationTagLink still have one.
+    ``.correlate(entity)`` is the only thing holding the seven up.
+
+    Parametrized over the registry so a future entity is covered without anyone
+    remembering to add a case.
     """
     outer = apply_scope(
         select(entity).select_from(entity, Patient), entity, _grader_scope(1)

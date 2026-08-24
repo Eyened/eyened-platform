@@ -1,12 +1,17 @@
 """Which projects does this object touch?
 
-``Patient.ProjectID`` is the schema's only project anchor. Every other
-project-scoped entity reaches it by joins. That route is declared **once**, in
-``_PARENT_OF``, and everything consumes that one definition: ``apply_scope``
-correlates it into a read as an ``EXISTS``, writes execute it as a selectable,
-and ``eorm grant-for-task`` executes the same function. Two implementations
-will drift, and the failure mode is an administrator granting a set that does
-not match what the API requires.
+``Patient.ProjectID`` is the schema's only project *authority*, but it is no
+longer the only place the answer lives: ``Study``, ``Series``, ``ImageInstance``
+and ``SubTaskImageLink`` each carry a copy that composite foreign keys hold
+equal to it, and a task's project set is declared outright in ``TaskProject``.
+So an entity reaches its project either on its own column or in one hop.
+
+That route is declared **once**, in ``_OWN_PROJECT_COLUMN`` and ``_ONE_HOP_TO``,
+and everything consumes that one definition: ``apply_scope`` correlates it into
+a read as an ``EXISTS``, writes execute it as a selectable, and ``eorm
+grant-for-task`` executes the same function. Two implementations will drift, and
+the failure mode is an administrator granting a set that does not match what the
+API requires.
 """
 from __future__ import annotations
 
@@ -15,7 +20,6 @@ from collections.abc import Set as AbstractSet
 
 from sqlalchemy import ColumnElement, Select, exists, select
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.util import AliasedClass
 
 from ..base import Base
 from ..creator import Creator
@@ -32,7 +36,7 @@ from ..tag import (
     StudyTagLink,
     Tag,
 )
-from ..task import SubTask, SubTaskImageLink, Task, TaskProject
+from ..task import SubTask, Task, TaskProject
 from .scope import AccessScope
 
 __all__ = [
@@ -56,22 +60,30 @@ __all__ = [
 ]
 
 
-# --- the one join chain, consumed by both forms ----------------------------
+# --- the one route, consumed by both forms ---------------------------------
 #
-# ``_PARENT_OF`` is the *only* place an entity's route to ``Patient`` is
-# written down. Each entry names the next table up and the ON clause that gets
-# there; ``_join_to_patient`` walks the links until it reaches the anchor. Both
-# consumers below are built from that one walk -- the selectable form
-# (``project_ids_of_*``, executed by writes and the CLI) and the correlated
-# ``EXISTS`` predicate (``apply_scope``, correlated into a read). Two hand-
-# written implementations of the same route is exactly the drift this module's
-# docstring says it exists to prevent.
+# ``_OWN_PROJECT_COLUMN`` and ``_ONE_HOP_TO`` between them are the *only* place
+# an entity's route to its ``ProjectID`` is written down, and
+# ``_hops_to_column`` is the only thing that reads them. Both consumers below
+# are built from that one route -- the selectable form (``project_ids_of_*``,
+# executed by writes and the CLI) and the correlated ``EXISTS`` predicate
+# (``apply_scope``, correlated into a read). Two hand-written implementations
+# of the same route is exactly the drift this module's docstring says it exists
+# to prevent.
 
 
-_PARENT_OF: dict[type[Base], tuple[type[Base], Callable[[], ColumnElement[bool]]]] = {
-    Study: (Patient, lambda: Study.PatientID == Patient.PatientID),
-    Series: (Study, lambda: Series.StudyID == Study.StudyID),
-    ImageInstance: (Series, lambda: ImageInstance.SeriesID == Series.SeriesID),
+# Entities carrying their own ProjectID: the route ends here, at a column.
+_OWN_PROJECT_COLUMN: dict[type[Base], ColumnElement[int]] = {
+    Patient: Patient.ProjectID,
+    Study: Study.ProjectID,
+    Series: Series.ProjectID,
+    ImageInstance: ImageInstance.ProjectID,
+}
+
+# One hop nearer a ProjectID column. Replaces the five-hop walk to Patient:
+# the anchor is still Patient.ProjectID, but every row down the chain now
+# carries a structurally-equal copy, so nothing has to travel to reach it.
+_ONE_HOP_TO: dict[type[Base], tuple[type[Base], Callable[[], ColumnElement[bool]]]] = {
     Segmentation: (
         ImageInstance,
         lambda: Segmentation.ImageInstanceID == ImageInstance.ImageInstanceID,
@@ -99,7 +111,9 @@ _PARENT_OF: dict[type[Base], tuple[type[Base], Callable[[], ColumnElement[bool]]
     ),
 }
 
-SINGLE_PROJECT_ENTITIES: frozenset[type[Base]] = frozenset(_PARENT_OF) | {Patient}
+SINGLE_PROJECT_ENTITIES: frozenset[type[Base]] = (
+    frozenset(_OWN_PROJECT_COLUMN) | frozenset(_ONE_HOP_TO)
+)
 SET_VALUED_ENTITIES: frozenset[type[Base]] = frozenset({Task, SubTask})
 
 # Entities that carry no project anchor and are therefore safe to read
@@ -115,79 +129,106 @@ SAFE_UNFILTERED_ENTITIES: frozenset[type[Base]] = frozenset(
 )
 
 
-def _join_to_patient(stmt: Select, node: type[Base]) -> Select:
-    """Join ``stmt`` -- already selecting FROM ``node`` -- up to ``Patient``.
+def _hops_to_column(
+    entity: type[Base],
+) -> tuple[
+    list[tuple[type[Base], Callable[[], ColumnElement[bool]]]], ColumnElement[int]
+]:
+    """The one route: the hops to walk, and the ProjectID column they land on.
 
-    Bounded by ``len(_PARENT_OF)`` hops: that is the longest a chain through
-    the map can legitimately be, since each hop consumes one entry and none
-    are revisited on a well-formed map. A malformed ``_PARENT_OF`` -- a cycle,
-    or a chain that dead-ends without reaching ``Patient`` -- raises instead of
-    looping forever, which matters here because this walk sits on the
+    Successor to ``_join_to_patient``, and it exists for the same reason: the
+    correlated ``EXISTS`` and the executable ``Select`` must be built from one
+    declaration, or they drift, and the failure mode is an administrator
+    granting a set that does not match what the API requires.
+
+    Bounded by ``len(_ONE_HOP_TO)`` hops -- today the longest chain is two
+    (``SegmentationTagLink -> Segmentation -> ImageInstance``). A malformed map
+    raises rather than looping, which matters because this sits on the
     authorization path.
     """
-    start = node
-    for _ in range(len(_PARENT_OF) + 1):
-        if node is Patient:
-            return stmt
-        if node not in _PARENT_OF:
+    joins: list[tuple[type[Base], Callable[[], ColumnElement[bool]]]] = []
+    node = entity
+    for _ in range(len(_ONE_HOP_TO) + 1):
+        own = _OWN_PROJECT_COLUMN.get(node)
+        if own is not None:
+            return joins, own
+        if node not in _ONE_HOP_TO:
             raise KeyError(
-                f"{start.__name__} has no route to Patient: "
-                f"{node.__name__} is not registered in _PARENT_OF"
+                f"{entity.__name__} has no route to a ProjectID column: "
+                f"{node.__name__} is in neither _OWN_PROJECT_COLUMN nor _ONE_HOP_TO"
             )
-        parent, onclause = _PARENT_OF[node]
-        stmt = stmt.join(parent, onclause())
+        parent, onclause = _ONE_HOP_TO[node]
+        joins.append((parent, onclause))
         node = parent
     raise ValueError(
-        f"{start.__name__}'s _PARENT_OF chain did not reach Patient within "
-        f"{len(_PARENT_OF)} hops -- it is likely cyclic"
+        f"{entity.__name__}'s _ONE_HOP_TO chain did not reach a ProjectID column "
+        f"within {len(_ONE_HOP_TO)} hops -- it is likely cyclic"
     )
 
 
 def _project_ids_from(
     anchor: type[Base], anchor_id_column: ColumnElement[int], entity_id: int
 ) -> Select:
-    """The selectable form: every project one row of ``anchor`` reaches."""
-    return (
-        _join_to_patient(select(Patient.ProjectID).select_from(anchor), anchor)
-        .where(anchor_id_column == entity_id)
-        .distinct()
-    )
+    """The selectable form: the project one row of ``anchor`` sits in.
+
+    No ``.distinct()``: the route now ends at a column on a single row, so it
+    returns exactly one, by construction rather than by every hop happening to
+    be many-to-one.
+    """
+    joins, column = _hops_to_column(anchor)
+    stmt = select(column).select_from(anchor)
+    for parent, onclause in joins:
+        stmt = stmt.join(parent, onclause())
+    return stmt.where(anchor_id_column == entity_id)
 
 
 def _single_project_predicate(
     entity: type[Base], accessible: AbstractSet[int]
 ) -> ColumnElement[bool]:
-    """``EXISTS`` up the chain from ``entity`` to an accessible ``Patient``.
+    """``ProjectID IN (...)``, on the row's own column or through one hop.
 
-    ``Patient.ProjectID IN (...)`` is pushed **inside** the subquery rather than
-    compared against a correlated scalar subquery in the outer WHERE. The scalar
-    form is not sargable: MySQL 8.0.27 re-executes it once per outer row, which
-    on 1.8M ``ImageInstance`` rows measured 687 ms for a matching scope and
-    10.2 s for a scope matching nothing -- an authenticated-user DoS surface,
-    because the *empty* result is the expensive one. As an ``EXISTS`` the
-    optimizer decorrelates it into a semi-join that drives off the project index
-    and never touches the outer table (0.005 ms on the same page).
+    An entity in ``_OWN_PROJECT_COLUMN`` gets the bare column test: no
+    subquery, nothing to correlate, and nothing for the optimizer to get wrong.
+    Both paragraphs below are about the seven entities that still emit an
+    ``EXISTS``, and they are why it is an ``EXISTS`` rather than the obvious
+    alternatives.
 
-    ``.correlate(entity)`` is load-bearing, not decoration. SQLAlchemy's
-    *auto*-correlation strips from a subquery's FROM every table the enclosing
-    query already has, and this subquery joins tables (``Patient``, ``Study``)
-    that real read queries also join -- ``join_from(Study, Patient, ...)`` is a
-    shape the search layer builds today. Auto-correlation would empty the FROM
-    and raise ``InvalidRequestError: ... returned no FROM clauses due to
-    auto-correlation``. Naming the single outer entity turns auto-correlation
-    off and pins exactly one table as the correlated one, so the predicate is
-    safe in any enclosing query by construction rather than by accident.
+    ``ProjectID IN (...)`` is pushed **inside** that subquery rather than
+    compared against a correlated scalar subquery in the outer WHERE. The
+    scalar form is not sargable: MySQL 8.0.27 re-executes it once per outer
+    row, which on 1.8M ``ImageInstance`` rows measured 687 ms for a matching
+    scope and 10.2 s for a scope matching nothing -- an authenticated-user DoS
+    surface, because the *empty* result is the expensive one. As an ``EXISTS``
+    the optimizer decorrelates it into a semi-join that drives off the project
+    index and never touches the outer table (0.005 ms on the same page). Those
+    numbers were measured on the five-hop walk, but what they are about is the
+    scalar-versus-``EXISTS`` shape rather than the length of the chain, so the
+    argument still governs every entry that keeps a subquery -- shortening the
+    walk to one hop did not make the scalar form safe.
+
+    ``.correlate(entity)`` is load-bearing, not decoration, for the same reason
+    as before: SQLAlchemy's *auto*-correlation strips from a subquery's FROM
+    every table the enclosing query already has, and these subqueries select
+    FROM tables real read queries also join -- ``Patient`` for the two
+    ``FormAnnotation`` routes, ``ImageInstance`` for the segmentations and
+    ``ImageInstanceTagLink``, ``Study`` for ``StudyTagLink``, all three of
+    which the search layer's image statement holds at once. Auto-correlation
+    would empty the FROM and raise ``InvalidRequestError: ... returned no FROM
+    clauses due to auto-correlation``. Naming the single outer entity turns
+    auto-correlation off and pins exactly one table as the correlated one, so
+    the predicate is safe in any enclosing query by construction rather than by
+    accident. Do not drop it because the subquery got smaller.
     """
-    if entity is Patient:
-        return Patient.ProjectID.in_(accessible)
-    parent, onclause = _PARENT_OF[entity]
-    inner = (
-        _join_to_patient(select(1).select_from(parent), parent)
-        .where(onclause())
-        .where(Patient.ProjectID.in_(accessible))
-        .correlate(entity)
+    joins, column = _hops_to_column(entity)
+    if not joins:
+        return column.in_(accessible)
+    first_parent, first_onclause = joins[0]
+    inner = select(1).select_from(first_parent)
+    for parent, onclause in joins[1:]:
+        inner = inner.join(parent, onclause())
+    return exists(
+        inner.where(first_onclause()).where(column.in_(accessible)).correlate(entity)
     )
-    return exists(inner)
 
 
 # --- the selectable form, consumed by writes and the CLI -------------------
@@ -215,11 +256,7 @@ def image_project_pairs(image_instance_ids: Sequence[int]) -> Select:
     """``(ImageInstanceID, ProjectID)`` for a batch of images, in one query.
 
     The batched sibling of ``project_ids_of_image``, for a gate that must judge
-    a whole list of caller-supplied ids at once. It walks the same
-    ``_PARENT_OF`` chain as everything else, so a change to the route -- a
-    denormalized column, an anchor move, a predicate added to a hop -- reaches
-    this gate with the read filters instead of leaving it resolving projects by
-    a stale route with nothing red.
+    a whole list of caller-supplied ids at once.
 
     Named for its rows rather than ``project_ids_of_images``: every
     ``project_ids_of_*`` selects one column and is consumed through
@@ -229,21 +266,14 @@ def image_project_pairs(image_instance_ids: Sequence[int]) -> Select:
     because the caller needs to tell *which* id resolved to nothing: an id
     absent from the result is what its 404 is built on.
 
-    No ``.distinct()``: every hop of today's chain is many-to-one, so one image
-    yields one row. What depends on that is not the wasted row -- a duplicate
-    pair is harmless -- but the caller building a ``dict`` off these rows, where
-    last-row-wins would silently keep one project per image. Should
-    ``_PARENT_OF[ImageInstance]`` ever route through a one-to-many hop, the gate
-    would then judge a *subset* of an image's projects while ``apply_scope``'s
-    ``EXISTS`` still considers all of them; the caller must key by image
-    differently before that route changes.
+    One row per image is now guaranteed by construction -- ``ProjectID`` is a
+    column on the row itself -- rather than resting on every hop of a join
+    chain being many-to-one. The caller builds a dict off these rows, and that
+    is what depended on it.
     """
-    return _join_to_patient(
-        select(ImageInstance.ImageInstanceID, Patient.ProjectID).select_from(
-            ImageInstance
-        ),
-        ImageInstance,
-    ).where(ImageInstance.ImageInstanceID.in_(image_instance_ids))
+    return select(ImageInstance.ImageInstanceID, ImageInstance.ProjectID).where(
+        ImageInstance.ImageInstanceID.in_(image_instance_ids)
+    )
 
 
 def project_ids_of_segmentation(segmentation_id: int) -> Select:
@@ -261,32 +291,6 @@ def project_ids_of_model_segmentation(model_segmentation_id: int) -> Select:
 def project_ids_of_form_annotation(form_annotation_id: int) -> Select:
     return _project_ids_from(
         FormAnnotation, FormAnnotation.FormAnnotationID, form_annotation_id
-    )
-
-
-def _subtask_images_to_patient(
-    subtask: type[SubTask] | AliasedClass[SubTask],
-) -> Select:
-    """SELECT ... FROM <subtask> -> its images -> up the shared chain to Patient.
-
-    The join deliberately does **not** filter ``ImageInstance.Inactive``: a
-    soft-deleted image still ties its project to the task, and excluding it
-    would silently widen who can see the task -- the one direction this design
-    must never move in by accident.
-
-    No callers left: ``project_ids_of_task``/``_subtask`` moved onto
-    ``TaskProject``, and so has ``_set_valued_predicate``. Kept only so its
-    deletion lands with the rest of the walk.
-    """
-    return _join_to_patient(
-        select(Patient.ProjectID)
-        .select_from(subtask)
-        .join(SubTaskImageLink, SubTaskImageLink.SubTaskID == subtask.SubTaskID)
-        .join(
-            ImageInstance,
-            ImageInstance.ImageInstanceID == SubTaskImageLink.ImageInstanceID,
-        ),
-        ImageInstance,
     )
 
 
@@ -368,7 +372,7 @@ def _set_valued_predicate(
 
 # Deliberately narrower than ``SINGLE_PROJECT_ENTITIES``: the four tag-link
 # entities (``StudyTagLink``, ``ImageInstanceTagLink``, ``SegmentationTagLink``,
-# ``FormAnnotationTagLink``) have a ``_PARENT_OF`` entry above -- they must be
+# ``FormAnnotationTagLink``) have a ``_ONE_HOP_TO`` entry above -- they must be
 # filterable on the read path -- but no ``projects_of`` resolver here,
 # so ``projects_of(session, StudyTagLink, ...)`` raises ``KeyError`` by design.
 # A tag link carries no project of its own; a write that applies or removes one
@@ -412,8 +416,8 @@ def scope_criteria(
     relationship whose target has a different project anchor from its parent
     (``ImageInstance.FormAnnotations`` is the one such load on the read path)
     needs the same predicate handed to ``with_loader_criteria`` instead. This
-    function is what both consume, so the collection is filtered by the same
-    ``_PARENT_OF`` walk as the root rather than by a second hand-written rule.
+    function is what both consume, so the collection is filtered off the same
+    route declaration as the root rather than by a second hand-written rule.
 
     ``None`` means "add nothing": an admin scope, or an entity declared safe to
     read unfiltered. Returning a tautology instead would put a
