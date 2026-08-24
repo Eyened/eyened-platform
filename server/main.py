@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, TimeoutError as PoolTimeoutError
 
 from server.routes import (
     auth,
@@ -28,6 +28,8 @@ from server.routes import (
 )
 from server.config import get_redis_connection, settings
 from server.services.exceptions import register_exception_handlers
+
+logger = logging.getLogger(__name__)
 
 app_api = FastAPI(title="Eyened API")
 app_api.include_router(auth.router)
@@ -59,9 +61,25 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app_api.exception_handler(SQLAlchemyError)
 async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
-    if settings.debug:
-        # print stack trace
-        traceback.print_exc()
+    # Log unconditionally, not only under debug. Because this handler matches,
+    # Starlette does not re-raise, so nothing downstream logs these -- unlike the
+    # generic Exception handler below, whose exception ServerErrorMiddleware
+    # re-raises after responding. Without this, a pool-checkout timeout is a bare
+    # 500 with no mention of the pool anywhere in the logs, which is the opposite
+    # of the fast, visible failure the short pool_timeout exists to produce.
+    if isinstance(exc, PoolTimeoutError):
+        # No traceback: the message already names the pool, its size and the
+        # timeout, and exhaustion arrives in bursts of one per queued request.
+        logger.error(
+            "connection pool exhausted on %s %s: %s",
+            request.method,
+            request.url.path,
+            exc,
+        )
+    else:
+        logger.exception(
+            "database error on %s %s", request.method, request.url.path
+        )
     return JSONResponse(
         status_code=500,
         content={"detail": "A database error occurred."},
