@@ -5,11 +5,13 @@
         BrowserContext,
         type Condition,
     } from "$lib/browser/browserContext.svelte";
+    import { ApiError, isOutOfDeclaration } from "$lib/api/client";
     import { Button } from "$lib/components/ui/button";
     import { addSubTaskImage, removeSubTaskImage } from "$lib/data/helpers";
     import { instances } from "$lib/data/stores.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import { getContext, onDestroy } from "svelte";
+    import { toast } from "svelte-sonner";
     import type { ImageGET } from "../../types/openapi_types";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
@@ -73,11 +75,33 @@
         }
     }
 
-    function close() {
+    // Registered only as onDestroy(close), which does not await. The await
+    // below therefore cannot hold teardown open -- what it buys is ordering:
+    // the view state is no longer written before the server has accepted the
+    // link. Errors have to be reported from outside the component, which works
+    // because svelte-sonner's toast is a module singleton and <Toaster /> lives
+    // in the root layout.
+    async function close() {
         const currentInstanceIds = [...browserContext.selectedIds];
-        if (subTask) {
-            if (updateImageLinks) {
-                updateSubTaskImageLinks(currentInstanceIds);
+        if (subTask && updateImageLinks) {
+            try {
+                await updateSubTaskImageLinks(currentInstanceIds);
+            } catch (e) {
+                if (e instanceof ApiError && isOutOfDeclaration(e)) {
+                    toast.error(e.detail.message, {
+                        description:
+                            `Image project ${e.detail.image_projects.join(", ")}; ` +
+                            `task declares ${e.detail.declared_projects.join(", ")}. ` +
+                            `The selection was not saved.`,
+                    });
+                } else {
+                    toast.error(String(e));
+                }
+                // Teardown cannot be cancelled, so the panel closes and the
+                // selection is lost rather than handed back for correction.
+                // Persisting a link the server refused is worse: the viewer
+                // would show an image the database does not have.
+                return;
             }
         }
         // Prune/persist before goto so the snapshot includes the updated v=.

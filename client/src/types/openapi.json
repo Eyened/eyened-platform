@@ -4175,7 +4175,7 @@
     "/task": {
       "post": {
         "summary": "Create Task",
-        "description": "Create a task owned by the current user.",
+        "description": "Create a task owned by the current user, declaring its projects.",
         "operationId": "create_task_task_post",
         "parameters": [
           {
@@ -9426,12 +9426,21 @@
           "task_definition_id": {
             "type": "integer",
             "title": "Task Definition Id"
+          },
+          "projects": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Projects"
           }
         },
         "type": "object",
         "required": [
           "name",
-          "task_definition_id"
+          "task_definition_id",
+          "projects"
         ],
         "title": "TaskPUT"
       },

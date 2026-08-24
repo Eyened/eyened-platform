@@ -961,7 +961,7 @@ export interface paths {
         put?: never;
         /**
          * Create Task
-         * @description Create a task owned by the current user.
+         * @description Create a task owned by the current user, declaring its projects.
          */
         post: operations["create_task_task_post"];
         delete?: never;
@@ -2452,6 +2452,8 @@ export interface components {
             contact_id?: number | null;
             /** Task Definition Id */
             task_definition_id: number;
+            /** Projects */
+            projects: number[];
         };
         /** TaskResponse */
         TaskResponse: {

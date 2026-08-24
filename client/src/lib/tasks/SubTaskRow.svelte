@@ -4,6 +4,7 @@
     import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
     import { Button } from "$lib/components/ui/button";
     import * as Table from "$lib/components/ui/table";
+    import { ApiError, isOutOfDeclaration } from "$lib/api/client";
     import type { SubTaskWithImagesGET } from "../../types/openapi_types";
     import { toast } from "svelte-sonner";
     import {
@@ -60,7 +61,19 @@
                 await addSubTaskImage(row.id, id);
             }
         } catch (e) {
-            toast.error(String(e));
+            if (e instanceof ApiError && isOutOfDeclaration(e)) {
+                toast.error(e.detail.message, {
+                    // The loop above stops at the first refusal, so whatever
+                    // ran before it is already saved. Say so, or the grader
+                    // re-submits and double-adds those.
+                    description:
+                        `Image project ${e.detail.image_projects.join(", ")}; ` +
+                        `task declares ${e.detail.declared_projects.join(", ")}. ` +
+                        `Earlier changes were saved; the rest were not applied.`,
+                });
+            } else {
+                toast.error(String(e));
+            }
         } finally {
             showPicker = false;
         }
