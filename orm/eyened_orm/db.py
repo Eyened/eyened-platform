@@ -42,7 +42,6 @@ class Database:
         *,
         pool_size: int = 5,
         max_overflow: int = 10,
-        pool_recycle: int = 3600,
     ):
         """Pool sizing is per *process role*, not per database.
 
@@ -63,10 +62,6 @@ class Database:
             pool_pre_ping=True,
             pool_size=pool_size,
             max_overflow=max_overflow,
-            # pool_pre_ping already survives a connection dropped by MySQL's
-            # wait_timeout; recycling avoids paying its round-trip on
-            # connections already known to be too old.
-            pool_recycle=pool_recycle,
         )
         self._session_factory = sessionmaker(
             bind=self.engine,
