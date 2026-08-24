@@ -5,9 +5,12 @@ event loop, so the worker serves one request at a time. Declaring it def puts
 it in Starlette's threadpool instead. This guard fails the reflex.
 
 What it proves, exactly: no decorated handler is an AsyncFunctionDef whose body
-contains no await. It does NOT prove that a synchronous call inside a
-legitimately-async handler is wrapped in run_in_threadpool -- that blind spot is
-covered by test_route_concurrency.py, not by this file.
+contains no await, other than the two declared in `_LOOP_BOUND_ALLOWED` below.
+
+Blind spot: it does NOT prove that a synchronous call inside a
+legitimately-async handler is wrapped in run_in_threadpool. Nothing covers that
+-- test_route_concurrency.py drives `/task` and `/features`, both plain `def`,
+so it exercises none of the async handlers and says nothing about this case.
 
 Scope: `server/routes/*.py`, non-recursively, and only decorators written on a
 name literally called `router`. `server/main.py`'s `@app.get("/health")` is an
@@ -56,11 +59,28 @@ def _endpoints(tree: ast.AST):
             yield node
 
 
+# Declared exceptions: (label, function) -> why. Keyed on the same path the
+# offender list prints, not on the bare filename, so a routes file added under
+# another root cannot inherit an exemption by basename collision.
+#
+# Zarr reads: the segmentation store has no write lock, and the event loop is
+# the only thing serializing access to it within a worker. These two block the
+# loop deliberately -- moving them into the threadpool would let concurrent
+# readers race a concurrent writer against unsynchronised storage. What would
+# remove them: a lock in the storage layer, which is separate work.
+_LOOP_BOUND_ALLOWED: dict[tuple[str, str], str] = {
+    ("server/routes/segmentations.py", "get_segmentation_data"): "blocks the loop deliberately -- serializes zarr access; the storage layer has no lock",
+    ("server/routes/segmentations.py", "get_model_segmentation_data"): "blocks the loop deliberately -- serializes zarr access; the storage layer has no lock",
+}
+
+
 def _offenders_in(source: str, label: str) -> list[str]:
     return [
         f"{label}:{n.lineno} {n.name}"
         for n in _endpoints(ast.parse(source))
-        if isinstance(n, ast.AsyncFunctionDef) and not _awaits_something(n)
+        if isinstance(n, ast.AsyncFunctionDef)
+        and not _awaits_something(n)
+        and (label, n.name) not in _LOOP_BOUND_ALLOWED
     ]
 
 
