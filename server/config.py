@@ -143,10 +143,13 @@ class Settings(BaseSettings):
     refresh_cookie_name: str = "refresh_token"
     gzip_minimum_size: int = 1024 * 1024
 
-    # Thread capacity is the binding constraint and the pool is sized to serve
-    # it, so a request never waits on pool checkout. anyio's own default is 40
-    # threads, which against SQLAlchemy's default 5+10 pool would queue 25 of
-    # them behind that pool's default 30s pool_timeout.
+    # Sizing the pool to the thread count is necessary but NOT sufficient: a
+    # request holds its connection across several threadpool hops (each sync
+    # dependency, the endpoint, response-model validation), so checkouts can
+    # exceed the thread count -- measured, 20 against 16. What the relation
+    # rules out is the gross case: anyio's own default is 40 threads, which
+    # against SQLAlchemy's default 5+10 pool would queue 25 on checkout.
+    # pool_timeout bounds the wait that remains.
     threadpool_limit: int = Field(
         default=16,
         ge=1,
@@ -174,6 +177,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _threads_cannot_outnumber_connections(self) -> "Settings":
+        """Kept because it still catches a grossly undersized pool. It does not
+        guarantee a checkout never waits -- see the threadpool_limit comment."""
         capacity = self.pool_size + self.max_overflow
         if self.threadpool_limit > capacity:
             raise ValueError(
