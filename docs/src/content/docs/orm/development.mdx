@@ -101,11 +101,19 @@ When committing migrations to production:
 
 7. If the migration fails, recreate the test database and then repeat steps 4-6 until the migration is successful.
 
-8. The test database and test ORM are now in sync. Store the full SQL migration by running:
-   ```bash
-   ./generate_latest_migration_sql.sh
-   ```
-   This script is located in the `orm/migrations` directory.
+8. The test database and test ORM are now in sync.
+
+   :::caution
+   There is no offline SQL dump of a migration to store, and do not try to produce
+   one with `alembic upgrade <rev>:head --sql`. In offline mode `op.get_bind()` is
+   `None`, so any migration that reads the database before emitting DDL crashes with
+   `AttributeError: 'NoneType' object has no attribute 'scalar'`, and the crash looks
+   like a broken migration rather than an unsupported mode. Guarding the reads would
+   be worse than the crash: steps that *discover* live names or bounds — the
+   single-column foreign key a composite replaces, the `MIN`/`MAX` bounds a chunked
+   backfill loops over — would resolve to nothing and be silently omitted from the
+   generated file. Rehearse on a restored copy with `alembic upgrade head` instead.
+   :::
 
 9. Push the changes on a branch with a convenient name that reflects the changes made. Submit a pull request. 
 
