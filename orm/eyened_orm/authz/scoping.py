@@ -1,31 +1,30 @@
 """Which projects does this object touch?
 
-``Patient.ProjectID`` is the schema's only project *authority*, but it is no
-longer the only place the answer lives: ``Study``, ``Series`` and
-``ImageInstance`` each carry a copy that composite foreign keys hold equal to
-it, and a task's project set is declared outright in ``TaskProject``. So an
-entity reaches its project either on its own column or in one hop.
+``Patient.ProjectID`` is the schema's only project *authority*, but no longer
+the only place the answer lives: ``Study``, ``Series`` and ``ImageInstance``
+each carry a copy that composite foreign keys hold equal to it, and a task's
+project set is declared outright in ``TaskProject``. So an entity reaches its
+project either on its own column or in one hop.
 
-``SubTaskImageLink`` carries a fourth copy, and it is *not* one of these
-routes: it is there for containment -- ``(TaskID, ProjectID)`` references
-``TaskProject``, which is what refuses an image from a project its task never
-declared. It appears in none of the registries below, so a scoped read of it
-raises rather than resolving a route.
+``SubTaskImageLink`` carries a fourth copy that is *not* a route: it is there
+for containment -- ``(TaskID, ProjectID)`` references ``TaskProject``, which is
+what refuses an image from a project its task never declared. It appears in
+none of the registries below, so a scoped read of it raises rather than
+resolving a route.
 
-That route is declared **once**, in ``_OWN_PROJECT_COLUMN`` and ``_ONE_HOP_TO``,
-and everything consumes that one definition: ``apply_scope`` correlates it into
-a read as an ``EXISTS``, writes execute it as a selectable, and ``eorm
-grant-for-task`` executes the same function. Two implementations will drift, and
-the failure mode is an administrator granting a set that does not match what the
-API requires.
+The route is declared **once**, in ``_OWN_PROJECT_COLUMN`` and ``_ONE_HOP_TO``,
+and every consumer is built from that one definition: ``apply_scope``
+correlates it into a read as an ``EXISTS``, writes execute it as a selectable,
+``eorm grant-for-task`` calls the same function. Two implementations will
+drift, and the failure mode is an administrator granting a set that does not
+match what the API requires.
 
-Those two registries name **entities only** -- which entities end the route on
-their own row, and which entity each remaining one hops to. The ``ProjectID``
-column and the ON clause are *derived* from the entity and from the schema's own
-foreign keys rather than written down beside them, so the pairings that are
-valid SQL with a wrong answer -- another table's ``ProjectID``, this table's
-other integer column, a hop keyed on the wrong column or against itself -- are
-not merely untested here, they cannot be written.
+Both registries name **entities only**: the ``ProjectID`` column and each hop's
+ON clause are *derived* from the entity and from the schema's own foreign keys
+rather than written down beside them, so a pairing that is valid SQL with a
+wrong answer cannot be written at all rather than merely being untested. Only a
+wrong *entity* is expressible, and a reader can check that against the name
+beside it.
 """
 from __future__ import annotations
 
@@ -80,22 +79,13 @@ __all__ = [
 
 # --- the one route, consumed by both forms ---------------------------------
 #
-# ``_OWN_PROJECT_COLUMN`` and ``_ONE_HOP_TO`` between them are the *only* place
-# an entity's route to its ``ProjectID`` is written down, and
-# ``_hops_to_column`` is the only thing that reads them. Both consumers below
-# are built from that one route -- the selectable form (``project_ids_of_*``,
-# executed by writes and the CLI) and the correlated ``EXISTS`` predicate
-# (``apply_scope``, correlated into a read). Two hand-written implementations
-# of the same route is exactly the drift this module's docstring says it exists
-# to prevent.
-#
-# Both registries name entities and nothing else. That is deliberate, and it is
-# what makes the two consumers safe to reason about separately: they build the
-# same route with SQLAlchemy primitives that behave *oppositely* toward a table
-# named in a predicate but present in no FROM. ``select().where()`` infers the
-# FROM, so such a table is silently added, unjoined -- a cross join, legal SQL,
-# every row returned. ``stmt.join()`` does not infer, so the same entry is a
-# dangling reference and raises. One bad pairing would therefore widen every
+# The two consumers -- the selectable form (``project_ids_of_*``, executed by
+# writes and the CLI) and the correlated ``EXISTS`` (``apply_scope``) -- build
+# the same route with SQLAlchemy primitives that behave *oppositely* toward a
+# table named in a predicate but present in no FROM. ``select().where()`` infers
+# the FROM, so such a table is silently added, unjoined -- a cross join, legal
+# SQL, every row returned. ``stmt.join()`` does not infer, so the same entry is
+# a dangling reference and raises. One bad pairing would therefore widen every
 # read while crashing the first write, and a test pointed at either consumer is
 # no evidence about the other. Deriving both halves of the route removes the
 # pairing rather than testing it twice.
@@ -108,40 +98,32 @@ class _CarriesProjectID(Protocol):
 
 
 # Entities carrying their own ProjectID: the route ends here, on *that
-# entity's* column. A set, not a map: the column is derived from the entity
-# rather than written beside it, so ``Series: Study.ProjectID`` -- valid SQL,
-# wrong answer, cross-joins Study into the enclosing FROM and returns every
-# Series row -- and ``Series: Series.StudyID`` -- valid SQL, no cross join, a
-# StudyID judged against a project set, which on a fixture whose project ids
-# and row ids coincide even gives the right answer -- are both unwriteable
-# rather than merely untested. The element type is what pins the column's
-# *type* as well: nothing checks these annotations today, but a ``Mapped[str]``
-# anchor is the one place SQLite and MySQL disagree about ``IN`` (MySQL coerces
-# both sides to DOUBLE, so '03' and '3abc' match ``IN (3)``; SQLite matches
-# neither), and this is where that would be caught if a checker is ever run.
+# entity's* column. A set, not a map, so that ``Series: Study.ProjectID``
+# (valid SQL, wrong answer: cross-joins Study into the enclosing FROM and
+# returns every Series row) and ``Series: Series.StudyID`` (valid SQL, no cross
+# join, a StudyID judged against a project set, which on a fixture whose project
+# ids and row ids coincide even gives the right answer) are unwriteable. The
+# element type pins the column's *type* as well: MySQL coerces both sides of
+# ``IN`` to DOUBLE, so a ``Mapped[str]`` anchor would match '03' and '3abc'
+# against ``IN (3)`` where SQLite matches neither. Nothing checks the annotation
+# today.
 _OWN_PROJECT_COLUMN: frozenset[type[_CarriesProjectID]] = frozenset(
     {Patient, Study, Series, ImageInstance}
 )
 
-# One hop nearer a ProjectID column, named by the *parent* only. Replaces the
-# five-hop walk to Patient: the anchor is still Patient.ProjectID, but every row
-# down the chain now carries a structurally-equal copy, so nothing has to travel
-# to reach it.
-#
-# The ON clause is the foreign key the schema itself declares, derived by
-# ``_hop_onclause`` rather than written out here. A hand-written clause can key
-# on the wrong column, key a table against itself -- which degenerates the
-# EXISTS into "does any row in scope exist" and returns the whole table -- or
-# name a parent no foreign key reaches; all three are valid SQL, all three are
-# fail-open, and none of them is visible in the compiled statement's shape. A
-# parent that is not a foreign-key neighbour now raises at the first call
-# instead.
+# One hop nearer a ProjectID column, named by the *parent* only; the ON clause
+# comes from ``_hop_onclause``. A hand-written clause can key on the wrong
+# column, key a table against itself -- which degenerates the EXISTS into "does
+# any row in scope exist" and returns the whole table -- or name a parent no
+# foreign key reaches; all three are valid SQL, all three are fail-open, and
+# none of them is visible in the compiled statement's shape. A parent that is
+# not a foreign-key neighbour raises at the first call instead.
 _ONE_HOP_TO: dict[type[Base], type[Base]] = {
     Segmentation: ImageInstance,
     ModelSegmentation: ImageInstance,
     FormAnnotation: Patient,
-    # A tag link carries no project of its own; it inherits the one its parent
-    # row resolves to, so it simply enters the chain one hop lower.
+    # A tag link carries no project of its own; it inherits its parent row's,
+    # so it simply enters the chain one hop lower.
     StudyTagLink: Study,
     ImageInstanceTagLink: ImageInstance,
     SegmentationTagLink: Segmentation,
@@ -154,13 +136,12 @@ SINGLE_PROJECT_ENTITIES: frozenset[type[Base]] = (
 SET_VALUED_ENTITIES: frozenset[type[Base]] = frozenset({Task, SubTask})
 
 # Entities that carry no project anchor and are therefore safe to read
-# unfiltered. This list is the *reason* apply_scope may return a statement
-# untouched; naming it is what lets that function fail closed on everything
-# else instead of guessing. An entity is only safe here because a membership
-# governs nothing about it -- a creator, a hardware model, a segmentation
-# feature, a form definition and a label all exist independently of any
-# project. Adding a name is a claim of exactly that, and the suite pins both
-# directions: every member passes through, and a non-member raises.
+# unfiltered. Adding a name here is a claim that no membership governs the
+# entity at all -- a creator, a hardware model, a segmentation feature, a form
+# definition and a label exist independently of any project. Naming them is
+# what lets ``scope_criteria`` fail closed on everything else instead of
+# guessing, and the suite pins both directions: every member passes through,
+# and a non-member raises.
 SAFE_UNFILTERED_ENTITIES: frozenset[type[Base]] = frozenset(
     {Creator, DeviceInstance, DeviceModel, Feature, FormSchema, Tag}
 )
@@ -169,21 +150,20 @@ SAFE_UNFILTERED_ENTITIES: frozenset[type[Base]] = frozenset(
 def _hop_onclause(child: type[Base], parent: type[Base]) -> ColumnElement[bool]:
     """One hop's ON clause: the foreign key the schema already declares.
 
-    ``join_condition`` reads the constraint rather than trusting anyone to
-    retype it, and it is the *whole* answer for the failure modes a written-out
-    clause has: a parent no foreign key reaches raises ``NoForeignKeysError``, a
+    Reading the constraint answers a written-out clause's failure modes
+    outright: a parent no foreign key reaches raises ``NoForeignKeysError``, a
     pair with more than one candidate raises ``AmbiguousForeignKeysError``, and a
     composite key derives as the composite AND instead of one of its halves. All
     three are refusals at the first call, where the written-out version was legal
     SQL that returned too many rows.
 
-    The one thing done to its output is to render the child's column first.
-    ``join_condition`` puts the *referenced* column on the left, so it emits
-    ``ImageInstance.ImageInstanceID = Segmentation.ImageInstanceID``; ``=`` is
-    commutative and both dialects agree, so this is cosmetic -- but it keeps
-    every compiled statement byte-identical to the hand-written clauses this
-    replaced, which is what allows a diff of the whole scoped-SQL surface to be
-    the evidence that deriving the route changed nothing.
+    Each equality is then normalised child-first, because ``join_condition``
+    renders the *referenced* column on the left whichever way round its
+    arguments go: both orders emit ``ImageInstance.ImageInstanceID =
+    Segmentation.ImageInstanceID``. ``=`` is commutative and both dialects
+    agree, so the normalisation is cosmetic -- but without it every compiled
+    statement that has a hop in it flips sides, and a diff of the scoped-SQL
+    surface stops being evidence that the route itself has not moved.
     """
     condition = join_condition(child.__table__, parent.__table__)
     equalities = (
@@ -197,8 +177,8 @@ def _hop_onclause(child: type[Base], parent: type[Base]) -> ColumnElement[bool]:
             not isinstance(equality, BinaryExpression)
             or equality.operator is not operators.eq
         ):
-            # Unreachable for a foreign-key join; it fails closed rather than
-            # letting an unrecognised clause through onto the authorization path.
+            # Unreachable for a foreign-key join; fails closed rather than let
+            # an unrecognised clause through onto the authorization path.
             raise TypeError(
                 f"{child.__name__} -> {parent.__name__} derived a non-equality "
                 f"join condition: {equality!s}"
@@ -215,16 +195,10 @@ def _hops_to_column(
 ) -> tuple[list[tuple[type[Base], ColumnElement[bool]]], ColumnElement[int]]:
     """The one route: the hops to walk, and the ProjectID column they land on.
 
-    Successor to ``_join_to_patient``, and it exists for the same reason: the
-    correlated ``EXISTS`` and the executable ``Select`` must be built from one
-    declaration, or they drift, and the failure mode is an administrator
-    granting a set that does not match what the API requires.
-
-    Nothing here is looked up in a table of columns or clauses: the anchor is
-    ``node.ProjectID`` on the entity that ends the route, and each hop's ON
-    clause comes from the schema. The registries above therefore cannot express
-    a wrong column or a wrong predicate at all -- only a wrong *entity*, which
-    a reader can check against the name beside it.
+    The only reader of the two registries, so the correlated ``EXISTS`` and the
+    executable ``Select`` are built from one declaration. The anchor is
+    ``node.ProjectID`` on the entity that ends the route; each hop's ON clause
+    comes from the schema.
 
     Bounded by ``len(_ONE_HOP_TO)`` hops -- today the longest chain is two
     (``SegmentationTagLink -> Segmentation -> ImageInstance``). A malformed map
@@ -255,9 +229,9 @@ def _project_ids_from(
 ) -> Select:
     """The selectable form: the project one row of ``anchor`` sits in.
 
-    No ``.distinct()``: the route now ends at a column on a single row, so it
-    returns exactly one, by construction rather than by every hop happening to
-    be many-to-one.
+    No ``.distinct()``: the route ends at a column on a single row, so it
+    returns exactly one by construction rather than by every hop happening to be
+    many-to-one.
     """
     joins, column = _hops_to_column(anchor)
     stmt = select(column).select_from(anchor)
@@ -271,11 +245,10 @@ def _single_project_predicate(
 ) -> ColumnElement[bool]:
     """``ProjectID IN (...)``, on the row's own column or through one hop.
 
-    An entity in ``_OWN_PROJECT_COLUMN`` gets the bare column test: no
-    subquery, nothing to correlate, and nothing for the optimizer to get wrong.
-    Both paragraphs below are about the seven entities that still emit an
-    ``EXISTS``, and they are why it is an ``EXISTS`` rather than the obvious
-    alternatives.
+    The four entities in ``_OWN_PROJECT_COLUMN`` get the bare column test: no
+    subquery, nothing to correlate, nothing for the optimizer to get wrong. The
+    two paragraphs below are about the seven that still emit an ``EXISTS``, and
+    why it is an ``EXISTS`` rather than the obvious alternatives.
 
     ``ProjectID IN (...)`` is pushed **inside** that subquery rather than
     compared against a correlated scalar subquery in the outer WHERE. The
@@ -285,23 +258,22 @@ def _single_project_predicate(
     surface, because the *empty* result is the expensive one. As an ``EXISTS``
     the optimizer decorrelates it into a semi-join that drives off the project
     index and never touches the outer table (0.005 ms on the same page). Those
-    numbers were measured on the five-hop walk, but what they are about is the
-    scalar-versus-``EXISTS`` shape rather than the length of the chain, so the
-    argument still governs every entry that keeps a subquery -- shortening the
-    walk to one hop did not make the scalar form safe.
+    numbers were measured on a five-hop walk, but they are about the
+    scalar-versus-``EXISTS`` shape rather than the length of the chain, so they
+    still govern every entry that keeps a subquery.
 
-    ``.correlate(entity)`` is load-bearing, not decoration, for the same reason
-    as before: SQLAlchemy's *auto*-correlation strips from a subquery's FROM
-    every table the enclosing query already has, and these subqueries select
-    FROM tables real read queries also join -- ``Patient`` for the two
-    ``FormAnnotation`` routes, ``ImageInstance`` for the segmentations and
-    ``ImageInstanceTagLink``, ``Study`` for ``StudyTagLink``, all three of
-    which the search layer's image statement holds at once. Auto-correlation
-    would empty the FROM and raise ``InvalidRequestError: ... returned no FROM
-    clauses due to auto-correlation``. Naming the single outer entity turns
-    auto-correlation off and pins exactly one table as the correlated one, so
-    the predicate is safe in any enclosing query by construction rather than by
-    accident. Do not drop it because the subquery got smaller.
+    ``.correlate(entity)`` is load-bearing, not decoration. SQLAlchemy's
+    *auto*-correlation strips from a subquery's FROM every table the enclosing
+    query already has, and these subqueries select FROM tables real read queries
+    also join -- ``Patient`` for the two ``FormAnnotation`` routes,
+    ``ImageInstance`` for the segmentations and ``ImageInstanceTagLink``,
+    ``Study`` for ``StudyTagLink``, all three of which the search layer's image
+    statement holds at once. Auto-correlation would empty the FROM and raise
+    ``InvalidRequestError: ... returned no FROM clauses due to
+    auto-correlation``. Naming the single outer entity turns auto-correlation
+    off and pins exactly one table as the correlated one, so the predicate is
+    safe in any enclosing query by construction. Do not drop it because the
+    subquery got smaller.
     """
     joins, column = _hops_to_column(entity)
     if not joins:
@@ -340,28 +312,27 @@ def image_project_pairs(image_instance_ids: Sequence[int]) -> Select:
     """``(ImageInstanceID, ProjectID)`` for a batch of images, in one query.
 
     The batched sibling of ``project_ids_of_image``, for a gate that must judge
-    a whole list of caller-supplied ids at once. It is built from
-    ``_hops_to_column`` like every other consumer, so a change to the route --
-    a denormalized column, an anchor move, a predicate added to a hop --
-    reaches this gate with the read filters instead of leaving it resolving
-    projects by a stale route with nothing red.
+    a whole list of caller-supplied ids at once. It is the one selectable that
+    could plausibly be hand-written, and is not: a change to the route reaches
+    this gate with the read filters instead of leaving it resolving projects by
+    a stale route with nothing red.
 
     Named for its rows rather than ``project_ids_of_images``: every
     ``project_ids_of_*`` selects one column and is consumed through
-    ``session.scalars``, and under that name the same call would hand a caller
+    ``session.scalars``, so under that name the same call would hand a caller
     column 0 -- *image* ids -- to feed ``AccessScope.require`` as a project set,
     wrong by construction with nothing to raise. Pairs, not bare project ids,
     because the caller needs to tell *which* id resolved to nothing: an id
     absent from the result is what its 404 is built on.
 
-    No ``.distinct()``: today the route is zero hops -- ``ProjectID`` is a
+    No ``.distinct()``: the route is zero hops today -- ``ProjectID`` is a
     column on the image row itself -- so one image yields one row. What depends
     on that is not the wasted row (a duplicate pair is harmless) but the caller
     building a ``dict`` off these rows, where last-row-wins would silently keep
     one project per image. Should ``ImageInstance``'s route ever pass through a
-    one-to-many hop, the gate would then judge a *subset* of an image's
-    projects while ``apply_scope``'s ``EXISTS`` still considers all of them;
-    the caller must key by image differently before that route changes.
+    one-to-many hop, the gate would judge a *subset* of an image's projects
+    while ``apply_scope``'s ``EXISTS`` still considers all of them; the caller
+    must key by image differently before that route changes.
     """
     joins, column = _hops_to_column(ImageInstance)
     stmt = select(ImageInstance.ImageInstanceID, column).select_from(ImageInstance)
@@ -411,42 +382,35 @@ def _set_valued_predicate(
     Reads the declaration rather than walking the image links, which is what
     makes this O(projects per task) instead of O(links in the task). Both
     entities key on their own ``TaskID`` column, so neither needs a join.
+    ``projects_of`` dispatches to ``project_ids_of_task``/``_subtask``, which
+    select from this same table -- the selectable form of what is correlated
+    here, so read and write judge a task by the same set.
 
-    Vacuity is unchanged: a task declaring nothing produces no rows, so the
-    EXISTS is false and NOT EXISTS is true -- visible to everyone. An actor
-    with no memberships still sees only those, since ``NOT IN ()`` renders
-    true and excludes any task with a declaration.
+    Vacuity: a task declaring nothing produces no rows, so the EXISTS is false
+    and NOT EXISTS is true -- it is visible to everyone. An actor with no
+    memberships still sees only those, since ``NOT IN ()`` renders true and so
+    excludes any task that declares anything.
 
-    Read and write now answer the same question about a task: it is findable
-    by the projects it declares and writable by them too. ``projects_of``
-    dispatches to ``project_ids_of_task``/``_subtask``, which select from this
-    same table -- the selectable form of what is correlated here.
+    **Why the declaration cannot widen anything.** ``SubTaskImageLink`` carries
+    ``(TaskID, ProjectID)`` under ``fk_SubTaskImageLink_TaskProject``, so an
+    image from an undeclared project cannot be linked at all: the declaration is
+    a *superset* of the projects a task's images sit in, held there by the
+    database rather than by any writer. Judging the superset can only ever hide
+    a task from someone who could otherwise see it, never the reverse. Where a
+    declaration was seeded from the task's own images the two sets are in fact
+    *equal*, which is why no pre-existing fixture or production task tells them
+    apart.
 
-    **Why leaving the walk cannot widen anything.** ``SubTaskImageLink``
-    carries ``(TaskID, ProjectID)`` under ``fk_SubTaskImageLink_TaskProject``,
-    so an image from an undeclared project cannot be linked at all: the
-    declaration is a *superset* of the projects a task's images sit in, held
-    there by the database rather than by any writer. Reading the superset can
-    only ever hide a task from someone the walk showed it to, never the
-    reverse. And on every row that predates the switch the two sets are
-    *equal*, because the migration that created ``TaskProject`` seeded it from
-    exactly this walk (``INSERT ... SELECT DISTINCT st.TaskID, p.ProjectID FROM
-    SubTask ... JOIN Patient``), which is why no pre-existing fixture or
-    production task can tell the two apart.
+    That narrowing is real, though, not a pure optimisation: a task declaring
+    ``{A, B}`` whose images all sit in ``A`` is not visible to an ``A``-only
+    member. Extending a declaration produces exactly that shape on purpose --
+    fail-safe and deliberate, but a behaviour change.
 
-    Narrowing is not nothing, though, and this is not a change that leaves
-    visibility untouched: a task declaring ``{A, B}`` whose images all sit in
-    ``A`` was visible to an ``A``-only member under the walk and is not under
-    the declaration. Extending a declaration (§6.3) produces exactly that
-    shape on purpose. Fail-safe, deliberate -- but a behaviour change, so do
-    not restate it as a pure optimisation.
-
-    ``.correlate(entity)`` is load-bearing now, not the uniformity it was while
-    this walked six tables: the subquery's entire FROM is ``TaskProject``, so a
-    read that joins ``TaskProject`` itself would have auto-correlation strip it
-    and raise ``InvalidRequestError`` -- the failure that motivates the call in
-    ``_single_project_predicate``. Naming the outer entity pins exactly one
-    correlated table and turns auto-correlation off.
+    ``.correlate(entity)`` is load-bearing: the subquery's entire FROM is
+    ``TaskProject``, so a read that joins ``TaskProject`` itself would have
+    auto-correlation strip it and raise ``InvalidRequestError`` -- the failure
+    that motivates the call in ``_single_project_predicate``. Naming the outer
+    entity pins exactly one correlated table and turns auto-correlation off.
     """
     if entity is Task:
         task_id_column = Task.TaskID
@@ -465,15 +429,13 @@ def _set_valued_predicate(
 
 
 # Deliberately narrower than ``SINGLE_PROJECT_ENTITIES``: the four tag-link
-# entities (``StudyTagLink``, ``ImageInstanceTagLink``, ``SegmentationTagLink``,
-# ``FormAnnotationTagLink``) have a ``_ONE_HOP_TO`` entry above -- they must be
-# filterable on the read path -- but no ``projects_of`` resolver here,
-# so ``projects_of(session, StudyTagLink, ...)`` raises ``KeyError`` by design.
-# A tag link carries no project of its own; a write that applies or removes one
-# is authorized against its *parent* entity (the study, image, segmentation or
-# form annotation being tagged), which does have a resolver. Tag authorization
-# must honour that, or add the four resolvers here and stop routing through the
-# parent -- but not both, or the two paths will disagree.
+# entities have a ``_ONE_HOP_TO`` entry above -- they must be filterable on the
+# read path -- but no resolver here, so ``projects_of(session, StudyTagLink,
+# ...)`` raises ``KeyError`` by design. A write that applies or removes a tag is
+# authorized against its *parent* entity (the study, image, segmentation or form
+# annotation being tagged), which does have a resolver. Either honour that, or
+# add the four resolvers here and stop routing through the parent -- but not
+# both, or the two paths will disagree.
 PROJECT_IDS_OF: dict[type[Base], Callable[[int], Select]] = {
     Patient: project_ids_of_patient,
     Study: project_ids_of_study,
@@ -491,10 +453,8 @@ def projects_of(session: Session, entity: type[Base], entity_id: int) -> set[int
     """Execute the entity's rule and return its project set.
 
     Used by writes (``scope.require(projects_of(...), floor)``) and by the CLI's
-    ``grant-for-task``. The read path correlates these same definitions for
-    every entity here, ``Task`` and ``SubTask`` included: the divergence that
-    stood while reads walked the image links closed when
-    ``_set_valued_predicate`` moved onto ``TaskProject``.
+    ``grant-for-task``. The read path correlates these same definitions, for
+    every entity here including ``Task`` and ``SubTask``.
     """
     return set(session.scalars(PROJECT_IDS_OF[entity](entity_id)).all())
 
@@ -509,14 +469,14 @@ def scope_criteria(
     SELECT for the collection, which the root's WHERE never touches -- so a
     relationship whose target has a different project anchor from its parent
     (``ImageInstance.FormAnnotations`` is the one such load on the read path)
-    needs the same predicate handed to ``with_loader_criteria`` instead. This
-    function is what both consume, so the collection is filtered off the same
-    route declaration as the root rather than by a second hand-written rule.
+    needs the same predicate handed to ``with_loader_criteria`` instead. Both
+    consume this function, so the collection is filtered off the same route
+    declaration as the root rather than by a second hand-written rule.
 
     ``None`` means "add nothing": an admin scope, or an entity declared safe to
-    read unfiltered. Returning a tautology instead would put a
-    ``with_loader_criteria(..., true())`` on every admin read and read as
-    though a filter were in force.
+    read unfiltered. A tautology instead would put a
+    ``with_loader_criteria(..., true())`` on every admin read and read as though
+    a filter were in force.
     """
     if scope.is_admin:
         return None
@@ -541,28 +501,19 @@ def apply_scope(stmt: Select, entity: type[Base], scope: AccessScope) -> Select:
     ``NotFoundError`` produces the 404 -- so reads never need ``scope.require``
     and there is no path where a row is fetched first and judged afterwards.
 
-    Entities with no project anchor pass through unfiltered; that is
-    deliberate, not an omission, and ``SAFE_UNFILTERED_ENTITIES`` is the list
-    -- named rather than implied, so the coverage test in the suite can pin
-    both directions of it.
-
-    Raises ``KeyError`` for any other entity. Returning such a statement
-    unfiltered would be a silent no-op wearing a scoped name: an entity that
-    ought to be scoped but was never registered would read as though it had
-    been filtered. Failing closed makes the omission a crash at the first call
-    instead of a leak.
+    The registry decisions are ``scope_criteria``'s, which the eager-load path
+    also consumes: entities named in ``SAFE_UNFILTERED_ENTITIES`` pass through
+    unfiltered, and any entity in no registry raises ``KeyError``. Returning
+    such a statement unfiltered would be a silent no-op wearing a scoped name --
+    an entity that ought to be scoped but was never registered would read as
+    though it had been filtered -- so failing closed makes the omission a crash
+    at the first call instead of a leak.
 
     ``scoped_one`` raises on a strictly larger set of entities: it has no
-    ``SAFE_UNFILTERED_ENTITIES`` fallback, so it raises on an entity this
-    function would pass through unfiltered, and it only reaches this function
-    at all once its own, earlier check has cleared. It is also unconditional
-    where this one is not -- an admin scope short-circuits here before any
-    registry is consulted, so ``scoped_one(session, Project, admin)`` raises
-    while ``apply_scope(stmt, Project, admin)`` returns the statement untouched.
-
-    The registry decisions themselves live in ``scope_criteria``, which the
-    eager-load path also consumes; everything described above is that
-    function's behaviour, applied to a statement.
+    ``SAFE_UNFILTERED_ENTITIES`` fallback, and it is unconditional where this
+    one is not -- an admin scope short-circuits here before any registry is
+    consulted, so ``scoped_one(session, Project, admin)`` raises while
+    ``apply_scope(stmt, Project, admin)`` returns the statement untouched.
     """
     criteria = scope_criteria(entity, scope)
     return stmt if criteria is None else stmt.where(criteria)
