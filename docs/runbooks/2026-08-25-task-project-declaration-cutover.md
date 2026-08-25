@@ -1,9 +1,5 @@
 # Task project declaration cutover — deploying `2db0e63195db`
 
-> Preparer: replace `<contact>` below with a real name and channel before sending this to a site, then delete this line.
-
-**Contact:** `<contact>`
-
 Five migrations, `d3ce100ab2b6` through `2db0e63195db`, denormalize `ProjectID` down the patient chain and add the `TaskProject` declaration the read path switches to.
 
 The chain and the release are not independent. The chain adds `NOT NULL` columns with no default, so the **previous** release cannot INSERT once it is applied — the importer included — and the new release cannot SELECT before it. Apply the chain and deploy in one window, chain first. Run once per site.
@@ -18,7 +14,7 @@ The chain and the release are not independent. The chain adds `NOT NULL` columns
 - Do not run any of this with `foreign_key_checks` off. The migrations refuse; off, `ADD FOREIGN KEY` creates a key that has never looked at a row.
 - Do not re-run a failed migration over its result without reading Recovery first. MySQL commits DDL implicitly.
 - Take the head from `alembic heads` on the release checkout, not from this document. If other migrations land after this one, the chain is rebased and the id below is no longer the target.
-- Anything that does not match this document: stop before the next command and contact `<contact>`.
+- Anything that does not match this document: stop before the next command and escalate.
 
 ## Timing
 
@@ -45,13 +41,13 @@ The migrated schema costs **+17%** over the same rows.
 
 | Check | Expect |
 |---|---|
-| `alembic -x env_file=<ddl.env> current` | `orm_baseline`. A later id means the chain was rebased — stop and contact `<contact>` |
+| `alembic -x env_file=<ddl.env> current` | `orm_baseline`. A later id means the chain was rebased — stop and escalate |
 | `SELECT @@SESSION.sql_mode` | contains `STRICT_TRANS_TABLES` or `STRICT_ALL_TABLES` |
 | `SELECT @@GLOBAL.binlog_format` | `ROW` — the backfills fail with ERROR 1665 under `STATEMENT` |
 | `SELECT @@SESSION.foreign_key_checks` | `1` |
 | free disk | at least the size of `ImageInstance`, plus 17% of the schema |
 
-No part of this repository sets `sql_mode` or `binlog_format`; they are the server's. Anything else here: stop and contact `<contact>`.
+No part of this repository sets `sql_mode` or `binlog_format`; they are the server's. Anything else here: stop and escalate.
 
 **1. Stop the writers.** API and importer both. Reads may continue.
 
@@ -63,7 +59,7 @@ No part of this repository sets `sql_mode` or `binlog_format`; they are the serv
 **3. `alembic current`, then `alembic check`** — the gate. Do not deploy until it passes.
 
 - Expect: `2db0e63195db (head)` and a clean check.
-- Otherwise: stop before step 4 and contact `<contact>`.
+- Otherwise: stop before step 4 and escalate.
 
 **4. Deploy the release.**
 
@@ -76,10 +72,10 @@ No part of this repository sets `sql_mode` or `binlog_format`; they are the serv
 
 | Situation | Action |
 |---|---|
-| `2db0e63195db` aborts: `N (task, project) pairs are reachable through the image links but not declared in TaskProject ... Reconcile first` | A writer was live during step 2. The gate runs before any DDL, so nothing is half-applied and the database sits at `b45090e1544e`. Stop the writer, insert the missing pairs into `TaskProject`, re-run `upgrade head`. Contact `<contact>` for the reconciling statement — declaration management does not ship in this release. |
+| `2db0e63195db` aborts: `N (task, project) pairs are reachable through the image links but not declared in TaskProject ... Reconcile first` | A writer was live during step 2. The gate runs before any DDL, so nothing is half-applied and the database sits at `b45090e1544e`. Stop the writer, insert the missing pairs into `TaskProject`, re-run `upgrade head`. Escalate for the reconciling statement — declaration management does not ship in this release. |
 | `2db0e63195db` prints `NOTE: N declared (task, project) pairs no link uses` | Not an error, the migration continues. Those tasks become harder to see once the read path switches. Record and continue. |
-| A migration fails part-way, or the run is interrupted | Every migration in the chain is re-runnable — each step is guarded by the state it would produce. Run `alembic current`, then `alembic upgrade head` again. If `current` names a revision you do not expect, stop and contact `<contact>`. |
+| A migration fails part-way, or the run is interrupted | Every migration in the chain is re-runnable — each step is guarded by the state it would produce. Run `alembic current`, then `alembic upgrade head` again. If `current` names a revision you do not expect, stop and escalate. |
 | Roll back before step 4 | `alembic downgrade orm_baseline`. **16 min 14 s** at dev scale, of which `b45090e1544e` blocks writes for a further **8 min 19 s** re-copying the same three tables. Restoring the backup is faster if the window is still open. |
 | Roll back after step 4 | The previous release cannot write to the migrated schema, so code alone is not enough: redeploy the previous release **and** downgrade, in that order, at the cost above. |
 | Downgrade past `99724789b34d` | Drops `TaskProject`. Declarations broader than a task's images are derived from nothing and do not come back — re-applying the chain re-derives only what the links imply. Note any task created after step 4 before downgrading. |
-| Step 2's DDL must be undone entirely | Redeploy the previous release **first**, then restore the pre-step-2 backup — only while the window is still open. Once the new release has taken writes, restoring loses them: contact `<contact>` instead. |
+| Step 2's DDL must be undone entirely | Redeploy the previous release **first**, then restore the pre-step-2 backup — only while the window is still open. Once the new release has taken writes, restoring loses them: escalate instead. |
