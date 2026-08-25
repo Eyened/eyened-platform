@@ -100,7 +100,7 @@ do nothing. There is no feature flag: a flag means two code paths where the
 |---|---|---|
 | Read anything, in any project | yes | yes |
 | Create annotations; modify and delete **own** | yes | yes |
-| Create a task | yes | yes (vacuous -- a new task holds no images) |
+| Create a task | yes | yes, but not vacuous: `POST /task` requires a non-empty `projects` declaration and `grader` in every project in it |
 | Update task/subtask status; add/remove subtasks and images | yes | yes |
 | **Modify another user's annotation** | yes | **no** |
 | **Delete another user's annotation** | yes | **no** -- project admin |
@@ -192,7 +192,7 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
 | `eorm grant --user U --project P --role R` | Grant or change a role |
 | `eorm revoke --user U --project P` | Remove a membership |
 | `eorm revoke --user U --all` | Remove every membership the user holds; confirms unless `--yes` |
-| `eorm grant-for-task --user U --task N [--task M] --role R` | Grant every project the tasks touch, after review |
+| `eorm grant-for-task --user U --task N [--task M] --role R` | Grant every project the tasks **declare**, after review. Not the projects their images sit in: a declaration may be a strict superset, and this grants full membership in every project it names |
 | `eorm grant-all` | Cutover step 3 |
 | `eorm set-admin --user U --on/--off` | Set or clear administrator status on an existing account |
 | `eorm set-password --user U` | Set an existing user's password -- including an account (OIDC-provisioned, an AI model, attribution-only) that was never meant to log in by password at all |
@@ -243,16 +243,35 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
   hold no images today, and every task is empty between creation and its first
   image. Any authenticated user can see, modify and delete them. Accepted in
   v0.3 to keep the rule one sentence long.
-- **Adding an image can evict collaborators.** Adding an image from a new
-  project narrows who can see the task; anyone lacking the new project loses all
-  of it. Nothing is deleted and nothing leaks, but grading in progress can
-  become unreachable to the people doing it. `eorm grant-for-task` and the
-  `projects` field on `TaskGET` are the remedies -- `GET /task/{id}` resolves
-  it unconditionally, but `GET /task` returns it only with
+- **Adding an image out of a task's declaration is refused, not absorbed.** It
+  used to narrow who could see the task; it is now a hard **409**
+  (`image_outside_task_declaration`) from `add_image`, and under that the
+  database refuses the link outright via `fk_SubTaskImageLink_TaskProject`. So
+  the operator report to expect is "I cannot add this image", not "my
+  collaborators vanished". The remedy is to extend the task's declaration
+  first. `eorm grant-for-task` and the `projects` field on `TaskGET` still
+  answer "which projects does this task need" -- `GET /task/{id}` resolves it
+  unconditionally, but `GET /task` returns it only with
   `?include_projects=true`.
-- **Removing an image can widen access.** When the last image of a project
-  leaves a task, subtask comments and grading state recorded while it spanned
-  more become visible to users who could not see them before.
+- **A broad declaration at creation hides the task from everyone who does not
+  hold all of it.** This is the eviction shape that replaced the one above, and
+  it is the risk this release introduces. `POST /task` takes the `projects`
+  declaration from the caller, and a task is visible only to actors holding
+  **every** project in it -- so a task declared over `{A, B}` is invisible to an
+  `A`-only grader from the moment it is created, with no image having moved and
+  nothing to remove. Extending an existing declaration (adding a project to a
+  live task) does the same to collaborators already working on it. The remedy is
+  the same as above -- `eorm grant-for-task`, then review -- but note there is
+  no undo: declaration management does not ship in v0.3, so a declaration cannot
+  be narrowed back.
+- **Removing an image no longer widens access.** It used to: when the last image
+  of a project left a task, subtask comments and grading state recorded while it
+  spanned more became visible to users who could not see them before. Visibility
+  now reads `TaskProject`, and `fk_SubTaskImageLink_TaskProject` carries no
+  `ON DELETE`, so unlinking an image never touches the declaration. **The
+  operational consequence is the loss of a lever**: "remove the image to restore
+  access" was a real recovery step and now silently does nothing. Use
+  `eorm grant-for-task` instead.
 - **15 mis-scoped `FormAnnotation` rows** land in the wrong project's scope
   until a DBA script runs. `Patient.ProjectID` is the sole project authority, so
   a row whose `PatientID` disagrees with its image surfaces to the wrong
