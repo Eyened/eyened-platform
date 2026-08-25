@@ -41,7 +41,7 @@ def _declare(session, task_id: int, image_id: int) -> None:
     """Declare, on ``task_id``, the project the image sits in.
 
     Read off the image rather than passed in, so the declaration cannot drift
-    from the project ``_make_image`` actually built. Task 6's foreign key
+    from the project ``_make_image`` actually built. The containment foreign key
     checks a link against its task's declaration at the moment the link is
     inserted, so the declaration has to exist first.
     """

@@ -52,10 +52,9 @@ def spanning(session):
 
     # Before the subtask/link loop, not after: that loop flushes *inside* each
     # iteration, so every link but the last is already in the database by the
-    # time it ends. Declaring afterwards therefore lands behind the rows the
-    # declaration has to cover, and Task 6's foreign key rejects them.
-    # `empty` declares nothing on purpose -- it is the vacuity case the scoping
-    # tests turn on, and it holds no links for a declaration to cover.
+    # time it ends, and the containment foreign key rejects a link inserted
+    # before the declaration it needs. `empty` declares nothing on purpose --
+    # it is the vacuity case the scoping tests turn on, and holds no links.
     for label, names in (("spanning", ("A", "B")), ("a_only", ("A",))):
         for name in names:
             session.add(TaskProject(TaskID=tasks[label], ProjectID=projects[name]))

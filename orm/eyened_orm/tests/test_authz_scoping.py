@@ -68,7 +68,7 @@ def _task_over(session, images, *, name="T"):
     session.flush()
     from eyened_orm import SubTaskImageLink, TaskProject
 
-    # Declared before the links, because Task 6's foreign key checks the
+    # Declared before the links: the containment foreign key checks the
     # declaration at the moment a link is inserted. An empty ``images``
     # declares nothing, which is the no-images case one caller relies on.
     for project_id in sorted({image.ProjectID for image in images}):
@@ -139,8 +139,8 @@ def test_a_subtask_resolves_to_its_parent_tasks_projects(session):
     only_b = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
     session.add_all([only_a, only_b])
     session.flush()
-    # Declared before the links: Task 6's foreign key checks the declaration at
-    # the moment a link is inserted, and this task spans both projects.
+    # Declared before the links: the containment foreign key checks the
+    # declaration at the moment a link is inserted, and this task spans both.
     session.add_all([
         TaskProject(TaskID=task.TaskID, ProjectID=project_a.ProjectID),
         TaskProject(TaskID=task.TaskID, ProjectID=project_b.ProjectID),
@@ -371,12 +371,10 @@ def test_the_batch_image_gate_follows_the_route_declaration(monkeypatch):
 
 # --- the correlated EXISTS predicate that apply_scope emits ------------------
 #
-# These retarget Task 4's guards from the scalar-subquery form
-# (``project_id_of_column``, removed) onto the EXISTS form that replaced it.
-# The hazard they guard -- auto-correlation emptying the subquery's FROM -- is
-# unchanged by the shape of the subquery, so the coverage had to move, not go.
-# The set-valued case joined them once ``_set_valued_predicate`` moved onto
-# ``TaskProject``: a one-table FROM is the shape auto-correlation can empty.
+# The hazard these guard is auto-correlation emptying the subquery's FROM,
+# which the shape of the subquery does not change. The set-valued case belongs
+# here too, ``_set_valued_predicate`` reading ``TaskProject``: a one-table FROM
+# is exactly the shape auto-correlation can empty.
 
 
 def _grader_scope(*project_ids: int) -> AccessScope:
@@ -401,16 +399,15 @@ def test_the_task_predicate_compiles_inside_a_query_that_joins_taskproject(entit
     raises ``InvalidRequestError: ... returned no FROM clauses due to
     auto-correlation`` the moment the call is dropped, on both branches.
 
-    Its docstring said so and nothing held it to that: deleting
-    ``.correlate(entity)`` used to leave the entire suite green, because no
-    read in the codebase reaches this shape today -- ``declared_projects`` and
-    ``projects_for_tasks`` both select FROM ``TaskProject`` in their outer
-    query now, but both reach the predicate through a subquery whose own FROM
-    is ``Task``, and auto-correlation does not cross that level: compiling
-    ``projects_for_tasks``'s statement with the correlation removed still
-    succeeds. So the shape is built here rather than borrowed from a caller: the
-    claim is about the predicate, and it has to be checkable without waiting
-    for a caller to grow into it.
+    Without this test, deleting ``.correlate(entity)`` leaves the whole suite
+    green, because no read in the codebase reaches this shape:
+    ``declared_projects`` and ``projects_for_tasks`` do select FROM
+    ``TaskProject`` in their outer query, but reach the predicate through a
+    subquery whose own FROM is ``Task``, and auto-correlation does not cross
+    that level -- compiling ``projects_for_tasks`` with the correlation removed
+    still succeeds. So the shape is built here rather than borrowed from a
+    caller: the claim is about the predicate, and has to be checkable without
+    waiting for a caller to grow into it.
 
     Compiling is the assertion; two string checks stop a predicate that
     degenerated into something trivially compilable from passing. **Each has to
@@ -455,52 +452,40 @@ def test_the_task_predicate_compiles_inside_a_query_that_joins_taskproject(entit
 def test_apply_scope_compiles_inside_a_query_that_holds_every_route_table(entity):
     """Every entry must survive an enclosing query that already holds its FROM.
 
-    Without this: SQLAlchemy *auto*-correlation strips from a subquery's FROM
-    every table the enclosing query already has. The Study and FormAnnotation
-    entries used to reach Patient with no explicit ``.correlate(...)``, so an
-    outer query holding both Patient and the entity emptied their FROM and
-    SQLAlchemy raised ``InvalidRequestError: ... returned no FROM clauses due to
-    auto-correlation``. The search layer builds exactly that shape
-    (``join_from(Study, Patient, ...)``), so the read path would 500. The other
-    entries only survived by accident -- their FROM was a single Join object
-    that never matches an enclosing table by identity -- which an innocuous
-    edit to any helper would remove.
+    SQLAlchemy *auto*-correlation strips from a subquery's FROM every table the
+    enclosing query already has. An entry whose FROM is then empty raises
+    ``InvalidRequestError: ... returned no FROM clauses due to
+    auto-correlation``, and the search layer builds exactly such a shape
+    (``join_from(Study, Patient, ...)``), so the read path would 500.
 
-    Since the route moved onto the denormalized ``ProjectID``, that danger no
-    longer applies uniformly, so read the paragraph above as history for four
-    of the eleven cases. The ``_OWN_PROJECT_COLUMN`` entities -- Patient,
-    Study, Series, ImageInstance -- emit a bare ``ProjectID IN (...)`` with no
-    subquery at all, and auto-correlation has nothing to strip. Study is one of
-    them, so the shape the search layer builds can no longer bite the entry
-    that first motivated this test.
+    Four of the eleven cases are now immune for free: the
+    ``_OWN_PROJECT_COLUMN`` entities -- Patient, Study, Series, ImageInstance
+    -- emit a bare ``ProjectID IN (...)`` with no subquery at all, so
+    auto-correlation has nothing to strip.
 
-    The exposure moved rather than went away, and for the seven one-hop entries
-    it got *sharper*: five of them (Segmentation, ModelSegmentation,
-    FormAnnotation, StudyTagLink, ImageInstanceTagLink) now select FROM a bare
-    table, which is exactly what auto-correlation matches by identity, where
-    before all but FormAnnotation hid behind a multi-table Join object. Only
-    SegmentationTagLink and FormAnnotationTagLink still have one.
-    ``.correlate(entity)`` is the only thing holding the seven up.
+    The seven one-hop entries are the exposure, and it is *sharp*: five
+    (Segmentation, ModelSegmentation, FormAnnotation, StudyTagLink,
+    ImageInstanceTagLink) select FROM a bare table, which is exactly what
+    auto-correlation matches by identity. ``.correlate(entity)`` is the only
+    thing holding them up.
 
     So the enclosing query is derived from ``_ONE_HOP_TO`` rather than
     hardcoding Patient: it holds every table some entry hops to -- Patient
-    among them today, and kept explicitly so the original shape survives a map
-    that stops hopping there -- which is what it takes for one shape to reach
-    all five. Hardcoding Patient reached only
-    FormAnnotation -- the other four select FROM ImageInstance or Study, which
-    that query never held, so the guard covered one of the five exposures the
-    paragraph above describes. **Five is the ceiling**, not a gap: the FROM of
-    SegmentationTagLink and FormAnnotationTagLink is a multi-table ``Join``
-    object, which auto-correlation cannot match against an enclosing table by
-    identity, so those two are *structurally immune* and no enclosing shape can
-    make them fail. Dropping ``.correlate(entity)`` fails exactly the five and
-    leaves those two green; do not read that as something left to cover.
+    among them today, and kept explicitly so the shape survives a map that
+    stops hopping there -- which is what it takes for one shape to reach all
+    five. Hardcoding Patient reached only FormAnnotation; the other four select
+    FROM ImageInstance or Study, which that query never held. **Five is the
+    ceiling**, not a gap: SegmentationTagLink and FormAnnotationTagLink select
+    FROM a multi-table ``Join`` object, which auto-correlation cannot match
+    against an enclosing table by identity, so those two are *structurally
+    immune*. Dropping ``.correlate(entity)`` fails exactly the five and leaves
+    those two green; do not read that as something left to cover.
 
-    The assertion is read off the WHERE clause rather than off the whole
-    statement, because ``"ProjectID" in sql`` is already true of
+    The assertion is read off the WHERE clause rather than the whole statement,
+    because ``"ProjectID" in sql`` is already true of
     ``select(Patient|Study|Series|ImageInstance)`` with no predicate at all --
     the column is in the SELECT list, so for those four an ``apply_scope`` that
-    returned the statement untouched used to pass. The unscoped compile is the
+    returned the statement untouched would pass. The unscoped compile is the
     control: the enclosing query contributes no WHERE of its own, so a WHERE
     mentioning ProjectID can only have come from the predicate.
 
@@ -514,15 +499,13 @@ def test_apply_scope_compiles_inside_a_query_that_holds_every_route_table(entity
     stmt = select(entity).select_from(entity, *reached)
     unscoped = str(stmt.compile(dialect=sqlite.dialect()))
     assert "WHERE " not in unscoped, unscoped
-    # Anti-vacuity for the derivation itself: prove this entity's parent really
-    # entered the enclosing FROM. With ``reached`` empty every assertion below
-    # still passes -- even with ``.correlate(entity)`` dropped -- so the test
-    # could fall from catching five exposures to catching none, silently.
+    # Anti-vacuity for the derivation itself: with ``reached`` empty every
+    # assertion below still passes -- even with ``.correlate(entity)`` dropped
+    # -- so the test could silently fall from catching five exposures to none.
     #
-    # Matched against the FROM clause, and quoted. A bare ``ImageInstance in
+    # Matched against the FROM clause, and quoted: a bare ``ImageInstance in
     # unscoped`` is satisfied by ``"Segmentation"."ImageInstanceID"`` in the
-    # SELECT list, so it holds under an empty ``reached`` for all seven -- an
-    # anti-vacuity check that is itself vacuous.
+    # SELECT list, so it holds under an empty ``reached`` for all seven.
     if entity in _ONE_HOP_TO:
         from_clause = unscoped.rpartition("FROM ")[2]
         assert f'"{_ONE_HOP_TO[entity][0].__tablename__}"' in from_clause, unscoped

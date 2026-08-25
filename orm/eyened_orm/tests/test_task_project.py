@@ -14,15 +14,13 @@ def test_deleting_a_task_removes_its_declaration(session, spanning):
     declaration rather than writing its own -- writing one here would
     duplicate the fixture's row on its composite primary key.
 
-    Placed here rather than with the constraint tests because Task 6 adds a
-    RESTRICT foreign key from SubTaskImageLink to this table, and that is what
-    turns an ORM-ordered delete into an IntegrityError. This passes now and
-    must still pass then -- it is the regression test for the cascade
-    configuration below, not for the composite primary key.
+    This is the regression test for the cascade configuration below, not for
+    the composite primary key: SubTaskImageLink's RESTRICT foreign key to this
+    table is what turns an ORM-ordered delete into an IntegrityError.
 
-    Its subject must stay `a_only`, the task that *has* images: from Task 6
-    the declaration it deletes is referenced by a live RESTRICT foreign key,
-    which is a shape the link-less `empty` task cannot reach.
+    Its subject must stay `a_only`, the task that *has* images: the declaration
+    it deletes is referenced by a live RESTRICT foreign key, a shape the
+    link-less `empty` task cannot reach.
     """
     task_id = spanning["a_only"]
     assert session.scalars(

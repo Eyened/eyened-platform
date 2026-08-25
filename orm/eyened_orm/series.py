@@ -26,8 +26,8 @@ class Series(Base):
         # The parent half of ImageInstance's composite foreign key -- see the
         # equivalent on Patient.
         UniqueConstraint("SeriesID", "ProjectID", name="uq_Series_Series_Project"),
-        # Declared rather than left to InnoDB, which would otherwise create the
-        # referencing-side index itself under a generated name that no later
+        # Declared rather than left to InnoDB, which would create the
+        # referencing-side index itself under a generated name no later
         # migration can predict or drop. Additional to the ForeignKeyIndex
         # above, which stays: that one indexes StudyID alone.
         Index("ix_Series_Study_Project", "StudyID", "ProjectID"),
@@ -46,15 +46,12 @@ class Series(Base):
     # No column-level ForeignKey: the key on this column is the composite in
     # __table_args__ above.
     StudyID: Mapped[int]
-    # The project that the series belongs to, denormalized from
-    # Patient.ProjectID by way of Study and held equal to Study's own copy by
-    # the composite foreign key above. Also populated by the before_flush
-    # listener in authz/denormalization.py, which covers the writers
-    # foreign-key sync never fires for -- see that module's docstring.
-    #
-    # Deliberately no ForeignKey to Project here: a second single-column FK
-    # straight to Project would let the two disagree about which project this
-    # series is in.
+    # Denormalized from Patient.ProjectID by way of Study, held equal to Study's
+    # own copy by the composite foreign key above; also populated by the
+    # before_flush listener in authz/denormalization.py, which covers the
+    # writers foreign-key sync never fires for. Deliberately no single-column
+    # ForeignKey to Project: a second path straight to Project would let the two
+    # disagree about which project this series is in.
     ProjectID: Mapped[int]
 
     SeriesNumber: Mapped[Optional[int]] = mapped_column()

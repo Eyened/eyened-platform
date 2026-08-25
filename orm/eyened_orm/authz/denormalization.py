@@ -1,43 +1,34 @@
 """Populate the derived ``ProjectID`` columns from their parent rows.
 
 ``Patient.ProjectID`` is the sole authority. Study, Series, ImageInstance and
-SubTaskImageLink are each meant to carry a copy so that ``apply_scope`` is an
-indexed lookup rather than a five-hop walk, with each copy held equal to its
-parent by a composite foreign key (see the containment design, section 4.5).
-All four now have that foreign key; SubTaskImageLink carries a copy of TaskID
-under one as well, and is additionally held inside its task's declaration by a
-third. The two listeners here fill the columns for the writers the constraints
-alone cannot serve, and they cover different ones:
+SubTaskImageLink each carry a copy so that ``apply_scope`` is an indexed lookup
+rather than a five-hop walk, held equal to its parent by a composite foreign
+key. SubTaskImageLink carries a copy of TaskID under one as well, and is held
+inside its task's declaration by a third. The two listeners here fill the
+columns for the writers the constraints alone cannot serve:
 
-* **This listener, at ``before_flush``**, for writers that assign a raw
-  foreign-key *id*: ``Study(PatientID=...)`` in the test factories,
-  ``SubTaskRepository.add_link``. There the parent row is already persistent,
-  so it can simply be read. ``before_flush`` is where querying the database is
-  legal, which is why that read happens here. What it still cannot resolve it
-  leaves unset, and the flush that follows fills it -- by foreign-key sync,
-  not by the listener below, which the measurement further down shows has
-  never once been the thing that set the value.
-  This pass is load-bearing permanently: foreign-key sync only ever copies a
-  *relationship's* columns, and a raw-id writer never sets one, so sync never
-  fires for that case. Measured with both listeners removed, a raw-id
-  ``Study(PatientID=...)`` dies on ``NOT NULL constraint failed:
-  Study.ProjectID``.
-* **The ``before_insert`` listener**, historically the backstop for a
-  hierarchy that was still entirely pending at ``before_flush`` -- the
-  importer's shape, where nothing upstream had a primary key yet.
+* **``before_flush``**, for writers that assign a raw foreign-key *id*:
+  ``Study(PatientID=...)`` in the test factories, ``SubTaskRepository.add_link``.
+  The parent row is already persistent, so it can be read -- and ``before_flush``
+  is the moment where querying the database is legal. What it cannot resolve it
+  leaves unset for foreign-key sync to fill during the flush.
+  This pass is permanently load-bearing: foreign-key sync only ever copies a
+  *relationship's* columns, and a raw-id writer never sets one. Measured with
+  both listeners removed, a raw-id ``Study(PatientID=...)`` dies on ``NOT NULL
+  constraint failed: Study.ProjectID``.
+* **``before_insert``**, the backstop for a hierarchy still entirely pending at
+  ``before_flush`` -- the importer's shape, nothing upstream holding a primary
+  key yet.
 
-**The ``before_insert`` backstop is now a no-op, and is kept anyway.** Two
-independent mechanisms reach the same value before it runs: ``_project_of``
-walks the *object* graph, so the ``before_flush`` pass above already resolves
-a wholly-pending hierarchy from memory; and since the composite foreign keys
-landed, SQLAlchemy's own foreign-key sync copies ProjectID parent-to-child
-during the flush for any writer that assigns the relationship. Measured over
-the whole backend suite, the backstop fired 2228 times and set a value zero
-times; measured with both listeners stripped, foreign-key sync alone fills all
-three levels of the importer's shape. It is retained because deleting a
-redundant safety net is a decision in its own right -- one for whoever weighs
-it deliberately, with these numbers in hand -- and not something the task that
-made it redundant should do as tidying.
+**The ``before_insert`` backstop is a no-op, and is kept anyway.** Two
+mechanisms reach the value before it runs: ``_project_of`` walks the *object*
+graph, so the ``before_flush`` pass resolves a wholly-pending hierarchy from
+memory; and SQLAlchemy's foreign-key sync copies ProjectID parent-to-child
+during the flush for any writer that assigns the relationship. Measured over the
+whole backend suite, the backstop fired 2228 times and set a value zero times;
+with both listeners stripped, foreign-key sync alone fills all three levels of
+the importer's shape. Removing a redundant safety net is a decision for whoever
+weighs it deliberately, with those numbers in hand.
 
 Neither listener is the enforcement. The foreign keys guarantee the value is
 correct; these only spare each writer from having to know. Raw SQL bypasses
@@ -55,10 +46,9 @@ from sqlalchemy.orm import Mapper, Session, UOWTransaction, object_session
 from ..base import Base
 
 if TYPE_CHECKING:
-    # Deferred, not eager: importing ``..task`` at module scope closes the
-    # circular import through ``eyened_orm.__init__`` that ``_parent_ref``
-    # exists to dodge. ``from __future__ import annotations`` above means the
-    # annotation below is never evaluated at runtime.
+    # Deferred: importing ``..task`` at module scope closes a circular import
+    # through ``eyened_orm.__init__``. ``from __future__ import annotations``
+    # above means the annotation below is never evaluated at runtime.
     from ..task import SubTaskImageLink
 
 __all__ = ["populate_project_id_on_insert", "populate_project_ids", "register"]
@@ -94,18 +84,16 @@ def _project_of(session: Session, obj: object, *, required: bool = True) -> int 
     primary key, no row -- is read from memory. Only when the relationship is
     unset does it load the parent by id, which is the raw-id writer's case and
     exactly where the row does exist. Because the walk carries itself, it does
-    not depend on the order ``session.new`` iterates in.
-
-    Bounded like ``_join_to_patient``: a malformed map raises instead of
-    looping, because this sits on the write path for every image.
+    not depend on the order ``session.new`` iterates in. Bounded, so a malformed
+    map raises instead of looping: this sits on the write path for every image.
 
     Args:
         required: whether a *deferrable* dead end is an error. ``False`` at
             ``before_flush``, where an ancestor may simply not have been
             inserted yet and foreign-key sync will fill the column during the
-            flush, once the ancestor's own INSERT has run; ``True`` at
-            ``before_insert``, the last moment this listener could set it. It
-            does not govern a parent id that reaches no row -- see ``Raises``.
+            flush; ``True`` at ``before_insert``, the last moment this listener
+            could set it. It does not govern a parent id that reaches no row --
+            see ``Raises``.
 
     Returns:
         The governing ``ProjectID``, or ``None`` when the walk dead-ends on an
@@ -144,11 +132,8 @@ def _project_of(session: Session, obj: object, *, required: bool = True) -> int 
             else:
                 parent = session.get(parent_class, parent_id)
         if parent is None:
-            # Reaching here with the id set means the id reaches no row.
-            # Nothing later will make it resolve, so it is raised whatever
-            # `required` says: deferring only moves the failure past the
-            # ancestors' INSERTs, where it surfaces as PendingRollbackError
-            # instead of as this message, before any SQL.
+            # Reaching here with the id set means the id reaches no row: raised
+            # whatever `required` says, for the reason given under Raises above.
             raise ValueError(
                 f"cannot resolve ProjectID for {type(start).__name__}: "
                 f"{type(obj).__name__}.{attribute} is unset and "
@@ -176,10 +161,8 @@ def populate_project_ids(
 
     Anything still unresolvable here has an ancestor that is itself pending,
     and is deliberately left unset: the flush that follows copies the value
-    down parent-to-child by foreign-key sync. ``populate_project_id_on_insert``
-    runs later and would be the other candidate, but measured over the whole
-    backend suite it has never been the one that set the value -- see this
-    module's docstring for the numbers.
+    down parent-to-child by foreign-key sync, not the ``before_insert``
+    backstop.
     """
     from ..image_instance import ImageInstance
     from ..series import Series
@@ -209,18 +192,15 @@ def populate_project_ids(
 def _populate_link(session: Session, link: "SubTaskImageLink") -> None:
     """Fill a link's TaskID and ProjectID, where they can be known yet.
 
-    ``TaskID`` is left alone when the parent SubTask is itself pending: its
-    own ``TaskID`` is not assigned until the Task's INSERT, so there is
-    nothing to copy. Foreign-key sync fills it during the flush instead --
-    which is the only mechanism that can, and the reason the columns and the
-    composite key ship together.
+    ``TaskID`` is left alone when the parent SubTask is itself pending: its own
+    ``TaskID`` is not assigned until the Task's INSERT, so there is nothing to
+    copy. Foreign-key sync fills it during the flush -- the only mechanism that
+    can, and the reason the columns and the composite key ship together.
 
     ``_project_of`` is called with its default ``required=True`` here, unlike
-    the caller above: ``image`` is always persistent, read either off the
-    relationship or by ``session.get``, so a dead end is a real error rather
-    than something a later moment resolves. That is also why this table gets
-    no ``before_insert`` backstop -- ``SubTaskRepository.add_link`` works from
-    a persistent ``ImageInstance``, so this pass alone suffices.
+    the caller above: ``image`` is always persistent, so a dead end is a real
+    error rather than something a later moment resolves. That is also why this
+    table gets no ``before_insert`` backstop.
     """
     from ..image_instance import ImageInstance
     from ..task import SubTask
@@ -249,8 +229,7 @@ def populate_project_id_on_insert(
     column-based attribute here is the documented purpose of ``before_insert``
     and is picked up by the INSERT being assembled.
 
-    Retained but no longer reached with anything left to do -- see this
-    module's docstring for the measurement and for why it is kept.
+    A no-op in practice; see this module's docstring for why it is kept anyway.
     """
     if getattr(target, "ProjectID", None) is not None:
         return

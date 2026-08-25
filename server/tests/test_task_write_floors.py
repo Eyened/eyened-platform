@@ -52,11 +52,10 @@ def test_read_only_cannot_update_task_status(client_scoped, spanning):
 def test_creating_a_task_is_authorized_against_its_declaration(
     session, client_scoped, spanning
 ):
-    """Superseded 2026-08-18 by the task->project containment plan.
+    """Creation is authorized against the task's declaration.
 
     v0.3's "creation is unrestricted" reading rested on a new task touching no
-    projects; a task now declares its projects at creation, so creation is
-    authorized against the declaration.
+    projects, which no longer holds: a task declares its projects at creation.
 
     The two requests here are the **schema's** directions, not the floor's:
     declaring nothing is refused by ``Field(min_length=1)`` (422), and a

@@ -239,11 +239,10 @@ def spanning(session):
         tasks[label] = task.TaskID
 
     # Before the subtask/link loop, not after: that loop flushes *inside* each
-    # iteration and the link-less subtask below flushes after it, so by the end
-    # every link is already in the database. Declaring afterwards therefore
-    # lands behind the rows the declaration has to cover, and Task 6's foreign
-    # key rejects them. `empty` declares nothing on purpose -- it is the
-    # vacuity case the scoping tests turn on, and it holds no links.
+    # iteration, so by the end every link is already in the database, and the
+    # containment foreign key rejects a link inserted before the declaration it
+    # needs. `empty` declares nothing on purpose -- it is the vacuity case the
+    # scoping tests turn on, and it holds no links.
     for label, names in (
         ("spanning", ("A", "B")),
         ("a_only", ("A",)),
@@ -356,19 +355,18 @@ def one_project(session):
     )
     session.add(task)
     session.flush()
-    # Declared before the link exists, because Task 6's foreign key checks the
+    # Declared before the link exists: the containment foreign key checks the
     # declaration at the moment the link is inserted.
     session.add(TaskProject(TaskID=task.TaskID, ProjectID=project.ProjectID))
     session.flush()
     subtask = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
     session.add(subtask)
     session.flush()
-    # A task's projects are its declaration, so the TaskProject row above is
-    # what keeps the floors on this task non-vacuous -- not this link. What the
-    # link still does is make the task *populated* in the data sense: the
-    # project-admin delete cell then has to cascade through a real link row as
-    # well as through the declaration. No assertion depends on it -- removing
-    # it leaves the whole suite green.
+    # The TaskProject row above, not this link, is what keeps the floors on this
+    # task non-vacuous. The link makes the task *populated* in the data sense,
+    # so the project-admin delete cell cascades through a real link row as well
+    # as through the declaration. No assertion depends on it -- removing it
+    # leaves the whole suite green.
     session.add(
         SubTaskImageLink(
             SubTaskID=subtask.SubTaskID,

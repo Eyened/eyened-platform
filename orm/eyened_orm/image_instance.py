@@ -216,15 +216,13 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             "SOPInstanceUid",
             unique=True,
         ),
-        # Declared for symmetry with Study and Series, which each need theirs as
-        # the parent half of a child's composite key. Nothing references
-        # ImageInstance by (ImageInstanceID, ProjectID) yet; Task 6's key on
-        # SubTaskImageLink is what will.
+        # The parent half of SubTaskImageLink's composite foreign key -- see the
+        # equivalent on Patient for why InnoDB needs it declared.
         UniqueConstraint(
             "ImageInstanceID", "ProjectID", name="uq_ImageInstance_Image_Project"
         ),
-        # Declared rather than left to InnoDB, which would otherwise create the
-        # referencing-side index itself under a generated name that no later
+        # Declared rather than left to InnoDB, which would create the
+        # referencing-side index itself under a generated name no later
         # migration can predict or drop. Additional to
         # fk_ImageInstance_Series1_idx above, which indexes SeriesID alone.
         Index("ix_ImageInstance_Series_Project", "SeriesID", "ProjectID"),
@@ -252,16 +250,13 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     # The series that the image belongs to. No column-level ForeignKey: the key
     # on this column is the composite in __table_args__ above.
     SeriesID: Mapped[int]
-    # The project that the image belongs to, denormalized from Patient.ProjectID
-    # so that authorization scoping is an indexed lookup rather than a five-hop
-    # join, and held equal to the parent Series' own copy by the composite
-    # foreign key above. Also populated by the before_flush listener in
-    # authz/denormalization.py, which covers the writers foreign-key sync never
-    # fires for -- see that module's docstring.
-    #
-    # Deliberately no ForeignKey to Project here: a second single-column FK
-    # straight to Project would let the two disagree about which project this
-    # image is in.
+    # Denormalized from Patient.ProjectID so that authorization scoping is an
+    # indexed lookup rather than a five-hop join, held equal to the parent
+    # Series' copy by the composite foreign key above; also populated by the
+    # before_flush listener in authz/denormalization.py, which covers the
+    # writers foreign-key sync never fires for. Deliberately no single-column
+    # ForeignKey to Project: a second path straight to Project would let the two
+    # disagree about which project this image is in.
     ProjectID: Mapped[int]
     # The source that the image belongs to (optional, not used by platform)
     SourceInfoID: Mapped[Optional[int]] = mapped_column(

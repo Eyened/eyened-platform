@@ -6,9 +6,8 @@ projects get resolved.
 ``spanning``'s tasks each declare exactly the projects their images sit in, so
 on those rows reading ``TaskProject`` and walking the image links up to
 ``Patient.ProjectID`` return the same set. The first three tests below pass
-under either mechanism -- and until the ones below them were written, so did
-every other test in the repository: reinstating the image walk left 925 of 926
-green, the single failure being the one test the switch itself had added.
+under either mechanism, and so does almost everything else in the repository:
+reinstating the image walk left 925 of 926 tests green.
 
 ``declared_beyond_images`` builds the row where the two part company, and the
 tests under it are the ones that fail if the declaration switch is ever undone.
@@ -58,21 +57,18 @@ def declared_beyond_images(session, spanning):
     declaration answers ``{A, B}`` and hides it.
 
     **Do not "simplify" this back to declaration == image projects.** The
-    divergence is not an artificial test shape -- extending a declaration
-    (spec §6.3) writes exactly this row on purpose, because containment is an
-    intersection and extending is therefore how visibility is *narrowed*. A
-    task also sits in this shape from creation until an image has landed in
-    each project it declared. Flatten the fixture and the tests below keep
-    passing while proving nothing: they would run on rows where the two
-    resolutions agree, and no behavioural test anywhere would notice the read
-    predicate going back to the walk.
+    divergence is not an artificial test shape: extending a declaration writes
+    exactly this row on purpose, and a task sits in this shape from creation
+    until an image has landed in each project it declared. Flatten the fixture
+    and the tests below keep passing while proving nothing -- they would run on
+    rows where the two resolutions agree, and no behavioural test anywhere
+    would notice the read predicate going back to the walk.
 
-    Built here rather than added to ``spanning`` because ``spanning`` is shared
-    and its row count is load-bearing elsewhere: ``test_task_list_query_budget``
-    reasons about "the fixture seeds four", and the ORM-side ``spanning``
-    backs an exact ``list_all() == ["empty"]``. A task deliberately visible to
-    nobody outside both projects is not a safe thing to add to a fixture a
-    dozen files share.
+    Built here rather than added to ``spanning`` because ``spanning``'s row
+    count is load-bearing elsewhere: ``test_task_list_query_budget`` reasons
+    about "the fixture seeds four", and the ORM-side ``spanning`` backs an exact
+    ``list_all() == ["empty"]``. A task deliberately visible to nobody outside
+    both projects is not a safe thing to add to a fixture a dozen files share.
     """
     from eyened_orm import SubTask, Task, TaskProject
     from eyened_orm.task import SubTaskImageLink, SubTaskState, TaskState
@@ -149,7 +145,7 @@ def test_the_subtask_of_such_a_task_is_hidden_on_its_own_merits(
 
     ``GET /subtasks/{id}`` resolves the subtask directly, with no task lookup
     ahead of it, so the ``SubTask`` branch answers alone here. It is **one of
-    two** such routes, not the only one: ``get_task_subtask`` behind
+    two** such routes: ``get_task_subtask`` behind
     ``GET /task/{task_id}/subtask/{subtask_index}`` goes straight to
     ``list_for_task`` with nothing resolved ahead of it either, and the test
     below covers it. ``GET /task/{task_id}/subtasks`` is the contrast --
@@ -179,11 +175,10 @@ def test_the_by_index_route_hides_the_subtask_too(
 
     ``get_task_subtask`` calls ``list_for_task`` with no task lookup ahead of
     it, so ``apply_scope(..., SubTask, ...)`` is the only thing here that can
-    produce a 404 -- the ``SubTask`` branch answering alone, as in the test
-    above. Pinned separately because this is the route the client's
-    ``fetchSubTaskByIndex`` drives for viewer navigation, which makes it the
-    per-click read the measured win belongs to; covering only ``/subtasks/{id}``
-    would leave the hot path free to revert to the image walk unnoticed.
+    produce a 404. Pinned separately because this is the route the client's
+    ``fetchSubTaskByIndex`` drives for viewer navigation -- the per-click read
+    the measured win belongs to -- so covering only ``/subtasks/{id}`` would
+    leave the hot path free to revert to the image walk unnoticed.
 
     Same row and same scope as above: under the walk the subtask's own image
     sits in ``A`` and an ``A``-only member is served it; under the declaration

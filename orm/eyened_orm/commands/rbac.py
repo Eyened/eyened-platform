@@ -365,9 +365,9 @@ def check_declarations() -> None:
     """List (task, project) declarations no image link uses.
 
     Rows are expected rather than faults: a task declares its projects at
-    creation and acquires its links afterwards, and removing a task's links
-    leaves its declaration standing. No ``eorm`` operation removes one --
-    this reports, it does not reconcile.
+    creation and acquires its links afterwards, and removing links leaves the
+    declaration standing. No ``eorm`` operation removes one -- this reports, it
+    does not reconcile.
     """
     database = get_database()
     with database.get_session() as session:

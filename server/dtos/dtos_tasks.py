@@ -38,8 +38,8 @@ class TaskBase(BaseModel):
 
 class TaskPUT(TaskBase):
     # On TaskPUT rather than TaskBase: TaskGET also extends TaskBase and
-    # already declares a `projects` of its own -- (id, name) pairs, optional --
-    # so putting it on the base would give one field name two types and two
+    # declares a `projects` of its own -- (id, name) pairs, optional -- so
+    # putting it on the base would give one field name two types and two
     # requirednesses depending on which class you read.
     projects: List[int] = Field(min_length=1)
 

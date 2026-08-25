@@ -74,23 +74,19 @@ class TaskProject(Base):
 
     __tablename__ = "TaskProject"
     __table_args__ = (
-        # Named explicitly because InnoDB requires an index on the referencing
-        # side of the ProjectID foreign key and will create one itself,
-        # called `ProjectID`, if we do not. That index is then undeclarable in
-        # the model and undroppable in the database (ERROR 1553: "needed in a
-        # foreign key constraint"), so every future `alembic revision
-        # --autogenerate` emits a remove_index for it, forever. Every other
-        # table in this schema names its FK index; this one was the exception.
+        # Named because InnoDB requires an index on the referencing side of the
+        # ProjectID foreign key and creates one itself, called `ProjectID`, if
+        # we do not. That index is undeclarable in the model and undroppable in
+        # the database (ERROR 1553: "needed in a foreign key constraint"), so
+        # every later `alembic revision --autogenerate` emits a remove_index for
+        # it, forever.
         Index("ix_TaskProject_Project", "ProjectID"),
     )
 
-    # Both foreign keys are named rather than left to MySQL's
-    # `TaskProject_ibfk_N`. `fk_TaskProject_Task` in particular is load-bearing
-    # and not cosmetic: InnoDB walks a parent's referencing constraints in
-    # constraint-id order, and this name is chosen to lose that race against
-    # SubTask's key to `Task`. See the migration that creates this table for
-    # the byte comparison, and the guard in the containment migration that
-    # refuses to run if it ever stops holding.
+    # `fk_TaskProject_Task` is named, and the name is load-bearing: InnoDB walks
+    # a parent's referencing constraints in constraint-id order, and this name
+    # is chosen to lose that race against SubTask's key to `Task`. A guard in
+    # the containment migration refuses to run if that ordering stops holding.
     TaskID: Mapped[int] = mapped_column(
         ForeignKey("Task.TaskID", ondelete="CASCADE", name="fk_TaskProject_Task"),
         primary_key=True,
@@ -103,10 +99,10 @@ class TaskProject(Base):
     )
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    # Needed to attach a declaration to a Task that is still pending: the
-    # importer and create_from_imagesets both build the Task and its
-    # declaration in one flush, and only the relationship can carry TaskID
-    # across an INSERT that has not happened yet.
+    # Needed to attach a declaration to a Task that is still pending: only the
+    # relationship can carry TaskID across an INSERT that has not happened yet,
+    # and the importer and create_from_imagesets both build the Task and its
+    # declaration in one flush.
     Task: Mapped["Task"] = relationship(
         "eyened_orm.task.Task", back_populates="TaskProjects"
     )
@@ -170,25 +166,23 @@ class Task(Base):
     ) -> "Task":
         """Build a task, its subtasks and its project declaration.
 
-        ``projects=None`` derives the declaration from the images given. That
-        is not the auto-extend the design rejects: at creation there is no
-        existing declaration to widen and no collaborator to evict, so
-        deriving here reproduces exactly today's visibility for a new task.
-        Passing an explicit list is stricter -- any image outside it is
-        refused by ``fk_SubTaskImageLink_TaskProject``.
+        ``projects=None`` derives the declaration from the images given. That is
+        not the auto-extend the design rejects: at creation there is no existing
+        declaration to widen and no collaborator to evict. Passing an explicit
+        list is stricter -- any image outside it is refused by
+        ``fk_SubTaskImageLink_TaskProject``.
 
         Raises:
             ValueError: if the declaration would be empty. A task declaring
                 nothing is visible to every authenticated user *and* cannot
                 accept an image, because every image would be outside its
-                declaration -- a state nothing in this codebase can undo until
-                declaration management ships.
+                declaration -- and nothing in this codebase can undo that state.
         """
         from eyened_orm import ImageInstance as _ImageInstance
 
-        # ``imagesets`` is typed Iterable[Iterable[...]] and deriving the
-        # declaration needs a second pass over it; a generator argument would
-        # otherwise yield subtasks with images and a declaration of nothing.
+        # Deriving the declaration needs a second pass over ``imagesets``; a
+        # generator argument would otherwise yield subtasks with images and a
+        # declaration of nothing.
         materialised = [list(imset) for imset in imagesets]
         subtasks = [SubTask.create_from_images(imset) for imset in materialised]
 
@@ -263,14 +257,10 @@ class SubTaskImageLink(Base):
     __tablename__ = "SubTaskImageLink"
     __table_args__ = (
         # (ImageInstanceID, ProjectID) and (SubTaskID, TaskID) lead their
-        # indexes because each backs a foreign key.
-        #
-        # SubTaskID moves to third position in the first index, so it is no
-        # longer a two-column lookup for (image, subtask) the way the index
-        # this replaces was. That is fine rather than free: an equality on
-        # ImageInstanceID leaves a handful of rows, so the residual scan is
-        # not measurable. Do not describe it as covering the same lookups --
-        # it covers the same *queries*, by a slightly worse route.
+        # indexes because each backs a foreign key. SubTaskID therefore sits
+        # third, so an (image, subtask) lookup is no longer a two-column index
+        # seek but a seek plus a residual scan -- not measurable, because an
+        # equality on ImageInstanceID leaves only a handful of rows.
         Index(
             "ix_SubTaskImageLink_Image_Project",
             "ImageInstanceID", "ProjectID", "SubTaskID",
@@ -294,10 +284,9 @@ class SubTaskImageLink(Base):
             onupdate="CASCADE",
             ondelete="CASCADE",
         ),
-        # No onupdate="CASCADE", deliberately: cascading it would let a change
-        # to TaskProject silently rewrite link rows. The point is that it
-        # refuses instead. No ondelete either, so a declaration cannot be
-        # removed out from under the links that rely on it.
+        # No onupdate and no ondelete, deliberately: either would let a change
+        # to TaskProject silently rewrite or drop link rows. The point is that
+        # a declaration cannot move out from under the links relying on it.
         ForeignKeyConstraint(
             ["TaskID", "ProjectID"],
             ["TaskProject.TaskID", "TaskProject.ProjectID"],
@@ -309,8 +298,8 @@ class SubTaskImageLink(Base):
     ImageIndex: Mapped[int]
     # Denormalized from SubTask and ImageInstance respectively. Neither is a
     # cache: the composite foreign keys above hold both equal to their source,
-    # and the pair (TaskID, ProjectID) is what the containment constraint
-    # checks against TaskProject.
+    # and the pair is what the containment constraint checks against
+    # TaskProject.
     TaskID: Mapped[int]
     ProjectID: Mapped[int]
 

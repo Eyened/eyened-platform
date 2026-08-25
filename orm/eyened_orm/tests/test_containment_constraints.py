@@ -30,10 +30,10 @@ def test_moving_a_patient_carries_its_whole_chain(session, spanning):
     """ON UPDATE CASCADE down all five levels, so no copy can go stale.
 
     Image A is linked by BOTH the spanning task and the a_only task, so both
-    must declare the destination before the move is legal. That is the design
-    working, not an inconvenience: a patient's project cannot move out from
-    under a task that has not agreed to it. Without those two declarations
-    this is `test_moving_a_patient_into_an_undeclared_project_is_refused`.
+    must declare the destination before the move is legal: a patient's project
+    cannot move out from under a task that has not agreed to it. Without those
+    two declarations this is
+    `test_moving_a_patient_into_an_undeclared_project_is_refused`.
     """
     other = make_project(session, "C")
     # Captured before anything detaches `other`, per the suite's

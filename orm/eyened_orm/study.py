@@ -38,20 +38,19 @@ class Study(Base):
         # The parent half of Series' composite foreign key -- see the
         # equivalent on Patient.
         UniqueConstraint("StudyID", "ProjectID", name="uq_Study_Study_Project"),
-        # Declared rather than left to InnoDB, which would otherwise create the
-        # referencing-side index itself under a generated name that no later
+        # Declared rather than left to InnoDB, which would create the
+        # referencing-side index itself under a generated name no later
         # migration can predict or drop.
         Index("ix_Study_Patient_Project", "PatientID", "ProjectID"),
-        # This REPLACES the single-column FK that used to sit on PatientID; it
-        # is not added alongside it. Two foreign-key paths between Study and
-        # Patient make SQLAlchemy refuse to configure Study.Patient at all
-        # (AmbiguousForeignKeysError), and the replacement is also what makes
-        # the ORM copy ProjectID parent-to-child on flush.
+        # This REPLACES the single-column FK on PatientID rather than joining
+        # it: two foreign-key paths between Study and Patient make SQLAlchemy
+        # refuse to configure Study.Patient at all (AmbiguousForeignKeysError).
+        # The composite is also what makes the ORM copy ProjectID
+        # parent-to-child on flush.
         #
-        # ondelete carried across from the key it replaces: Patient.Studies is
-        # passive_deletes=True, so SQLAlchemy deliberately leaves the cascade
-        # to the database. onupdate is new, and is what holds the denormalized
-        # copy equal to its parent when a patient moves project.
+        # ondelete is required because Patient.Studies is passive_deletes=True,
+        # which leaves the cascade to the database. onupdate is what holds the
+        # denormalized copy equal to its parent when a patient moves project.
         ForeignKeyConstraint(
             ["PatientID", "ProjectID"],
             ["Patient.PatientID", "Patient.ProjectID"],
@@ -65,15 +64,12 @@ class Study(Base):
     # No column-level ForeignKey: the key on this column is the composite in
     # __table_args__ above.
     PatientID: Mapped[int]
-    # The project that the study belongs to, denormalized from
-    # Patient.ProjectID and held equal to it by the composite foreign key
-    # above. Also populated by the before_flush listener in
-    # authz/denormalization.py, which covers the writers foreign-key sync
-    # never fires for -- see that module's docstring.
-    #
-    # Deliberately no ForeignKey to Project here: a second single-column FK
-    # straight to Project would let the two disagree about which project this
-    # study is in.
+    # Denormalized from Patient.ProjectID and held equal to it by the composite
+    # foreign key above; also populated by the before_flush listener in
+    # authz/denormalization.py, which covers the writers foreign-key sync never
+    # fires for. Deliberately no single-column ForeignKey to Project: a second
+    # path straight to Project would let the two disagree about which project
+    # this study is in.
     ProjectID: Mapped[int]
     StudyRound: Mapped[Optional[int]]
     StudyDescription: Mapped[Optional[str]] = mapped_column(String(64))

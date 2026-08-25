@@ -65,9 +65,9 @@ def _fixture(session):
     lone = SubTask(TaskID=empty.TaskID, TaskState=SubTaskState.NotStarted)
     session.add_all([subtask, lone])
     session.flush()
-    # Declared before the links, because Task 6's foreign key checks the
+    # Declared before the links: the containment foreign key checks the
     # declaration at the moment a link is inserted. ``empty`` declares nothing
-    # on purpose: it is this file's vacuity case and holds no links.
+    # on purpose -- it is this file's vacuity case and holds no links.
     for name in ("A", "B"):
         session.add(
             TaskProject(TaskID=spanning.TaskID, ProjectID=made[name][0].ProjectID)

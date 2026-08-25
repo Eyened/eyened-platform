@@ -34,9 +34,8 @@ async def create_task(
         dto.task_definition_id,
         dto.projects,
     )
-    # A task is created with no subtasks, but it always declares at least one
-    # project -- so `projects=[]` here is no longer reachable, and would be a
-    # lie if it were.
+    # A task is created with no subtasks but always declares at least one
+    # project, so `projects=[]` here would be a lie.
     return DTOConverter.task_to_get(
         task, num_tasks=0, num_tasks_ready=0, projects=projects
     )

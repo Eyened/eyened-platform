@@ -120,28 +120,23 @@ class TaskRepository:
     def _declared_projects_select(self, task_ids: list[int]) -> Select:
         """Declared ``(task, project, name)`` rows for the given ids, unscoped.
 
-        Successor to the five-hop walk to ``Patient``, and it deliberately
-        takes on the arrangement that walk avoided: ``Project`` is joined in
-        the same SELECT the caller adds its scope predicate to, where the
-        predecessor kept it out and joined names to an already-scoped subquery
-        instead. That arrangement is what MySQL answered by cross-joining the
-        44-row table against the scoped walk -- 933,108 driving rows instead of
-        21,207, 12.2s versus 2.2s, measured. What is gone is the thing it
-        multiplied: this drives off ~108 ``TaskProject`` rows keyed by
-        ``TaskID`` rather than a walk over ~87k image links, so there is far
-        less for such a plan to cost. That is structure traded for scale -- a
-        reason to expect it cheap, not a proof the plan cannot recur, and it
-        has not been re-measured, no database being available to do so.
+        ``Project`` is joined in the same SELECT the caller adds its scope
+        predicate to -- the arrangement the five-hop walk to ``Patient`` had to
+        avoid, because MySQL answered it by cross-joining the 44-row table
+        against the scoped walk: 933,108 driving rows instead of 21,207, 12.2s
+        versus 2.2s, measured. What the cross-join multiplied is gone: this
+        drives off ~108 ``TaskProject`` rows keyed by ``TaskID`` rather than a
+        walk over ~87k image links. That is a reason to expect it cheap, not a
+        proof the plan cannot recur; it has not been re-measured.
 
-        No ``.distinct()``, and that part is safe by construction rather than
-        by expectation: ``TaskProject``'s primary key is the composite
-        ``(TaskID, ProjectID)`` and ``Project`` contributes exactly one row per
-        project, so no pair can repeat. The old ``.distinct()`` carried a
-        second job -- stopping MySQL merging the derived table into the outer
-        query -- and there is no derived table here for it to protect.
+        No ``.distinct()``, and safe by construction rather than by
+        expectation: ``TaskProject``'s primary key is ``(TaskID, ProjectID)``
+        and ``Project`` contributes exactly one row per project, so no pair can
+        repeat. ``.distinct()`` also stopped MySQL merging a derived table into
+        the outer query; there is no derived table here for it to protect.
 
-        Unscoped on purpose: the caller applies the scope, so that the call
-        stays inside the public read method where the AST guard in
+        Unscoped on purpose: the callers apply the scope, so the call stays
+        inside a public read method where the AST guard in
         ``server/tests/test_repository_reads_are_scoped.py`` can see it.
         """
         return (
@@ -157,9 +152,9 @@ class TaskRepository:
         """Return {task_id: [(project_id, project_name), ...]} for the given ids.
 
         Reads the declaration -- the same ``TaskProject`` rows ``projects_of``
-        and ``eorm grant-for-task`` answer from -- instead of walking the image
-        links, so the batched, name-carrying query and the enforcement path
-        cannot drift. A test still pins them to the same answer.
+        and ``eorm grant-for-task`` answer from -- so the batched, name-carrying
+        query and the enforcement path cannot drift. A test pins them to the
+        same answer.
 
         Every requested id is present in the result, and an empty list means
         one of *two* things: the task declares no project, or the caller's
@@ -167,8 +162,8 @@ class TaskRepository:
         nothing" on its own; the routes are safe because they 404 an invisible
         task before the field is read. A task that declares nothing is visible
         to everyone under vacuity rather than hidden -- the create route
-        declares a project set for every task it makes, but rows predating that
-        can still be in this state.
+        declares a project set for every task it makes, but older rows can
+        still be in this state.
 
         ``apply_scope`` is called here rather than inside
         ``_declared_projects_select`` so that the repository read guard, which
@@ -193,14 +188,10 @@ class TaskRepository:
         """The ``(id, name)`` pairs one task *declares*, for a response body.
 
         The single-task form of ``projects_for_tasks``, sharing its builder so
-        the join is written once. It existed because that method walked the
-        image links and this one read ``TaskProject``: a task that declares
-        projects it holds no image in yet -- which every task is the moment it
-        is created -- resolved to nothing through the walk. Both read the
-        declaration now, so the two agree by construction; what keeps this a
-        method of its own is that the create route wants one task's list rather
-        than a dict, and that a thin delegation would move ``apply_scope`` out
-        of this body, where the read guard has to see it.
+        the join is written once. Kept as a method of its own because the create
+        route wants one task's list rather than a dict, and because a thin
+        delegation would move ``apply_scope`` out of this body, where the read
+        guard has to see it.
 
         The scope predicate is a backstop, not a path: the only caller has
         already required the actor at ``grader`` in every project named here.

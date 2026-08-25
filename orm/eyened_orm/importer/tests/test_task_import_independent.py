@@ -82,11 +82,9 @@ def test_image_then_task_import_creates_tasks_subtasks_and_links(session):
 def test_a_task_creating_row_with_no_resolvable_image_is_refused(session):
     """A task this run creates must end up with a declaration -- empty is a dead end.
 
-    Mirrors Task 4 Step 1's test_a_task_that_would_declare_nothing_is_refused,
-    for the importer instead of create_from_imagesets: a task with no
-    declared project is visible to every authenticated user and can never
-    accept an image, because every image would fall outside its (empty)
-    declaration.
+    The importer's half of the rule ``create_from_imagesets`` enforces: a task
+    with no declared project is visible to every authenticated user and can
+    never accept an image, every image falling outside its empty declaration.
     """
     row = ImportTaskRow(
         task_definition_name="td-none",
@@ -101,10 +99,9 @@ def test_a_task_creating_row_with_no_resolvable_image_is_refused(session):
 def test_subtask_image_link_rejects_unknown_image_instance_id(session):
     """Applying a task row whose ``image_instance_id`` does not exist violates the link FK.
 
-    The task also gets one resolvable image in the same run, so its
-    declaration is non-empty and the empty-declaration refusal (2026-08-20
-    amendment, Step 5) does not pre-empt this test -- the dangling id still
-    has to fail at the link's own foreign key, which is what this test is for.
+    The task also gets one resolvable image in the same run, so its declaration
+    is non-empty and the empty-declaration refusal does not pre-empt this test:
+    the dangling id still has to fail at the link's own foreign key.
     """
     defaults = {
         "project_external": "Y",
@@ -270,9 +267,8 @@ def _import_one_image(session, *, project_name: str, key: str) -> int:
 def test_a_task_import_declares_the_projects_of_the_images_it_brings(session):
     """The importer is the third writer of SubTaskImageLink, and it must declare.
 
-    Without this the task importer is the one production writer with real users
-    that creates links under no declaration at all, and Task 6's foreign key
-    breaks every task import.
+    Without this the importer creates links under no declaration at all, and
+    the containment foreign key breaks every task import.
     """
     image_id = _import_one_image(session, project_name="dec-proj", key="dec")
     project_id = session.get(ImageInstance, image_id).ProjectID
