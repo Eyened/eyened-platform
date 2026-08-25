@@ -147,7 +147,16 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "ALTER TABLE ImageInstance DROP COLUMN ProjectID, "
-        "ALGORITHM=INPLACE, LOCK=NONE"
-    )
+    # Guarded for the same reason the ADD COLUMN above is, and it is the same
+    # guard: DDL commits implicitly, so once this statement has run the column
+    # is gone whether or not alembic_version was updated afterwards, and an
+    # unguarded re-run dies on `ERROR 1091 Can't DROP 'ProjectID'`. One table
+    # cannot half-revert the way the two-table sibling can, so re-entry here
+    # arrives by the other route: an operator recovering with `alembic stamp`
+    # and downgrading again, which is the scenario a rollback is for.
+    conn = op.get_bind()
+    if _column_exists(conn, "ImageInstance", "ProjectID"):
+        op.execute(
+            "ALTER TABLE ImageInstance DROP COLUMN ProjectID, "
+            "ALGORITHM=INPLACE, LOCK=NONE"
+        )
