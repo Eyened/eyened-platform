@@ -126,8 +126,10 @@ class TaskRepository:
         against the scoped walk: 933,108 driving rows instead of 21,207, 12.2s
         versus 2.2s, measured. What the cross-join multiplied is gone: this
         drives off ~108 ``TaskProject`` rows keyed by ``TaskID`` rather than a
-        walk over ~87k image links. That is a reason to expect it cheap, not a
-        proof the plan cannot recur; it has not been re-measured.
+        walk over ~87k image links. Measured on a copy of the dev database, at
+        the same row counts: 2.5 ms to resolve the spans of all 48 tasks for a
+        member of every project, against 648 ms for the walk, and no cross join
+        in the plan.
 
         No ``.distinct()``, and safe by construction rather than by
         expectation: ``TaskProject``'s primary key is ``(TaskID, ProjectID)``

@@ -27,3 +27,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [A large `IN` list makes MySQL abandon the range optimizer](2026-08-20-large-in-list-defeats-range-optimizer.md)
 - [`docs/rbac-operations.md` is two documents in one file](2026-08-21-rbac-operations-doc-has-two-homes.md)
 - [`is_admin` makes `scope.require` vacuous, so an administrator gets 500 where anyone else gets 404](2026-08-21-admin-scope-vacuity-turns-404s-into-500s.md)
+- [Cross-project data cleaning has no safe path, and the ORM actively misleads](2026-08-25-cross-project-data-cleaning-has-no-safe-path.md)

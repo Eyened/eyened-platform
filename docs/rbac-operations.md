@@ -1,5 +1,10 @@
 # RBAC operations
 
+The task project declaration (`TaskProject`) ships in its own release with its
+own migration chain and its own window. That deployment is not covered here --
+see `docs/runbooks/2026-08-25-task-project-declaration-cutover.md`. What the
+declaration changes for operators is under **Accepted risks** below.
+
 ## Cutover
 
 Memberships are inert rows until enforcement reads them, and the CLI is a
