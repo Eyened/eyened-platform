@@ -355,14 +355,25 @@ def test_the_batch_image_gate_follows_the_route_declaration(monkeypatch):
         "_ONE_HOP_TO",
         {
             **scoping._ONE_HOP_TO,
-            ImageInstance: (Series, lambda: ImageInstance.SeriesID == Series.SeriesID),
+            ImageInstance: Series,
         },
     )
 
     after = str(image_project_pairs(ids).compile(dialect=sqlite.dialect()))
     assert 'JOIN "Series"' in after, after
-    assert '"Series"."ProjectID"' in after, after
-    assert '"ImageInstance"."ProjectID"' not in after, after
+
+    # Asserted against the SELECT list rather than the whole statement: the ON
+    # clause derived for the composite fk_ImageInstance_Series_Project
+    # legitimately names ImageInstance.ProjectID, so banning the string
+    # outright fires on correct behaviour. What must not happen is the route
+    # answering with the entity's own column instead of travelling the hop.
+    # Split on the keyword, not " FROM " -- the compiler puts a newline before
+    # it, so a spaced separator silently matches nothing and ``partition``
+    # hands back the whole statement, restoring the over-broad assertion this
+    # replaced.
+    select_list = after.split("FROM", 1)[0]
+    assert '"Series"."ProjectID"' in select_list, after
+    assert '"ImageInstance"."ProjectID"' not in select_list, after
 
 
 # --- the correlated EXISTS predicate that apply_scope emits ------------------
@@ -489,7 +500,7 @@ def test_apply_scope_compiles_inside_a_query_that_holds_every_route_table(entity
     remembering to add a case.
     """
     reached = sorted(
-        ({parent for parent, _ in _ONE_HOP_TO.values()} | {Patient}) - {entity},
+        (set(_ONE_HOP_TO.values()) | {Patient}) - {entity},
         key=lambda e: e.__name__,
     )
     stmt = select(entity).select_from(entity, *reached)
@@ -504,7 +515,7 @@ def test_apply_scope_compiles_inside_a_query_that_holds_every_route_table(entity
     # SELECT list, so it holds under an empty ``reached`` for all seven.
     if entity in _ONE_HOP_TO:
         from_clause = unscoped.rpartition("FROM ")[2]
-        assert f'"{_ONE_HOP_TO[entity][0].__tablename__}"' in from_clause, unscoped
+        assert f'"{_ONE_HOP_TO[entity].__tablename__}"' in from_clause, unscoped
 
     scoped = apply_scope(stmt, entity, _grader_scope(1))
     sql = str(scoped.compile(dialect=sqlite.dialect()))

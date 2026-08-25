@@ -19,10 +19,13 @@ grant-for-task`` executes the same function. Two implementations will drift, and
 the failure mode is an administrator granting a set that does not match what the
 API requires.
 
-``_OWN_PROJECT_COLUMN`` names **entities only**: the ``ProjectID`` column is
-*derived* from the entity rather than written down beside it, so a pairing that
-is valid SQL with a wrong answer -- another table's ``ProjectID``, or this
-table's other integer column -- cannot be written at all.
+Those two registries name **entities only** -- which entities end the route on
+their own row, and which entity each remaining one hops to. The ``ProjectID``
+column and the ON clause are *derived* from the entity and from the schema's own
+foreign keys rather than written down beside them, so the pairings that are
+valid SQL with a wrong answer -- another table's ``ProjectID``, this table's
+other integer column, a hop keyed on the wrong column or against itself -- are
+not merely untested here, they cannot be written.
 """
 from __future__ import annotations
 
@@ -30,8 +33,11 @@ from collections.abc import Callable, Sequence
 from collections.abc import Set as AbstractSet
 from typing import Protocol
 
-from sqlalchemy import ColumnElement, Select, exists, select
+from sqlalchemy import ColumnElement, Select, and_, exists, select
 from sqlalchemy.orm import Mapped, Session
+from sqlalchemy.sql import operators
+from sqlalchemy.sql.elements import BinaryExpression, BooleanClauseList
+from sqlalchemy.sql.util import join_condition
 
 from ..base import Base
 from ..creator import Creator
@@ -83,16 +89,16 @@ __all__ = [
 # of the same route is exactly the drift this module's docstring says it exists
 # to prevent.
 #
-# ``_OWN_PROJECT_COLUMN`` names entities and nothing else. That is deliberate,
-# and it is what makes the two consumers safe to reason about separately: they
-# build the same route with SQLAlchemy primitives that behave *oppositely*
-# toward a table named in a predicate but present in no FROM.
-# ``select().where()`` infers the FROM, so such a table is silently added,
-# unjoined -- a cross join, legal SQL, every row returned. ``stmt.join()`` does
-# not infer, so the same entry is a dangling reference and raises. One bad
-# pairing would therefore widen every read while crashing the first write, and
-# a test pointed at either consumer is no evidence about the other. Deriving
-# the column removes the pairing rather than testing it twice.
+# Both registries name entities and nothing else. That is deliberate, and it is
+# what makes the two consumers safe to reason about separately: they build the
+# same route with SQLAlchemy primitives that behave *oppositely* toward a table
+# named in a predicate but present in no FROM. ``select().where()`` infers the
+# FROM, so such a table is silently added, unjoined -- a cross join, legal SQL,
+# every row returned. ``stmt.join()`` does not infer, so the same entry is a
+# dangling reference and raises. One bad pairing would therefore widen every
+# read while crashing the first write, and a test pointed at either consumer is
+# no evidence about the other. Deriving both halves of the route removes the
+# pairing rather than testing it twice.
 
 
 class _CarriesProjectID(Protocol):
@@ -117,35 +123,29 @@ _OWN_PROJECT_COLUMN: frozenset[type[_CarriesProjectID]] = frozenset(
     {Patient, Study, Series, ImageInstance}
 )
 
-# One hop nearer a ProjectID column. Replaces the five-hop walk to Patient:
-# the anchor is still Patient.ProjectID, but every row down the chain now
-# carries a structurally-equal copy, so nothing has to travel to reach it.
-_ONE_HOP_TO: dict[type[Base], tuple[type[Base], Callable[[], ColumnElement[bool]]]] = {
-    Segmentation: (
-        ImageInstance,
-        lambda: Segmentation.ImageInstanceID == ImageInstance.ImageInstanceID,
-    ),
-    ModelSegmentation: (
-        ImageInstance,
-        lambda: ModelSegmentation.ImageInstanceID == ImageInstance.ImageInstanceID,
-    ),
-    FormAnnotation: (Patient, lambda: FormAnnotation.PatientID == Patient.PatientID),
+# One hop nearer a ProjectID column, named by the *parent* only. Replaces the
+# five-hop walk to Patient: the anchor is still Patient.ProjectID, but every row
+# down the chain now carries a structurally-equal copy, so nothing has to travel
+# to reach it.
+#
+# The ON clause is the foreign key the schema itself declares, derived by
+# ``_hop_onclause`` rather than written out here. A hand-written clause can key
+# on the wrong column, key a table against itself -- which degenerates the
+# EXISTS into "does any row in scope exist" and returns the whole table -- or
+# name a parent no foreign key reaches; all three are valid SQL, all three are
+# fail-open, and none of them is visible in the compiled statement's shape. A
+# parent that is not a foreign-key neighbour now raises at the first call
+# instead.
+_ONE_HOP_TO: dict[type[Base], type[Base]] = {
+    Segmentation: ImageInstance,
+    ModelSegmentation: ImageInstance,
+    FormAnnotation: Patient,
     # A tag link carries no project of its own; it inherits the one its parent
     # row resolves to, so it simply enters the chain one hop lower.
-    StudyTagLink: (Study, lambda: StudyTagLink.StudyID == Study.StudyID),
-    ImageInstanceTagLink: (
-        ImageInstance,
-        lambda: ImageInstanceTagLink.ImageInstanceID == ImageInstance.ImageInstanceID,
-    ),
-    SegmentationTagLink: (
-        Segmentation,
-        lambda: SegmentationTagLink.SegmentationID == Segmentation.SegmentationID,
-    ),
-    FormAnnotationTagLink: (
-        FormAnnotation,
-        lambda: FormAnnotationTagLink.FormAnnotationID
-        == FormAnnotation.FormAnnotationID,
-    ),
+    StudyTagLink: Study,
+    ImageInstanceTagLink: ImageInstance,
+    SegmentationTagLink: Segmentation,
+    FormAnnotationTagLink: FormAnnotation,
 }
 
 SINGLE_PROJECT_ENTITIES: frozenset[type[Base]] = (
@@ -166,11 +166,53 @@ SAFE_UNFILTERED_ENTITIES: frozenset[type[Base]] = frozenset(
 )
 
 
+def _hop_onclause(child: type[Base], parent: type[Base]) -> ColumnElement[bool]:
+    """One hop's ON clause: the foreign key the schema already declares.
+
+    ``join_condition`` reads the constraint rather than trusting anyone to
+    retype it, and it is the *whole* answer for the failure modes a written-out
+    clause has: a parent no foreign key reaches raises ``NoForeignKeysError``, a
+    pair with more than one candidate raises ``AmbiguousForeignKeysError``, and a
+    composite key derives as the composite AND instead of one of its halves. All
+    three are refusals at the first call, where the written-out version was legal
+    SQL that returned too many rows.
+
+    The one thing done to its output is to render the child's column first.
+    ``join_condition`` puts the *referenced* column on the left, so it emits
+    ``ImageInstance.ImageInstanceID = Segmentation.ImageInstanceID``; ``=`` is
+    commutative and both dialects agree, so this is cosmetic -- but it keeps
+    every compiled statement byte-identical to the hand-written clauses this
+    replaced, which is what allows a diff of the whole scoped-SQL surface to be
+    the evidence that deriving the route changed nothing.
+    """
+    condition = join_condition(child.__table__, parent.__table__)
+    equalities = (
+        condition.clauses
+        if isinstance(condition, BooleanClauseList)
+        else (condition,)
+    )
+    child_first = []
+    for equality in equalities:
+        if (
+            not isinstance(equality, BinaryExpression)
+            or equality.operator is not operators.eq
+        ):
+            # Unreachable for a foreign-key join; it fails closed rather than
+            # letting an unrecognised clause through onto the authorization path.
+            raise TypeError(
+                f"{child.__name__} -> {parent.__name__} derived a non-equality "
+                f"join condition: {equality!s}"
+            )
+        left, right = equality.left, equality.right
+        if left.table is parent.__table__:
+            left, right = right, left
+        child_first.append(left == right)
+    return and_(*child_first)
+
+
 def _hops_to_column(
     entity: type[Base],
-) -> tuple[
-    list[tuple[type[Base], Callable[[], ColumnElement[bool]]]], ColumnElement[int]
-]:
+) -> tuple[list[tuple[type[Base], ColumnElement[bool]]], ColumnElement[int]]:
     """The one route: the hops to walk, and the ProjectID column they land on.
 
     Successor to ``_join_to_patient``, and it exists for the same reason: the
@@ -178,17 +220,18 @@ def _hops_to_column(
     declaration, or they drift, and the failure mode is an administrator
     granting a set that does not match what the API requires.
 
-    The anchor is not looked up in a table of columns: it is ``node.ProjectID``
-    on the entity that ends the route, so ``_OWN_PROJECT_COLUMN`` cannot
-    express a wrong column at all -- only a wrong *entity*, which a reader can
-    check against the name beside it.
+    Nothing here is looked up in a table of columns or clauses: the anchor is
+    ``node.ProjectID`` on the entity that ends the route, and each hop's ON
+    clause comes from the schema. The registries above therefore cannot express
+    a wrong column or a wrong predicate at all -- only a wrong *entity*, which
+    a reader can check against the name beside it.
 
     Bounded by ``len(_ONE_HOP_TO)`` hops -- today the longest chain is two
     (``SegmentationTagLink -> Segmentation -> ImageInstance``). A malformed map
     raises rather than looping, which matters because this sits on the
     authorization path.
     """
-    joins: list[tuple[type[Base], Callable[[], ColumnElement[bool]]]] = []
+    joins: list[tuple[type[Base], ColumnElement[bool]]] = []
     node: type[Base] = entity
     for _ in range(len(_ONE_HOP_TO) + 1):
         if node in _OWN_PROJECT_COLUMN:
@@ -198,8 +241,8 @@ def _hops_to_column(
                 f"{entity.__name__} has no route to a ProjectID column: "
                 f"{node.__name__} is in neither _OWN_PROJECT_COLUMN nor _ONE_HOP_TO"
             )
-        parent, onclause = _ONE_HOP_TO[node]
-        joins.append((parent, onclause))
+        parent = _ONE_HOP_TO[node]
+        joins.append((parent, _hop_onclause(node, parent)))
         node = parent
     raise ValueError(
         f"{entity.__name__}'s _ONE_HOP_TO chain did not reach a ProjectID column "
@@ -219,7 +262,7 @@ def _project_ids_from(
     joins, column = _hops_to_column(anchor)
     stmt = select(column).select_from(anchor)
     for parent, onclause in joins:
-        stmt = stmt.join(parent, onclause())
+        stmt = stmt.join(parent, onclause)
     return stmt.where(anchor_id_column == entity_id)
 
 
@@ -266,9 +309,9 @@ def _single_project_predicate(
     first_parent, first_onclause = joins[0]
     inner = select(1).select_from(first_parent)
     for parent, onclause in joins[1:]:
-        inner = inner.join(parent, onclause())
+        inner = inner.join(parent, onclause)
     return exists(
-        inner.where(first_onclause()).where(column.in_(accessible)).correlate(entity)
+        inner.where(first_onclause).where(column.in_(accessible)).correlate(entity)
     )
 
 
@@ -323,7 +366,7 @@ def image_project_pairs(image_instance_ids: Sequence[int]) -> Select:
     joins, column = _hops_to_column(ImageInstance)
     stmt = select(ImageInstance.ImageInstanceID, column).select_from(ImageInstance)
     for parent, onclause in joins:
-        stmt = stmt.join(parent, onclause())
+        stmt = stmt.join(parent, onclause)
     return stmt.where(ImageInstance.ImageInstanceID.in_(image_instance_ids))
 
 
