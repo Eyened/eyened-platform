@@ -112,6 +112,22 @@ describe("BrowserOverlay teardown", () => {
         expect(setInstanceIDs).not.toHaveBeenCalled();
     });
 
+    it("reports a failure that is not the declaration refusal", async () => {
+        vi.mocked(addSubTaskImage).mockRejectedValue(new Error("Network down"));
+
+        const { setInstanceIDs, unmount } = await renderOverlay();
+
+        unmount();
+
+        // One argument, not two: the refusal's description names projects the
+        // server never sent for this error.
+        await vi.waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith("Error: Network down"),
+        );
+
+        expect(setInstanceIDs).not.toHaveBeenCalled();
+    });
+
     it("persists the selection when the server accepts the link", async () => {
         vi.mocked(addSubTaskImage).mockResolvedValue(undefined);
 
