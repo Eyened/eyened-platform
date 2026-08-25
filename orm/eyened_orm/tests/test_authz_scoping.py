@@ -10,6 +10,7 @@ from sqlalchemy.dialects import sqlite
 from eyened_orm import (
     FormAnnotation,
     ImageInstance,
+    ModelSegmentation,
     Patient,
     Series,
     Study,
@@ -224,6 +225,85 @@ def test_a_form_annotation_resolves_through_its_patient(session):
     assert projects_of(session, FormAnnotation, annotation.FormAnnotationID) == {
         project.ProjectID
     }
+
+
+@pytest.fixture()
+def one_row_each_in_two_projects(session):
+    """One ``Study``, ``Series`` and ``ModelSegmentation`` in A, and one in B.
+
+    Seeded A first, so in every one of those tables the *lowest* primary key
+    belongs to A. That ordering is the point: it is what lets the B half of the
+    round trip below tell "the project of the row you asked about" apart from
+    "the project of some arbitrary row of that type".
+    """
+    from eyened_orm.segmentation import DataRepresentation, Datatype, SegmentationModel
+
+    backend = make_storage_backend(session)
+    device = make_device(session, "d")
+    # No factory exists for ModelSegmentation: ModelID is NOT NULL and
+    # SegmentationModel is a joined-table subclass of Model whose ModelName and
+    # Version are NOT NULL too.
+    model = SegmentationModel(ModelName="m", Version="1")
+    session.add(model)
+    session.flush()
+
+    seeded: dict[str, dict] = {}
+    for name in ("A", "B"):
+        project = make_project(session, name)
+        patient = make_patient(session, project, f"pat-{name}")
+        study = make_study(session, patient, date(2024, 1, 1))
+        series = make_series(session, study)
+        image = make_image(session, series, device, backend, f"img-{name}")
+        segmentation = ModelSegmentation(
+            ModelID=model.ModelID,
+            ImageInstanceID=image.ImageInstanceID,
+            DataType=Datatype.R8UI,
+            DataRepresentation=DataRepresentation.Binary,
+            Depth=1,
+            Height=4,
+            Width=4,
+        )
+        session.add(segmentation)
+        session.flush()
+        seeded[name] = {
+            "project": project.ProjectID,
+            Study: study.StudyID,
+            Series: series.SeriesID,
+            ModelSegmentation: segmentation.ModelSegmentationID,
+        }
+    session.commit()
+    return seeded
+
+
+@pytest.mark.parametrize(
+    "entity",
+    [Study, Series, ModelSegmentation],
+    ids=lambda entity: entity.__name__,
+)
+def test_a_write_resolver_answers_for_the_row_it_was_asked_about(
+    session, one_row_each_in_two_projects, entity
+):
+    """Both halves, per entity: A resolves to A *and* B resolves to B.
+
+    ``projects_of`` is the write side of the route -- its answer is the set
+    ``AccessScope.require`` is judged against at ``study_service`` and
+    ``segmentation_service``, so a resolver naming the wrong-but-plausible
+    project fails open: the actor is checked against a project they may well
+    hold. The read side is thoroughly covered and this side was not, which is
+    the asymmetry this test exists to close.
+
+    One project would prove nothing: a resolver ignoring its argument
+    altogether still returns the only project there is. Two rows, asserted in
+    *both* directions, is the smallest fixture that separates three different
+    resolvers from three different wrong answers -- every project in the
+    database, some other row's project, and an arbitrary first row's project.
+    """
+    seeded = one_row_each_in_two_projects
+    for name in ("A", "B"):
+        row_id = seeded[name][entity]
+        assert projects_of(session, entity, row_id) == {seeded[name]["project"]}, (
+            f"{entity.__name__} {row_id} should resolve to project {name} alone"
+        )
 
 
 def test_the_batch_image_gate_follows_the_route_declaration(monkeypatch):
