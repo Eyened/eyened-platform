@@ -348,11 +348,7 @@ def test_the_batch_image_gate_follows_the_route_declaration(monkeypatch):
     monkeypatch.setattr(
         scoping,
         "_OWN_PROJECT_COLUMN",
-        {
-            entity: column
-            for entity, column in scoping._OWN_PROJECT_COLUMN.items()
-            if entity is not ImageInstance
-        },
+        scoping._OWN_PROJECT_COLUMN - {ImageInstance},
     )
     monkeypatch.setattr(
         scoping,

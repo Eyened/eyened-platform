@@ -18,14 +18,20 @@ a read as an ``EXISTS``, writes execute it as a selectable, and ``eorm
 grant-for-task`` executes the same function. Two implementations will drift, and
 the failure mode is an administrator granting a set that does not match what the
 API requires.
+
+``_OWN_PROJECT_COLUMN`` names **entities only**: the ``ProjectID`` column is
+*derived* from the entity rather than written down beside it, so a pairing that
+is valid SQL with a wrong answer -- another table's ``ProjectID``, or this
+table's other integer column -- cannot be written at all.
 """
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from collections.abc import Set as AbstractSet
+from typing import Protocol
 
 from sqlalchemy import ColumnElement, Select, exists, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Mapped, Session
 
 from ..base import Base
 from ..creator import Creator
@@ -76,15 +82,40 @@ __all__ = [
 # (``apply_scope``, correlated into a read). Two hand-written implementations
 # of the same route is exactly the drift this module's docstring says it exists
 # to prevent.
+#
+# ``_OWN_PROJECT_COLUMN`` names entities and nothing else. That is deliberate,
+# and it is what makes the two consumers safe to reason about separately: they
+# build the same route with SQLAlchemy primitives that behave *oppositely*
+# toward a table named in a predicate but present in no FROM.
+# ``select().where()`` infers the FROM, so such a table is silently added,
+# unjoined -- a cross join, legal SQL, every row returned. ``stmt.join()`` does
+# not infer, so the same entry is a dangling reference and raises. One bad
+# pairing would therefore widen every read while crashing the first write, and
+# a test pointed at either consumer is no evidence about the other. Deriving
+# the column removes the pairing rather than testing it twice.
 
 
-# Entities carrying their own ProjectID: the route ends here, at a column.
-_OWN_PROJECT_COLUMN: dict[type[Base], ColumnElement[int]] = {
-    Patient: Patient.ProjectID,
-    Study: Study.ProjectID,
-    Series: Series.ProjectID,
-    ImageInstance: ImageInstance.ProjectID,
-}
+class _CarriesProjectID(Protocol):
+    """An entity whose route to its project ends on its own row."""
+
+    ProjectID: Mapped[int]
+
+
+# Entities carrying their own ProjectID: the route ends here, on *that
+# entity's* column. A set, not a map: the column is derived from the entity
+# rather than written beside it, so ``Series: Study.ProjectID`` -- valid SQL,
+# wrong answer, cross-joins Study into the enclosing FROM and returns every
+# Series row -- and ``Series: Series.StudyID`` -- valid SQL, no cross join, a
+# StudyID judged against a project set, which on a fixture whose project ids
+# and row ids coincide even gives the right answer -- are both unwriteable
+# rather than merely untested. The element type is what pins the column's
+# *type* as well: nothing checks these annotations today, but a ``Mapped[str]``
+# anchor is the one place SQLite and MySQL disagree about ``IN`` (MySQL coerces
+# both sides to DOUBLE, so '03' and '3abc' match ``IN (3)``; SQLite matches
+# neither), and this is where that would be caught if a checker is ever run.
+_OWN_PROJECT_COLUMN: frozenset[type[_CarriesProjectID]] = frozenset(
+    {Patient, Study, Series, ImageInstance}
+)
 
 # One hop nearer a ProjectID column. Replaces the five-hop walk to Patient:
 # the anchor is still Patient.ProjectID, but every row down the chain now
@@ -147,17 +178,21 @@ def _hops_to_column(
     declaration, or they drift, and the failure mode is an administrator
     granting a set that does not match what the API requires.
 
+    The anchor is not looked up in a table of columns: it is ``node.ProjectID``
+    on the entity that ends the route, so ``_OWN_PROJECT_COLUMN`` cannot
+    express a wrong column at all -- only a wrong *entity*, which a reader can
+    check against the name beside it.
+
     Bounded by ``len(_ONE_HOP_TO)`` hops -- today the longest chain is two
     (``SegmentationTagLink -> Segmentation -> ImageInstance``). A malformed map
     raises rather than looping, which matters because this sits on the
     authorization path.
     """
     joins: list[tuple[type[Base], Callable[[], ColumnElement[bool]]]] = []
-    node = entity
+    node: type[Base] = entity
     for _ in range(len(_ONE_HOP_TO) + 1):
-        own = _OWN_PROJECT_COLUMN.get(node)
-        if own is not None:
-            return joins, own
+        if node in _OWN_PROJECT_COLUMN:
+            return joins, node.ProjectID
         if node not in _ONE_HOP_TO:
             raise KeyError(
                 f"{entity.__name__} has no route to a ProjectID column: "
