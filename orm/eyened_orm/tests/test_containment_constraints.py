@@ -150,7 +150,7 @@ def test_a_declaration_in_use_cannot_be_removed(session, spanning):
         TaskProject,
         {"TaskID": spanning["task"], "ProjectID": spanning["projects"]["A"]},
     )
-    assert declared is not None, "Task 4 should have made the fixture declare this"
+    assert declared is not None, "the fixture must declare this project for the test to mean anything"
     session.delete(declared)
     with pytest.raises(IntegrityError):
         session.flush()
