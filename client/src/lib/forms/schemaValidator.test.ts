@@ -23,7 +23,18 @@ describe("validateSchema type checking", () => {
     it("accepts null only for type null", () => {
         expect(validateSchema({ type: "null" }, null)).toEqual([]);
         expect(
-            validateSchema({ type: "null" }, { x: 1 }).some((e) => e.type === "type"),
+            validateSchema({ type: "null" }, { x: 1 }).some(
+                (e) => e.type === "type",
+            ),
+        ).toBe(true);
+    });
+
+    it("accepts integers and rejects non-integers for type integer", () => {
+        expect(validateSchema({ type: "integer" }, 3)).toEqual([]);
+        expect(
+            validateSchema({ type: "integer" }, 3.5).some(
+                (e) => e.type === "type",
+            ),
         ).toBe(true);
     });
 
@@ -42,7 +53,10 @@ describe("validateSchema type checking", () => {
             oneOf: [
                 {
                     type: "object",
-                    properties: { x: { type: "number" }, y: { type: "number" } },
+                    properties: {
+                        x: { type: "number" },
+                        y: { type: "number" },
+                    },
                     required: ["x", "y"],
                     additionalProperties: false,
                 },
@@ -52,9 +66,9 @@ describe("validateSchema type checking", () => {
         expect(validateSchema(schema, { x: 1, y: 2 })).toEqual([]);
         expect(validateSchema(schema, null)).toEqual([]);
         // Without type checks, {x,y} matched both arms (object + type:null).
-        expect(validateSchema(schema, { x: 1, y: 2, z: 3 }).length).toBeGreaterThan(
-            0,
-        );
+        expect(
+            validateSchema(schema, { x: 1, y: 2, z: 3 }).length,
+        ).toBeGreaterThan(0);
     });
 });
 
@@ -83,7 +97,9 @@ describe("validateSchema additionalProperties", () => {
         };
         expect(validateSchema(schema, { a: [1, 2] })).toEqual([]);
         expect(
-            validateSchema(schema, { a: "nope" }).some((e) => e.type === "type"),
+            validateSchema(schema, { a: "nope" }).some(
+                (e) => e.type === "type",
+            ),
         ).toBe(true);
     });
 });

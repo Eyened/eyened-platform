@@ -91,7 +91,10 @@ export interface ValidationError {
 }
 
 /** Testable entry point for the recursive JSON Schema checks. */
-export function validateSchema(schema: any, value: any): ValidationError[] {
+export function validateSchema(
+    schema: unknown,
+    value: unknown,
+): ValidationError[] {
     return run_validation(schema, value).errors;
 }
 
@@ -117,9 +120,7 @@ function matchesType(
     const allowed = Array.isArray(schemaType) ? schemaType : [schemaType];
     const t = jsonType(value);
     return allowed.some((a) =>
-        a === "integer"
-            ? t === "number" && Number.isInteger(value)
-            : a === t,
+        a === "integer" ? t === "number" && Number.isInteger(value) : a === t,
     );
 }
 
@@ -178,7 +179,11 @@ function validate(
     }
 
     // Required properties
-    if (schema.required && Array.isArray(schema.required) && isPlainObject(value)) {
+    if (
+        schema.required &&
+        Array.isArray(schema.required) &&
+        isPlainObject(value)
+    ) {
         for (const key of schema.required) {
             if (!(key in value)) {
                 const message = `${path}.${key}: Missing required property`;

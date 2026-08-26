@@ -85,6 +85,35 @@ describe("resolvePanels", () => {
         expect(expandedPanelNames).toEqual(["Grading"]);
     });
 
+    it("returns defaults immediately when taskConfig has no layout object", () => {
+        const { panels, expandedPanelNames } = resolvePanels(baseInput);
+        expect(panels.map((p) => p.name)).toEqual([
+            "Info",
+            "Rendering",
+            "Measure",
+            "Form",
+            "Segmentation",
+        ]);
+        expect(expandedPanelNames).toEqual([]);
+    });
+
+    it("includes ETDRS and Registration when 2D schemas are present", () => {
+        const { panels } = resolvePanels({
+            is2D: true,
+            etdrsSchema: { id: 1, name: "etdrs" } as never,
+            registrationSchema: { id: 2, name: "reg" } as never,
+        });
+        expect(panels.map((p) => p.name)).toEqual([
+            "Info",
+            "Rendering",
+            "ETDRS",
+            "Registration",
+            "Measure",
+            "Form",
+            "Segmentation",
+        ]);
+    });
+
     it("skips unknown prepend types with a console warning", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
         const taskConfig = {

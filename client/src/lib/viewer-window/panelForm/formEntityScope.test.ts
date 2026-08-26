@@ -55,6 +55,28 @@ describe("matchesFormEntityScope", () => {
         const a = { ...annotation, image_id: "abc123" } as FormAnnotationGET;
         expect(matchesFormEntityScope(a, "ImageInstance", ctx)).toBe(true);
     });
+
+    it("rejects a different patient", () => {
+        const a = { ...annotation, patient_id: 999 } as FormAnnotationGET;
+        expect(matchesFormEntityScope(a, "Patient", ctx)).toBe(false);
+    });
+
+    it("matches Patient, Study, and Eye", () => {
+        const a = {
+            ...annotation,
+            study_id: 50,
+            laterality: "R",
+        } as FormAnnotationGET;
+        expect(matchesFormEntityScope(a, "Patient", ctx)).toBe(true);
+        expect(matchesFormEntityScope(a, "Study", ctx)).toBe(true);
+        expect(matchesFormEntityScope(a, "Eye", ctx)).toBe(true);
+    });
+
+    it("rejects an unknown scope", () => {
+        expect(matchesFormEntityScope(annotation, "Nope" as never, ctx)).toBe(
+            false,
+        );
+    });
 });
 
 describe("buildFormAnnotationCreatePayload", () => {
@@ -80,5 +102,71 @@ describe("buildFormAnnotationCreatePayload", () => {
             form_data: {},
         });
         expect("image_id" in payload).toBe(false);
+    });
+
+    it("builds payloads for Patient, Study, Eye, and ImageInstance", () => {
+        const ctx = {
+            patientId: 100,
+            studyId: 50,
+            imageId: "abc123",
+            laterality: "R" as const,
+        };
+        expect(
+            buildFormAnnotationCreatePayload({
+                formSchemaId: 10,
+                scope: "Patient",
+                ctx,
+            }),
+        ).toEqual({
+            form_schema_id: 10,
+            patient_id: 100,
+            sub_task_id: undefined,
+            form_data: {},
+        });
+        expect(
+            buildFormAnnotationCreatePayload({
+                formSchemaId: 10,
+                scope: "Study",
+                ctx,
+            }).study_id,
+        ).toBe(50);
+        expect(
+            buildFormAnnotationCreatePayload({
+                formSchemaId: 10,
+                scope: "Eye",
+                ctx,
+            }).laterality,
+        ).toBe("R");
+        expect(
+            buildFormAnnotationCreatePayload({
+                formSchemaId: 10,
+                scope: "ImageInstance",
+                ctx,
+            }),
+        ).toMatchObject({
+            study_id: 50,
+            image_id: "abc123",
+            laterality: "R",
+        });
+    });
+
+    it("falls back to the patient payload for an unknown scope", () => {
+        expect(
+            buildFormAnnotationCreatePayload({
+                formSchemaId: 10,
+                scope: "Nope" as never,
+                ctx: {
+                    patientId: 100,
+                    studyId: 50,
+                    imageId: "abc123",
+                    laterality: "R",
+                },
+            }),
+        ).toEqual({
+            form_schema_id: 10,
+            patient_id: 100,
+            sub_task_id: undefined,
+            form_data: {},
+        });
     });
 });
