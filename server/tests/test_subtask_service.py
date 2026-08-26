@@ -169,6 +169,21 @@ def test_update_subtask_claim_conflict_when_assigned(session):
     assert exc.value.detail["creator_id"] == owner.id
 
 
+def test_update_subtask_claim_succeeds_when_already_owned_by_actor(session):
+    """claim=True is idempotent when the actor already owns the subtask."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    st.CreatorID = actor.id
+    session.commit()
+
+    updated = _service(session, actor).update_subtask(
+        st.SubTaskID, None, None, claim=True
+    )
+    assert updated.CreatorID == actor.id
+
+
 def test_update_subtask_claim_conflict_when_concurrent_claim_wins(session):
     """claim=True raises ConflictError if the conditional UPDATE loses the race.
 

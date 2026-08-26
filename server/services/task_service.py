@@ -399,14 +399,20 @@ class SubTaskService:
             # Conditional UPDATE is the source of truth (covers concurrent claims).
             if not self.subtasks.claim_if_unassigned(subtask_id, actor.id):
                 current = self.subtasks.get_by_id(subtask_id)
-                raise ConflictError(
-                    {
-                        "code": "subtask_already_claimed",
-                        "message": "SubTask is already assigned",
-                        "creator_id": current.CreatorID if current else None,
-                    }
-                )
-            subtask.CreatorID = actor.id
+                if current is None:
+                    raise NotFoundError(f"SubTask {subtask_id} not found")
+                if current.CreatorID == actor.id:
+                    subtask.CreatorID = actor.id
+                else:
+                    raise ConflictError(
+                        {
+                            "code": "subtask_already_claimed",
+                            "message": "SubTask is already assigned",
+                            "creator_id": current.CreatorID,
+                        }
+                    )
+            else:
+                subtask.CreatorID = actor.id
         elif claim is False:
             if subtask.CreatorID is None:
                 pass
