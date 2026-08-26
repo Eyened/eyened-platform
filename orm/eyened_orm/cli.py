@@ -91,7 +91,7 @@ _register_rbac_commands()
 
 
 @eorm.command()
-@click.option("--recreate", is_flag=True, default=False, help="Drop and create the database before creating the models")
+@click.option("--recreate", is_flag=True, default=False, help="Drop and recreate the database before running the migrations")
 @click.option(
     "--seed-form-schemas",
     is_flag=True,
@@ -99,9 +99,7 @@ _register_rbac_commands()
     help="Also insert builtin viewer FormSchema rows after creating tables",
 )
 def initialize_database(recreate: bool, seed_form_schemas: bool):
-    """Initialize an empty database and create ORM tables."""
-    from eyened_orm.base import Base
-
+    """Initialize an empty database by running the migration trail to head."""
     print("Initializing database...")
     database = get_database(confirmation=True)
     db_config = database.database_settings
@@ -111,20 +109,11 @@ def initialize_database(recreate: bool, seed_form_schemas: bool):
         if not drop_create_db(db_config):
             raise click.ClickException("Failed to recreate empty database.")
 
-    print("Creating tables...")
-    Base.metadata.create_all(database.engine)
+    print("Running migrations...")
+    from eyened_orm.utils.alembic_utils import upgrade_to_head
 
-    from eyened_orm.utils.alembic_utils import (
-        get_current_alembic_revision,
-        stamp_alembic_head,
-    )
-
-    current = get_current_alembic_revision(database.engine)
-    head = stamp_alembic_head(database.engine)
-    if current == head:
-        print(f"Alembic already at head ({head}).")
-    else:
-        print(f"Stamped Alembic at head ({head}).")
+    head = upgrade_to_head(database.engine)
+    print(f"Database is at Alembic head ({head}).")
 
     if seed_form_schemas:
         _run_seed_form_schemas(database, update=False)

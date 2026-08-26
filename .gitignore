@@ -37,3 +37,11 @@ docs/superpowers/
 
 # Agent / superpowers working docs (local only)
 .agents/
+
+.coverage
+coverage.xml
+htmlcov/
+client/coverage/
+# diff-cover writes its markdown report to the cwd, not into coverage/.
+diff-cover.md
+client/diff-cover-client.md

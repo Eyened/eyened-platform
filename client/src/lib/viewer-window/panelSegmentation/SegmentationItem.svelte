@@ -4,7 +4,7 @@
     import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import { Hide, PanelIcon, Show, Trash } from "../icons/icons";
+    import { Hide, Intersection, PanelIcon, Show, Trash } from "../icons/icons";
     import ThresholdSlider from "./ThresholdSlider.svelte";
 
     import StringDialogue from "$lib/StringDialogue.svelte";
@@ -102,6 +102,14 @@
         segmentationContext.isActiveSegmentation(segmentation),
     );
 
+    const hasReferenceMask = $derived(
+        segmentation.annotation_type === "grader_segmentation" &&
+            Boolean(segmentation.reference_segmentation_id),
+    );
+    const maskingApplied = $derived(
+        mainViewerContext.isMaskingApplied(segmentation),
+    );
+
     function pointerEnter() {
         mainViewerContext.highlightedSegmentationItem = segmentationItem;
     }
@@ -161,6 +169,17 @@
                     onrightclick={showOnly}
                     tooltip="Show"
                     Icon={Hide}
+                />
+            {/if}
+            {#if hasReferenceMask}
+                <PanelIcon
+                    onclick={() =>
+                        mainViewerContext.toggleMasking(segmentationItem)}
+                    active={maskingApplied}
+                    tooltip={maskingApplied
+                        ? "Showing masked annotation"
+                        : "Showing unmasked annotation"}
+                    Icon={Intersection}
                 />
             {/if}
         </div>

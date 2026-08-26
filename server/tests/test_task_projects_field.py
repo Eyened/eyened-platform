@@ -32,7 +32,7 @@ def test_the_task_list_carries_the_field_too(client_scoped, spanning):
     """The collection route reports the same spanned projects the detail route does."""
     client, set_scope = client_scoped
     set_scope(scope_for(*spanning["projects"].values()))
-    rows = client.get("/task").json()
+    rows = client.get("/task?include_projects=true").json()
     by_id = {t["id"]: t for t in rows}
     assert sorted(p["name"] for p in by_id[spanning["task"]]["projects"]) == ["A", "B"]
 

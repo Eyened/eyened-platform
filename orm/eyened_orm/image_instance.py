@@ -127,12 +127,6 @@ class ImageStorage(Base):
         Index(
             "ix_ImageStorage_ImageInstanceID_IsPrimary", "ImageInstanceID", "IsPrimary"
         ),
-        # define indexes for both (StorageBackendID, ObjectKey) and (ObjectKey, StorageBackendID)
-        Index(
-            "StorageBackendID_ObjectKey",
-            "StorageBackendID",
-            "ObjectKey",
-        ),
         Index(
             "ObjectKey_StorageBackendID_UNIQUE",
             "ObjectKey",

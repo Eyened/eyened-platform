@@ -30,7 +30,7 @@ alembic -x env_file=<ddl.env> upgrade head   # c3f5a2b81d94, then b2e2800000b2
 `upgrade` prompts `Target database: ... Proceed? [y/N]`
 (`orm/migrations/alembic/env.py`), so it does not run unattended as written --
 only `revision`, `history`, `current`, `heads`, `branches`, `show`, `check`,
-`list_templates` and `stamp` skip the prompt.
+and `list_templates` skip the prompt; `stamp` no longer does.
 
 **The one visible change before step 5.** `c3f5a2b81d94` flips five `TagID`
 foreign keys from CASCADE to RESTRICT. The pre-cutover server has
@@ -241,7 +241,9 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
   project narrows who can see the task; anyone lacking the new project loses all
   of it. Nothing is deleted and nothing leaks, but grading in progress can
   become unreachable to the people doing it. `eorm grant-for-task` and the
-  `projects` field on `TaskGET` are the remedies.
+  `projects` field on `TaskGET` are the remedies -- `GET /task/{id}` resolves
+  it unconditionally, but `GET /task` returns it only with
+  `?include_projects=true`.
 - **Removing an image can widen access.** When the last image of a project
   leaves a task, subtask comments and grading state recorded while it spanned
   more become visible to users who could not see them before.

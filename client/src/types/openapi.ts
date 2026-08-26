@@ -292,40 +292,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/instances/images/{dataset_identifier}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get File */
-        get: operations["get_file_instances_images__dataset_identifier__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/instances/thumbnails/{thumbnail_identifier}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Thumb */
-        get: operations["get_thumb_instances_thumbnails__thumbnail_identifier__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/instances/{instance_id}/tags": {
         parameters: {
             query?: never;
@@ -600,7 +566,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Status */
+        /**
+         * Get Status
+         * @description Return a queued job's status and result.
+         *
+         *     Authenticated, but not scope-aware, and that is not an oversight: every RQ
+         *     entrypoint returns a bare bool (pinned by
+         *     test_every_rq_entrypoint_returns_a_bare_bool), so there is no project data
+         *     in the response to filter. Job ids are uuid4 and not enumerable here, so
+         *     this is a capability control -- but a capability that leaks through a log
+         *     line or a screenshot would otherwise need no credential at all.
+         */
         get: operations["get_status_import_status__task_id__get"];
         put?: never;
         post?: never;
@@ -929,7 +905,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Tag
-         * @description Delete a tag.
+         * @description Delete a tag (409 if it is still applied to any record).
          */
         delete: operations["delete_tag_tags__tag_id__delete"];
         options?: never;
@@ -975,6 +951,11 @@ export interface paths {
         /**
          * List Tasks
          * @description List all tasks (no pagination).
+         *
+         *     ``include_projects`` is off by default: resolving the projects each task
+         *     spans walks every image link of every task, and no client renders the
+         *     field today. Omitted, ``projects`` is ``null`` rather than ``[]`` --
+         *     "not requested", not "spans nothing".
          */
         get: operations["list_tasks_task_get"];
         put?: never;
@@ -2471,6 +2452,8 @@ export interface components {
             creator?: components["schemas"]["CreatorMeta"] | null;
             task_state?: components["schemas"]["TaskState"] | null;
             task_definition: components["schemas"]["TaskDefinitionGET"];
+            /** Projects */
+            projects?: components["schemas"]["ProjectMeta"][] | null;
         };
         /** TaskPATCH */
         TaskPATCH: {
@@ -3111,6 +3094,7 @@ export interface operations {
             };
             cookie?: {
                 jwt_token?: string;
+                refresh_token?: string;
             };
         };
         requestBody?: never;
@@ -3148,76 +3132,7 @@ export interface operations {
             };
             cookie?: {
                 jwt_token?: string;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_file_instances_images__dataset_identifier__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                dataset_identifier: string;
-            };
-            cookie?: {
-                jwt_token?: string;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_thumb_instances_thumbnails__thumbnail_identifier__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                thumbnail_identifier: string;
-            };
-            cookie?: {
-                jwt_token?: string;
+                refresh_token?: string;
             };
         };
         requestBody?: never;
@@ -3969,11 +3884,16 @@ export interface operations {
     get_status_import_status__task_id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string;
+            };
             path: {
                 task_id: string;
             };
-            cookie?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
         };
         requestBody?: never;
         responses: {
@@ -4985,7 +4905,9 @@ export interface operations {
     };
     list_tasks_task_get: {
         parameters: {
-            query?: never;
+            query?: {
+                include_projects?: boolean;
+            };
             header?: {
                 authorization?: string;
             };

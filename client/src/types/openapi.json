@@ -694,6 +694,15 @@
               "type": "string",
               "title": "Jwt Token"
             }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
           }
         ],
         "responses": {
@@ -760,115 +769,14 @@
               "type": "string",
               "title": "Jwt Token"
             }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/instances/images/{dataset_identifier}": {
-      "get": {
-        "summary": "Get File",
-        "operationId": "get_file_instances_images__dataset_identifier__get",
-        "parameters": [
-          {
-            "name": "dataset_identifier",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Dataset Identifier"
-            }
           },
           {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "jwt_token",
+            "name": "refresh_token",
             "in": "cookie",
             "required": false,
             "schema": {
               "type": "string",
-              "title": "Jwt Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/instances/thumbnails/{thumbnail_identifier}": {
-      "get": {
-        "summary": "Get Thumb",
-        "operationId": "get_thumb_instances_thumbnails__thumbnail_identifier__get",
-        "parameters": [
-          {
-            "name": "thumbnail_identifier",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Thumbnail Identifier"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "jwt_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Jwt Token"
+              "title": "Refresh Token"
             }
           }
         ],
@@ -2336,6 +2244,7 @@
     "/import/status/{task_id}": {
       "get": {
         "summary": "Get Status",
+        "description": "Return a queued job's status and result.\n\nAuthenticated, but not scope-aware, and that is not an oversight: every RQ\nentrypoint returns a bare bool (pinned by\ntest_every_rq_entrypoint_returns_a_bare_bool), so there is no project data\nin the response to filter. Job ids are uuid4 and not enumerable here, so\nthis is a capability control -- but a capability that leaks through a log\nline or a screenshot would otherwise need no credential at all.",
         "operationId": "get_status_import_status__task_id__get",
         "parameters": [
           {
@@ -2345,6 +2254,33 @@
             "schema": {
               "type": "string",
               "title": "Task Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
             }
           }
         ],
@@ -4061,7 +3997,7 @@
       },
       "delete": {
         "summary": "Delete Tag",
-        "description": "Delete a tag.",
+        "description": "Delete a tag (409 if it is still applied to any record).",
         "operationId": "delete_tag_tags__tag_id__delete",
         "parameters": [
           {
@@ -4305,9 +4241,19 @@
       },
       "get": {
         "summary": "List Tasks",
-        "description": "List all tasks (no pagination).",
+        "description": "List all tasks (no pagination).\n\n``include_projects`` is off by default: resolving the projects each task\nspans walks every image link of every task, and no client renders the\nfield today. Omitted, ``projects`` is ``null`` rather than ``[]`` --\n\"not requested\", not \"spans nothing\".",
         "operationId": "list_tasks_task_get",
         "parameters": [
+          {
+            "name": "include_projects",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Projects"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -9489,6 +9435,20 @@
           },
           "task_definition": {
             "$ref": "#/components/schemas/TaskDefinitionGET"
+          },
+          "projects": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ProjectMeta"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projects"
           }
         },
         "type": "object",
