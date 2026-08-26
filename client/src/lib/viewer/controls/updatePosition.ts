@@ -4,7 +4,6 @@ export class UpdatePosition implements ViewerEventListener {
     constructor() {}
 
     pointermove(e: ViewerEvent<PointerEvent>) {
-        if (e.modifiers.shift) return;
         const {
             viewerContext,
             viewerContext: { registration, image, index },
@@ -12,6 +11,13 @@ export class UpdatePosition implements ViewerEventListener {
         } = e;
 
         if (!viewerContext.updatePosition) {
+            return;
+        }
+
+        const isTopViewer =
+            viewerContext.viewerWindowContext.topViewers.get(image) ===
+            viewerContext;
+        if (e.modifiers.shift !== isTopViewer) {
             return;
         }
 
