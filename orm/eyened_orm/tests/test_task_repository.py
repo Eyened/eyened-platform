@@ -1,6 +1,7 @@
 from eyened_orm import Creator, SubTask, Task, TaskDefinition
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import TaskRepository, SubTaskRepository
+from eyened_orm.utils.factories import admin_scope
 
 
 def _creator(session, name: str = "tester") -> Creator:
@@ -43,7 +44,7 @@ def test_list_all_orders_by_id_with_relations(session):
     _make_task(session, td.TaskDefinitionID, creator.CreatorID, "A")
     _make_task(session, td.TaskDefinitionID, creator.CreatorID, "B")
 
-    tasks = TaskRepository(session).list_all()
+    tasks = TaskRepository(session, scope=admin_scope()).list_all()
 
     assert [t.TaskName for t in tasks] == ["A", "B"]
     # Eager-loaded: reading these needs no extra lazy query.
@@ -57,7 +58,7 @@ def test_get_with_relations_eager_loads_creator_and_definition(session):
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
 
-    loaded = TaskRepository(session).get_with_relations(task.TaskID)
+    loaded = TaskRepository(session, scope=admin_scope()).get_with_relations(task.TaskID)
 
     assert loaded is not None
     assert loaded.Creator.CreatorName == "tester"
@@ -73,7 +74,7 @@ def test_subtask_counts_totals_and_ready(session):
     _make_subtask(session, task.TaskID, SubTaskState.Ready)
     _make_subtask(session, task.TaskID, SubTaskState.Ready)
 
-    counts = TaskRepository(session).subtask_counts([task.TaskID])
+    counts = TaskRepository(session, scope=admin_scope()).subtask_counts([task.TaskID])
 
     assert counts[task.TaskID] == (3, 2)
 
@@ -84,7 +85,7 @@ def test_subtask_counts_fills_zero_for_task_without_subtasks(session):
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
 
-    counts = TaskRepository(session).subtask_counts([task.TaskID])
+    counts = TaskRepository(session, scope=admin_scope()).subtask_counts([task.TaskID])
 
     assert counts == {task.TaskID: (0, 0)}
 
@@ -94,6 +95,12 @@ def _make_image(session, public_id: str) -> "int":
 
     Returns the new ImageInstanceID. Mirrors the smallest row set that
     satisfies ImageInstance's NOT NULL FKs under PRAGMA foreign_keys=ON.
+
+    Plus one ``ImageStorage`` on its own ``StorageBackend``: those are not FK
+    requirements, they are the last two legs of ``_SUBTASK_IMAGE_LOADER``, and
+    the eager-load tests below cannot observe a leg with no row at the end of
+    it. Keys are derived from ``public_id`` so two images in one test do not
+    collide.
     """
     import datetime
 
@@ -101,9 +108,11 @@ def _make_image(session, public_id: str) -> "int":
         DeviceInstance,
         DeviceModel,
         ImageInstance,
+        ImageStorage,
         Patient,
         Project,
         Series,
+        StorageBackend,
         Study,
     )
     from eyened_orm.project import ExternalEnum
@@ -134,6 +143,19 @@ def _make_image(session, public_id: str) -> "int":
     )
     session.add(image)
     session.flush()
+    backend = StorageBackend(Key=f"backend-{public_id}", Kind="local")
+    session.add(backend)
+    session.flush()
+    session.add(
+        ImageStorage(
+            ImageInstanceID=image.ImageInstanceID,
+            StorageBackendID=backend.StorageBackendID,
+            ObjectKey=f"obj-{public_id}",
+            Format="png",
+            IsPrimary=True,
+        )
+    )
+    session.flush()
     return image.ImageInstanceID
 
 
@@ -145,7 +167,7 @@ def test_all_ids_for_task_ordered(session):
     a = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     b = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
 
-    ids = SubTaskRepository(session).all_ids_for_task(task.TaskID)
+    ids = SubTaskRepository(session, scope=admin_scope()).all_ids_for_task(task.TaskID)
 
     assert ids == [a.SubTaskID, b.SubTaskID]
 
@@ -158,7 +180,7 @@ def test_count_for_task_with_and_without_status(session):
     _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     _make_subtask(session, task.TaskID, SubTaskState.Ready)
     _make_subtask(session, task.TaskID, SubTaskState.Ready)
-    repo = SubTaskRepository(session)
+    repo = SubTaskRepository(session, scope=admin_scope())
 
     assert repo.count_for_task(task.TaskID) == 3
     assert repo.count_for_task(task.TaskID, status=SubTaskState.Ready) == 2
@@ -173,7 +195,7 @@ def test_list_for_task_paginates_in_id_order(session):
         _make_subtask(session, task.TaskID, SubTaskState.NotStarted) for _ in range(5)
     ]
 
-    rows = SubTaskRepository(session).list_for_task(task.TaskID, limit=2, offset=1)
+    rows = SubTaskRepository(session, scope=admin_scope()).list_for_task(task.TaskID, limit=2, offset=1)
 
     assert [r.SubTaskID for r in rows] == [made[1].SubTaskID, made[2].SubTaskID]
 
@@ -186,63 +208,117 @@ def test_list_for_task_filters_by_status(session):
     _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     ready = _make_subtask(session, task.TaskID, SubTaskState.Ready)
 
-    rows = SubTaskRepository(session).list_for_task(
+    rows = SubTaskRepository(session, scope=admin_scope()).list_for_task(
         task.TaskID, status=SubTaskState.Ready, limit=10, offset=0
     )
 
     assert [r.SubTaskID for r in rows] == [ready.SubTaskID]
 
 
-def test_list_for_task_with_images_loads_links(session):
-    """with_images eager-loads the SubTaskImageLinks -> ImageInstance chain."""
+def _seed_subtask_with_one_image(session) -> tuple[int, int]:
+    """Seed a task/subtask/image link and COMMIT. Returns (task_id, subtask_id).
+
+    Committing rather than flushing, and returning ids rather than instances, is
+    what makes the two eager-load tests below able to fail. Seeding and reading
+    on one uncommitted session serves every relationship access out of the
+    identity map, so the loader's presence is unobservable -- these two tests
+    were fully green with the eager loading deleted outright.
+
+    Ids are captured before the commit: ``expire_on_commit=True`` (production's
+    setting, mirrored by the fixture) expires every attribute, and after
+    ``expunge_all()`` a re-read would raise ``DetachedInstanceError``.
+    """
+    from eyened_orm import SubTaskImageLink
+
     creator = _creator(session)
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
     st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     image_id = _make_image(session, "pub-1")
-    from eyened_orm import SubTaskImageLink
-
     session.add(
         SubTaskImageLink(
             SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=0
         )
     )
-    session.flush()
+    task_id, subtask_id = task.TaskID, st.SubTaskID
+    session.commit()
+    session.expunge_all()
+    return task_id, subtask_id
 
-    rows = SubTaskRepository(session).list_for_task(
-        task.TaskID, limit=10, offset=0, with_images=True
+
+def test_list_for_task_with_images_loads_links(session):
+    """with_images eager-loads the SubTaskImageLinks -> ImageInstance chain.
+
+    The chain is walked while the rows are **detached**, which is the only way
+    to tell an eager load from a lazy one: an attached row lazy-loads on demand
+    and looks identical. Detaching reproduces the production failure -- the
+    request session closes before subtask DTO conversion finishes walking
+    SubTaskImageLinks -> ImageInstance -> ImageStorages -> StorageBackend per
+    row -- so dropping the loader raises DetachedInstanceError here instead of
+    silently issuing ~4 queries per subtask.
+
+    Walked to the **end** of that chain, not to its second leg. Asserting only
+    ``link.ImageInstance.PublicID`` stopped two legs short of what DTO
+    conversion actually walks, so nothing here observed whether the deeper ones
+    resolve at all.
+
+    What that covers, precisely, because it is not what it looks like: dropping
+    the last two legs from ``_SUBTASK_IMAGE_LOADER`` alone is **not** a
+    degradation and this test correctly stays green for it. ``ImageStorages``
+    and ``ImageStorage.StorageBackend`` are ``lazy="selectin"`` on the mappers,
+    so they load either way -- measured at 14 statements and **zero** lazy
+    loads during a full attached walk, with and without those legs. The legs
+    are redundant belt-and-braces, and a test made to fail on their removal
+    would be pinning a spelling rather than a behaviour.
+
+    What this does pin is the behaviour: the chain is available on a detached
+    row, whichever declaration provides it. It goes red when that stops being
+    true from either direction -- truncating the loader *and* taking
+    ``lazy="selectin"`` off either mapper raises ``DetachedInstanceError`` on
+    exactly the leg that lost its loader.
+    """
+    task_id, _ = _seed_subtask_with_one_image(session)
+
+    rows = SubTaskRepository(session, scope=admin_scope()).list_for_task(
+        task_id, limit=10, offset=0, with_images=True
     )
-
     assert len(rows) == 1
+    session.expunge_all()
+
     assert [link.ImageInstance.PublicID for link in rows[0].SubTaskImageLinks] == [
         "pub-1"
     ]
+    assert [
+        storage.StorageBackend.Key
+        for link in rows[0].SubTaskImageLinks
+        for storage in link.ImageInstance.ImageStorages
+    ] == ["backend-pub-1"]
 
 
 def test_get_with_images_loads_link_chain(session):
-    """get_with_images returns the subtask with its image links eager-loaded."""
-    creator = _creator(session)
-    td = _task_def(session)
-    task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
-    st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
-    image_id = _make_image(session, "pub-1")
-    from eyened_orm import SubTaskImageLink
+    """get_with_images returns the subtask with its image links eager-loaded.
 
-    session.add(
-        SubTaskImageLink(SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=0)
-    )
-    session.flush()
+    Detached read, and walked to the end of the four-leg chain, for the two
+    reasons given on the sibling test above.
+    """
+    _, subtask_id = _seed_subtask_with_one_image(session)
 
-    loaded = SubTaskRepository(session).get_with_images(st.SubTaskID)
-
+    loaded = SubTaskRepository(session, scope=admin_scope()).get_with_images(subtask_id)
     assert loaded is not None
+    session.expunge_all()
+
     assert [link.ImageInstance.PublicID for link in loaded.SubTaskImageLinks] == ["pub-1"]
+    assert [
+        storage.StorageBackend.Key
+        for link in loaded.SubTaskImageLinks
+        for storage in link.ImageInstance.ImageStorages
+    ] == ["backend-pub-1"]
 
 
 def test_resolve_image_instance_id_found_and_missing(session):
     """resolve_image_instance_id maps a PublicID to its int id, or None if absent."""
     image_id = _make_image(session, "pub-42")
-    repo = SubTaskRepository(session)
+    repo = SubTaskRepository(session, scope=admin_scope())
 
     assert repo.resolve_image_instance_id("pub-42") == image_id
     assert repo.resolve_image_instance_id("nope") is None
@@ -255,7 +331,7 @@ def test_next_image_index_starts_at_zero_then_increments(session):
     task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
     st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     image_id = _make_image(session, "pub-1")
-    repo = SubTaskRepository(session)
+    repo = SubTaskRepository(session, scope=admin_scope())
 
     assert repo.next_image_index(st.SubTaskID) == 0
 
@@ -277,7 +353,7 @@ def test_claim_if_unassigned_sets_creator(session):
     st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     session.commit()
 
-    claimed = SubTaskRepository(session).claim_if_unassigned(
+    claimed = SubTaskRepository(session, scope=admin_scope()).claim_if_unassigned(
         st.SubTaskID, actor.CreatorID
     )
     session.commit()
@@ -296,7 +372,7 @@ def test_claim_if_unassigned_does_not_steal(session):
     st.CreatorID = owner.CreatorID
     session.commit()
 
-    claimed = SubTaskRepository(session).claim_if_unassigned(
+    claimed = SubTaskRepository(session, scope=admin_scope()).claim_if_unassigned(
         st.SubTaskID, other.CreatorID
     )
     session.commit()
@@ -318,7 +394,7 @@ def test_list_for_task_filters_unassigned_and_creator(session):
     other_st.CreatorID = other.CreatorID
     session.commit()
 
-    repo = SubTaskRepository(session)
+    repo = SubTaskRepository(session, scope=admin_scope())
     only_unassigned = repo.list_for_task(
         task.TaskID, unassigned=True, limit=50, offset=0
     )
@@ -348,6 +424,6 @@ def test_list_assignees_for_task_returns_distinct_non_null_creators(session):
     st3.CreatorID = amy.CreatorID
     session.commit()
 
-    assignees = SubTaskRepository(session).list_assignees_for_task(task.TaskID)
+    assignees = SubTaskRepository(session, scope=admin_scope()).list_assignees_for_task(task.TaskID)
 
     assert [c.CreatorName for c in assignees] == ["amy", "zed"]

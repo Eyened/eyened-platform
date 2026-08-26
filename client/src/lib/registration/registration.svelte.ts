@@ -1,3 +1,4 @@
+import { untrack } from "svelte";
 import type { Position } from "$lib/types";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import {
@@ -5,8 +6,24 @@ import {
     type PhotoLocator,
 } from "./photoLocators";
 import { OCTToProj, ProjToOCT } from "./projectionRegistration";
+import { enfaceToProjRegistrationItems } from "./enfaceToProj";
 import type { mappingFunction, RegistrationItem } from "./registrationItem";
 import { getRegistrationSets, type RegistrationSet } from "./registrationItem";
+
+/** DICOM SliceThickness as mm/frame from OCT volume dimensions when available. */
+function sliceThicknessMmFromOct(image: AbstractImage): number | null {
+    const { depth, depth_mm } = image.dimensions;
+    if (depth > 1 && depth_mm > 0) {
+        return depth_mm / depth;
+    }
+    try {
+        const raw = image.meta?.x52009229?.[0]?.x00289110?.[0]?.x00180050;
+        const n = Number(raw);
+        return n > 0 ? n : null;
+    } catch {
+        return null;
+    }
+}
 
 export type Pointer = {
     image_id: string;
@@ -37,10 +54,22 @@ class Mapper<T> {
 }
 
 export class Registration {
+    /**
+     * Bumped whenever registration items are imported or paths are recomputed.
+     * The graph is mutated in place and keeps growing after viewers mount (photo
+     * locators load per image, patient-level sets load later still), so reactive
+     * consumers need a signal to re-query it.
+     */
+    revision = $state(0);
+
     private pointer: Pointer = {
         image_id: "",
         position: { x: 0, y: 0, index: 0 },
     };
+    // The graph and its caches are queried imperatively (RAF repaint, pointer
+    // mapping), never read from $effect/$derived directly — `revision` above is
+    // the reactive signal — so SvelteMap/SvelteSet would only add proxy cost.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- see above
     private cache = new Map<string, Position | undefined>();
 
     private readonly mappings = new Mapper<mappingFunction>();
@@ -106,6 +135,14 @@ export class Registration {
         return currentPosition;
     }
 
+    private bumpRevision() {
+        // `revision++` both reads and writes. Callers often run from `$effect`
+        // (RegistrationItemLoader), and a tracked read would re-subscribe that
+        // effect to revision → infinite loop. Untrack the read so only explicit
+        // consumers (TopViewer `$derived`) depend on the signal.
+        this.revision = untrack(() => this.revision) + 1;
+    }
+
     private scheduleRecompute() {
         if (this.recomputeScheduled) return;
         this.recomputeScheduled = true;
@@ -126,6 +163,7 @@ export class Registration {
         if (this.pointer.image_id) {
             this.cache.set(this.pointer.image_id, this.pointer.position);
         }
+        this.bumpRevision();
     }
 
     async addImage(image: AbstractImage, photoLocators: PhotoLocator[]) {
@@ -133,6 +171,16 @@ export class Registration {
         if (image.is3D) {
             items.push(new OCTToProj(image.instance));
             items.push(new ProjToOCT(image.instance));
+            // Direct enface → `_proj` GPU hops (patient affines never target `_proj`).
+            items.push(
+                ...enfaceToProjRegistrationItems(
+                    photoLocators,
+                    `${image.instance.id}`,
+                    image.width,
+                    image.depth,
+                    sliceThicknessMmFromOct(image),
+                ),
+            );
         }
         this.importRegistrationItems(items);
     }
@@ -154,6 +202,7 @@ export class Registration {
         }
         this.pathsDirty = true;
         this.scheduleRecompute();
+        this.bumpRevision();
     }
 
     /** Import all patient-level registration pairs and recompute paths for transitive linking. */
@@ -164,7 +213,17 @@ export class Registration {
     }
 
     getLinkedImgIds(source: string): Set<string> {
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- plain query result
         return new Set(Object.keys(this.shortestPaths[source] ?? {}));
+    }
+
+    /** Shortest path node ids inclusive, or undefined if unreachable. */
+    getPath(source: string, target: string): string[] | undefined {
+        return this.shortestPaths[source]?.[target];
+    }
+
+    listDirectTargets(source: string): string[] {
+        return [...this.registrationItems.targets(source)];
     }
 
     mapPosition(
@@ -186,6 +245,8 @@ export class Registration {
     }
 }
 
+// Local BFS scratch state — never observed reactively.
+/* eslint-disable svelte/prefer-svelte-reactivity */
 function allPairsShortestPaths(graph: Mapper<mappingFunction>): {
     [node: string]: { [node: string]: string[] };
 } {

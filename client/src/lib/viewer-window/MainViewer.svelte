@@ -43,6 +43,14 @@
     );
     setContext("mainViewerContext", mainViewerContext);
     onDestroy(viewerContext.addOverlay(mainViewerContext));
+
+    if (image.is3D) {
+        const enfaceManager = viewerWindowContext.enfaceProjectionManagers.get(
+            image.instance.id,
+        );
+        enfaceManager?.registerMainViewerContext(mainViewerContext);
+    }
+
     onDestroy(
         viewerContext.addOverlay(
             new FeaturePipetteOverlay(mainViewerContext, globalContext.user.id),

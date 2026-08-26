@@ -2,6 +2,7 @@ from eyened_orm import DeviceModel
 from eyened_orm.repositories.device_repository import DeviceRepository
 
 from server.services.device_service import DeviceService
+from eyened_orm.utils.factories import admin_scope
 
 
 def test_list_devices_returns_repository_rows_in_order(session):
@@ -14,7 +15,7 @@ def test_list_devices_returns_repository_rows_in_order(session):
     )
     session.flush()
 
-    service = DeviceService(DeviceRepository(session))
+    service = DeviceService(DeviceRepository(session, scope=admin_scope()), scope=admin_scope())
     result = service.list_devices()
 
     assert [d.Manufacturer for d in result] == ["Topcon", "Zeiss"]

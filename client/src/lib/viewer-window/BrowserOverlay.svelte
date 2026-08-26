@@ -1,6 +1,5 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import { page } from "$app/state";
     import Browser from "$lib/browser/Browser.svelte";
     import {
         BrowserContext,
@@ -89,14 +88,17 @@
             if (updateImageLinks) {
                 updateSubTaskImageLinks(currentInstanceIds);
             }
-        } else {
-            // updates url (just visual, does not reload the page)
-            const searchParams = page.url.searchParams;
+        }
+        // Prune/persist before goto so the snapshot includes the updated v=.
+        viewerWindowContext.setInstanceIDs(currentInstanceIds);
+        if (!subTask) {
+            // history.replaceState (view-state) is not mirrored into page.url.
+            // eslint-disable-next-line svelte/prefer-svelte-reactivity -- one-shot close() rewrite
+            const searchParams = new URLSearchParams(window.location.search);
             searchParams.set("instances", currentInstanceIds.join(","));
             // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
-            goto(`?${page.url.searchParams.toString()}`.replaceAll("%2C", ","));
+            goto(`?${searchParams.toString()}`.replaceAll("%2C", ","));
         }
-        viewerWindowContext.setInstanceIDs(currentInstanceIds);
     }
     onDestroy(close);
 </script>

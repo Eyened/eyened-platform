@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_instances import ImageGET
 from ..dtos.dtos_aux import ObjectTagPOST, ObjectTagPATCH, TagMeta
-from ..services.acting_user import ActingUser
 from ..services.image_instance_service import (
     ImageInstanceService,
     get_image_instance_service,
@@ -109,27 +108,6 @@ async def get_public_image_thumbnail(
     return build_storage_redirect_response(ref.nginx_path)
 
 
-@router.get("/instances/images/{dataset_identifier:path}")
-async def get_file(
-    dataset_identifier: str,
-    _: bool = Depends(is_authenticated),
-):
-    # Set X-Accel-Redirect header to tell NGINX to serve the file
-    response = Response()
-    response.headers["X-Accel-Redirect"] = "/files/" + dataset_identifier
-    return response
-
-
-@router.get("/instances/thumbnails/{thumbnail_identifier:path}")
-async def get_thumb(
-    thumbnail_identifier: str,
-    _: bool = Depends(is_authenticated),
-):
-    response = Response()
-    response.headers["X-Accel-Redirect"] = "/thumbnails/" + thumbnail_identifier
-    return response
-
-
 @router.post("/instances/{instance_id}/tags", response_model=TagMeta)
 async def tag_instance(
     instance_id: str,
@@ -142,7 +120,6 @@ async def tag_instance(
         instance_id,
         body.tag_id,
         body.comment,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -160,7 +137,6 @@ async def patch_instance_tag(
         instance_id,
         tag_id,
         body.comment,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -176,6 +152,5 @@ async def untag_instance(
     service.untag_instance(
         instance_id,
         tag_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)

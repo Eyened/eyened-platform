@@ -17,7 +17,6 @@ from fastapi import (
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPOST, TagMeta
 from ..dtos.dtos_main import SegmentationGET, SegmentationPATCH, SegmentationPOST
-from ..services.acting_user import ActingUser
 from ..services.segmentation_service import (
     ModelSegmentationService,
     SegmentationService,
@@ -84,7 +83,6 @@ async def create_segmentation(
         threshold=dto.threshold,
         reference_segmentation_id=dto.reference_segmentation_id,
         array=array,
-        actor=ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.segmentation_to_get(segmentation)
 
@@ -107,7 +105,6 @@ async def delete_segmentation(
 ):
     service.soft_delete(
         segmentation_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)
 
@@ -132,7 +129,6 @@ async def update_segmentation_data(
         np_image,
         axis=axis,
         scan_nr=scan_nr,
-        actor=ActingUser(id=current_user.id, username=current_user.username),
     )
 
 
@@ -160,7 +156,6 @@ async def patch_segmentation(
         reference_segmentation_id=dto.reference_segmentation_id,
         feature_id=dto.feature_id,
         threshold=dto.threshold,
-        actor=ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.segmentation_to_get(segmentation)
 
@@ -176,7 +171,6 @@ async def tag_segmentation(
     link = service.tag(
         segmentation_id,
         body.tag_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -192,7 +186,6 @@ async def untag_segmentation(
     service.untag(
         segmentation_id,
         tag_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)
 

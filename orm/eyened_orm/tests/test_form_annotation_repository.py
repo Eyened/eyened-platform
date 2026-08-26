@@ -3,6 +3,7 @@ from eyened_orm.project import ExternalEnum
 from eyened_orm.repositories.form_annotation_repository import (
     FormAnnotationRepository,
 )
+from eyened_orm.utils.factories import admin_scope
 
 
 def _make_annotation(
@@ -44,7 +45,7 @@ def test_list_active_excludes_inactive_and_filters_by_schema(session):
     """list_active drops Inactive rows and applies the form_schema_id filter."""
     keep = _make_annotation(session, "keep")
     _make_annotation(session, "gone", inactive=True)
-    repo = FormAnnotationRepository(session)
+    repo = FormAnnotationRepository(session, scope=admin_scope())
 
     rows = repo.list_active()
     ids = {r.FormAnnotationID for r in rows}
@@ -60,7 +61,7 @@ def test_list_active_excludes_inactive_and_filters_by_schema(session):
 def test_get_with_tag_links_found_and_missing(session):
     """get_with_tag_links returns the row (tag links loaded) or None if absent."""
     ann = _make_annotation(session, "one")
-    repo = FormAnnotationRepository(session)
+    repo = FormAnnotationRepository(session, scope=admin_scope())
 
     got = repo.get_with_tag_links(ann.FormAnnotationID)
     assert got is not None and got.FormAnnotationID == ann.FormAnnotationID

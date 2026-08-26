@@ -7,6 +7,7 @@ from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepos
 from server.services.acting_user import ActingUser
 from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.task_service import TaskService
+from eyened_orm.utils.factories import admin_scope
 
 
 class FakeAudit:
@@ -51,8 +52,20 @@ def _make_task(session, td_id: int, creator_id: int, name: str = "T") -> Task:
     return task
 
 
-def _service(session, audit=None) -> TaskService:
-    return TaskService(TaskRepository(session), SubTaskRepository(session), audit=audit)
+def _service(
+    session, actor: ActingUser | None = None, *, audit=None
+) -> TaskService:
+    scope = (
+        admin_scope(actor_id=actor.id, username=actor.username)
+        if actor is not None
+        else admin_scope()
+    )
+    return TaskService(
+        TaskRepository(session, scope=scope),
+        SubTaskRepository(session, scope=scope),
+        scope=scope,
+        audit=audit,
+    )
 
 
 def test_create_task_persists_with_defaults(session):
@@ -60,8 +73,8 @@ def test_create_task_persists_with_defaults(session):
     actor = _actor(session)
     td = _task_def(session)
 
-    task = _service(session).create_task(
-        "New", "desc", None, td.TaskDefinitionID, actor
+    task = _service(session, actor).create_task(
+        "New", "desc", None, td.TaskDefinitionID
     )
 
     assert task.TaskName == "New"
@@ -78,11 +91,12 @@ def test_create_task_logs_insert(session):
     td = _task_def(session)
     audit = FakeAudit()
 
-    _service(session, audit).create_task("New", None, None, td.TaskDefinitionID, actor)
+    _service(session, actor, audit=audit).create_task("New", None, None, td.TaskDefinitionID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
     assert audit.records[0]["entity"] == "Task"
+    assert audit.records[0]["actor"] == actor
 
 
 def test_list_tasks_returns_tasks_with_counts(session):
@@ -94,7 +108,7 @@ def test_list_tasks_returns_tasks_with_counts(session):
     session.add(SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted))
     session.flush()
 
-    tasks, counts = _service(session).list_tasks()
+    tasks, counts, _projects = _service(session).list_tasks()
 
     assert [t.TaskID for t in tasks] == [task.TaskID]
     assert counts[task.TaskID] == (2, 1)
@@ -108,7 +122,7 @@ def test_get_task_returns_task_and_counts(session):
     session.add(SubTask(TaskID=task.TaskID, TaskState=SubTaskState.Ready))
     session.flush()
 
-    got, counts = _service(session).get_task(task.TaskID)
+    got, counts, _projects = _service(session).get_task(task.TaskID)
 
     assert got.TaskID == task.TaskID
     assert counts == (1, 1)
@@ -126,8 +140,8 @@ def test_update_task_changes_fields(session):
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, actor.id, "Old")
 
-    updated, _counts = _service(session).update_task(
-        task.TaskID, "New", "newdesc", None, None, TaskState.Busy, actor
+    updated, _counts, _projects = _service(session, actor).update_task(
+        task.TaskID, "New", "newdesc", None, None, TaskState.Busy
     )
 
     assert updated.TaskName == "New"
@@ -139,7 +153,7 @@ def test_update_task_unknown_raises_not_found(session):
     """Updating a missing task is translated to NotFoundError (-> 404)."""
     actor = _actor(session)
     with pytest.raises(NotFoundError):
-        _service(session).update_task(999_999, "x", None, None, None, None, actor)
+        _service(session, actor).update_task(999_999, "x", None, None, None, None)
 
 
 def test_update_task_logs_rename_as_diff(session):
@@ -149,8 +163,8 @@ def test_update_task_logs_rename_as_diff(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id, "Old")
     audit = FakeAudit()
 
-    _service(session, audit).update_task(
-        task.TaskID, "New", None, None, None, None, actor
+    _service(session, actor, audit=audit).update_task(
+        task.TaskID, "New", None, None, None, None
     )
 
     assert len(audit.records) == 1
@@ -167,17 +181,17 @@ def test_delete_task_removes_it_and_cascades_subtasks(session):
     session.add(SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted))
     session.flush()
 
-    _service(session).delete_task(task.TaskID, actor)
+    _service(session, actor).delete_task(task.TaskID)
 
-    assert TaskRepository(session).get_by_id(task.TaskID) is None
-    assert SubTaskRepository(session).all_ids_for_task(task.TaskID) == []
+    assert TaskRepository(session, scope=admin_scope()).get_by_id(task.TaskID) is None
+    assert SubTaskRepository(session, scope=admin_scope()).all_ids_for_task(task.TaskID) == []
 
 
 def test_delete_task_unknown_raises_not_found(session):
     """Deleting a missing task is translated to NotFoundError (-> 404)."""
     actor = _actor(session)
     with pytest.raises(NotFoundError):
-        _service(session).delete_task(999_999, actor)
+        _service(session, actor).delete_task(999_999)
 
 
 def test_delete_task_logs_delete(session):
@@ -187,7 +201,7 @@ def test_delete_task_logs_delete(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     audit = FakeAudit()
 
-    _service(session, audit).delete_task(task.TaskID, actor)
+    _service(session, actor, audit=audit).delete_task(task.TaskID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"

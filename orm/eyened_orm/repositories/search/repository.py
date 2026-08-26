@@ -9,18 +9,51 @@ the OR-of-joins EXISTS, and the redundant DISTINCT in instances_for_studies).
 They are deliberate follow-up work, gated on an EXPLAIN ANALYZE baseline against
 real MySQL; the SQLite suite can prove rows are unchanged but not that a rewrite
 is faster. Do not "fix" them here.
+
+Read-scoping coverage of SearchRepository's twelve public methods:
+
+Seven row/count/value-returning methods scope before returning data the
+caller's project memberships allow: search_instances, count_instances,
+search_studies, count_studies, studies_by_ids, instances_for_studies, and
+visible_project_names. The last of these filters Project.ProjectID directly
+against the scope's accessible set rather than going through apply_scope,
+since Project has no anchor route for that helper to walk -- it is the
+anchor every other entity's route leads to, not an entity with a route of
+its own.
+
+Four methods are deliberately unfiltered: they read non-project vocabulary
+with no project anchor to scope against -- tag_names,
+active_form_creator_names, attribute_signature_rows,
+resolve_attribute_definitions.
+
+column_values is unfiltered too, and that is safe: every remaining call site
+passes Creator, DeviceModel, Feature or FormSchema, all non-project
+vocabulary. Its former Project-typed call sites (the project-name dropdown on
+both search-form signatures) were replaced by visible_project_names above.
+Do not add a new column_values(Project, ...) call -- the generic wrapper has
+no scoping of its own, and doing so would silently reopen this leak.
 """
 from __future__ import annotations
 
 from typing import Any, List, Literal, Optional, Tuple
 
-from eyened_orm import Creator, FormAnnotation, ImageInstance, Series, Study, Tag
+from eyened_orm import (
+    Creator,
+    FormAnnotation,
+    ImageInstance,
+    Project,
+    Series,
+    Study,
+    Tag,
+)
 from eyened_orm.attributes import (
     AttributeDataType,
     AttributeDefinition,
     AttributesModel,
     AttributesModelOutput,
 )
+from eyened_orm.authz.scope import AccessScope
+from eyened_orm.authz.scoping import apply_scope
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -39,8 +72,9 @@ from .selects import (
 class SearchRepository:
     """Query construction and execution for instance and study search."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def search_instances(
         self,
@@ -62,6 +96,7 @@ class SearchRepository:
         stmt = build_instance_select(
             conditions, attr_conditions, attr_defs, order_by, order
         )
+        stmt = apply_scope(stmt, ImageInstance, self._scope)
         return list(
             self._session.execute(
                 stmt.options(*instance_options()).limit(limit).offset(offset)
@@ -79,6 +114,7 @@ class SearchRepository:
     ) -> int:
         """Count instances matching the same predicate ``search_instances`` applies."""
         stmt = instance_filtered_select(conditions, attr_conditions, attr_defs)
+        stmt = apply_scope(stmt, ImageInstance, self._scope)
         return self._session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
@@ -106,6 +142,7 @@ class SearchRepository:
     ) -> List[Study]:
         """Return studies matching the conditions, ordered and windowed."""
         stmt = build_study_select(conditions, order_by, order)
+        stmt = apply_scope(stmt, Study, self._scope)
         return list(
             self._session.execute(
                 stmt.options(*study_options()).limit(limit).offset(offset)
@@ -121,6 +158,7 @@ class SearchRepository:
     ) -> int:
         """Count studies matching the same predicate ``search_studies`` applies."""
         stmt = study_filtered_select(conditions)
+        stmt = apply_scope(stmt, Study, self._scope)
         return self._session.execute(
             select(func.count()).select_from(stmt.subquery())
         ).scalar_one()
@@ -187,6 +225,7 @@ class SearchRepository:
             .where(Study.StudyID.in_(study_ids))
             .options(*study_options())
         )
+        stmt = apply_scope(stmt, Study, self._scope)
         return list(self._session.execute(stmt).scalars().all())
 
     def instances_for_studies(self, study_ids: List[int]) -> List[ImageInstance]:
@@ -201,7 +240,27 @@ class SearchRepository:
             .options(*instance_options())
             .distinct()
         )
+        stmt = apply_scope(stmt, ImageInstance, self._scope)
         return list(self._session.execute(stmt).scalars().all())
+
+    def visible_project_names(self) -> List[str]:
+        """Distinct project names the scope may see, sorted.
+
+        Admin short-circuits to every project; a non-admin caller sees only
+        the names of the projects in its scope. Filters ``Project.ProjectID``
+        directly rather than through ``apply_scope``, since ``Project`` has no
+        anchor route for that helper to walk -- it is the anchor other
+        entities route *to*.
+        """
+        if self._scope.is_admin:
+            return sorted(Project.query_column(self._session, Project.ProjectName))
+        return sorted(
+            Project.query_column(
+                self._session,
+                Project.ProjectName,
+                where=Project.ProjectID.in_(self._scope.project_ids),
+            )
+        )
 
     def column_values(self, model: Any, column: Any, *, where: Any = None) -> List[Any]:
         """Distinct values of a column on ``model`` (thin wrapper over ``Model.query_column``).

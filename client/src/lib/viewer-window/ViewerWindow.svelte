@@ -22,14 +22,8 @@ Keeps track of the main panels and the top row of images.
     setContext("viewerWindowContext", viewerWindowContext);
     const registration = viewerWindowContext.registration;
 
-    $effect(() => {
-        const ids = viewerWindowContext.instanceIds;
-        if (!ids.length) {
-            viewerWindowContext.mainPanels = [];
-            return;
-        }
-        void viewerWindowContext.openFirstTopRowImage();
-    });
+    // Main viewers are restored by ViewerWindowContext after images load
+    // (see restoreMainViewersFromViewState) so task grade and /view share one path.
 
     let main: HTMLDivElement | undefined = $state();
     let isResizing = false;

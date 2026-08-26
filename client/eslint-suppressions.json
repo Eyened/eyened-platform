@@ -271,11 +271,6 @@
   },
   "src/lib/viewer-window/TopRowImages.svelte": {
     "svelte/require-each-key": {
-      "count": 2
-    }
-  },
-  "src/lib/viewer-window/TopViewer.svelte": {
-    "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
   },
@@ -428,7 +423,7 @@
   },
   "src/lib/webgl/segmentationItem.svelte.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 7
+      "count": 1
     }
   },
   "src/lib/webgl/segmentationState.svelte.ts": {

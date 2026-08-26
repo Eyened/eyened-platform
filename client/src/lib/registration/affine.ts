@@ -18,7 +18,7 @@ export class AffineRegistration implements RegistrationItem {
     }
 
     get glslMapping(): string {
-        return `vec2 mapping(vec2 uv) {
+        return `vec2 map_hop(vec2 uv) {
             mat3 transform = ${mat3(this.M)}
             vec3 transformedUV = transform * vec3(uv * u_size_primary.xy, 1.0);
             vec2 result = transformedUV.xy / transformedUV.z;
@@ -32,11 +32,17 @@ export class AffineRegistration implements RegistrationItem {
     }
 }
 
+/**
+ * GLSL `mat3(...)` takes its arguments column by column, so the emitted order is
+ * the same column-major order as `Matrix.asUniform`. Deriving it from that getter
+ * keeps the shader path and the `uniformMatrix3fv` path from drifting apart.
+ */
 export function mat3(M: Matrix): string {
+    const [c0x, c0y, c0z, c1x, c1y, c1z, c2x, c2y, c2z] = M.asUniform;
     return `mat3(
-        ${f(M.d)}, ${f(M.e)}, ${f(M.f)},
-        ${f(M.a)}, ${f(M.b)}, ${f(M.c)},
-        ${f(M.g)}, ${f(M.h)}, ${f(M.i)}
+        ${f(c0x)}, ${f(c0y)}, ${f(c0z)},
+        ${f(c1x)}, ${f(c1y)}, ${f(c1z)},
+        ${f(c2x)}, ${f(c2y)}, ${f(c2z)}
     );`;
 }
 

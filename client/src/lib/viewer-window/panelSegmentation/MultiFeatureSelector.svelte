@@ -4,6 +4,7 @@
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import { Hide, PanelIcon, Show } from "../icons/icons";
+    import { isDrawableSubfeatureIndex } from "./subfeatureBits";
     import { type Segmentation } from "./segmentationContext.svelte";
 
     interface Props {
@@ -14,18 +15,22 @@
 
     const { feature, data_representation } = segmentation;
 
-    const groupType = {
-        MultiLabel: "checkbox",
-        MultiClass: "radio",
-    }[data_representation as "MultiLabel" | "MultiClass"];
-
     const mainViewerContext =
         getContext<MainViewerContext>("mainViewerContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
     const { segmentationContext } = mainViewerContext;
 
-    let activeIndices = $state<number | number[]>(0);
+    const isMultiClass = data_representation === "MultiClass";
+
+    let activeClassIndex = $state(1);
+    let activeLabelIndices = $state<number[]>([]);
+
+    const drawableSubfeatures = $derived(
+        (feature.subfeatures ?? []).filter((subfeature) =>
+            isDrawableSubfeatureIndex(subfeature.index),
+        ),
+    );
 
     function indicesEqual(a: number | number[], b: number | number[]): boolean {
         if (Array.isArray(a) && Array.isArray(b)) {
@@ -45,20 +50,33 @@
 
     $effect(() => {
         if (active) {
-            segmentationContext.activeIndices = activeIndices;
+            segmentationContext.activeIndices = isMultiClass
+                ? activeClassIndex
+                : activeLabelIndices;
         }
     });
 
     $effect(() => {
         if (!active) return;
         const fromCtx = segmentationContext.activeIndices;
-        if (!indicesEqual(activeIndices, fromCtx)) {
-            activeIndices = fromCtx;
+        if (isMultiClass) {
+            if (typeof fromCtx === "number" && fromCtx !== activeClassIndex) {
+                activeClassIndex = fromCtx;
+            }
+            return;
+        }
+        if (
+            Array.isArray(fromCtx) &&
+            !indicesEqual(activeLabelIndices, fromCtx)
+        ) {
+            activeLabelIndices = fromCtx;
         }
     });
 
     function pointerEnter(featureIndex: number) {
         mainViewerContext.highlightedFeatureIndex = featureIndex;
+        mainViewerContext.highlightedSegmentationItem =
+            segmentationContext.getSegmentationItem(segmentation);
     }
     function pointerLeave() {
         mainViewerContext.highlightedFeatureIndex = undefined;
@@ -99,7 +117,7 @@
         </div>
     {/if}
     <ul>
-        {#each feature.subfeatures as subfeature}
+        {#each drawableSubfeatures as subfeature}
             <li
                 onpointerenter={() => pointerEnter(subfeature.index)}
                 onpointerleave={pointerLeave}
@@ -133,16 +151,16 @@
                         <span class="feature-index">{subfeature.index}</span>
 
                         <label>
-                            {#if groupType == "radio"}
+                            {#if isMultiClass}
                                 <input
                                     type="radio"
-                                    bind:group={activeIndices}
+                                    bind:group={activeClassIndex}
                                     value={subfeature.index}
                                 />
                             {:else}
                                 <input
                                     type="checkbox"
-                                    bind:group={activeIndices}
+                                    bind:group={activeLabelIndices}
                                     value={subfeature.index}
                                 />
                             {/if}

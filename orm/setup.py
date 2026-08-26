@@ -27,7 +27,6 @@ setup(
         "tqdm==4.*",
         "alembic==1.13.2",
         "pymysql>=1.1.1",
-        "mysql-connector-python==8.*",
         "pydicom==3.*",
         "pylibjpeg==2.*",
         "pylibjpeg-libjpeg==2.*",

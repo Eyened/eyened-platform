@@ -8,6 +8,7 @@ import type {
 } from "../../../types/openapi_types";
 import type { ImageBox } from "./segmentationRegion";
 import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
+import { subfeatureBit } from "./subfeatureBits";
 
 export type Segmentation = SegmentationGET | ModelSegmentationGET;
 
@@ -212,7 +213,7 @@ export class SegmentationContext {
         segmentation: Segmentation,
         featureIndex: number,
     ): boolean {
-        const bit = (1 << (featureIndex - 1)) >>> 0;
+        const bit = subfeatureBit(featureIndex);
         return (this.getVisibleFeatureMask(segmentation) & bit) !== 0;
     }
 
@@ -222,7 +223,7 @@ export class SegmentationContext {
     ): void {
         const key = getSegmentationKey(segmentation);
         const cur = this.getVisibleFeatureMask(segmentation) >>> 0;
-        const bit = (1 << (featureIndex - 1)) >>> 0;
+        const bit = subfeatureBit(featureIndex);
         this.visibleFeatureMaskBySegmentationKey.set(key, (cur ^ bit) >>> 0);
     }
 }

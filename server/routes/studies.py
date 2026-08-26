@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Response
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPATCH, ObjectTagPOST, TagMeta
-from ..services.acting_user import ActingUser
 from ..services.study_service import StudyService, get_study_service
 from .auth import CurrentUser, get_current_user
 
@@ -21,7 +20,6 @@ async def tag_study(
         study_id,
         body.tag_id,
         body.comment,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)
 
@@ -37,7 +35,6 @@ async def untag_study(
     service.untag_study(
         study_id,
         tag_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)
 
@@ -55,6 +52,5 @@ async def patch_study_tag(
         study_id,
         tag_id,
         body.comment,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)

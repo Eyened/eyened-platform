@@ -1,5 +1,5 @@
 import { formAnnotations } from "$lib/data";
-import type { Registration } from "$lib/registration/registration";
+import type { Registration } from "$lib/registration/registration.svelte";
 import type { Position, Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";

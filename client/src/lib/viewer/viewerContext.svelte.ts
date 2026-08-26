@@ -5,7 +5,7 @@ import { BaseImageRenderer } from "$lib/webgl/imageRenderer";
 import type { Shaders } from "$lib/webgl/shaders";
 import { SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
-import type { Registration } from "../registration/registration";
+import type { Registration } from "../registration/registration.svelte";
 import type { ViewerWindowContext } from "../viewer-window/viewerWindowContext.svelte";
 import { HotKeys } from "./controls/hotkeys";
 import { ScrollOCT } from "./controls/scrollOCT";
@@ -15,6 +15,7 @@ import { CursorOverlay } from "./overlays/CursorOverlay";
 import type { MeasureTool } from "./tools/Measure.svelte.js";
 import type {
     EventName,
+    EnfaceProjectionMode,
     Overlay,
     PanelName,
     RenderMode,
@@ -77,6 +78,12 @@ export class ViewerContext {
 
     hideOverlays: boolean = $state(false);
     renderMode: RenderMode = $state("Original");
+    enfaceProjectionMode: EnfaceProjectionMode = $state("off");
+    /** Per-OCT enface overlay mode for non-_proj top-row images. */
+    enfaceProjectionModesByOct: Map<string, EnfaceProjectionMode> = $state(
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
+        new Map(),
+    );
     lockScroll: boolean = $state(false);
     windowLevel: WindowLevel = $state({ min: 0, max: 255 });
     cursorStyle: cursorStyle = $state("default");
@@ -166,21 +173,38 @@ export class ViewerContext {
             ) {
                 this.windowLevel = { min: 30, max: 225 };
             }
-            // aspect ratio for OCT
-            if (image.resolution.z && image.resolution.x > 0) {
+            // B-scan exaggeration only for axial OCT volumes (not enface stacks)
+            if (
+                image.orientation === "axial" &&
+                image.resolution.z &&
+                image.resolution.x > 0
+            ) {
                 this.stretch = (8 * image.resolution.y) / image.resolution.x;
             }
         }
         this.transform = this.getInitTransform();
         this.imageTransform = image.transform;
 
-        if (image.is3D) {
+        if (image.is3D && image.depth > 1) {
             this.addOverlay(new ScrollOCT());
         }
         this.addOverlay(new UpdatePosition());
         this.addOverlay(new ZoomPan());
         this.addOverlay(new CursorOverlay());
         this.addOverlay(new HotKeys());
+
+        if (image.is3D && image.depth > 1) {
+            const pending = this.viewerWindowContext.viewState?.peekIndex(
+                this.image.image_id,
+                image.depth,
+            );
+            // Apply pending on viewer.index only. setIndex() writes the global
+            // registration pointer, which cannot hold per-viewer frames
+            // (known limitation for multiple open volumes).
+            this.index = pending ?? Math.round(image.depth / 2);
+        } else if (image.is3D) {
+            this.index = 0;
+        }
     }
 
     setIndex(i: number) {
@@ -199,6 +223,24 @@ export class ViewerContext {
             index: i,
         });
         this.index = i;
+        if (this.image.is3D && this.image.depth > 1) {
+            this.viewerWindowContext.viewState?.recordIndex(
+                this.image.image_id,
+                i,
+                this.image.depth,
+            );
+        }
+    }
+
+    cycleEnfaceProjectionModeForOct(octPublicId: string): void {
+        const modes: EnfaceProjectionMode[] = ["off", "binary", "heatmap"];
+        const current =
+            this.enfaceProjectionModesByOct.get(octPublicId) ?? "off";
+        const next = modes[(modes.indexOf(current) + 1) % modes.length];
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
+        const map = new Map(this.enfaceProjectionModesByOct);
+        map.set(octPublicId, next);
+        this.enfaceProjectionModesByOct = map;
     }
 
     initTransform() {
@@ -372,11 +414,8 @@ export class ViewerContext {
         );
         if (p) {
             this.index = p.index;
-        } else {
-            // this.index = Math.round(this.image.depth / 2);
-            this.index =
-                this.image.depth === 1 ? 0 : Math.round(this.image.depth / 2);
         }
+        // else keep this.index (mid-slice / restored pending / last setIndex)
 
         const renderTarget = { ...renderBounds, framebuffer: null };
 

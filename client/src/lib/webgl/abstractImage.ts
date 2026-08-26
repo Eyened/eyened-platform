@@ -38,12 +38,24 @@ export abstract class AbstractImage {
         this.height = height;
         this.depth = depth;
 
-        if (instance.modality === "OCT") {
-            if (instance.resolution_axial && instance.resolution_axial > 0) {
-                this.orientation = "axial";
-            } else {
-                this.orientation = "enface";
-            }
+        // `_proj` is already enface (keeps mm world aspect via getAspectRatio).
+        // Axial = OCT B-scan volumes only (not square isotropic IR stacks tagged OCT).
+        if (image_id.endsWith("_proj")) {
+            this.orientation = "enface";
+        } else if (
+            instance.modality === "OCT" &&
+            instance.resolution_axial &&
+            instance.resolution_axial > 0
+        ) {
+            const { width, height, width_mm, height_mm } = this.dimensions;
+            const squareIso =
+                width_mm > 0 &&
+                height_mm > 0 &&
+                Math.max(width_mm / width, height_mm / height) /
+                    Math.min(width_mm / width, height_mm / height) <
+                    1.1 &&
+                Math.max(width, height) / Math.min(width, height) < 1.1;
+            this.orientation = squareIso ? "enface" : "axial";
         } else {
             this.orientation = "enface";
         }
@@ -58,6 +70,12 @@ export abstract class AbstractImage {
 
     abstract is3D: boolean;
     abstract is2D: boolean;
+
+    /**
+     * When false, only Original + CLAHE are offered (volumes / grayscale).
+     * Color fundus bitmaps set this true so CE / channels / etc. appear.
+     */
+    supportsColorRenderModes = false;
 
     getAspectRatio() {
         const { width, height, width_mm, height_mm } = this.dimensions;

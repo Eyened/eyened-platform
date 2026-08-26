@@ -4,13 +4,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from eyened_orm import Creator
+from eyened_orm.authz.scope import AccessScope
 
 
 class CreatorRepository:
     """Data access for Creator rows (identity table; escalation-relevant under RBAC)."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def get_by_id(self, creator_id: int) -> Creator | None:
         return self._session.get(Creator, creator_id)

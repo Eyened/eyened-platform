@@ -6,10 +6,21 @@ transaction; only ``seed_search_dataset`` commits.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Session
+
+if TYPE_CHECKING:
+    # Type-checking only, so the quoted annotations on admin_scope/scope_for
+    # actually resolve -- an annotation that cannot resolve is not an
+    # annotation. The runtime imports stay function-local for symmetry with the
+    # rest of this module, NOT to keep the import cheap: the line below already
+    # pulls eyened_orm, which loads authz.scope and authz.roles transitively.
+    from eyened_orm.authz.roles import ProjectRole
+    from eyened_orm.authz.scope import AccessScope
 
 from eyened_orm import (
     Creator,
@@ -321,4 +332,45 @@ def seed_search_dataset(session: Session) -> SearchDataset:
         images={"a1": a1, "a2": a2, "b1": b1, "inactive": inactive},
         studies={"a": study_a, "b": study_b},
         projects={"alpha": alpha, "beta": beta},
+    )
+
+
+def admin_scope(actor_id: int = 1, username: str = "tester") -> "AccessScope":
+    """An unrestricted scope, for tests whose subject is not authorization."""
+    from eyened_orm.authz.scope import AccessScope
+
+    return AccessScope(
+        actor_id=actor_id, username=username, is_admin=True, roles={}
+    )
+
+
+def scope_for(
+    *project_ids: int,
+    role: "ProjectRole | None" = None,
+    roles: "Mapping[int, ProjectRole] | None" = None,
+    actor_id: int = 1,
+    username: str = "tester",
+) -> "AccessScope":
+    """A non-admin scope holding ``role`` in each of ``project_ids``.
+
+    Pass ``roles`` instead for the shape that a single broadcast ``role``
+    cannot express: a *different* role per project (e.g. grader in one,
+    read_only in another). ``roles`` is exclusive with ``project_ids``/
+    ``role`` -- it replaces them rather than layering on top.
+    """
+    from eyened_orm.authz.roles import ProjectRole
+    from eyened_orm.authz.scope import AccessScope
+
+    if roles is not None:
+        if project_ids or role is not None:
+            raise ValueError("roles is exclusive with project_ids/role")
+        role_map = dict(roles)
+    else:
+        role_map = {p: role or ProjectRole.grader for p in project_ids}
+
+    return AccessScope(
+        actor_id=actor_id,
+        username=username,
+        is_admin=False,
+        roles=role_map,
     )

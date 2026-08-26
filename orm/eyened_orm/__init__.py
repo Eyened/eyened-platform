@@ -6,6 +6,7 @@ from .study import *        # Depends on Patient
 from .series import *       # Depends on Study
 from .image_instance import * # Depends on Series
 from .creator import *      # Independent
+from .project_member import *  # Depends on Creator, Project
 from .audit_log import *     # Independent audit sink
 from .form_annotation import * # Depends on Patient, Study, ImageInstance
 from .task import *         # Depends on ImageInstance, Creator
