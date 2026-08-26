@@ -207,11 +207,6 @@
       "count": 1
     }
   },
-  "src/lib/tasks/TaskOverlay.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
   "src/lib/usermanager.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
       "count": 1
