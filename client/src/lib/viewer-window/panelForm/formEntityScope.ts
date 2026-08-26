@@ -31,16 +31,16 @@ export function matchesFormEntityScope(
         case "Patient":
             return true;
         case "Study":
-            return annotation.study_id === ctx.studyId;
+            return (annotation.study_id ?? null) === (ctx.studyId ?? null);
         case "Eye":
-            return annotation.laterality === ctx.laterality;
+            return (annotation.laterality ?? null) === (ctx.laterality ?? null);
         case "StudyEye":
             return (
-                annotation.study_id === ctx.studyId &&
-                annotation.laterality === ctx.laterality
+                (annotation.study_id ?? null) === (ctx.studyId ?? null) &&
+                (annotation.laterality ?? null) === (ctx.laterality ?? null)
             );
         case "ImageInstance":
-            return annotation.image_id === ctx.imageId;
+            return (annotation.image_id ?? null) === (ctx.imageId ?? null);
         default:
             return false;
     }

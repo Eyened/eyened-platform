@@ -77,6 +77,48 @@ describe("matchesFormEntityScope", () => {
             false,
         );
     });
+
+    it("treats null and undefined laterality as the same Eye scope", () => {
+        const nullLateralityCtx = {
+            patientId: 100,
+            laterality: undefined,
+        };
+        const a = {
+            ...annotation,
+            laterality: null,
+        } as FormAnnotationGET;
+        expect(matchesFormEntityScope(a, "Eye", nullLateralityCtx)).toBe(true);
+    });
+
+    it("treats null and undefined study_id and laterality as the same StudyEye scope", () => {
+        const nullStudyEyeCtx = {
+            patientId: 100,
+            studyId: undefined,
+            laterality: undefined,
+        };
+        const a = {
+            ...annotation,
+            study_id: null,
+            laterality: null,
+        } as FormAnnotationGET;
+        expect(matchesFormEntityScope(a, "StudyEye", nullStudyEyeCtx)).toBe(
+            true,
+        );
+    });
+
+    it("does not match Eye when laterality is R and ctx laterality is undefined", () => {
+        const undefinedLateralityCtx = {
+            patientId: 100,
+            laterality: undefined,
+        };
+        const a = {
+            ...annotation,
+            laterality: "R",
+        } as FormAnnotationGET;
+        expect(matchesFormEntityScope(a, "Eye", undefinedLateralityCtx)).toBe(
+            false,
+        );
+    });
 });
 
 describe("buildFormAnnotationCreatePayload", () => {
