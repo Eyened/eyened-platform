@@ -6,6 +6,8 @@
     import { updateSubTask } from "$lib/data/api";
     import ChevronLeft from "@lucide/svelte/icons/chevron-left";
     import ChevronRight from "@lucide/svelte/icons/chevron-right";
+    import Expand from "@lucide/svelte/icons/expand";
+    import Shrink from "@lucide/svelte/icons/shrink";
     import { toast } from "svelte-sonner";
     import { subTaskStates } from "../../types/openapi_constants";
     import type { SubTaskState } from "../../types/openapi_types";
@@ -80,29 +82,37 @@
         class:expanded
         aria-label="Task"
     >
-        {#if showExpandControl}
-            <div class="controls">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onclick={toggleExpanded}
-                    aria-expanded={expanded}
-                    aria-label={expanded
-                        ? "Collapse task panel"
-                        : "Expand task panel"}
-                >
-                    {expanded ? "Collapse" : "Expand"}
-                </Button>
+        {#if showExpandControl || panelConfig.sections.title}
+            <div class="header">
+                {#if showExpandControl}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="toggle"
+                        onclick={toggleExpanded}
+                        aria-expanded={expanded}
+                        aria-label={expanded
+                            ? "Collapse task panel"
+                            : "Expand task panel"}
+                    >
+                        {#if expanded}
+                            <Shrink />
+                        {:else}
+                            <Expand />
+                        {/if}
+                    </Button>
+                {/if}
+                {#if panelConfig.sections.title}
+                    <div class="title">
+                        Set {subTaskIndex} of {task.num_tasks}
+                    </div>
+                {/if}
             </div>
         {/if}
 
-        {#if panelConfig.sections.title}
-            <div class="title">Set {subTaskIndex} of {task.num_tasks}</div>
-        {/if}
-
         {#if panelConfig.sections.nav}
-            <div class="controls">
-                <ButtonGroup orientation="vertical">
+            <div class="controls nav">
+                <ButtonGroup orientation="horizontal">
                     <Button
                         variant="outline"
                         size="sm"
@@ -111,7 +121,6 @@
                         aria-label="Previous subtask"
                     >
                         <ChevronLeft />
-                        Previous
                     </Button>
                     <Button
                         variant="outline"
@@ -120,7 +129,6 @@
                         disabled={navigation.nextDisabled}
                         aria-label="Next subtask"
                     >
-                        Next
                         <ChevronRight />
                     </Button>
                 </ButtonGroup>
@@ -153,13 +161,13 @@
                 <div class="comments">
                     Comments:
                     <textarea
-                        rows="6"
+                        rows="4"
                         value={subTask.comments || ""}
                         onchange={async (e) => {
                             const target = e.target as HTMLTextAreaElement;
                             await updateComments(target.value);
                         }}
-                        class="min-h-[60px] w-full rounded border p-2"
+                        class="min-h-[48px] w-full rounded border p-1 text-xs"
                         placeholder="Add comments..."
                     ></textarea>
                 </div>
@@ -180,28 +188,75 @@
     aside.task-panel {
         display: flex;
         flex-direction: column;
-        flex: 0 0 10rem;
+        flex: 0 0 9rem;
         z-index: 2;
         background-color: black;
         color: rgba(255, 255, 255, 0.9);
         border-left: 1px solid rgba(255, 255, 255, 0.4);
-        padding: 0.5rem;
-        gap: 0.5rem;
+        padding: 0.25rem;
+        gap: 0.2rem;
         overflow-y: auto;
         overflow-x: hidden;
+        font-size: 0.75rem;
+        line-height: 1.2;
     }
     aside.task-panel.expanded {
-        flex-basis: 18rem;
+        flex-basis: 16rem;
+    }
+    .header {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.15rem;
+    }
+    aside.task-panel :global(button.toggle) {
+        width: 1.35rem;
+        flex: 0 0 1.35rem;
+        padding-left: 0;
+        padding-right: 0;
     }
     .title {
+        flex: 1;
         font-weight: bold;
-        font-size: 0.85rem;
+        font-size: 0.75rem;
+        line-height: 1.2;
         text-align: center;
+        padding: 0.1rem 0;
+        min-width: 0;
     }
     .controls {
         display: flex;
         flex-direction: column;
         align-items: stretch;
+        gap: 0;
+    }
+    aside.task-panel :global([data-slot="button-group"]) {
+        width: 100%;
+    }
+    .nav :global([data-slot="button-group"]) {
+        display: flex;
+        flex-direction: row;
+    }
+    .nav :global(button) {
+        flex: 1;
+        min-width: 0;
+    }
+    aside.task-panel :global(button) {
+        height: 1.35rem;
+        min-height: 1.35rem;
+        padding-top: 0;
+        padding-bottom: 0;
+        padding-left: 0.35rem;
+        padding-right: 0.35rem;
+        font-size: 0.7rem;
+        line-height: 1;
+        width: 100%;
+        justify-content: center;
+        gap: 0.15rem;
+    }
+    aside.task-panel :global(button svg) {
+        width: 0.8rem;
+        height: 0.8rem;
     }
     .busy {
         opacity: 0.6;
@@ -211,11 +266,12 @@
     .comments {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
-        font-size: 0.85rem;
+        gap: 0.15rem;
+        font-size: 0.75rem;
     }
     textarea {
         background-color: white;
         color: black;
+        line-height: 1.2;
     }
 </style>
