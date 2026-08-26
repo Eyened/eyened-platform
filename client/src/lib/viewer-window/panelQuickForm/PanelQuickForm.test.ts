@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { formAnnotations, formSchemasByName } from "$lib/data/stores.svelte";
 import type {
     FormAnnotationGET,
@@ -118,6 +118,35 @@ describe("PanelQuickForm", () => {
                 sub_task_id: 7,
             }),
         );
+        expect(openFormInNewWindow).toHaveBeenCalledWith(
+            created,
+            true,
+            expect.anything(),
+        );
+    });
+
+    it("does not create a second annotation when Grade is clicked twice in flight", async () => {
+        formSchemasByName.set("Naevi grading", schema);
+        let resolveCreate!: (value: FormAnnotationGET) => void;
+        const pending = new Promise<FormAnnotationGET>((resolve) => {
+            resolveCreate = resolve;
+        });
+        vi.mocked(createFormAnnotation).mockReturnValue(pending);
+
+        render(PanelQuickForm, { props: {}, context: contexts } as never);
+
+        const button = screen.getByRole("button", { name: "Grade" });
+        await fireEvent.click(button);
+        await fireEvent.click(button);
+
+        expect(createFormAnnotation).toHaveBeenCalledTimes(1);
+
+        const created = { id: 99, form_schema_id: 10 } as FormAnnotationGET;
+        resolveCreate(created);
+
+        await waitFor(() => {
+            expect(openFormInNewWindow).toHaveBeenCalledTimes(1);
+        });
         expect(openFormInNewWindow).toHaveBeenCalledWith(
             created,
             true,

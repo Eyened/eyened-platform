@@ -81,23 +81,29 @@
         annotation ? globalContext.canEdit(annotation) : true,
     );
     const gradeDisabled = $derived(!schema);
+    let submitting = $state(false);
 
     async function onGradeClick() {
-        if (!schema) return;
+        if (!schema || submitting) return;
 
-        let form = annotation;
-        if (!form) {
-            form = await createFormAnnotation(
-                buildFormAnnotationCreatePayload({
-                    formSchemaId: schema.id,
-                    scope: entityScope,
-                    ctx: formContext,
-                    subTaskId: taskContext?.subTask?.id,
-                }),
-            );
+        submitting = true;
+        try {
+            let form = annotation;
+            if (!form) {
+                form = await createFormAnnotation(
+                    buildFormAnnotationCreatePayload({
+                        formSchemaId: schema.id,
+                        scope: entityScope,
+                        ctx: formContext,
+                        subTaskId: taskContext?.subTask?.id,
+                    }),
+                );
+            }
+
+            openFormInNewWindow(form, canEdit, viewerContext);
+        } finally {
+            submitting = false;
         }
-
-        openFormInNewWindow(form, canEdit, viewerContext);
     }
 </script>
 
@@ -110,7 +116,7 @@
         <p class="status {statusLabel.toLowerCase()}">Status: {statusLabel}</p>
     {/if}
 
-    <button onclick={onGradeClick} disabled={gradeDisabled}>
+    <button onclick={onGradeClick} disabled={gradeDisabled || submitting}>
         {buttonLabel}
     </button>
 </div>
