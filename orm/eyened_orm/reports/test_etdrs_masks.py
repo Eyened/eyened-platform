@@ -43,6 +43,29 @@ def _per_field_summary(masks: ETDRS_masks, binary, fields, **kwargs):
     return result
 
 
+def test_grid_is_3mm_disk_and_rings_partition_it():
+    masks = _masks()
+    d = masks.distance_to_fovea
+    np.testing.assert_array_equal(masks.center, d < 0.5)
+    np.testing.assert_array_equal(masks.inner, (d < 1.5) & (d >= 0.5))
+    np.testing.assert_array_equal(masks.outer, (d < 3) & (d >= 1.5))
+    np.testing.assert_array_equal(masks.grid, d < 3)
+    np.testing.assert_array_equal(
+        masks.center | masks.inner | masks.outer, masks.grid
+    )
+    assert not (masks.center & masks.inner).any()
+    assert not (masks.center & masks.outer).any()
+    assert not (masks.inner & masks.outer).any()
+
+
+def test_grid_does_not_materialize_rings():
+    masks = _masks()
+    _ = masks.grid
+    assert "center" not in masks.__dict__
+    assert "inner" not in masks.__dict__
+    assert "outer" not in masks.__dict__
+
+
 def test_get_summary_matches_per_field_for_compact_lesions():
     masks = _masks()
     binary = np.zeros((200, 200), dtype=bool)

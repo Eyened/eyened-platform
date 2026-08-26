@@ -129,30 +129,30 @@ class ETDRS_masks:
 
     @cached_property
     def distance_to_fovea(self):
-        dx = self.dx * self.resolution_x
-        dy = self.dy * self.resolution_y
-        return np.sqrt(dx * dx + dy * dy)
+        return np.hypot(self.dx * self.resolution_x, self.dy * self.resolution_y)
 
     @cached_property
     def total(self):
         return np.ones((self.h, self.w), dtype=bool)
 
-    # rings
+    # rings (independent distance cuts so grid does not force the three rings)
     @cached_property
     def center(self):
         return self.distance_to_fovea < 0.5
 
     @cached_property
     def inner(self):
-        return (self.distance_to_fovea < 1.5) & ~self.center
+        d = self.distance_to_fovea
+        return (d < 1.5) & (d >= 0.5)
 
     @cached_property
     def outer(self):
-        return (self.distance_to_fovea < 3) & ~(self.center | self.inner)
+        d = self.distance_to_fovea
+        return (d < 3) & (d >= 1.5)
 
     @cached_property
     def grid(self):
-        return self.center | self.inner | self.outer
+        return self.distance_to_fovea < 3
 
     # quadrants
     @cached_property
