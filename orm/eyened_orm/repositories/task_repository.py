@@ -361,7 +361,10 @@ class SubTaskRepository:
         anyone, including ``creator_id``). Does not commit; the caller
         controls the transaction boundary.
         """
-        result = self._session.execute(
+        # Bind-level execute: Session.execute() autoflushes the identity map,
+        # which would write a stale CreatorID=None and let this UPDATE "win"
+        # after another writer already assigned the row.
+        result = self._session.connection().execute(
             update(SubTask)
             .where(SubTask.SubTaskID == subtask_id, SubTask.CreatorID.is_(None))
             .values(CreatorID=creator_id)

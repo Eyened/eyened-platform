@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from sqlalchemy import select, update
 
 from eyened_orm import Creator, SubTask, Task, TaskDefinition
 from eyened_orm.task import SubTaskState, TaskState
@@ -187,8 +188,10 @@ def test_update_subtask_claim_succeeds_when_already_owned_by_actor(session):
 def test_update_subtask_claim_conflict_when_concurrent_claim_wins(session):
     """claim=True raises ConflictError if the conditional UPDATE loses the race.
 
-    Simulates another writer assigning the subtask after our load: UPDATE the
-    row out from under the identity map, then claim must fail (not succeed).
+    A second Session cannot run concurrently here: StaticPool is one connection.
+    Instead, UPDATE the row with synchronize_session=False so the identity map
+    still shows unassigned while the transaction already has a winner. A naive
+    read-then-write would succeed; claim_if_unassigned must not.
     """
     owner = _actor(session)
     actor = _actor(session)
@@ -196,17 +199,27 @@ def test_update_subtask_claim_conflict_when_concurrent_claim_wins(session):
     task = _make_task(session, td.TaskDefinitionID, owner.id)
     st = _make_subtask(session, task.TaskID)
     session.commit()
+    subtask_id = st.SubTaskID
 
-    # Concurrent winner: assign via repository UPDATE (does not sync identity).
-    assert SubTaskRepository(session, scope=admin_scope()).claim_if_unassigned(
-        st.SubTaskID, owner.id
+    service_a = _service(session, actor)
+    loaded = service_a.get_subtask(subtask_id, with_images=False)
+    assert loaded.CreatorID is None
+
+    result = session.execute(
+        update(SubTask)
+        .where(SubTask.SubTaskID == subtask_id)
+        .values(CreatorID=owner.id)
+        .execution_options(synchronize_session=False)
     )
-    session.commit()
+    assert result.rowcount == 1
+    db_owner = session.execute(
+        select(SubTask.CreatorID).where(SubTask.SubTaskID == subtask_id)
+    ).scalar_one()
+    assert db_owner == owner.id
+    assert loaded.CreatorID is None
 
     with pytest.raises(ConflictError) as exc:
-        _service(session, actor).update_subtask(
-            st.SubTaskID, None, None, claim=True
-        )
+        service_a.update_subtask(subtask_id, None, None, claim=True)
     assert exc.value.detail["code"] == "subtask_already_claimed"
     assert exc.value.detail["creator_id"] == owner.id
 
