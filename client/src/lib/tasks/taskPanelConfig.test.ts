@@ -23,9 +23,9 @@ describe("parseTaskPanelConfig", () => {
     });
 
     it("honors enabled false", () => {
-        expect(parseTaskPanelConfig({ task_panel: { enabled: false } }).enabled).toBe(
-            false,
-        );
+        expect(
+            parseTaskPanelConfig({ task_panel: { enabled: false } }).enabled,
+        ).toBe(false);
     });
 
     it("merges partial sections onto defaults", () => {

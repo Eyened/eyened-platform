@@ -36,16 +36,17 @@
         panelConfig.sections.comments || panelConfig.sections.overview,
     );
 
-    let expanded = $state(false);
+    let prefsTick = $state(0);
     let isUpdatingState = $state(false);
 
-    $effect.pre(() => {
-        expanded = getTaskPanelExpanded(task.id, panelConfig.expanded);
+    const expanded = $derived.by(() => {
+        void prefsTick;
+        return getTaskPanelExpanded(task.id, panelConfig.expanded);
     });
 
     function toggleExpanded() {
-        expanded = !expanded;
-        setTaskPanelExpanded(task.id, expanded);
+        setTaskPanelExpanded(task.id, !expanded);
+        prefsTick += 1;
     }
 
     async function setState(state: SubTaskState) {
@@ -77,11 +78,7 @@
 </script>
 
 {#if panelConfig.enabled}
-    <aside
-        class="task-panel"
-        class:expanded
-        aria-label="Task"
-    >
+    <aside class="task-panel" class:expanded aria-label="Task">
         {#if showExpandControl || panelConfig.sections.title}
             <div class="header">
                 {#if showExpandControl}
