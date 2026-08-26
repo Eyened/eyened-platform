@@ -25,7 +25,7 @@
 
     let { taskContext }: Props = $props();
 
-    const navigation = new TaskNavigation(taskContext);
+    const navigation = $derived.by(() => new TaskNavigation(taskContext));
     const subTask = $derived(taskContext.subTask);
     const task = $derived(taskContext.task);
     const subTaskIndex = $derived(taskContext.subTaskIndex);
@@ -39,7 +39,7 @@
     let expanded = $state(false);
     let isUpdatingState = $state(false);
 
-    $effect(() => {
+    $effect.pre(() => {
         expanded = getTaskPanelExpanded(task.id, panelConfig.expanded);
     });
 
