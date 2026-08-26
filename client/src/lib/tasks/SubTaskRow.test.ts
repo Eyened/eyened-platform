@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import type { SubTaskWithImagesGET } from "../../types/openapi_types";
+import { ApiError } from "$lib/api/client";
 
 vi.mock("svelte-sonner", () => ({
     toast: {
@@ -107,5 +108,28 @@ describe("SubTaskRow", () => {
 
         await fireEvent.click(screen.getByRole("button", { name: "Claim" }));
         expect(toast.error).toHaveBeenCalled();
+    });
+
+    it("refreshes and reports when the subtask is already claimed", async () => {
+        vi.mocked(updateSubTask).mockRejectedValue(
+            new ApiError(409, "SubTask is already assigned", {
+                code: "subtask_already_claimed",
+                message: "SubTask is already assigned",
+                creator_id: 9,
+            }),
+        );
+        const onAssignmentChange = vi.fn();
+        render(SubTaskRow, {
+            props: {
+                subtask: makeRow(),
+                taskId: 9,
+                onAssignmentChange,
+            },
+            context: new Map([["globalContext", { user: { id: 5 } }]]),
+        } as never);
+
+        await fireEvent.click(screen.getByRole("button", { name: "Claim" }));
+        expect(toast.error).toHaveBeenCalledWith("SubTask is already assigned");
+        expect(onAssignmentChange).toHaveBeenCalled();
     });
 });

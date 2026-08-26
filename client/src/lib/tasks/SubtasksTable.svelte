@@ -4,6 +4,7 @@
     import { Button } from "$lib/components/ui/button";
     import * as Table from "$lib/components/ui/table";
     import SubTaskRow from "$lib/tasks/SubTaskRow.svelte";
+    import { ApiError } from "$lib/api/client";
     import { updateSubTask } from "$lib/data/api";
     import { setContext } from "svelte";
     import type { SubTaskWithImagesGET } from "../../types/openapi_types";
@@ -45,7 +46,13 @@
                 try {
                     await updateSubTask(row.id, { claim: true });
                     claimed += 1;
-                } catch {
+                } catch (e) {
+                    if (
+                        e instanceof ApiError &&
+                        e.code === "subtask_already_claimed"
+                    ) {
+                        continue;
+                    }
                     failed += 1;
                 }
             }

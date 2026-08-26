@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from eyened_orm.task import SubTaskState
 
 from ..dtos.dto_converter import DTOConverter
-from ..dtos.dtos_tasks import SubTaskGET, SubTaskWithImagesGET
+from ..dtos.dtos_tasks import SubTaskConflict, SubTaskGET, SubTaskWithImagesGET
 from ..services.task_service import SubTaskService, get_subtask_service
 from .auth import CurrentUser, get_current_user
 
@@ -39,14 +39,23 @@ async def get_subtask(
     return DTOConverter.subtask_to_get(st)
 
 
-@router.patch("/subtasks/{subtaskid}", response_model=SubTaskGET)
+@router.patch(
+    "/subtasks/{subtaskid}",
+    response_model=SubTaskGET,
+    responses={
+        409: {
+            "model": SubTaskConflict,
+            "description": "Subtask already claimed or not owned by the actor",
+        }
+    },
+)
 async def patch_subtask(
     subtaskid: int,
     dto: SubTaskPATCH,
     service: SubTaskService = Depends(get_subtask_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Update a subtask's comments and/or state."""
+    """Update a subtask's comments, state, and/or claim. Returns 409 if already claimed or not owned."""
     st = service.update_subtask(
         subtaskid,
         dto.comments,

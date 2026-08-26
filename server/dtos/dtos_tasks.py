@@ -81,6 +81,16 @@ class SubTaskGET(SubTaskBase):
     next_task: Optional["SubTaskGET"] = None
 
 
+class SubTaskConflictDetail(BaseModel):
+    code: str
+    message: str
+    creator_id: Optional[int] = None
+
+
+class SubTaskConflict(BaseModel):
+    detail: SubTaskConflictDetail
+
+
 class SubTaskWithImagesGET(SubTaskGET):
     """SubTask with associated images included."""
     images: List[ImageGET]

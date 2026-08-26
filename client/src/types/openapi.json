@@ -4918,7 +4918,7 @@
       },
       "patch": {
         "summary": "Patch Subtask",
-        "description": "Update a subtask's comments and/or state.",
+        "description": "Update a subtask's comments, state, and/or claim. Returns 409 if already claimed or not owned.",
         "operationId": "patch_subtask_subtasks__subtaskid__patch",
         "parameters": [
           {
@@ -4975,6 +4975,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SubTaskGET"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Subtask already claimed or not owned by the actor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubTaskConflict"
                 }
               }
             }
@@ -8915,6 +8925,47 @@
           "name"
         ],
         "title": "SubFeatureItem"
+      },
+      "SubTaskConflict": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/SubTaskConflictDetail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "SubTaskConflict"
+      },
+      "SubTaskConflictDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "creator_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creator Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "SubTaskConflictDetail"
       },
       "SubTaskGET": {
         "properties": {

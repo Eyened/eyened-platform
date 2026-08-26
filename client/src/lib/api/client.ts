@@ -78,20 +78,72 @@ async function handleTokenRefresh(): Promise<void> {
 
 export class ApiError extends Error {
     readonly status: number;
+    readonly detail: unknown;
 
-    constructor(status: number, message: string) {
+    constructor(status: number, message: string, detail?: unknown) {
         super(message);
         this.name = "ApiError";
         this.status = status;
+        this.detail = detail ?? message;
+    }
+
+    get code(): string | undefined {
+        if (
+            this.detail &&
+            typeof this.detail === "object" &&
+            !Array.isArray(this.detail) &&
+            "code" in this.detail
+        ) {
+            const code = (this.detail as { code?: unknown }).code;
+            return typeof code === "string" ? code : undefined;
+        }
+        return undefined;
     }
 }
 
-/** Build an ApiError from a FastAPI error response (always `{ detail: string }`). */
+/** Pull a human message and structured detail out of a FastAPI error body. */
+export function messageFromApiErrorBody(
+    error: unknown,
+    fallback: string,
+): { message: string; detail: unknown } {
+    const detail =
+        error &&
+        typeof error === "object" &&
+        error !== null &&
+        "detail" in error
+            ? (error as { detail: unknown }).detail
+            : error;
+    if (typeof detail === "string" && detail.trim()) {
+        return { message: detail, detail };
+    }
+    if (
+        detail &&
+        typeof detail === "object" &&
+        !Array.isArray(detail) &&
+        "message" in detail &&
+        typeof (detail as { message: unknown }).message === "string"
+    ) {
+        const message = (detail as { message: string }).message.trim();
+        if (message) return { message, detail };
+    }
+    return { message: fallback, detail };
+}
+
+/** Build an ApiError from a FastAPI error response (`detail` may be a string or dict). */
 export async function apiErrorFromResponse(
     response: Response,
 ): Promise<ApiError> {
-    const { detail }: { detail: string } = await response.json();
-    return new ApiError(response.status, detail);
+    let body: unknown;
+    try {
+        body = await response.json();
+    } catch {
+        return new ApiError(response.status, response.statusText);
+    }
+    const { message, detail } = messageFromApiErrorBody(
+        body,
+        response.statusText || `Request failed: ${response.status}`,
+    );
+    return new ApiError(response.status, message, detail);
 }
 
 export function isUnauthorizedStatus(status: number): boolean {

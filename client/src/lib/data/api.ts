@@ -13,6 +13,7 @@ import {
     ApiError,
     api,
     isUnauthorizedStatus,
+    messageFromApiErrorBody,
     withAuthRetry,
 } from "../api/client";
 import {
@@ -46,10 +47,12 @@ function handleResponse<T>(
     if (res.error || isUnauthorizedStatus(res.response.status)) {
         // Auth errors may surface as status only (fetch retried once at HTTP layer).
         // withAuthRetry on callers can refresh and run the operation again.
-        throw new ApiError(
-            res.response.status,
-            `Failed to ${operation}: ${res.response.status}`,
+        const fallback = `Failed to ${operation}: ${res.response.status}`;
+        const { message, detail } = messageFromApiErrorBody(
+            res.error,
+            fallback,
         );
+        throw new ApiError(res.response.status, message, detail);
     }
     return res.data as T;
 }

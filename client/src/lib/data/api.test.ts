@@ -1,15 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { subtasks } from "./stores.svelte";
 
-vi.mock("../api/client", () => {
-    class ApiError extends Error {
-        status: number;
-        constructor(status: number, message: string) {
-            super(message);
-            this.status = status;
-        }
-    }
+vi.mock("../api/client", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../api/client")>();
     return {
+        ...actual,
         api: {
             GET: vi.fn(),
             POST: vi.fn(),
@@ -17,13 +12,13 @@ vi.mock("../api/client", () => {
             DELETE: vi.fn(),
         },
         withAuthRetry: async (fn: () => Promise<unknown>) => fn(),
-        isUnauthorizedStatus: (status: number) => status === 401,
-        ApiError,
+        isUnauthorizedStatus: (status: number) =>
+            status === 401 || status === 403,
         fetchApi: vi.fn(),
     };
 });
 
-const { api } = await import("../api/client");
+const { api, ApiError } = await import("../api/client");
 const { fetchSubTasks, fetchSubTaskAssignees, updateSubTask } = await import(
     "./api"
 );
@@ -96,5 +91,30 @@ describe("subtask API helpers", () => {
         );
         expect(updated.creator_id).toBe(4);
         expect(subtasks.get(1)?.creator_id).toBe(4);
+    });
+
+    it("throws ApiError with conflict detail when claim returns 409", async () => {
+        vi.mocked(api.PATCH).mockResolvedValue({
+            data: undefined,
+            error: {
+                detail: {
+                    code: "subtask_already_claimed",
+                    message: "SubTask is already assigned",
+                    creator_id: 4,
+                },
+            },
+            response: { status: 409 } as Response,
+        });
+
+        try {
+            await updateSubTask(1, { claim: true });
+            throw new Error("expected updateSubTask to throw");
+        } catch (error) {
+            expect(error).toBeInstanceOf(ApiError);
+            const apiError = error as InstanceType<typeof ApiError>;
+            expect(apiError.status).toBe(409);
+            expect(apiError.message).toBe("SubTask is already assigned");
+            expect(apiError.code).toBe("subtask_already_claimed");
+        }
     });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import type { SubTaskWithImagesGET } from "../../types/openapi_types";
+import { ApiError } from "$lib/api/client";
 
 vi.mock("svelte-sonner", () => ({
     toast: {
@@ -111,6 +112,37 @@ describe("SubtasksTable", () => {
             }),
         );
         expect(toast.message).toHaveBeenCalledWith("Claimed 0, failed 2");
+    });
+
+    it("treats already-claimed conflicts as skipped, not failed", async () => {
+        vi.mocked(updateSubTask).mockRejectedValue(
+            new ApiError(409, "SubTask is already assigned", {
+                code: "subtask_already_claimed",
+                message: "SubTask is already assigned",
+                creator_id: 9,
+            }),
+        );
+        const onAssignmentChange = vi.fn();
+        render(SubtasksTable, {
+            props: {
+                rows: [row({ id: 1 }), row({ id: 2 })],
+                taskId: 9,
+                count: 2,
+                page: 0,
+                onPageChange: vi.fn(),
+                onAssignmentChange,
+            },
+            context: new Map([["globalContext", { user: { id: 5 } }]]),
+        } as never);
+
+        await fireEvent.click(
+            screen.getByRole("button", {
+                name: /Claim all unassigned on this page/,
+            }),
+        );
+        expect(toast.success).toHaveBeenCalledWith("Claimed 0 subtask(s)");
+        expect(toast.message).not.toHaveBeenCalled();
+        expect(onAssignmentChange).toHaveBeenCalled();
     });
 
     it("shows an empty state", () => {

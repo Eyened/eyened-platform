@@ -1085,7 +1085,7 @@ export interface paths {
         head?: never;
         /**
          * Patch Subtask
-         * @description Update a subtask's comments and/or state.
+         * @description Update a subtask's comments, state, and/or claim. Returns 409 if already claimed or not owned.
          */
         patch: operations["patch_subtask_subtasks__subtaskid__patch"];
         trace?: never;
@@ -2278,6 +2278,19 @@ export interface components {
             index: number;
             /** Name */
             name: string;
+        };
+        /** SubTaskConflict */
+        SubTaskConflict: {
+            detail: components["schemas"]["SubTaskConflictDetail"];
+        };
+        /** SubTaskConflictDetail */
+        SubTaskConflictDetail: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Creator Id */
+            creator_id?: number | null;
         };
         /** SubTaskGET */
         SubTaskGET: {
@@ -5305,6 +5318,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubTaskGET"];
+                };
+            };
+            /** @description Subtask already claimed or not owned by the actor */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubTaskConflict"];
                 };
             };
             /** @description Validation Error */

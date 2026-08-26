@@ -4,6 +4,7 @@
     import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
     import { Button } from "$lib/components/ui/button";
     import * as Table from "$lib/components/ui/table";
+    import { ApiError } from "$lib/api/client";
     import { updateSubTask } from "$lib/data/api";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { SubTaskWithImagesGET } from "../../types/openapi_types";
@@ -58,7 +59,8 @@
             toast.success("Subtask claimed");
             await onAssignmentChange?.();
         } catch (e) {
-            toast.error(String(e));
+            toast.error(e instanceof ApiError ? e.message : String(e));
+            await onAssignmentChange?.();
         } finally {
             claiming = false;
         }
@@ -71,7 +73,8 @@
             toast.success("Subtask unclaimed");
             await onAssignmentChange?.();
         } catch (e) {
-            toast.error(String(e));
+            toast.error(e instanceof ApiError ? e.message : String(e));
+            await onAssignmentChange?.();
         } finally {
             claiming = false;
         }
