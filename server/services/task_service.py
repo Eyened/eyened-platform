@@ -7,7 +7,7 @@ from eyened_orm.authz.errors import NotVisibleError
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
-from sqlalchemy.orm import Session, object_session
+from sqlalchemy.orm import Session
 
 from ..db import get_db
 from .access_scope import get_access_scope
@@ -401,10 +401,6 @@ class SubTaskService:
                 current = self.subtasks.get_by_id(subtask_id)
                 if current is None:
                     raise NotFoundError(f"SubTask {subtask_id} not found")
-                # Identity map may still show unassigned after a lost race.
-                session = object_session(current)
-                if session is not None:
-                    session.refresh(current)
                 if current.CreatorID == actor.id:
                     subtask.CreatorID = actor.id
                 else:

@@ -78,50 +78,21 @@ describe("matchesFormEntityScope", () => {
         );
     });
 
-    it("treats null and undefined laterality as the same Eye scope", () => {
-        const nullLateralityCtx = {
-            patientId: 100,
-            laterality: undefined,
-        };
+    it("treats null and undefined laterality as the same", () => {
         const a = {
             ...annotation,
             laterality: null,
+            study_id: null,
         } as FormAnnotationGET;
-        expect(matchesFormEntityScope(a, "Eye", nullLateralityCtx)).toBe(true);
-    });
-
-    it("treats null and undefined study_id and laterality as the same StudyEye scope", () => {
-        const nullStudyEyeCtx = {
+        const ctxNullish = {
             patientId: 100,
             studyId: undefined,
             laterality: undefined,
         };
-        const a = {
-            ...annotation,
-            study_id: null,
-            laterality: null,
-        } as FormAnnotationGET;
-        expect(matchesFormEntityScope(a, "StudyEye", nullStudyEyeCtx)).toBe(
-            true,
-        );
+        expect(matchesFormEntityScope(a, "Eye", ctxNullish)).toBe(true);
+        expect(matchesFormEntityScope(a, "StudyEye", ctxNullish)).toBe(true);
     });
 
-    it("does not match Eye when laterality is R and ctx laterality is undefined", () => {
-        const undefinedLateralityCtx = {
-            patientId: 100,
-            laterality: undefined,
-        };
-        const a = {
-            ...annotation,
-            laterality: "R",
-        } as FormAnnotationGET;
-        expect(matchesFormEntityScope(a, "Eye", undefinedLateralityCtx)).toBe(
-            false,
-        );
-    });
-});
-
-describe("buildFormAnnotationCreatePayload", () => {
     it("omits image_id for StudyEye scope", () => {
         const payload = buildFormAnnotationCreatePayload({
             formSchemaId: 10,

@@ -99,32 +99,15 @@ describe("SubTaskRow", () => {
         expect(toast.success).toHaveBeenCalledWith("Subtask unclaimed");
     });
 
-    it("toasts when claim fails", async () => {
-        vi.mocked(updateSubTask).mockRejectedValue(new Error("busy"));
-        render(SubTaskRow, {
-            props: { subtask: makeRow(), taskId: 9 },
-            context: new Map([["globalContext", { user: { id: 5 } }]]),
-        } as never);
-
-        await fireEvent.click(screen.getByRole("button", { name: "Claim" }));
-        expect(toast.error).toHaveBeenCalled();
-    });
-
-    it("refreshes and reports when the subtask is already claimed", async () => {
+    it("toasts and refreshes when claim fails", async () => {
         vi.mocked(updateSubTask).mockRejectedValue(
             new ApiError(409, "SubTask is already assigned", {
                 code: "subtask_already_claimed",
-                message: "SubTask is already assigned",
-                creator_id: 9,
             }),
         );
         const onAssignmentChange = vi.fn();
         render(SubTaskRow, {
-            props: {
-                subtask: makeRow(),
-                taskId: 9,
-                onAssignmentChange,
-            },
+            props: { subtask: makeRow(), taskId: 9, onAssignmentChange },
             context: new Map([["globalContext", { user: { id: 5 } }]]),
         } as never);
 

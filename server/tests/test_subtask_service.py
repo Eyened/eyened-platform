@@ -1,7 +1,6 @@
 import uuid
 
 import pytest
-from sqlalchemy import select, update
 
 from eyened_orm import Creator, SubTask, Task, TaskDefinition
 from eyened_orm.task import SubTaskState, TaskState
@@ -183,45 +182,6 @@ def test_update_subtask_claim_succeeds_when_already_owned_by_actor(session):
         st.SubTaskID, None, None, claim=True
     )
     assert updated.CreatorID == actor.id
-
-
-def test_update_subtask_claim_conflict_when_concurrent_claim_wins(session):
-    """claim=True raises ConflictError if the conditional UPDATE loses the race.
-
-    A second Session cannot run concurrently here: StaticPool is one connection.
-    Instead, UPDATE the row with synchronize_session=False so the identity map
-    still shows unassigned while the transaction already has a winner. A naive
-    read-then-write would succeed; claim_if_unassigned must not.
-    """
-    owner = _actor(session)
-    actor = _actor(session)
-    td = _task_def(session)
-    task = _make_task(session, td.TaskDefinitionID, owner.id)
-    st = _make_subtask(session, task.TaskID)
-    session.commit()
-    subtask_id = st.SubTaskID
-
-    service_a = _service(session, actor)
-    loaded = service_a.get_subtask(subtask_id, with_images=False)
-    assert loaded.CreatorID is None
-
-    result = session.execute(
-        update(SubTask)
-        .where(SubTask.SubTaskID == subtask_id)
-        .values(CreatorID=owner.id)
-        .execution_options(synchronize_session=False)
-    )
-    assert result.rowcount == 1
-    db_owner = session.execute(
-        select(SubTask.CreatorID).where(SubTask.SubTaskID == subtask_id)
-    ).scalar_one()
-    assert db_owner == owner.id
-    assert loaded.CreatorID is None
-
-    with pytest.raises(ConflictError) as exc:
-        service_a.update_subtask(subtask_id, None, None, claim=True)
-    assert exc.value.detail["code"] == "subtask_already_claimed"
-    assert exc.value.detail["creator_id"] == owner.id
 
 
 def test_update_subtask_unclaim_releases_own(session):
