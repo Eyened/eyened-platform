@@ -109,4 +109,6 @@ jobs:
       - name: Prove the schema gates can fail
         env:
           EYENED_REQUIRE_MYSQL_TESTS: "1"
-        run: pytest orm/eyened_orm/tests/test_schema_gates_mysql.py -v
+        # addopts now deselects `mysql`-marked tests by default; without
+        # -m mysql this collects 0, deselects 2, and exits 5.
+        run: pytest orm/eyened_orm/tests/test_schema_gates_mysql.py -v -m mysql

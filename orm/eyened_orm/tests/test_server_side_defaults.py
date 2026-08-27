@@ -29,10 +29,13 @@ def test_date_modified_is_maintained_by_mysql_on_every_write(table):
 
 
 def test_no_model_declares_the_noisy_now_spelling():
-    """func.now() renders as MySQL's parenthesised `(now())`, which can never
-    text-match the model, so compare_server_default reports a false positive on
-    every column that uses it -- disabling the gate while looking correct.
-    Same behaviour, different literal, which is why it survives review."""
+    """func.now() compiles under the MySQL dialect to unparenthesised `now()`
+    (measured: `DATETIME DEFAULT now()`), and alembic strips only a trailing
+    `()` when comparing -- reducing it to `now`, which can never text-match a
+    reflected `current_timestamp`. So compare_server_default reports a false
+    positive on every column that uses it, disabling the gate while looking
+    correct. Same behaviour, different literal, which is why it survives
+    review."""
     noisy = [
         f"{table.name}.{column.name}"
         for table in Base.metadata.tables.values()
@@ -40,4 +43,4 @@ def test_no_model_declares_the_noisy_now_spelling():
         if column.server_default is not None
         and "now()" in str(getattr(column.server_default, "arg", "")).lower()
     ]
-    assert noisy == [], f"these render as (now()) and will break the gate: {noisy}"
+    assert noisy == [], f"these render as now() and can never match a reflected current_timestamp: {noisy}"

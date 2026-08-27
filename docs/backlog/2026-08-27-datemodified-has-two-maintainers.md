@@ -24,7 +24,9 @@
 
 After #222 the same five columns carry
 `server_default=CurrentTimestampOnUpdate()` plus `server_onupdate=FetchedValue()`,
-so the database maintains them for every writer on MySQL. The Python-side `onupdate` becomes a second mechanism doing the same
+so the database maintains them for every writer on MySQL. `Segmentation.DateModified`
+is the fifth column and already has no Python-side `onupdate` to remove; for the
+four above, that Python-side `onupdate` becomes a second mechanism doing the same
 job. Drop it, leaving the database as the single maintainer, and keep
 `server_onupdate=FetchedValue()` so the ORM still expires the attribute.
 
@@ -50,16 +52,17 @@ what an API returns, and #222 was already large.
 affected repository pins that a flush-only transaction serialises the value the
 database actually holds; the suite is green.
 
-## 2. Decide whether `Segmentation.Inactive` and `FormAnnotation.Inactive` want DDL defaults
+## 2. Decide whether `Annotation.Inactive`, `Segmentation.Inactive`, and `FormAnnotation.Inactive` want DDL defaults
 
 **Status:** open, low priority
 
 **What:** `ImageInstance.Inactive` and `ImageStorage.IsPrimary` carry DDL
-defaults on dev (`DEFAULT '0'` / `DEFAULT '1'`); `Segmentation.Inactive` and
-`FormAnnotation.Inactive` are `NOT NULL` with no default. #222 matches dev
-exactly rather than harmonising, so the inconsistency survives.
+defaults on dev (`DEFAULT '0'` / `DEFAULT '1'`); `Annotation.Inactive`,
+`Segmentation.Inactive`, and `FormAnnotation.Inactive` are `NOT NULL` with no
+default. #222 matches dev exactly rather than harmonising, so the
+inconsistency survives.
 
-**Why deferred:** adding a default to the latter two is a change to the database
-rather than a correction of drift, and nothing currently fails because of it —
-every writer names the column. Worth deciding deliberately rather than as a
-side effect of a drift fix.
+**Why deferred:** adding a default to the latter three is a change to the
+database rather than a correction of drift, and nothing currently fails
+because of it — every writer names the column. Worth deciding deliberately
+rather than as a side effect of a drift fix.
