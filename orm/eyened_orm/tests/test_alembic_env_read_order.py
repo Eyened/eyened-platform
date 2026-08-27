@@ -146,8 +146,15 @@ def test_online_configure_passes_render_item():
 def test_online_configure_compares_server_defaults():
     """Correcting the model spellings was what made this switchable on. Dropped,
     the schema drifts again and nothing fails -- which is how it drifted before."""
-    call = _configure_call(_module_ast(), "run_migrations_online")
-    assert _keyword_is_true(call, "compare_server_default"), (
+    tree = _module_ast()
+
+    assert _keyword_is_true(_configure_call(tree, "run_migrations_online"), "compare_server_default"), (
         "run_migrations_online()'s context.configure(...) no longer passes "
         "compare_server_default=True, so alembic check cannot see default drift"
+    )
+    assert not _keyword_is_true(
+        _configure_call(tree, "run_migrations_offline"), "compare_server_default"
+    ), (
+        "compare_server_default in run_migrations_offline is inert churn -- "
+        "autogenerate and check are online-only"
     )
