@@ -17,10 +17,10 @@
 
 | Model | Site |
 |---|---|
-| `AnnotationData` | `orm/eyened_orm/annotation.py:146` |
+| `AnnotationData` | `orm/eyened_orm/annotation.py:147` |
 | `FormAnnotation` | `orm/eyened_orm/form_annotation.py:83` |
-| `ImageInstance` | `orm/eyened_orm/image_instance.py:179` |
-| `ImageStorage` | `orm/eyened_orm/image_instance.py:404` |
+| `ImageStorage` | `orm/eyened_orm/image_instance.py:181` |
+| `ImageInstance` | `orm/eyened_orm/image_instance.py:410` |
 
 After #222 the same five columns carry
 `server_default=CurrentTimestampOnUpdate()` plus `server_onupdate=FetchedValue()`,
