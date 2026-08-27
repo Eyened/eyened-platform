@@ -32,7 +32,7 @@
         active: boolean;
         etdrsSchema: FormSchemaGET;
     }
-    let { etdrsSchema }: Props = $props();
+    let { active: panelActive, etdrsSchema }: Props = $props();
 
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
@@ -295,6 +295,11 @@
         }
     }
     let showHide = $derived(removeAutoOverlay ? Show : Hide);
+
+    // Collapse stops landmark editing (PointTool) but keeps grid overlays.
+    $effect(() => {
+        if (!panelActive) close();
+    });
 
     $effect(() => {
         if (selectedId === undefined) return;

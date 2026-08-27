@@ -146,4 +146,29 @@ describe("PanelETDRS", () => {
         await fireEvent.click(icons[0]!); // automatic show/hide
         await fireEvent.click(icons[1]!); // own overlay toggle
     });
+
+    it("deactivates PointTool on panel collapse but keeps grid overlays", async () => {
+        const disposers: ReturnType<typeof vi.fn>[] = [];
+        addOverlay.mockImplementation(() => {
+            const dispose = vi.fn();
+            disposers.push(dispose);
+            return dispose;
+        });
+
+        const { rerender } = render(PanelETDRS, {
+            props: { active: true, etdrsSchema: schema },
+            context: contexts,
+        } as never);
+
+        await fireEvent.click(screen.getByText("me"));
+        // open() → ensureOverlay (grid) then PointTool
+        expect(disposers.length).toBeGreaterThanOrEqual(2);
+        const gridDispose = disposers[0]!;
+        const toolDispose = disposers[disposers.length - 1]!;
+
+        await rerender({ active: false, etdrsSchema: schema });
+
+        expect(toolDispose).toHaveBeenCalled();
+        expect(gridDispose).not.toHaveBeenCalled();
+    });
 });
