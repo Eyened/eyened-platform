@@ -4,6 +4,9 @@ testpaths = [
     "server",
     "orm",
 ]
+markers = [
+    "mysql: needs a live MySQL database migrated to head (the schema-sync CI job)",
+]
 
 [tool.coverage.run]
 # "orm", NOT "orm/eyened_orm" -- do not narrow this, however much it looks like

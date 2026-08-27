@@ -99,9 +99,14 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           pip install -e ./orm
+          pip install pytest
       - name: Build the schema from empty
         working-directory: orm/migrations
         run: alembic upgrade head
       - name: Assert models and migrations agree
         working-directory: orm/migrations
         run: alembic check
+      - name: Prove the schema gates can fail
+        env:
+          EYENED_REQUIRE_MYSQL_TESTS: "1"
+        run: pytest orm/eyened_orm/tests/test_schema_gates_mysql.py -v
