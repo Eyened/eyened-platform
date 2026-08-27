@@ -75,7 +75,7 @@ class Study(Base):
     StudyDescription: Mapped[Optional[str]] = mapped_column(String(64))
     StudyDate: Mapped[datetime.date]
 
-    DateInserted: Mapped[datetime.datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime.datetime] = mapped_column(server_default=func.current_timestamp())
 
     Patient: Mapped["Patient"] = relationship(
         "eyened_orm.patient.Patient", back_populates="Studies", lazy="selectin"

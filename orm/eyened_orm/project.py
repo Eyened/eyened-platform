@@ -44,7 +44,7 @@ class Project(Base):
     ContactID: Mapped[Optional[int]] = mapped_column(ForeignKey("Contact.ContactID"))
     DOI: Mapped[Optional[str]] = mapped_column(String(255))
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Contact: Mapped[Optional["Contact"]] = relationship(
         "eyened_orm.project.Contact", back_populates="Projects"

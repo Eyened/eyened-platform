@@ -59,7 +59,7 @@ class Patient(Base):
         ForeignKey("Project.ProjectID", ondelete="CASCADE")
     )
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Project: Mapped["Project"] = relationship(
         "eyened_orm.project.Project", back_populates="Patients", lazy="selectin"

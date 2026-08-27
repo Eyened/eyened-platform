@@ -43,7 +43,7 @@ class TaskDefinition(Base):
     Tasks: Mapped[List["Task"]] = relationship(
         "eyened_orm.task.Task", back_populates="TaskDefinition"
     )
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
 
 class SubTaskState(Enum):
@@ -97,7 +97,7 @@ class TaskProject(Base):
         ),
         primary_key=True,
     )
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     # Needed to attach a declaration to a Task that is still pending: only the
     # relationship can carry TaskID across an INSERT that has not happened yet,
@@ -126,7 +126,7 @@ class Task(Base):
     )
     # TaskStateID: Mapped[Optional[int]] = mapped_column(ForeignKey("TaskState.TaskStateID"))
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Contact: Mapped[Optional["Contact"]] = relationship(
         "eyened_orm.project.Contact", back_populates="Tasks"

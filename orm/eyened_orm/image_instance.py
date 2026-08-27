@@ -19,6 +19,7 @@ from rtnls_fundusprep.cfi_bounds import CFIBounds
 from rtnls_fundusprep.transformation import ProjectiveTransform
 from sqlalchemy import (
     event,
+    FetchedValue,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -26,6 +27,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
     select,
+    text,
 )
 from sqlalchemy.dialects.mysql import BINARY, JSON, TEXT
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -35,7 +37,7 @@ from eyened_orm.data_access import get_data_access_adapter
 
 from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
-from .types import OptionalEnum
+from .types import CurrentTimestampOnUpdate, OptionalEnum
 
 logger = logging.getLogger(__name__)
 
@@ -172,11 +174,15 @@ class ImageStorage(Base):
     # Whether this is the primary storage location for the image
     # Each image instance can have multiple storage locations, but only one can be primary
     # This is currently not enforced in the database however
-    IsPrimary: Mapped[bool] = mapped_column(default=True)
+    IsPrimary: Mapped[bool] = mapped_column(default=True, server_default=text("1"))
 
     # Datetimes - automatically filled
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(
+        server_default=CurrentTimestampOnUpdate(),
+        server_onupdate=FetchedValue(),
+        onupdate=func.now(),
+    )
 
     ImageInstance: Mapped["ImageInstance"] = relationship(
         "eyened_orm.image_instance.ImageInstance",
@@ -362,7 +368,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     FDAIdentifier: Mapped[Optional[int]]
 
     # Considered removed from the database (soft delete)
-    Inactive: Mapped[bool] = mapped_column(default=False)
+    Inactive: Mapped[bool] = mapped_column(default=False, server_default=text("0"))
 
     # Fundus-specific columns
     # will be removed in the future, using Attributes instead
@@ -400,8 +406,12 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     )
 
     # Datetimes - automatically filled
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(
+        server_default=CurrentTimestampOnUpdate(),
+        server_onupdate=FetchedValue(),
+        onupdate=func.now(),
+    )
     # DatePreprocessed is the date and time the image was last preprocessed
     DatePreprocessed: Mapped[Optional[datetime]]
 

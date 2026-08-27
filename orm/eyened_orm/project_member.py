@@ -32,4 +32,4 @@ class ProjectMember(Base):
         ForeignKey("Project.ProjectID", ondelete="CASCADE"), primary_key=True
     )
     Role: Mapped[ProjectRole] = mapped_column(SAEnum(ProjectRole), nullable=False)
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
