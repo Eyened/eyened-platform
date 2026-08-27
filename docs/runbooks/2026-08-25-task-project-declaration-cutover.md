@@ -17,6 +17,11 @@ Check on the target database:
 | `SELECT @@GLOBAL.binlog_format` | `ROW`, unless you disable the binary log in step 3 — the backfills fail with ERROR 1665 under `STATEMENT` |
 | `SELECT @@SESSION.foreign_key_checks` | `1`. Never turn this off to go faster: the foreign keys are the point of the release, and added with checks off they are never validated against the rows already in the table |
 | free disk | at least the size of `ImageInstance`, plus 17% of the schema |
+| `eorm check-dangling-references` | `No dangling references (5 hops checked).` |
+
+**If the dangling-reference check is not clean.** Each line names a child table whose parent row is gone, and the `NOT NULL` column whose backfill would resolve to NULL because of it. Left alone, that row stops the chain at `MODIFY ... NOT NULL` with `ERROR 1138 Invalid use of NULL value` — which names no table, no column and no row — part-way into the window, with the schema half changed. Reconcile before step 1: delete the orphaned rows, or restore the parents they point at. The check is read-only, needs only `SELECT`, runs with the application up, and always exits 0 — read its output rather than branching on its status. It takes its connection from `eorm -e <env>`, on the application's own credentials: the DDL account below is not needed, and neither is the window.
+
+Expect it to be clean. Every hop it walks already carries an enforced foreign key with `ON DELETE CASCADE`, so ordinary writes cannot produce one of these rows. The route that stays open is a load with checks off: `mysqldump` output sets `FOREIGN_KEY_CHECKS=0`, so a violating row loads silently and stays. Run it against the restored copy you rehearse on as well as against the target.
 
 Alembic needs the `eyened_ddl` credentials; the server's `eyened_wr` holds no DDL rights. Run every Alembic command from `orm/migrations`, with `-x env_file=` before the subcommand. `upgrade` prompts for confirmation and raises `EOFError` without a TTY — run it interactively or set `EYENED_ALEMBIC_ASSUME_YES=1`.
 
@@ -79,6 +84,7 @@ Expect `2db0e63195db (head)` and a clean check.
 | Situation | Action |
 |---|---|
 | A migration fails part-way, or the run is interrupted | Every migration in the chain is re-runnable — each step is guarded by the state it would produce. Run `alembic current`, then `alembic upgrade head` again. If `current` names a revision you do not expect, restore and escalate. |
+| A migration aborts: `ERROR 1138 Invalid use of NULL value` | A row's parent is missing, so its backfill resolved to NULL and the `MODIFY ... NOT NULL` refused it. The error names no table, no column and no row: run `eorm check-dangling-references` for all three. It reads only columns that exist on both sides of the chain, so it works on the half-migrated schema you are now looking at. Reaching this means the check in *Before you start* was skipped, or the data changed after it. The column is added and backfilled but still nullable and the revision is not stamped, so the step is re-runnable: reconcile the rows, then `alembic upgrade head`. `2db0e63195db`'s gate does not cover this — it inner-joins `ImageInstance`, so an orphaned link is invisible to it and a clean gate is not evidence. |
 | `2db0e63195db` aborts: `N (task, project) pairs are reachable through the image links but not declared in TaskProject ... Reconcile first` | A writer was live during the chain, so step 1 did not hold. The gate runs before any DDL, so nothing is half-applied. Stop the writer and re-run `upgrade head`. |
 | `2db0e63195db` prints `NOTE: N declared (task, project) pairs no link uses` | Not an error, the migration continues. Those tasks become harder to see once the read path switches. Record and continue. |
 | A problem is found after step 7, with users back on | Restoring loses their writes. Weigh that against the defect and escalate — do not restore reflexively. |
