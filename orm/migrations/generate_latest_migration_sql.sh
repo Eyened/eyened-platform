@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# First word of the first line: revision ids are not necessarily hex, and
+# `alembic current` can trail extra text such as "(head)".
+current_rev=$(alembic current | awk '{print $1; exit}')
+# Get the latest head revision
+head_rev=$(alembic heads | awk '{print $1; exit}')
+
+if [ -z "$current_rev" ]; then
+  echo "Error: could not determine the current revision (is the target database reachable and stamped?)." >&2
+  exit 1
+fi
+
+# Generate SQL for migrations between the current revision and head
+if [ "$current_rev" != "$head_rev" ]; then
+  # Git cannot track an empty directory, so the script owns its output location
+  # rather than depending on one being there.
+  mkdir -p sql || exit 1
+  # Next to the destination, so the final mv is an atomic same-filesystem rename.
+  tmp_sql=$(mktemp sql/.latest_migration.sql.XXXXXX)
+  if echo 'y' | alembic upgrade "$current_rev:$head_rev" --sql > "$tmp_sql"; then
+    # mktemp makes it 600; the dump is not a secret, so give it the usual mode.
+    chmod 644 "$tmp_sql"
+    if mv "$tmp_sql" sql/latest_migration.sql; then
+      echo "SQL for the latest migration generated: sql/latest_migration.sql"
+    else
+      status=$?
+      rm -f "$tmp_sql"
+      echo "Error: mv failed (exit $status); sql/latest_migration.sql left unchanged." >&2
+      exit 1
+    fi
+  else
+    status=$?
+    rm -f "$tmp_sql"
+    echo "Error: alembic upgrade --sql failed (exit $status); sql/latest_migration.sql left unchanged." >&2
+    exit 1
+  fi
+else
+  echo "No new migrations to apply."
+fi

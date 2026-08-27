@@ -113,6 +113,26 @@ def test_the_confirmation_prompt_still_exists():
     )
 
 
+def test_the_confirmation_guard_writes_only_to_stderr():
+    """`upgrade --sql` sends SQL to stdout; a prompt there corrupts the first statement."""
+    tree = _module_ast()
+
+    for call in _module_level_calls(tree, "print"):
+        assert any(
+            kw.arg == "file" and ast.unparse(kw.value) == "sys.stderr"
+            for kw in call.keywords
+        ), (
+            f"the print(...) at line {call.lineno} has no file=sys.stderr, so its text "
+            "lands in the SQL that `alembic upgrade --sql` writes to stdout"
+        )
+
+    for call in _module_level_calls(tree, "input"):
+        assert not call.args, (
+            f"input(...) at line {call.lineno} passes a prompt argument, which Python "
+            "writes to stdout -- print it to sys.stderr and call input() bare"
+        )
+
+
 def test_online_configure_passes_render_item():
     """A correct renderer that nothing calls is worth nothing."""
     call = _configure_call(_module_ast(), "run_migrations_online")

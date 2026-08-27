@@ -101,18 +101,30 @@ When committing migrations to production:
 
 7. If the migration fails, recreate the test database and then repeat steps 4-6 until the migration is successful.
 
-8. The test database and test ORM are now in sync.
+8. The test database and test ORM are now in sync. To review the DDL a migration
+   will run, generate it from `orm/migrations`:
+   ```bash
+   ./generate_latest_migration_sql.sh
+   ```
+   It writes `sql/latest_migration.sql`, which is gitignored. Regenerate it when you
+   need it rather than committing a copy — a committed dump goes stale against the
+   revision chain and ends up describing a hop that no longer exists.
 
    :::caution
-   There is no offline SQL dump of a migration to store, and do not try to produce
-   one with `alembic upgrade <rev>:head --sql`. In offline mode `op.get_bind()` is
-   `None`, so any migration that reads the database before emitting DDL crashes with
-   `AttributeError: 'NoneType' object has no attribute 'scalar'`, and the crash looks
-   like a broken migration rather than an unsupported mode. Guarding the reads would
-   be worse than the crash: steps that *discover* live names or bounds — the
-   single-column foreign key a composite replaces, the `MIN`/`MAX` bounds a chunked
-   backfill loops over — would resolve to nothing and be silently omitted from the
-   generated file. Rehearse on a restored copy with `alembic upgrade head` instead.
+   This only works for migrations that emit DDL without reading the database first.
+   Offline, `op.get_bind()` returns a connection that renders statements instead of
+   executing them, so `execute()` yields `None` and any migration that introspects —
+   `_column_exists`, a strict `sql_mode` assertion, a chunked backfill's `MIN`/`MAX`
+   bounds, the live foreign key name a composite replaces — dies with
+   `AttributeError: 'NoneType' object has no attribute 'scalar'`. The script reports
+   the failure, exits non-zero, and leaves any previous `sql/latest_migration.sql`
+   untouched; it never writes a partial file.
+
+   Do not work around that by guarding the reads. Offline, the discovering steps
+   resolve to nothing, and the dump would silently omit the `DROP FOREIGN KEY`s and
+   backfill `UPDATE`s they were meant to produce — a file that looks complete and is
+   not. For migrations of that shape, rehearse on a restored copy with
+   `alembic upgrade head` instead.
    :::
 
 9. Push the changes on a branch with a convenient name that reflects the changes made. Submit a pull request. 
