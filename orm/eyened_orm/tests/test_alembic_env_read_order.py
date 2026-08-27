@@ -136,8 +136,8 @@ def test_the_confirmation_guard_writes_only_to_stderr():
 def test_online_configure_passes_render_item():
     """A correct renderer that nothing calls is worth nothing."""
     call = _configure_call(_module_ast(), "run_migrations_online")
-    assert _keyword_is_name(call, "render_item", "render_optional_enum"), (
+    assert _keyword_is_name(call, "render_item", "render_custom_item"), (
         "run_migrations_online()'s context.configure(...) does not pass "
-        "render_item=render_optional_enum; OptionalEnum columns would autogenerate as "
-        "code that cannot run"
+        "render_item=render_custom_item; OptionalEnum columns would autogenerate as "
+        "code the generated module cannot run, and ON UPDATE clauses would be dropped"
     )

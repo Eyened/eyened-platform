@@ -10,7 +10,7 @@ from alembic import context
 from eyened_orm import *
 from eyened_orm.base import Base
 from eyened_orm.config import load_database_settings
-from eyened_orm.utils.alembic_render import render_optional_enum
+from eyened_orm.utils.alembic_render import render_custom_item
 from eyened_orm.utils.env import env_flag_enabled, load_env_file
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -126,7 +126,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
-            render_item=render_optional_enum,
+            render_item=render_custom_item,
         )
         with context.begin_transaction():
             context.run_migrations()
