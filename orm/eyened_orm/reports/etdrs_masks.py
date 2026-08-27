@@ -129,7 +129,9 @@ class ETDRS_masks:
 
     @cached_property
     def distance_to_fovea(self):
-        return np.hypot(self.dx * self.resolution_x, self.dy * self.resolution_y)
+        dx = self.dx * self.resolution_x
+        dy = self.dy * self.resolution_y
+        return np.sqrt(dx * dx + dy * dy)
 
     @cached_property
     def total(self):
