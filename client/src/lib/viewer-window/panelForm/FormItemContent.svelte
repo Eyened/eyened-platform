@@ -72,8 +72,26 @@
         status = "loaded";
     });
 
+    async function flushPendingSave() {
+        saveTimeout = null;
+        // JSON body cannot be undefined — persist null for an omitted root value.
+        try {
+            await setFormAnnotationValue(form.id, value ?? null);
+            status = "synced";
+        } catch (e) {
+            console.error("Failed to save form annotation", e);
+            status = "error";
+            toast.error("Failed to save form annotation");
+        }
+    }
+
+    // Children (e.g. PointField) tear down first and may disarm→persist→onchange,
+    // which schedules a debounced save. Flush that pending write instead of
+    // cancelling it — otherwise edits within the debounce window are lost.
     onDestroy(() => {
-        if (saveTimeout) clearTimeout(saveTimeout);
+        if (!saveTimeout) return;
+        clearTimeout(saveTimeout);
+        void flushPendingSave();
     });
 
     async function onchange(next: unknown) {
@@ -92,18 +110,8 @@
         status = "saving";
 
         // Debounce: wait 500ms after last keystroke before saving.
-        // JSON body cannot be undefined — persist null for an omitted root value.
-        saveTimeout = setTimeout(async () => {
-            try {
-                await setFormAnnotationValue(form.id, value ?? null);
-                status = "synced";
-            } catch (e) {
-                console.error("Failed to save form annotation", e);
-                status = "error";
-                toast.error("Failed to save form annotation");
-            } finally {
-                saveTimeout = null;
-            }
+        saveTimeout = setTimeout(() => {
+            void flushPendingSave();
         }, 500);
     }
 
