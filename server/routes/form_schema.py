@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.get("/form-schemas", response_model=list[FormSchemaGET])
-async def list_form_schemas(
+def list_form_schemas(
     service: FormSchemaService = Depends(get_form_schema_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -19,7 +19,7 @@ async def list_form_schemas(
 
 
 @router.get("/form-schemas/{form_schema_id}", response_model=FormSchemaGET)
-async def get_form_schema(
+def get_form_schema(
     form_schema_id: int,
     service: FormSchemaService = Depends(get_form_schema_service),
     current_user: CurrentUser = Depends(get_current_user),
