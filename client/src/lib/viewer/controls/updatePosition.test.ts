@@ -6,10 +6,12 @@ import { UpdatePosition } from "./updatePosition";
 
 function makeEvent({
     shift,
+    buttons = 0,
     updatePosition = true,
     isTopViewer = false,
 }: {
     shift: boolean;
+    buttons?: number;
     updatePosition?: boolean;
     isTopViewer?: boolean;
 }) {
@@ -29,7 +31,7 @@ function makeEvent({
         },
     } as unknown as ViewerContext;
     const event = {
-        event: {} as PointerEvent,
+        event: { buttons } as PointerEvent,
         cursor: { x: 10, y: 20 },
         position: { x: 3, y: 4 },
         modifiers: { shift, ctrl: false, alt: false, meta: false },
@@ -77,5 +79,15 @@ describe("UpdatePosition", () => {
             y: 4,
             index: 7,
         });
+    });
+
+    it("does not update the linked cursor while dragging a top-row viewer", () => {
+        const { event, setPosition } = makeEvent({
+            shift: true,
+            buttons: 1,
+            isTopViewer: true,
+        });
+        control.pointermove(event);
+        expect(setPosition).not.toHaveBeenCalled();
     });
 });

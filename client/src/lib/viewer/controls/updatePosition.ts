@@ -13,6 +13,9 @@ export class UpdatePosition implements ViewerEventListener {
         if (!viewerContext.updatePosition) {
             return;
         }
+        if (e.event.buttons !== 0) {
+            return;
+        }
 
         const isTopViewer =
             viewerContext.viewerWindowContext.topViewers.get(image) ===
