@@ -6,7 +6,7 @@ from json import JSONDecodeError
 
 import httpxyz
 from eyened_orm.utils.pretty_settings import pretty_settings
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict, BaseSettings
 
 
@@ -142,6 +142,65 @@ class Settings(BaseSettings):
     jwt_cookie_name: str = "jwt_token"
     refresh_cookie_name: str = "refresh_token"
     gzip_minimum_size: int = 1024 * 1024
+
+    # Sizing the pool to the thread count is necessary but NOT sufficient: a
+    # request holds its connection across several threadpool hops (each sync
+    # dependency, the endpoint, response-model validation), so checkouts can
+    # exceed the thread count -- measured, 20 against 16. What the relation
+    # rules out is the gross case: anyio's own default is 40 threads, which
+    # against SQLAlchemy's default 5+10 pool would queue 25 on checkout.
+    # pool_timeout bounds the wait that remains.
+    threadpool_limit: int = Field(
+        default=16,
+        ge=1,
+        description="Threads this API worker runs sync handlers in.",
+    )
+    pool_size: int = Field(
+        default=16,
+        ge=1,
+        description="Persistent DB connections per API worker.",
+    )
+    max_overflow: int = Field(
+        default=4,
+        ge=0,
+        description="Extra burst connections above pool_size, for dependency-time checkouts.",
+    )
+    # Not part of the relation the validator below checks: it does not change
+    # how many connections exist, only how long a request waits for one before
+    # giving up. SQLAlchemy's own default is 30s, which for an API is a hang;
+    # 5s turns pool exhaustion into a fast, visible error.
+    pool_timeout: int = Field(
+        default=5,
+        ge=1,
+        description="Seconds a request waits for a free DB connection before failing.",
+    )
+
+    # Argon2 is memory-hard by design: this deployment's parameters cost 64 MiB
+    # and ~75ms per hash. While handlers ran on the event loop that cost was
+    # serialized by accident -- one hash at a time per worker. The threadpool
+    # removes that accident, and /auth/login and /auth/token need no credentials
+    # to reach, so without a bound an anonymous caller multiplies 64 MiB by
+    # threadpool_limit. 4 is ~256 MiB per worker, ~1 GiB at WORKERS=4. A value
+    # above threadpool_limit can never be reached.
+    password_hash_concurrency: int = Field(
+        default=4,
+        ge=1,
+        description="Concurrent Argon2 password hashes per API worker.",
+    )
+
+    @model_validator(mode="after")
+    def _threads_cannot_outnumber_connections(self) -> "Settings":
+        """Kept because it still catches a grossly undersized pool. It does not
+        guarantee a checkout never waits -- see the threadpool_limit comment."""
+        capacity = self.pool_size + self.max_overflow
+        if self.threadpool_limit > capacity:
+            raise ValueError(
+                f"threadpool_limit ({self.threadpool_limit}) exceeds pool capacity "
+                f"({self.pool_size} + {self.max_overflow} = {capacity}). The excess "
+                "threads would block in pool.connect() until pool_timeout. Raise "
+                "pool_size/max_overflow or lower threadpool_limit."
+            )
+        return self
 
     default_study_date: date = date(1970, 1, 1)
 

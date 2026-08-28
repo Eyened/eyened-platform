@@ -19,8 +19,11 @@ Target database: probe_user@database:3306/eyened_database. Proceed? [y/N] CREATE
 
 `orm/migrations/generate_latest_migration_sql.sh` hits this on every run --
 `echo 'y' | alembic upgrade "$current_rev:$head_rev" --sql > "$tmp_sql"` -- so
-`sql/latest_migration.sql` carries the prompt line as a prefix to its first
-statement today.
+the next run would write the prompt line as a prefix to the first statement of
+`sql/latest_migration.sql`. The committed file is clean (it starts with
+`ALTER TABLE ...`) only because it predates the guard: it was last written on
+2026-03-23 by `72788a42`. Do not read that clean file as evidence the defect is
+absent.
 
 ## Repair
 

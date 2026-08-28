@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import jwt
 from fastapi import Cookie, Depends, Header, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from eyened_orm import Creator
@@ -69,7 +70,7 @@ def verify_token(token: str) -> dict:
     return _decode_token_or_401(token)
 
 
-async def get_current_user(
+def get_current_user(
     authorization: str = Header(None),
     jwt_token: str = Cookie(None),
     refresh_token: str = Cookie(None),
@@ -78,20 +79,29 @@ async def get_current_user(
     """Get the current authenticated user from either Authorization header or cookies."""
     # Bypass authentication if disabled (development mode)
     if settings.public_auth_disabled:
-        # ensure_admin, not a bare lookup: the account is a data superuser only
-        # if it is an administrator, and any dump taken before cutover has
-        # IsAdmin false on every row. No password is passed, though: the
-        # bypass never authenticates with one, and passing a password through
-        # would overwrite any password an operator set on this account on
-        # every single request.
-        creator, _ = ensure_admin(
-            session,
-            settings.admin_username,
-            None,
-        )
-        return CurrentUser(
-            creator_id=creator.CreatorID, username=creator.CreatorName
-        )
+        # Read first, so the common case is a SELECT rather than ensure_admin's
+        # flush. ensure_admin is still what runs when the account is missing or
+        # is not an administrator: the bypass account is a data superuser only
+        # if it is one, and any dump taken before cutover has IsAdmin false on
+        # every row. No password is passed -- the bypass never authenticates
+        # with one, and passing one through would overwrite any password an
+        # operator set on this account.
+        #
+        # Deliberately not cached in a module global: caching the id saved no
+        # query (a fresh session per request means the lookup is a SELECT
+        # either way), stopped re-checking IsAdmin after the first request,
+        # and leaked across tests.
+        creator = session.scalars(
+            select(Creator).where(Creator.CreatorName == settings.admin_username)
+        ).first()
+        if creator is None or not creator.IsAdmin:
+            creator, _ = ensure_admin(session, settings.admin_username, None)
+        if creator.Inactive:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+        return CurrentUser(creator_id=creator.CreatorID, username=creator.CreatorName)
 
     # Try Authorization header first (for API clients)
     if authorization and authorization.startswith("Bearer "):

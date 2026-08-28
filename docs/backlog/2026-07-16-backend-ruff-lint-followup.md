@@ -2,7 +2,8 @@
 
 - **Source:** Descoped from issue #118 (backend test CI) during design/planning,
   2026-07-16. See [design spec](../superpowers/specs/2026-07-16-backend-ci-design.md).
-- **Related prior art:** PR #49 "WIP: Code linting checks" (unmerged ruff draft);
+- **Related prior art:** PR #49 "WIP: Code linting checks" — a ruff draft that is
+  now **closed unmerged**, so there is no branch waiting to be picked up;
   the frontend prettier sweep in `client-ci.yml` (its own dedicated effort, which
   surfaced real bugs).
 
@@ -33,6 +34,11 @@ on `development` @ 4a70c44):
   11 F821 undefined-name, 10 F541 f-string, plus E711/E402/F841/E722/F811/E712/E721.
   60 auto-fixable (`--fix`), 10 more with `--unsafe-fixes`.
 - `ruff format --check`: **121 files would be reformatted** (103 already clean).
+
+**Those figures are a 2026-07-16 snapshot and must be re-measured before the work
+is scoped.** `4a70c44` is the merge of #145; six substantial branches have landed
+on `development` since — #165, #171, #195, #208, #212, #216 — none of them under a
+lint gate.
 
 **How to approach (do NOT bulk `--fix`):**
 1. **Formatting PR (isolated, mechanical):** run `ruff format server orm` as one
