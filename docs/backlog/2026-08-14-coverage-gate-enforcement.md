@@ -1,7 +1,12 @@
 # Phase C — make the coverage gates block a merge
 
-**Status:** deferred by design. Phase A (this branch) ships measurement and
-advisory checks only.
+**Status:** open — deferred by design. Phase A (this branch) ships measurement
+and advisory checks only.
+
+## Source
+
+The final review of PR #208 "Patch-coverage gate for Python and the client
+(advisory)", merged 2026-08-18 as `cf97c5ce`.
 
 ## What is enforced today
 
@@ -20,10 +25,13 @@ to an existing, already-active ruleset.
 
 ## Open questions, to be answered with real PR data rather than in advance
 
-1. **Which of the three checks become required?** `Server CI / test`,
-   `Client CI / client`, `Client CI / coverage`. The client job split makes
-   requiring `client` without `coverage` a real option, which matters on a tree
-   with 17 test files where most frontend PRs will go red at first.
+1. **Which of the four checks become required?** `Server CI / test`,
+   `Server CI / schema-sync`, `Client CI / client`, `Client CI / coverage`. The
+   client job split makes requiring `client` without `coverage` a real option,
+   which matters on a tree with 17 test files where most frontend PRs will go
+   red at first. `schema-sync` arrived later, with PR #216 (2026-08-21), and is
+   arguably the strongest candidate of the four: it gates schema drift, not
+   coverage, so it has no ratchet to negotiate and no legitimate-exception case.
 2. **The legitimate-exception case.** A refactor that deletes code and its tests
    together can miss the floor for a good reason. Python has no way to fail
    coverage independently of tests, so an exception mechanism is a phase C
@@ -50,6 +58,10 @@ under-measures is a false assurance, so settle these first.
    prunes such subdirectories of a `source` root, so their files never reach
    `coverage.xml` and diff-cover skips them. `import_utils/__init__.py` was added
    for exactly this reason, but the next such directory will be invisible again.
+   One already exists: `orm/migrations/alembic/versions_archive/` has no
+   `__init__.py`, and `671de935` narrowed the diff-cover exclude to `versions/`
+   only, so that exclude no longer covers it either. UNCONFIRMED which of the two
+   mechanisms is the one hiding it — settling that needs a coverage run, not a read.
    The client side does not share this weakness — `vite.config.ts` uses `include`
    so never-imported files appear at 0% — so the two gates disagree on their
    central anti-vacuity property.
