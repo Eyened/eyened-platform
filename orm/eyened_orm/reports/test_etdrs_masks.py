@@ -43,6 +43,59 @@ def _per_field_summary(masks: ETDRS_masks, binary, fields, **kwargs):
     return result
 
 
+def test_rings_partition_3mm_grid():
+    masks = _masks()
+    np.testing.assert_array_equal(
+        masks.center | masks.inner | masks.outer, masks.grid
+    )
+    assert not (masks.center & masks.inner).any()
+    assert not (masks.center & masks.outer).any()
+    assert not (masks.inner & masks.outer).any()
+
+
+def test_ring_pixel_counts_pin_sqrt_distance_boundaries():
+    # Golden pin at resolution=0.075 / 200x200 / fovea (100,100).
+    # At this spacing, 12 Pythagorean-triple offsets sit exactly on the 1.5 mm
+    # ring boundary under np.sqrt(dx*dx + dy*dy); a hypot-based distance flips
+    # those pixels across rings on some NumPy builds. Counts are from the
+    # long-standing sqrt formulation and must stay stable.
+    masks = ETDRS_masks(
+        h=200, w=200, fovea_x=100, fovea_y=100, resolution=0.075, laterality="R"
+    )
+    assert int(masks.center.sum()) == 137
+    assert int(masks.inner.sum()) == 1108
+    assert int(masks.outer.sum()) == 3768
+    assert int(masks.grid.sum()) == 5013
+    np.testing.assert_array_equal(
+        masks.center | masks.inner | masks.outer, masks.grid
+    )
+    # Pixels at exact 1.5 mm (sqrt) belong to outer, not inner.
+    boundary_yx = [
+        (80, 100),
+        (84, 88),
+        (84, 112),
+        (88, 84),
+        (88, 116),
+        (100, 80),
+        (100, 120),
+        (112, 84),
+        (112, 116),
+        (116, 88),
+        (116, 112),
+        (120, 100),
+    ]
+    for y, x in boundary_yx:
+        assert masks.outer[y, x] and not masks.inner[y, x], (y, x)
+
+
+def test_grid_does_not_materialize_rings():
+    masks = _masks()
+    _ = masks.grid
+    assert "center" not in masks.__dict__
+    assert "inner" not in masks.__dict__
+    assert "outer" not in masks.__dict__
+
+
 def test_get_summary_matches_per_field_for_compact_lesions():
     masks = _masks()
     binary = np.zeros((200, 200), dtype=bool)
