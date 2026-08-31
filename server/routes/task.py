@@ -22,7 +22,7 @@ router = APIRouter()
 
 
 @router.post("/task", response_model=TaskGET)
-async def create_task(
+def create_task(
     dto: TaskPUT,
     service: TaskService = Depends(get_task_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -39,7 +39,7 @@ async def create_task(
 
 
 @router.get("/task", response_model=List[TaskGET])
-async def list_tasks(
+def list_tasks(
     include_projects: bool = False,
     service: TaskService = Depends(get_task_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -64,7 +64,7 @@ async def list_tasks(
 
 
 @router.get("/task/{task_id}", response_model=TaskGET)
-async def get_task(
+def get_task(
     task_id: int,
     service: TaskService = Depends(get_task_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -77,7 +77,7 @@ async def get_task(
 
 
 @router.patch("/task/{task_id}", response_model=TaskGET)
-async def patch_task(
+def patch_task(
     task_id: int,
     dto: TaskPATCH,
     service: TaskService = Depends(get_task_service),
@@ -98,7 +98,7 @@ async def patch_task(
 
 
 @router.delete("/task/{task_id}", status_code=204)
-async def delete_task(
+def delete_task(
     task_id: int,
     service: TaskService = Depends(get_task_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -114,7 +114,7 @@ async def delete_task(
     "/task/{task_id}/subtasks",
     response_model=Union[SubTasksWithImagesResponse, SubTasksResponse],
 )
-async def list_subtasks(
+def list_subtasks(
     task_id: int,
     with_images: bool = False,
     limit: int = 200,
@@ -155,7 +155,7 @@ async def list_subtasks(
     "/task/{task_id}/subtask/{subtask_index}",
     response_model=Union[SubTaskWithImagesGET, SubTaskGET],
 )
-async def get_subtask(
+def get_subtask(
     task_id: int,
     subtask_index: int,
     with_images: bool = False,

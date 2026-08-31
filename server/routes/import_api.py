@@ -115,7 +115,7 @@ class RunCfiModelsRequest(BaseModel):
 
 
 @router.post("/import/image", response_model=ImportResponse)
-async def import_single_image(
+def import_single_image(
     request: ImportRequest,
     session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
@@ -208,7 +208,7 @@ def _queue_rq_job(
 
 
 @router.post("/import/run_cfi_models", response_model=TaskResponse)
-async def enqueue_run_cfi_models(
+def enqueue_run_cfi_models(
     body: RunCfiModelsRequest,
     current_user: CurrentUser = Depends(get_current_user),
     images: ImageInstanceService = Depends(get_image_instance_service),
@@ -253,7 +253,7 @@ async def enqueue_run_cfi_models(
 
 
 @router.post("/import/run_cfi_amd", response_model=TaskResponse)
-async def enqueue_run_cfi_amd(
+def enqueue_run_cfi_amd(
     body: RunCfiAmdRequest,
     current_user: CurrentUser = Depends(get_current_user),
     images: ImageInstanceService = Depends(get_image_instance_service),
@@ -271,7 +271,7 @@ async def enqueue_run_cfi_amd(
 
 
 @router.post("/import/run_layer_segmentation", response_model=TaskResponse)
-async def enqueue_run_layer_segmentation(
+def enqueue_run_layer_segmentation(
     body: RunImageIdsJobRequest,
     current_user: CurrentUser = Depends(get_current_user),
     images: ImageInstanceService = Depends(get_image_instance_service),
@@ -292,7 +292,7 @@ async def enqueue_run_layer_segmentation(
 
 
 @router.post("/import/update_thumbnails", response_model=TaskResponse)
-async def post_import_update_thumbnails(
+def post_import_update_thumbnails(
     failed: bool = Query(
         False,
         description="Include images with empty ThumbnailPath (failed previous run), like ``eorm update-thumbnails --failed``.",
@@ -334,7 +334,7 @@ async def post_import_update_thumbnails(
 
 
 @router.post("/import/update_thumbnails_for_image_ids", response_model=TaskResponse)
-async def post_import_update_thumbnails_for_image_ids(
+def post_import_update_thumbnails_for_image_ids(
     body: UpdateThumbnailsForImageIdsRequest,
     current_user: CurrentUser = Depends(get_current_user),
     images: ImageInstanceService = Depends(get_image_instance_service),

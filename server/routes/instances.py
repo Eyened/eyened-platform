@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 @router.get("/instances/{instance_id}", response_model=ImageGET)
-async def get_instance(
+def get_instance(
     instance_id: int,
     with_segmentations: bool = False,
     with_form_annotations: bool = False,
@@ -42,7 +42,7 @@ async def get_instance(
 
 
 @router.get("/images/{image_id}", response_model=ImageGET)
-async def get_public_image(
+def get_public_image(
     image_id: str,
     with_segmentations: bool = False,
     with_form_annotations: bool = False,
@@ -74,7 +74,7 @@ def build_storage_redirect_response(path: str) -> Response:
 
 
 @router.get("/images/{image_id}/data")
-async def get_public_image_data(
+def get_public_image_data(
     image_id: str,
     index: Optional[int] = None,
     meta: bool = False,
@@ -93,7 +93,7 @@ async def get_public_image_data(
 
 
 @router.get("/images/{image_id}/thumbnail")
-async def get_public_image_thumbnail(
+def get_public_image_thumbnail(
     image_id: str,
     size: int = 144,
     _: bool = Depends(is_authenticated),
@@ -109,7 +109,7 @@ async def get_public_image_thumbnail(
 
 
 @router.post("/instances/{instance_id}/tags", response_model=TagMeta)
-async def tag_instance(
+def tag_instance(
     instance_id: str,
     body: ObjectTagPOST,
     service: ImageInstanceService = Depends(get_image_instance_service),
@@ -125,7 +125,7 @@ async def tag_instance(
 
 
 @router.patch("/instances/{instance_id}/tags/{tag_id}", response_model=TagMeta)
-async def patch_instance_tag(
+def patch_instance_tag(
     instance_id: str,
     tag_id: int,
     body: ObjectTagPATCH,
@@ -142,7 +142,7 @@ async def patch_instance_tag(
 
 
 @router.delete("/instances/{instance_id}/tags/{tag_id}", status_code=204)
-async def untag_instance(
+def untag_instance(
     instance_id: str,
     tag_id: int,
     service: ImageInstanceService = Depends(get_image_instance_service),

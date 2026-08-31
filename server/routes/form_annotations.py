@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Request, Response
+from starlette.concurrency import run_in_threadpool
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import ObjectTagPATCH, ObjectTagPOST, TagMeta
@@ -19,7 +20,7 @@ router = APIRouter()
 
 
 @router.post("/form-annotations", response_model=FormAnnotationGET)
-async def create_form_annotation(
+def create_form_annotation(
     annotation: FormAnnotationPUT,
     service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -32,7 +33,7 @@ async def create_form_annotation(
 
 
 @router.get("/form-annotations", response_model=List[FormAnnotationGET])
-async def get_form_annotations(
+def get_form_annotations(
     patient_id: Optional[int] = None,
     study_id: Optional[int] = None,
     image_id: Optional[str] = None,
@@ -53,7 +54,7 @@ async def get_form_annotations(
 
 
 @router.get("/form-annotations/{annotation_id}", response_model=FormAnnotationGET)
-async def get_form_annotation(
+def get_form_annotation(
     annotation_id: int,
     service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -64,7 +65,7 @@ async def get_form_annotation(
 
 
 @router.patch("/form-annotations/{annotation_id}", response_model=FormAnnotationGET)
-async def update_form_annotation(
+def update_form_annotation(
     annotation_id: int,
     annotation: FormAnnotationPATCH,
     service: FormAnnotationService = Depends(get_form_annotation_service),
@@ -79,7 +80,7 @@ async def update_form_annotation(
 
 
 @router.delete("/form-annotations/{annotation_id}", status_code=204)
-async def delete_form_annotation(
+def delete_form_annotation(
     annotation_id: int,
     service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -92,7 +93,7 @@ async def delete_form_annotation(
 
 
 @router.get("/form-annotations/{form_annotation_id}/value")
-async def get_form_annotation_value(
+def get_form_annotation_value(
     form_annotation_id: int,
     service: FormAnnotationService = Depends(get_form_annotation_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -110,7 +111,8 @@ async def update_form_annotation_value(
 ):
     """Overwrite a form annotation's FormData payload."""
     form_data = await request.json()
-    service.set_value(
+    await run_in_threadpool(
+        service.set_value,
         form_annotation_id,
         form_data,
     )
@@ -118,7 +120,7 @@ async def update_form_annotation_value(
 
 
 @router.post("/form-annotations/{annotation_id}/tags", response_model=TagMeta)
-async def tag_form_annotation(
+def tag_form_annotation(
     annotation_id: int,
     body: ObjectTagPOST,
     service: FormAnnotationService = Depends(get_form_annotation_service),
@@ -134,7 +136,7 @@ async def tag_form_annotation(
 
 
 @router.delete("/form-annotations/{annotation_id}/tags/{tag_id}", status_code=204)
-async def untag_form_annotation(
+def untag_form_annotation(
     annotation_id: int,
     tag_id: int,
     service: FormAnnotationService = Depends(get_form_annotation_service),
@@ -151,7 +153,7 @@ async def untag_form_annotation(
 @router.patch(
     "/form-annotations/{annotation_id}/tags/{tag_id}", response_model=TagMeta
 )
-async def patch_form_annotation_tag(
+def patch_form_annotation_tag(
     annotation_id: int,
     tag_id: int,
     body: ObjectTagPATCH,

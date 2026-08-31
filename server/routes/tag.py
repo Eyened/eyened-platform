@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.post("/tags", response_model=TagGET)
-async def create_tag(
+def create_tag(
     dto: TagPUT,
     service: TagService = Depends(get_tag_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -24,7 +24,7 @@ async def create_tag(
 
 
 @router.get("/tags", response_model=list[TagGET])
-async def list_tags(
+def list_tags(
     service: TagService = Depends(get_tag_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -33,7 +33,7 @@ async def list_tags(
 
 
 @router.patch("/tags/{tag_id}", response_model=TagGET)
-async def patch_tag(
+def patch_tag(
     tag_id: int,
     dto: TagPATCH,
     service: TagService = Depends(get_tag_service),
@@ -50,7 +50,7 @@ async def patch_tag(
 
 
 @router.delete("/tags/{tag_id}", status_code=204)
-async def delete_tag(
+def delete_tag(
     tag_id: int,
     service: TagService = Depends(get_tag_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -63,7 +63,7 @@ async def delete_tag(
 
 
 @router.post("/tags/{tag_id}/star", status_code=204)
-async def star_tag(
+def star_tag(
     tag_id: int,
     service: TagService = Depends(get_tag_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -76,7 +76,7 @@ async def star_tag(
 
 
 @router.delete("/tags/{tag_id}/star", status_code=204)
-async def unstar_tag(
+def unstar_tag(
     tag_id: int,
     service: TagService = Depends(get_tag_service),
     current_user: CurrentUser = Depends(get_current_user),

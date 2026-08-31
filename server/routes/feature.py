@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.get("/features", response_model=list[FeatureGET])
-async def list_features(
+def list_features(
     with_counts: bool = False,
     service: FeatureService = Depends(get_feature_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -22,7 +22,7 @@ async def list_features(
 
 
 @router.post("/features", response_model=FeatureGET)
-async def create_feature(
+def create_feature(
     dto: FeaturePUT,
     service: FeatureService = Depends(get_feature_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -36,7 +36,7 @@ async def create_feature(
 
 
 @router.get("/features/{feature_id}", response_model=FeatureGET)
-async def get_feature(
+def get_feature(
     feature_id: int,
     service: FeatureService = Depends(get_feature_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -46,7 +46,7 @@ async def get_feature(
 
 
 @router.patch("/features/{feature_id}", response_model=FeatureGET)
-async def patch_feature(
+def patch_feature(
     feature_id: int,
     dto: FeaturePATCH,
     service: FeatureService = Depends(get_feature_service),
@@ -62,7 +62,7 @@ async def patch_feature(
 
 
 @router.delete("/features/{feature_id}", status_code=204)
-async def delete_feature(
+def delete_feature(
     feature_id: int,
     service: FeatureService = Depends(get_feature_service),
     current_user: CurrentUser = Depends(get_current_user),

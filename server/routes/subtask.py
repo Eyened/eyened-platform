@@ -26,7 +26,7 @@ class AddImageRequest(BaseModel):
 @router.get(
     "/subtasks/{subtaskid}", response_model=Union[SubTaskWithImagesGET, SubTaskGET]
 )
-async def get_subtask(
+def get_subtask(
     subtaskid: int,
     with_images: bool = False,
     service: SubTaskService = Depends(get_subtask_service),
@@ -49,7 +49,7 @@ async def get_subtask(
         }
     },
 )
-async def patch_subtask(
+def patch_subtask(
     subtaskid: int,
     dto: SubTaskPATCH,
     service: SubTaskService = Depends(get_subtask_service),
@@ -66,7 +66,7 @@ async def patch_subtask(
 
 
 @router.delete("/subtasks/{subtaskid}", status_code=204)
-async def delete_subtask(
+def delete_subtask(
     subtaskid: int,
     service: SubTaskService = Depends(get_subtask_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -79,7 +79,7 @@ async def delete_subtask(
 
 
 @router.post("/subtasks/{subtaskid}/images", response_model=SubTaskWithImagesGET)
-async def add_subtask_image(
+def add_subtask_image(
     subtaskid: int,
     body: AddImageRequest,
     service: SubTaskService = Depends(get_subtask_service),
@@ -96,7 +96,7 @@ async def add_subtask_image(
 @router.delete(
     "/subtasks/{subtaskid}/images/{instance_id}", response_model=SubTaskWithImagesGET
 )
-async def remove_subtask_image(
+def remove_subtask_image(
     subtaskid: int,
     instance_id: str,
     service: SubTaskService = Depends(get_subtask_service),

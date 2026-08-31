@@ -10,7 +10,8 @@ the API). The plan it came from is a working document that is not tracked in
 this repository, so it is named here rather than linked.
 
 Measured on the shared dev MySQL 8.0.27 (`eyened-gpu:8983`) on 2026-08-07, with
-read-only `EXPLAIN ANALYZE` / `SELECT` only. The plan's Task 12 block originally
+read-only `EXPLAIN ANALYZE` / `SELECT` only; row counts, table sizes and timings
+re-measured the same way on 2026-08-24. The plan's Task 12 block originally
 mandated two covering indexes as the fix; that mandate was removed after this
 analysis, and the block now points here.
 
@@ -28,48 +29,56 @@ NOT EXISTS (SELECT 1 FROM TaskProject tp
             WHERE tp.TaskID = t.TaskID AND tp.ProjectID NOT IN (:accessible))
 ```
 
-The map is **43 rows** today. It grows with tasks × projects-per-task, not with
-images.
+The map is **108 rows** today (2026-08-24). It grows with tasks × projects-per-task,
+not with images — but note it was 43 rows on 2026-08-07, so it has grown 2.5× in
+17 days. "Small and slow-growing" is half of this item's argument; re-check the
+count rather than inheriting it.
 
 ## Why
 
 Once task reads are scoped, the predicate costs **O(total `SubTaskImageLink`
 rows) per request** for every non-administrator, independent of how many tasks
 the caller can see and of `LIMIT`. (An administrator pays nothing: `apply_scope`
-returns the statement untouched. And nothing pays it *today* — no repository
-applies this predicate yet, so the figures below were measured by running it by
-hand, not by timing a live endpoint.) MySQL decorrelates the `NOT EXISTS`, dropping the `sib.TaskID = t.TaskID`
+returns the statement untouched. Everyone else pays it now — when this was written
+no repository applied the predicate, but `TaskRepository.list_all`
+(`orm/eyened_orm/repositories/task_repository.py:86`) does, so the task listing is
+a live cost. The figures below are still the predicate run by hand, not a timed
+endpoint.) MySQL decorrelates the `NOT EXISTS`, dropping the `sib.TaskID = t.TaskID`
 correlation, so it computes the task→project map for *every* task, materializes it
 with deduplication, and then antijoins. The antijoin itself is free
 (`Single-row index lookup on <subquery2>`, 0.000 ms/row); the whole cost is the one
 materialization. That is why the figure is the same whether the outer table is
-`Task` (46 rows) or `SubTask` (19,207), and why `LIMIT 50` does not help.
+`Task` (48 rows) or `SubTask` (21,207), and why `LIMIT 50` does not help.
 
-Measured baseline, three warm runs: **1,640 / 1,672 / 1,653 ms**. Per-hop
-increments, all driving the same 85,454 loops:
+Re-measured 2026-08-24, three warm runs, under the 2 GB buffer pool: **311 / 315 /
+317 ms**. (It was 1,640 / 1,672 / 1,653 ms on 2026-08-07 under MySQL's 128 MB
+default — see "Separate" below; that is the whole difference.) Per-hop increments,
+all driving the same 87,454 loops, table sizes as data+index:
 
 | hop | table size | increment |
 |---|---|---|
-| `SubTask` → `SubTaskImageLink` | 4 MB | 72 ms |
-| → `ImageInstance` (PK) | 909 MB | **+955 ms** |
-| → `Series` (PK) | 123 MB | **+448 ms** |
-| → `Study` (PK) | 11 MB | +64 ms |
-| → `Patient` (PK) | 7 MB | +71 ms |
+| `SubTask` → `SubTaskImageLink` | 11 MB | 44 ms |
+| → `ImageInstance` (PK) | 1,932 MB | **+150 ms** |
+| → `Series` (PK) | 419 MB | **+85 ms** |
+| → `Study` (PK) | 39 MB | ~0 ms |
+| → `Patient` (PK) | 17 MB | +30 ms |
 
-Cost tracks **table size, not row count** — `Study` does the same 85,454 clustered
-lookups over 210k rows in 64 ms. The variable is whether the table fits in cache;
-see the buffer-pool note below.
+Cost still tracks **table size, not row count** — `Study` does the same 87,454
+clustered lookups over 210k rows and is now free, because at 39 MB it is resident.
+The variable is whether the table fits in cache, which is why the one table that
+does not fit still dominates.
 
-**The growth argument is the reason this is worth doing.** Constant-factor fixes
-(buffer pool, covering indexes) buy roughly 5–8× and 4–5× respectively. The cost is
-linear in `SubTaskImageLink`, so one order of magnitude of data growth consumes the
-entire budget:
+**The growth argument is the reason this is worth doing**, and it is now stronger,
+because half the constant-factor budget has already been spent. The buffer pool was
+predicted to buy 5–8×; it bought 5.3× and is done. Covering indexes are the only
+constant-factor lever left, worth an estimated 4–5×. The cost is linear in
+`SubTaskImageLink`, so one order of magnitude of data growth consumes what remains:
 
-| `SubTaskImageLink` rows | today | with both constant-factor fixes (est.) |
+| `SubTaskImageLink` rows | today (2 GB pool) | with covering indexes too (est.) |
 |---|---|---|
-| 85k (now) | 1.6 s | ~0.2 s |
-| 850k (10×) | ~16 s | ~2 s |
-| 8.5M (100×) | ~160 s | ~20 s |
+| 87k (now) | 0.31 s | ~0.07 s |
+| 870k (10×) | ~3.1 s | ~0.7 s |
+| 8.7M (100×) | ~31 s | ~7 s |
 
 A materialized map changes the complexity class instead of the constant, and stays
 sub-millisecond at every row count above.
@@ -98,6 +107,10 @@ never hand-written).
 
 ## Rejected alternatives, with evidence
 
+Both were measured on 2026-08-07 under the old 128 MB buffer pool, so read the two
+absolute figures below as ratios against the 1.6 s baseline of that day, not against
+the 0.31 s one above. Neither conclusion depends on the constant.
+
 - **Two covering indexes** `ImageInstance (ImageInstanceID, SeriesID)` and
   `Series (SeriesID, StudyID)`. The mechanism is sound — `ImageInstance` already
   carries `fk_ImageInstance_Series1_idx (SeriesID)`, which InnoDB stores as
@@ -114,23 +127,17 @@ never hand-written).
   SQL text is not a lever here. The plan's "do not restructure the predicate"
   instruction is correct and now proven.
 
-## Separate, do regardless
+## Separate, do regardless — DONE
 
-**`innodb_buffer_pool_size` is 128 MB** — MySQL's untouched default — against a
-5.3 GB database, a 909 MB `ImageInstance`, and a 62 GB host with 35 GB free. All
-8,192 pages allocated, zero free. Nothing in `database/docker-compose.yaml` sets it.
-
-This is misconfiguration rather than a tuning choice, it is free, it needs no code
-or migration, and it helps every query in the system — but it belongs to the
-deployment work, not to this item, and it does **not** substitute for the
-materialized map (see the growth table).
-
-⚠️ Changing it restarts a container shared with other users' workloads on this host;
-coordinate before doing it.
+The buffer pool is off MySQL's 128 MB default: `c9fcb56f` (2026-08-18) set
+`--innodb-buffer-pool-size=${EYENED_DATABASE_BUFFER_POOL_SIZE:-2G}` in
+`database/docker-compose.yaml`, documented in `database/.env.example` and
+`database/README.md`. The live server reports 2147483648. It did **not** substitute
+for the materialized map — see the growth table.
 
 ## Before committing to any of this
 
-Every number here describes an 85,454-link snapshot. Generate a 10× dataset on a
+Every number here describes an 87,454-link snapshot. Generate a 10× dataset on a
 non-shared instance and re-measure before implementing — it is cheap to falsify the
 extrapolation, and better done now than after a migration. Add a latency-budget
 assertion on the tasks listing either way, so the cliff surfaces as a failing check
