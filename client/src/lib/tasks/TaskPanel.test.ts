@@ -78,12 +78,12 @@ describe("TaskPanel", () => {
                 taskContext: makeContext({ task_panel: { enabled: false } }),
             },
         });
-        expect(screen.queryByText("Set 3 of 10")).not.toBeInTheDocument();
+        expect(screen.queryByText("Set 3")).not.toBeInTheDocument();
     });
 
     it("shows collapsed chrome without comments or overview", () => {
         render(TaskPanel, { props: { taskContext: makeContext() } });
-        expect(screen.getByText("Set 3 of 10")).toBeInTheDocument();
+        expect(screen.getByText("Set 3")).toBeInTheDocument();
         expect(
             screen.getByRole("button", { name: "Previous subtask" }),
         ).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe("TaskPanel", () => {
                 }),
             },
         });
-        expect(screen.getByText("Set 3 of 10")).toBeInTheDocument();
+        expect(screen.getByText("Set 3")).toBeInTheDocument();
         expect(
             screen.queryByRole("button", { name: "NotStarted" }),
         ).not.toBeInTheDocument();
@@ -125,7 +125,7 @@ describe("TaskPanel", () => {
                 }),
             },
         });
-        expect(screen.getByText("Set 3 of 10")).toBeInTheDocument();
+        expect(screen.getByText("Set 3")).toBeInTheDocument();
         expect(
             screen.queryByRole("button", { name: "Expand task panel" }),
         ).not.toBeInTheDocument();

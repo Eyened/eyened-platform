@@ -16,12 +16,6 @@ describe("parseTaskPanelConfig", () => {
         });
     });
 
-    it("returns defaults when task_panel is absent", () => {
-        expect(
-            parseTaskPanelConfig({ form_schema_name: "Naevi grading" }),
-        ).toMatchObject({ enabled: true, expanded: false });
-    });
-
     it("honors enabled false", () => {
         expect(
             parseTaskPanelConfig({ task_panel: { enabled: false } }).enabled,

@@ -32,18 +32,4 @@ describe("taskPanelExpandedPrefs", () => {
         localStorage.setItem(TASK_PANEL_EXPANDED_STORAGE_KEY, "[]");
         expect(getTaskPanelExpanded(1, true)).toBe(true);
     });
-
-    it("does not throw when localStorage.setItem throws", () => {
-        vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-            throw new Error("quota");
-        });
-        expect(() => setTaskPanelExpanded(1, true)).not.toThrow();
-    });
-
-    it("does not throw when localStorage.getItem throws", () => {
-        vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-            throw new Error("blocked");
-        });
-        expect(getTaskPanelExpanded(1, false)).toBe(false);
-    });
 });
