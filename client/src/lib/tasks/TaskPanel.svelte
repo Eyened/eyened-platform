@@ -139,6 +139,7 @@
                             <Button
                                 variant={isActive ? "default" : "outline"}
                                 size="sm"
+                                disabled={isUpdatingState}
                                 onclick={() => !isActive && setState(state)}
                                 aria-pressed={isActive}
                                 class={isActive ? "font-semibold" : ""}
