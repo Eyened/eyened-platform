@@ -3,7 +3,11 @@ export const TASK_PANEL_EXPANDED_STORAGE_KEY = "eyened:taskPanelExpanded";
 type ExpandedMap = Record<string, boolean>;
 
 function canUseStorage(): boolean {
-    return typeof localStorage !== "undefined";
+    try {
+        return typeof localStorage !== "undefined";
+    } catch {
+        return false;
+    }
 }
 
 function readAll(): ExpandedMap {
