@@ -131,9 +131,9 @@ Task-specific form selection is configured on **`TaskDefinition.TaskConfig`**, n
 |-------|---------|
 | `form_schema_name` | `FormSchema.SchemaName` to pre-select in the Form panel when the task is active (clinical forms only; builtin ETDRS and registration schemas are excluded) |
 | `form_image_scope` | When `true`, list only form annotations for the current image |
-| `task_panel.enabled` | When `false`, hide the grading task column. Default `true` |
+| `task_panel.enabled` | When `false`, hide the grading task column. Default `true`. Hiding the panel removes in-app prev/next and status controls; graders must navigate another way |
 | `task_panel.expanded` | Default expanded vs collapsed when the grader has no stored preference. Default `false` (collapsed) |
-| `task_panel.sections.*` | Independently show `title`, `nav`, `status`, `comments`, `overview`. Each defaults to `true`. Missing `task_panel` means the panel is on with all sections, collapsed. Expand/collapse is stored in the browser per task |
+| `task_panel.sections.*` | Independently show `title`, `nav`, `status`, `comments`, `overview`. Each defaults to `true`. Missing `task_panel` means the panel is on with all sections, collapsed. Expand/collapse is stored in the browser per task. Hiding `nav` removes prev/next from the grading window |
 
 Example task import row (see **[Importer — tasks](/eyened-platform/orm/importer)**):
 

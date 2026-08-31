@@ -5,6 +5,7 @@ import TaskPanel from "./TaskPanel.svelte";
 import type { TaskContext } from "./TaskContext.svelte";
 import type { TaskGET, SubTaskWithImagesGET } from "../../types/openapi_types";
 import { TASK_PANEL_EXPANDED_STORAGE_KEY } from "./taskPanelExpandedPrefs";
+import { toast } from "svelte-sonner";
 
 const updateSubTask = vi.fn().mockResolvedValue({});
 const updateSubTaskComments = vi.fn().mockResolvedValue({});
@@ -66,6 +67,9 @@ describe("TaskPanel", () => {
         localStorage.clear();
         updateSubTask.mockClear();
         updateSubTaskComments.mockClear();
+        updateSubTask.mockResolvedValue({});
+        updateSubTaskComments.mockResolvedValue({});
+        vi.mocked(toast.error).mockClear();
     });
 
     it("renders nothing when enabled is false", () => {
@@ -105,6 +109,7 @@ describe("TaskPanel", () => {
                 }),
             },
         });
+        expect(screen.getByText("Set 3 of 10")).toBeInTheDocument();
         expect(
             screen.queryByRole("button", { name: "NotStarted" }),
         ).not.toBeInTheDocument();
@@ -120,6 +125,7 @@ describe("TaskPanel", () => {
                 }),
             },
         });
+        expect(screen.getByText("Set 3 of 10")).toBeInTheDocument();
         expect(
             screen.queryByRole("button", { name: "Expand task panel" }),
         ).not.toBeInTheDocument();
@@ -172,5 +178,23 @@ describe("TaskPanel", () => {
         const textarea = screen.getByPlaceholderText("Add comments...");
         await fireEvent.change(textarea, { target: { value: "updated" } });
         expect(updateSubTaskComments).toHaveBeenCalledWith(7, "updated");
+    });
+    it("shows a toast when status update fails", async () => {
+        updateSubTask.mockRejectedValueOnce(new Error("network"));
+        render(TaskPanel, { props: { taskContext: makeContext() } });
+        await fireEvent.click(screen.getByRole("button", { name: "Busy" }));
+        expect(toast.error).toHaveBeenCalledWith("Error: network");
+    });
+
+    it("shows a toast when comments update fails", async () => {
+        localStorage.setItem(
+            TASK_PANEL_EXPANDED_STORAGE_KEY,
+            JSON.stringify({ "42": true }),
+        );
+        updateSubTaskComments.mockRejectedValueOnce(new Error("save failed"));
+        render(TaskPanel, { props: { taskContext: makeContext() } });
+        const textarea = screen.getByPlaceholderText("Add comments...");
+        await fireEvent.change(textarea, { target: { value: "updated" } });
+        expect(toast.error).toHaveBeenCalledWith("Error: save failed");
     });
 });
