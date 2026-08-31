@@ -186,7 +186,7 @@ def get_subtask(
     "/task/{task_id}/subtask-assignees",
     response_model=List[CreatorMeta],
 )
-async def list_subtask_assignees(
+def list_subtask_assignees(
     task_id: int,
     service: TaskService = Depends(get_task_service),
     current_user: CurrentUser = Depends(get_current_user),
