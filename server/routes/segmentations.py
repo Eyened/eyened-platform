@@ -59,6 +59,9 @@ def _segmentation_data_response(arr: Optional[np.ndarray], filename: str) -> Res
     return Response(content=gz, media_type="application/octet-stream", headers=headers)
 
 
+# Must stay `async def`: the segmentation store has no write lock, and the
+# event loop is the only thing serializing zarr access within a worker. In
+# the threadpool, concurrent writes silently lose annotation data.
 @router.post("/segmentations", response_model=SegmentationGET)
 async def create_segmentation(
     metadata: Annotated[str, Form()],
@@ -88,7 +91,7 @@ async def create_segmentation(
 
 
 @router.get("/segmentations/{segmentation_id}", response_model=SegmentationGET)
-async def get_segmentation(
+def get_segmentation(
     segmentation_id: int,
     service: SegmentationService = Depends(get_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -98,7 +101,7 @@ async def get_segmentation(
 
 
 @router.delete("/segmentations/{segmentation_id}", status_code=204)
-async def delete_segmentation(
+def delete_segmentation(
     segmentation_id: int,
     service: SegmentationService = Depends(get_segmentation_service),
     current_user: CurrentUser = Depends(get_current_user),
@@ -109,6 +112,9 @@ async def delete_segmentation(
     return Response(status_code=204)
 
 
+# Must stay `async def`: the segmentation store has no write lock, and the
+# event loop is the only thing serializing zarr access within a worker. In
+# the threadpool, concurrent writes silently lose annotation data.
 @router.put("/segmentations/{segmentation_id}/data")
 async def update_segmentation_data(
     segmentation_id: int,
@@ -132,6 +138,9 @@ async def update_segmentation_data(
     )
 
 
+# Must stay `async def`: the segmentation store has no write lock, and the
+# event loop is the only thing serializing zarr access within a worker. In
+# the threadpool, concurrent writes silently lose annotation data.
 @router.get("/segmentations/{segmentation_id}/data")
 async def get_segmentation_data(
     segmentation_id: int,
@@ -145,7 +154,7 @@ async def get_segmentation_data(
 
 
 @router.patch("/segmentations/{segmentation_id}", response_model=SegmentationGET)
-async def patch_segmentation(
+def patch_segmentation(
     segmentation_id: int,
     dto: SegmentationPATCH,
     service: SegmentationService = Depends(get_segmentation_service),
@@ -161,7 +170,7 @@ async def patch_segmentation(
 
 
 @router.post("/segmentations/{segmentation_id}/tags", response_model=TagMeta)
-async def tag_segmentation(
+def tag_segmentation(
     segmentation_id: int,
     body: ObjectTagPOST,
     service: SegmentationService = Depends(get_segmentation_service),
@@ -176,7 +185,7 @@ async def tag_segmentation(
 
 
 @router.delete("/segmentations/{segmentation_id}/tags/{tag_id}", status_code=204)
-async def untag_segmentation(
+def untag_segmentation(
     segmentation_id: int,
     tag_id: int,
     service: SegmentationService = Depends(get_segmentation_service),
@@ -190,6 +199,9 @@ async def untag_segmentation(
     return Response(status_code=204)
 
 
+# Must stay `async def`: the segmentation store has no write lock, and the
+# event loop is the only thing serializing zarr access within a worker. In
+# the threadpool, concurrent writes silently lose annotation data.
 @router.get("/model-segmentations/{model_segmentation_id}/data")
 async def get_model_segmentation_data(
     model_segmentation_id: int,
@@ -202,6 +214,9 @@ async def get_model_segmentation_data(
     return _segmentation_data_response(arr, "model_segmentation.npy.gz")
 
 
+# Must stay `async def`: the segmentation store has no write lock, and the
+# event loop is the only thing serializing zarr access within a worker. In
+# the threadpool, concurrent writes silently lose annotation data.
 @router.put("/model-segmentations/{model_segmentation_id}/data")
 async def update_model_segmentation_data(
     model_segmentation_id: int,

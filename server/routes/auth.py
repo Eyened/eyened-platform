@@ -16,6 +16,7 @@ from eyened_orm import Creator, CreatorTagLink
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.repositories.creator_repository import CreatorRepository
 from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
+from server.services.password_hashing import password_hash_capacity
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
 from fastapi.params import Query
 
@@ -199,9 +200,12 @@ def check_login(username: str, password: str, db: Session) -> Creator:
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
 
-    # Verify password using Argon2 hash
-    if creator.PasswordHash and verify_password(password, creator.PasswordHash):
-        return creator
+    # Verify password using Argon2 hash. Gated: this is the one hashing site an
+    # unauthenticated caller reaches, so it is the one that can be amplified.
+    if creator.PasswordHash:
+        with password_hash_capacity():
+            if verify_password(password, creator.PasswordHash):
+                return creator
 
     # Legacy password hash support (for migration)
     if creator.Password:
@@ -211,7 +215,8 @@ def check_login(username: str, password: str, db: Session) -> Creator:
         if old_hash == creator.Password:
             # Migrate to new hash. The mutation stays pending here; get_db commits
             # it at the request boundary.
-            creator.PasswordHash = hash_password(password)
+            with password_hash_capacity():
+                creator.PasswordHash = hash_password(password)
             creator.Password = None
             AuditService(db, enabled=settings.db_log.enabled).record(
                 action="UPDATE",
@@ -229,7 +234,7 @@ def check_login(username: str, password: str, db: Session) -> Creator:
 
 # API endpoints
 @router.post("/auth/login", response_model=UserResponse)
-async def login(
+def login(
     user_data: TokenLoginRequest,  # Changed from UserLogin to TokenLoginRequest
     response: Response,
     session: Session = Depends(get_db),
@@ -276,7 +281,7 @@ async def login(
 
 
 @router.post("/auth/token", response_model=TokenResponse)
-async def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
+def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
     """Get access token for API clients."""
     creator = check_login(user_data.username, user_data.password, session)
 
@@ -291,7 +296,7 @@ async def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
 
 
 @router.get("/auth/me", response_model=UserResponse)
-async def get_current_user_info(
+def get_current_user_info(
     current_user: CurrentUser = Depends(get_current_user),
     session: Session = Depends(get_db),
 ):
@@ -300,7 +305,7 @@ async def get_current_user_info(
 
 
 @router.post("/auth/change-password", response_model=UserResponse)
-async def change_password(
+def change_password(
     change_password_data: ChangePasswordRequest,
     session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
@@ -313,7 +318,8 @@ async def change_password(
 
     # Set new password using Argon2. The mutation stays pending here; get_db
     # commits it at the request boundary.
-    creator.PasswordHash = hash_password(change_password_data.new_password)
+    with password_hash_capacity():
+        creator.PasswordHash = hash_password(change_password_data.new_password)
     creator.Password = None  # Clear old hash if it exists
 
     audit.record(
@@ -328,14 +334,19 @@ async def change_password(
 
 
 @router.post("/auth/register", response_model=UserResponse)
-async def register_user(
+def register_user(
     user_data: UserLogin,
     session: Session = Depends(get_db),
     audit: AuditService = Depends(get_audit_service),
 ):
     """Register a new user."""
     try:
-        new_user = create_user(session, user_data.username, user_data.password)
+        # The gate spans create_user's uniqueness query as well as its hash,
+        # because the hash happens inside it. Register is a rare write path, so
+        # holding a hashing slot across one indexed SELECT is not worth
+        # restructuring the ORM helper to avoid.
+        with password_hash_capacity():
+            new_user = create_user(session, user_data.username, user_data.password)
     except ValueError as err:
         # create_user only rejects an already-taken username. Uncaught, this
         # reached main.py's blanket handler as a 500, which made an
@@ -358,7 +369,7 @@ async def register_user(
 
 
 @router.post("/auth/refresh", response_model=UserResponse)
-async def refresh_token(
+def refresh_token(
     response: Response,
     refresh_token: str = Cookie(None),
     session: Session = Depends(get_db),
@@ -424,7 +435,7 @@ async def refresh_token(
 
 # Update logout to clear both cookies
 @router.post("/auth/logout")
-async def logout(response: Response):
+def logout(response: Response):
     """Logout and clear both JWT cookies."""
     response.delete_cookie(settings.jwt_cookie_name)
     response.delete_cookie(settings.refresh_cookie_name)

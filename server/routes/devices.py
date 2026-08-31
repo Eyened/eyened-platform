@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.get("/devices", response_model=list[DeviceModelGET])
-async def list_devices(
+def list_devices(
     service: DeviceService = Depends(get_device_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
