@@ -4,6 +4,7 @@ import type {
     ImageGET,
     PatientDetailGET,
     StudyGET,
+    CreatorMeta,
     SubTaskWithImagesGET,
     TagGET,
     TaskGET,
@@ -12,6 +13,7 @@ import {
     ApiError,
     api,
     isUnauthorizedStatus,
+    messageFromApiErrorBody,
     withAuthRetry,
 } from "../api/client";
 import {
@@ -45,10 +47,12 @@ function handleResponse<T>(
     if (res.error || isUnauthorizedStatus(res.response.status)) {
         // Auth errors may surface as status only (fetch retried once at HTTP layer).
         // withAuthRetry on callers can refresh and run the operation again.
-        throw new ApiError(
-            res.response.status,
-            `Failed to ${operation}: ${res.response.status}`,
+        const fallback = `Failed to ${operation}: ${res.response.status}`;
+        const { message, detail } = messageFromApiErrorBody(
+            res.error,
+            fallback,
         );
+        throw new ApiError(res.response.status, message, detail);
     }
     return res.data as T;
 }
@@ -479,6 +483,8 @@ export async function fetchSubTasks(params: {
     limit?: number;
     page?: number;
     subtask_status?: string;
+    unassigned?: boolean;
+    creator_id?: number;
 }): Promise<any> {
     const data = await apiGet<any>("/task/{task_id}/subtasks" as any, {
         params: {
@@ -488,6 +494,8 @@ export async function fetchSubTasks(params: {
                 limit: params.limit ?? 20,
                 page: params.page ?? 0,
                 subtask_status: params.subtask_status,
+                unassigned: params.unassigned || undefined,
+                creator_id: params.creator_id,
             },
         } as any,
     });
@@ -497,11 +505,28 @@ export async function fetchSubTasks(params: {
     return data;
 }
 
+export async function fetchSubTaskAssignees(
+    task_id: number,
+): Promise<CreatorMeta[]> {
+    const res = await apiInvoke(
+        () =>
+            api.GET("/task/{task_id}/subtask-assignees", {
+                params: { path: { task_id } },
+            }),
+        "fetch task subtask assignees",
+    );
+    return res.data ?? [];
+}
+
 // ===== SubTask Update Functions =====
 
 export async function updateSubTask(
     subtask_id: number,
-    patch: { task_state?: any; comments?: string | null },
+    patch: {
+        task_state?: any;
+        comments?: string | null;
+        claim?: boolean;
+    },
 ): Promise<any> {
     const data = await apiPatch<any>("/subtasks/{subtaskid}" as any, {
         params: { path: { subtaskid: Number(subtask_id) } } as any,

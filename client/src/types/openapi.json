@@ -4513,7 +4513,7 @@
     "/task/{task_id}/subtasks": {
       "get": {
         "summary": "List Subtasks",
-        "description": "List subtasks of a task (pagination, optional images, optional status filter).\n\n``index`` is the 0-based position within all subtasks of the task ordered by\nSubTaskID (computed before any subtask_status filtering).",
+        "description": "List subtasks of a task (pagination, optional images, status/assignee filters).\n\n``index`` is the 0-based position within all subtasks of the task ordered by\nSubTaskID (computed before any filtering). ``unassigned`` and ``creator_id``\nare mutually exclusive.",
         "operationId": "list_subtasks_task__task_id__subtasks_get",
         "parameters": [
           {
@@ -4569,6 +4569,32 @@
                 }
               ],
               "title": "Subtask Status"
+            }
+          },
+          {
+            "name": "unassigned",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Unassigned"
+            }
+          },
+          {
+            "name": "creator_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Creator Id"
             }
           },
           {
@@ -4735,6 +4761,77 @@
         }
       }
     },
+    "/task/{task_id}/subtask-assignees": {
+      "get": {
+        "summary": "List Subtask Assignees",
+        "description": "Distinct creators who have claimed at least one subtask on this task.",
+        "operationId": "list_subtask_assignees_task__task_id__subtask_assignees_get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CreatorMeta"
+                  },
+                  "title": "Response List Subtask Assignees Task  Task Id  Subtask Assignees Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/subtasks/{subtaskid}": {
       "get": {
         "summary": "Get Subtask",
@@ -4821,7 +4918,7 @@
       },
       "patch": {
         "summary": "Patch Subtask",
-        "description": "Update a subtask's comments and/or state.",
+        "description": "Update a subtask's comments, state, and/or claim. Returns 409 if already claimed or not owned.",
         "operationId": "patch_subtask_subtasks__subtaskid__patch",
         "parameters": [
           {
@@ -4878,6 +4975,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SubTaskGET"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Subtask already claimed or not owned by the actor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubTaskConflict"
                 }
               }
             }
@@ -8819,6 +8926,47 @@
         ],
         "title": "SubFeatureItem"
       },
+      "SubTaskConflict": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/SubTaskConflictDetail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "SubTaskConflict"
+      },
+      "SubTaskConflictDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "creator_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creator Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "SubTaskConflictDetail"
+      },
       "SubTaskGET": {
         "properties": {
           "task_id": {
@@ -8853,6 +9001,16 @@
               }
             ],
             "title": "Creator Id"
+          },
+          "creator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreatorMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "index": {
             "anyOf": [
@@ -8906,6 +9064,17 @@
                 "type": "null"
               }
             ]
+          },
+          "claim": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim"
           }
         },
         "type": "object",
@@ -8954,6 +9123,16 @@
               }
             ],
             "title": "Creator Id"
+          },
+          "creator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreatorMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "index": {
             "anyOf": [

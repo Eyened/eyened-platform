@@ -37,6 +37,34 @@ describe("Registration.revision", () => {
         expect(registration.revision).toBe(before + 1);
     });
 
+    it("clears mapped cursor cache when paths recompute", () => {
+        const registration = new Registration();
+        registration.importRegistrationItems(
+            [new AffineRegistration("a", "b", Matrix.identity)],
+            false,
+        );
+        registration.recomputePathsNow();
+        registration.setPosition("a", { x: 1, y: 2, index: 0 });
+        expect(registration.getPosition("b")).toEqual({
+            x: 1,
+            y: 2,
+            index: 0,
+        });
+
+        registration.recomputePathsNow();
+
+        expect(registration.getPosition("a")).toEqual({
+            x: 1,
+            y: 2,
+            index: 0,
+        });
+        expect(registration.getPosition("b")).toEqual({
+            x: 1,
+            y: 2,
+            index: 0,
+        });
+    });
+
     it("bumps for a late patient-level import, so consumers re-resolve", () => {
         const registration = new Registration();
         registration.importRegistrationItems(

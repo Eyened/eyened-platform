@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from eyened_orm import SubTask, Task
+from eyened_orm import Creator, SubTask, Task
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
 from eyened_orm.authz.errors import NotVisibleError
@@ -13,7 +13,7 @@ from ..db import get_db
 from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
-from .exceptions import NotFoundError
+from .exceptions import BadRequestError, ConflictError, NotFoundError
 
 
 class TaskService:
@@ -219,16 +219,23 @@ class TaskService:
         limit: int,
         page: int,
         status: SubTaskState | None,
+        creator_id: int | None = None,
+        unassigned: bool = False,
     ) -> tuple[list[tuple[SubTask, int]], int]:
         """Return one page of a task's subtasks, each with its absolute index.
 
         ``absolute_index`` is the subtask's 0-based position within *all* the
-        task's subtasks ordered by SubTaskID (computed before the ``status``
-        filter). The returned count honors ``status``.
+        task's subtasks ordered by SubTaskID (computed before status/assignee
+        filters). The returned count honors the filters.
 
         Raises:
             NotFoundError: If the task does not exist.
+            BadRequestError: If both ``unassigned`` and ``creator_id`` are set.
         """
+        if unassigned and creator_id is not None:
+            raise BadRequestError(
+                "unassigned and creator_id are mutually exclusive"
+            )
         if self.tasks.get_by_id(task_id) is None:
             raise NotFoundError(f"Task {task_id} not found")
 
@@ -238,14 +245,31 @@ class TaskService:
         rows = self.subtasks.list_for_task(
             task_id,
             status=status,
+            creator_id=creator_id,
+            unassigned=unassigned,
             limit=limit,
             offset=limit * page,
             with_images=with_images,
         )
-        count = self.subtasks.count_for_task(task_id, status=status)
+        count = self.subtasks.count_for_task(
+            task_id,
+            status=status,
+            creator_id=creator_id,
+            unassigned=unassigned,
+        )
         # Every returned row is one of the task's subtasks, so its id is always
         # in index_of (rows are a subset of all_ids_for_task).
         return [(st, index_of[st.SubTaskID]) for st in rows], count
+
+    def list_subtask_assignees(self, task_id: int) -> list[Creator]:
+        """Return distinct creators assigned to any subtask of this task.
+
+        Raises:
+            NotFoundError: If the task does not exist.
+        """
+        if self.tasks.get_by_id(task_id) is None:
+            raise NotFoundError(f"Task {task_id} not found")
+        return self.subtasks.list_assignees_for_task(task_id)
 
     def get_task_subtask(
         self,
@@ -332,15 +356,24 @@ class SubTaskService:
         subtask_id: int,
         comments: str | None,
         task_state: SubTaskState | None,
+        claim: bool | None = None,
     ) -> SubTask:
         """Update a subtask's comments/state (each optional).
 
         Requires ``grader`` in every project the parent task touches.
 
+        If ``claim`` is True, explicitly assign the subtask to the actor,
+        raising ConflictError if it is already assigned.
+        If ``claim`` is False, release the assignment only when the actor
+        currently owns it (cannot unclaim someone else's subtask).
+        Otherwise, comments/state edits auto-claim an unassigned subtask.
+
         Raises:
             NotFoundError: If the subtask does not exist.
             NotVisibleError: If the task touches a project the actor lacks.
             PermissionDeniedError: If the actor is under the floor.
+            ConflictError: If ``claim`` is True and already assigned, or
+                ``claim`` is False and assigned to a different creator.
         """
         subtask = self.subtasks.get_by_id(subtask_id)
         if subtask is None:
@@ -353,11 +386,49 @@ class SubTaskService:
             entity_id=subtask_id,
         )
 
-        before = AuditService.snapshot(subtask, "Comments", "TaskState")
+        before = AuditService.snapshot(
+            subtask, "Comments", "TaskState", "CreatorID"
+        )
         if comments is not None:
             subtask.Comments = comments
         if task_state is not None:
             subtask.TaskState = task_state
+
+        actor = self._actor
+        if claim is True:
+            # Conditional UPDATE is the source of truth (covers concurrent claims).
+            if not self.subtasks.claim_if_unassigned(subtask_id, actor.id):
+                current = self.subtasks.get_by_id(subtask_id)
+                if current is None:
+                    raise NotFoundError(f"SubTask {subtask_id} not found")
+                if current.CreatorID == actor.id:
+                    subtask.CreatorID = actor.id
+                else:
+                    raise ConflictError(
+                        {
+                            "code": "subtask_already_claimed",
+                            "message": "SubTask is already assigned",
+                            "creator_id": current.CreatorID,
+                        }
+                    )
+            else:
+                subtask.CreatorID = actor.id
+        elif claim is False:
+            if subtask.CreatorID is None:
+                pass
+            elif subtask.CreatorID != actor.id:
+                raise ConflictError(
+                    {
+                        "code": "subtask_not_owned",
+                        "message": "Only the assignee can unclaim this SubTask",
+                        "creator_id": subtask.CreatorID,
+                    }
+                )
+            else:
+                subtask.CreatorID = None
+        elif comments is not None or task_state is not None:
+            if self.subtasks.claim_if_unassigned(subtask_id, actor.id):
+                subtask.CreatorID = actor.id
 
         # SubTask has no server-generated columns a caller reads, so no
         # re-fetch is needed after the save.

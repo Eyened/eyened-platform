@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Response
 from eyened_orm import SubTaskState
 
 from ..dtos.dto_converter import DTOConverter
+from ..dtos.dtos_aux import CreatorMeta
 from ..dtos.dtos_tasks import (
     SubTaskGET,
     SubTasksResponse,
@@ -119,13 +120,16 @@ def list_subtasks(
     limit: int = 200,
     page: int = 0,
     subtask_status: Optional[SubTaskState] = None,
+    unassigned: bool = False,
+    creator_id: Optional[int] = None,
     service: TaskService = Depends(get_task_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """List subtasks of a task (pagination, optional images, optional status filter).
+    """List subtasks of a task (pagination, optional images, status/assignee filters).
 
     ``index`` is the 0-based position within all subtasks of the task ordered by
-    SubTaskID (computed before any subtask_status filtering).
+    SubTaskID (computed before any filtering). ``unassigned`` and ``creator_id``
+    are mutually exclusive.
     """
     rows_with_index, count = service.list_task_subtasks(
         task_id,
@@ -133,6 +137,8 @@ def list_subtasks(
         limit=limit,
         page=page,
         status=subtask_status,
+        creator_id=creator_id,
+        unassigned=unassigned,
     )
     convert = (
         DTOConverter.subtask_with_images_to_get
@@ -174,3 +180,17 @@ def get_subtask(
         next_dto = convert(nxt).copy(update={"index": subtask_index + 1})
         main_dto = main_dto.copy(update={"next_task": next_dto})
     return main_dto
+
+
+@router.get(
+    "/task/{task_id}/subtask-assignees",
+    response_model=List[CreatorMeta],
+)
+def list_subtask_assignees(
+    task_id: int,
+    service: TaskService = Depends(get_task_service),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Distinct creators who have claimed at least one subtask on this task."""
+    creators = service.list_subtask_assignees(task_id)
+    return [DTOConverter.creator_to_meta(c) for c in creators]

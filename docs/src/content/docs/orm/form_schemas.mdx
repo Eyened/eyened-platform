@@ -105,21 +105,67 @@ with db.get_session() as session:
 
 The JSON file must be a valid JSON Schema (Draft 7). Use `eorm validate-forms` to check schemas and existing annotation data.
 
+## Point widgets (`x-eyened-widget`)
+
+The viewer understands an optional vendor extension on field (or root) schemas:
+
+```json
+"x-eyened-widget": "keypoint"
+```
+
+When present, SchemaForm shows a **PointField** with an Activate control that arms a shared viewer `PointTool` (place with LMB, delete with RMB). Behavior comes from ordinary JSON Schema shape:
+
+| Schema shape | Meaning |
+|--------------|---------|
+| `type: "object"` with `x` / `y` | Single landmark |
+| `type: "array"` of point objects | List of landmarks (delete removes and closes the gap) |
+| `type: "array"` of point **or** `null` | Sparse list (mid-list delete leaves a hole; used when indices must stay aligned across images) |
+| `additionalProperties` → point or array of points | Per-image map keyed by image **PublicID**; the tool edits the entry for the image you are viewing |
+
+Validators ignore `x-eyened-*` keys. See [point-widget-schema-examples.md](../../../point-widget-schema-examples.md) for full examples.
+
+On **OCT volumes** (B-scans), the tool stores a numbered slice `index`. On the volume's **enface projection** (`*_proj`), it stores `index: null` so enface landmarks stay distinct from B-scan points (they share the same ImageInstance PublicID). Plain 2D images omit `index`. Visibility follows that tag: enface shows `index == null`, each B-scan shows only its slice number. If the point object schema uses `additionalProperties: false`, declare `index` as a number-or-null property so validation accepts both.
+
+Form **Activate** publishes an armed field on a shared bridge (`pointArming`). Each open **MainViewer** mounts its own `PointTool` against that session, so placement works on every main panel.
+
+After changing builtin JSON, refresh DB rows with:
+
+```bash
+eorm seed-form-schemas --update
+```
+
 ## TaskConfig for grading tasks
 
-Task-specific form selection is configured on **`TaskDefinition.TaskConfig`**, not hardcoded in the viewer.
+Task-specific form selection is configured on **`TaskDefinition.TaskConfig`**.
 
 ```json
 {
-  "form_schema_name": "Naevi grading",
-  "form_image_scope": true
+  "form_schema_name": "New ergo grading form",
+  "update_subtask_image_links": true,
+  "layout": {
+    "hide": ["Form"],
+    "prepend": [
+      {
+        "type": "quick-form",
+        "title": "Grading",
+        "expanded": true
+      }
+    ]
+  }
 }
 ```
 
+TaskConfig is merged over client defaults (`client/src/lib/config/clientDefaults.ts`). Attachment scope comes from **`FormSchema.EntityType`** (not TaskConfig).
+
 | Field | Meaning |
 |-------|---------|
-| `form_schema_name` | `FormSchema.SchemaName` to pre-select in the Form panel when the task is active (clinical forms only; builtin ETDRS and registration schemas are excluded) |
-| `form_image_scope` | When `true`, list only form annotations for the current image |
+| `form_schema_name` | `FormSchema.SchemaName` to pre-select in the Form panel when the task is active (clinical forms only; builtin ETDRS and registration schemas are excluded). Also used by the `quick-form` layout panel. |
+| `update_subtask_image_links` | Default for the browser overlay “Update task image links” checkbox (overrides client default `false`). |
+| `layout.hide` | Builtin sidebar panel names to omit (e.g. `"Form"`) |
+| `layout.prepend` | Custom panels inserted before the default sidebar list |
+| `layout.prepend[].type` | Panel type — v1 supports `"quick-form"` |
+| `layout.prepend[].title` | Panel header label (e.g. `"Grading"`) |
+| `layout.prepend[].expanded` | When `true`, panel starts expanded |
 
 Example task import row (see **[Importer — tasks](/eyened-platform/orm/importer)**):
 
@@ -128,6 +174,17 @@ ImportTaskRow(
     task_definition_name="Naevi grading",
     task_definition_config={
         "form_schema_name": "Naevi grading",
+        "update_subtask_image_links": True,
+        "layout": {
+            "hide": ["Form"],
+            "prepend": [
+                {
+                    "type": "quick-form",
+                    "title": "Grading",
+                    "expanded": True,
+                }
+            ],
+        },
     },
     task_name="Naevi batch 2025",
     creator_name="admin",
