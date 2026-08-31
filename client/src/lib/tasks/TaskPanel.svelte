@@ -99,7 +99,7 @@
                 {/if}
                 {#if panelConfig.sections.title}
                     <div class="title">
-                        Set {subTaskIndex} of {task.num_tasks}
+                        Set {subTaskIndex}
                     </div>
                 {/if}
             </div>
