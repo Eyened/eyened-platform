@@ -311,6 +311,92 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
   fi
 else
     ok "no deploy/.env yet — it will be created from .env.example"
+
+    # --- Leftover database volume on a first run --------------------------
+    # No .env means the entry point is about to GENERATE MYSQL_ROOT_PASSWORD
+    # and EYENED_DATABASE_PASSWORD. MySQL applies those only while it
+    # initialises an EMPTY data directory, so a db_data volume left behind by
+    # an earlier deployment keeps the credentials it was built with and the
+    # freshly generated ones never reach the server. That pair cannot work:
+    # bootstrap dies with (1045, 'Access denied for user ...') — for root as
+    # well — and the container log carries no initialisation marker at all,
+    # which is how you tell a stale volume from a wrong password.
+    #
+    # This check exists because nothing else looks at the volume before
+    # bootstrap does, and bootstrap runs AFTER the build. Measured on this
+    # repo twice in one day: each occurrence cost a full cold build (npm and
+    # pip from scratch) before the failure surfaced. The second one is the
+    # instructive half — it was caused by RENAMING COMPOSE_PROJECT_NAME to
+    # dodge the first, which does not move a volume, it abandons the old set
+    # under the default name that the next clone then takes from
+    # .env.example. So the fix this reports is "delete it or restore its
+    # .env", never "rename the project".
+    #
+    # Values come from .env.example (there is no .env yet), but the process
+    # environment wins where it is set, because that is compose's own
+    # precedence and an exported COMPOSE_PROJECT_NAME is common on a shared
+    # machine.
+    stale_ex="$DEPLOY_DIR/.env.example"
+    # '-', not ':-': a variable exported as EMPTY is SET, and compose reads it
+    # that way too. `COMPOSE_PROFILES=` is the documented way to drop
+    # 'local-db' (see .env.example and the external-database path), so ':-'
+    # here would quietly substitute .env.example's 'local-db' back in and
+    # report on a bundled database the operator has explicitly turned off.
+    stale_profiles=${COMPOSE_PROFILES-$(norm "$(env_get COMPOSE_PROFILES "$stale_ex")")}
+    stale_path=${DB_DATA_PATH-$(norm "$(env_get DB_DATA_PATH "$stale_ex")")}
+    stale_project=${COMPOSE_PROJECT_NAME-$(norm "$(env_get COMPOSE_PROJECT_NAME "$stale_ex")")}
+    # Compose normalises a project name (lowercasing, and dropping characters
+    # outside its allowed set) before building volume names from it, so the
+    # same normalisation has to happen here or the reconstructed name misses.
+    stale_project=$(printf '%s' "$stale_project" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')
+
+    # Three states are deliberately NOT checked, because in each of them no
+    # named db_data volume is involved and a report would be noise or wrong:
+    # DB_DATA_PATH set (the datadir is a bind mount the operator manages, and
+    # its credentials are their business), no 'local-db' profile (there is no
+    # bundled MySQL to initialise), and an empty project name (compose would
+    # fall back to the directory name, which this cannot reconstruct).
+    if [ -n "$stale_path" ]; then
+        ok "DB_DATA_PATH is set, so the database is a bind mount — leftover-volume check skipped"
+    elif [ -z "$stale_project" ]; then
+        ok "COMPOSE_PROJECT_NAME is empty, so the volume name cannot be predicted — leftover-volume check skipped"
+    else
+        case ",$stale_profiles," in
+            *,local-db,*)
+                # A failed `docker volume ls` must report "could not tell",
+                # not "none found": the daemon may be unreachable (the check
+                # at the top of this file would have said so), and an empty
+                # result from a failed command otherwise reads as a clean ok
+                # — the same "cannot fail" trap the port probe above guards
+                # against.
+                set +e
+                stale_vols=$(docker volume ls --format '{{.Name}}' 2>/dev/null)
+                stale_rc=$?
+                set -e
+                if [ "$stale_rc" -ne 0 ]; then
+                    ok "could not list docker volumes, so the leftover-database check was skipped"
+                elif printf '%s\n' "$stale_vols" | grep -Fqx "${stale_project}_db_data"; then
+                    problem "A docker volume named '${stale_project}_db_data' already exists, but there
+      is no deploy/.env — so this run will generate new database passwords
+      that MySQL will never apply. It reads MYSQL_ROOT_PASSWORD and
+      MYSQL_PASSWORD only while initialising an empty data directory; an
+      existing volume keeps the credentials it was built with, and bootstrap
+      then fails with (1045, 'Access denied for user ...') after the whole
+      stack has already been built.
+      Fix: if that volume holds data you want, put back the deploy/.env that
+           goes with it. If it does not, delete it and re-run:
+             docker volume rm ${stale_project}_db_data
+           Do NOT rename COMPOSE_PROJECT_NAME to get past this — that leaves
+           the volume behind under this name, where the next clone will
+           attach it instead."
+                else
+                    ok "no leftover '${stale_project}_db_data' volume — the database will initialise with the generated secrets"
+                fi ;;
+            # Reported rather than passed over in silence: on this list an
+            # absent line reads as a check that ran and said nothing.
+            *) ok "no 'local-db' profile, so no bundled database to initialise — leftover-volume check skipped" ;;
+        esac
+    fi
 fi
 
 # --- HTTP_PORT ------------------------------------------------------------

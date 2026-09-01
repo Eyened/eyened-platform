@@ -154,7 +154,12 @@ require_count() {
     case "$1" in
         ''|*[!0-9]*) die "bootstrap: could not read $2 from the server container.
       Got: '$1'
-      Look at: $COMPOSE_BIN logs server" ;;
+      The probe's own error output, if it produced any, is printed ABOVE this
+      message — not in the container log. This runs as a one-off
+      '$COMPOSE_BIN exec', whose stderr goes straight to this terminal, while
+      '$COMPOSE_BIN logs server' carries gunicorn's output and never sees it.
+      If nothing was printed above, the exec did not run at all: check that
+      the server container is up ('$COMPOSE_BIN ps')." ;;
     esac
 }
 

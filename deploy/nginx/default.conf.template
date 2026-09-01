@@ -78,6 +78,40 @@ server {
         proxy_set_header X-Forwarded-Proto $client_scheme;
     }
 
+    # Health, proxied to the API. This is NOT covered by `location /api/`
+    # above: server/main.py puts /health on the OUTER app and mounts the API
+    # sub-app at /api, so the route is /health and nothing at all answers
+    # /api/health.
+    #
+    # Without this block /health fell through to `location /` and the
+    # fileserver answered it with the SPA index. Measured through the
+    # published port, with the server container STOPPED: /health -> 200
+    # text/html, 1813 bytes, i.e. a health endpoint that cannot report
+    # unhealthy. Anything pointed at it — an external monitor, a load
+    # balancer, or a fronting nginx such as SURF Research Cloud's — reads the
+    # platform as up while the app is dead. Only /api/* failed honestly (502).
+    # The container's own healthcheck (compose.yaml) does not cover this: it
+    # runs inside the container's network namespace and never traverses nginx,
+    # which is exactly why the fault is invisible from `docker compose ps`.
+    #
+    # `=` (exact match), not a prefix: a prefix `location /health` would also
+    # capture any future /health* path the SPA might own. $api_upstream is set
+    # again here because `set` is scoped to its own location block — without
+    # it this block would fail to load, not silently misroute. The explicit
+    # /health on proxy_pass is redundant for an exact-match location (the
+    # request URI is already /health) and is spelled out so the block keeps
+    # sending /health if it is ever widened to a prefix match; note that with
+    # a variable in proxy_pass an explicit URI replaces the request URI
+    # outright rather than being appended to it.
+    location = /health {
+        set $api_upstream server;
+        proxy_pass http://$api_upstream:8000/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $client_scheme;
+    }
+
     # Frontend. The ONE location that differs between environments: dev
     # proxies to the vite dev server, prod serves the built SPA off disk.
     # Exactly one file is mounted here as client.conf — mounting the whole
