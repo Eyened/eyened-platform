@@ -4,7 +4,11 @@
     import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
     import { Button } from "$lib/components/ui/button";
     import * as Table from "$lib/components/ui/table";
+    import { ApiError } from "$lib/api/client";
+    import { updateSubTask } from "$lib/data/api";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { SubTaskWithImagesGET } from "../../types/openapi_types";
+    import { getContext } from "svelte";
     import { toast } from "svelte-sonner";
     import {
         addSubTaskImage,
@@ -15,23 +19,26 @@
     type Props = {
         subtask: SubTaskWithImagesGET;
         taskId: number;
+        onAssignmentChange?: () => void | Promise<void>;
     };
-    let { subtask, taskId }: Props = $props();
+    let { subtask, taskId, onAssignmentChange }: Props = $props();
+
+    const globalContext = getContext<GlobalContext>("globalContext");
 
     const row = $derived(subtask);
+    const assigneeId = $derived(row.creator?.id ?? row.creator_id ?? null);
+    const isUnassigned = $derived(assigneeId == null);
+    const isMine = $derived(assigneeId === globalContext.user.id);
 
     let showPicker = $state(false);
+    let claiming = $state(false);
 
-    // Image ids currently linked to this subtask.
-    const currentImageIds = $derived(
-        ((row as any).images ?? []).map((img: any) => String(img.id)),
-    );
+    const currentImageIds = $derived(row.images.map((img) => String(img.id)));
 
-    // Default query: all images for the patients already linked to this subtask.
     const pickerConditions = $derived.by((): Condition[] => {
         const identifiers = new Set<string>();
-        for (const img of (row as any).images ?? []) {
-            if (img?.patient?.identifier)
+        for (const img of row.images) {
+            if (img.patient?.identifier)
                 identifiers.add(img.patient.identifier);
         }
         if (identifiers.size === 0) return [];
@@ -45,14 +52,39 @@
         ];
     });
 
+    async function claim() {
+        claiming = true;
+        try {
+            await updateSubTask(row.id, { claim: true });
+            toast.success("Subtask claimed");
+            await onAssignmentChange?.();
+        } catch (e) {
+            toast.error(e instanceof ApiError ? e.message : String(e));
+            await onAssignmentChange?.();
+        } finally {
+            claiming = false;
+        }
+    }
+
+    async function unclaim() {
+        claiming = true;
+        try {
+            await updateSubTask(row.id, { claim: false });
+            toast.success("Subtask unclaimed");
+            await onAssignmentChange?.();
+        } catch (e) {
+            toast.error(e instanceof ApiError ? e.message : String(e));
+            await onAssignmentChange?.();
+        } finally {
+            claiming = false;
+        }
+    }
+
     async function confirmImages(selectedIds: string[]) {
         const initial: string[] = currentImageIds;
         const added = selectedIds.filter((id) => !initial.includes(id));
         const removed = initial.filter((id) => !selectedIds.includes(id));
         try {
-            // Run sequentially: each endpoint returns a full snapshot of the
-            // subtask's images, so parallel requests would ingest out-of-order
-            // (stale) snapshots and also race on the next ImageIndex.
             for (const id of removed) {
                 await removeSubTaskImage(row.id, id);
             }
@@ -89,6 +121,36 @@
     </Table.Cell>
     <Table.Cell>{row.task_state ?? "-"}</Table.Cell>
     <Table.Cell>
+        {#if isUnassigned}
+            <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={claiming}
+                onclick={claim}
+            >
+                Claim
+            </Button>
+        {:else}
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm"
+                    >{row.creator?.name ?? `Creator #${row.creator_id}`}</span
+                >
+                {#if isMine}
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={claiming}
+                        onclick={unclaim}
+                    >
+                        Unclaim
+                    </Button>
+                {/if}
+            </div>
+        {/if}
+    </Table.Cell>
+    <Table.Cell>
         <Button
             href={`/tasks/${taskId}/grade/${row.index}`}
             target="_blank"
@@ -99,8 +161,8 @@
     </Table.Cell>
     <Table.Cell>
         <div class="instances flex flex-wrap gap-1">
-            {#if (row as any).images?.length > 0}
-                {#each (row as any).images as img}
+            {#if row.images.length > 0}
+                {#each row.images as img (img.id)}
                     <div class="relative inline-block">
                         <InstanceComponent instance={img} />
                         <button

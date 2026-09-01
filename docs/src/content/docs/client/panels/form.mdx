@@ -22,6 +22,29 @@ Use this panel for **clinical grading** (AMD, glaucoma, naevi, etc.) and other s
 
 When you open the viewer from a **grading task**, new annotations are linked to the active subtask.
 
+## Quick-form layout panel
+
+Some grading tasks replace the standard Form panel with a task-specific **quick-form** panel configured via `TaskDefinition.TaskConfig.layout`:
+
+```json
+{
+  "layout": {
+    "hide": ["Form"],
+    "prepend": [
+      { "type": "quick-form", "title": "Grading", "expanded": true }
+    ]
+  }
+}
+```
+
+The quick-form panel:
+
+1. Shows only the current grader's annotation for `form_schema_name` on the current image.
+2. Displays validation status (**Valid ✓** or **Incomplete (N)**) from the JSON Schema.
+3. Provides a **Grade** button that find-or-creates the annotation and opens the form in a new window.
+
+See **[Form schemas — TaskConfig](/eyened-platform/orm/form_schemas#taskconfig-for-grading-tasks)** for the full layout schema.
+
 :::note
 This page is a stub — document schema selection, laterality, and validation errors from `PanelForm.svelte` and `FormPanelHelp.svelte`.
 :::
@@ -32,7 +55,7 @@ This page is a stub — document schema selection, laterality, and validation er
 
 Clinical forms are **inserted per site** — they are not part of the default platform seed. Each `FormSchema` row defines a JSON Schema (Draft 7) and an `EntityType` (Patient, Study, StudyEye, ImageInstance, …).
 
-Configure which form a task uses via **`TaskDefinition.TaskConfig`** (`form_schema_name`, optional `form_image_scope`). See **[Form schemas](/eyened-platform/orm/form_schemas)**.
+Configure which form a task uses via **`TaskDefinition.TaskConfig`** (`form_schema_name`). Attachment scope comes from the FormSchema’s `EntityType`. See **[Form schemas](/eyened-platform/orm/form_schemas)**.
 
 ### Storage and API
 

@@ -1,7 +1,7 @@
 import type { Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
-import type { ViewerContext } from "../viewerContext.svelte";
+import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
 
 export class SetBrushRadiusTool implements Overlay {
     wheelFactor = 1.05;
@@ -115,8 +115,6 @@ export class SetBrushRadiusTool implements Overlay {
             ctx.stroke(path);
         }
 
-        if (viewerContext.cursorStyle !== "wait") {
-            viewerContext.cursorStyle = "none";
-        }
+        viewerContext.claimCursor("none", CursorPriority.Hide);
     }
 }

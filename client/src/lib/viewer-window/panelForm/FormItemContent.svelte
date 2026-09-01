@@ -16,7 +16,9 @@
         resolveRefs,
         type JSONSchema,
     } from "$lib/forms/schemaType";
-    import { onMount } from "svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { onDestroy, onMount, setContext } from "svelte";
+    import { toast } from "svelte-sonner";
     import * as Tooltip from "../../components/ui/tooltip";
     import Tagger from "../../tags/Tagger.svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
@@ -24,8 +26,17 @@
     interface Props {
         form: FormAnnotationGET;
         canEdit: boolean;
+        viewerContext?: ViewerContext;
     }
-    let { form, canEdit }: Props = $props();
+    let { form, canEdit, viewerContext }: Props = $props();
+
+    if (viewerContext) {
+        setContext("viewerContext", viewerContext);
+    }
+    setContext("pointFormAnnotationId", form.id);
+    if (form.image_id) {
+        setContext("pointBoundImageId", form.image_id);
+    }
 
     const formSchema = $derived(formSchemas.get(form.form_schema_id)!);
     const schema = $derived(resolveRefs(formSchema.schema as JSONSchema));
@@ -61,24 +72,47 @@
         status = "loaded";
     });
 
-    async function onchange() {
-        if (!canEdit) return;
-        if (value) {
-            // Clear existing timeout
-            if (saveTimeout) {
-                clearTimeout(saveTimeout);
-            }
-
-            // Show "saving" status immediately for user feedback
-            status = "saving";
-
-            // Debounce: wait 500ms after last keystroke before saving
-            saveTimeout = setTimeout(async () => {
-                await setFormAnnotationValue(form.id, value);
-                status = "synced";
-                saveTimeout = null;
-            }, 500);
+    async function flushPendingSave() {
+        saveTimeout = null;
+        // JSON body cannot be undefined — persist null for an omitted root value.
+        try {
+            await setFormAnnotationValue(form.id, value ?? null);
+            status = "synced";
+        } catch (e) {
+            console.error("Failed to save form annotation", e);
+            status = "error";
+            toast.error("Failed to save form annotation");
         }
+    }
+
+    // Children (e.g. PointField) tear down first and may disarm→persist→onchange,
+    // which schedules a debounced save. Flush that pending write instead of
+    // cancelling it — otherwise edits within the debounce window are lost.
+    onDestroy(() => {
+        if (!saveTimeout) return;
+        clearTimeout(saveTimeout);
+        void flushPendingSave();
+    });
+
+    async function onchange(next: unknown) {
+        if (!canEdit) return;
+        // Always apply `next`, including undefined/null/''/0/false. Callers use
+        // undefined to omit/clear (PointField Remove, bare-single Clear, SchemaForm
+        // trash). Treating undefined as "no change" left stale value in state and
+        // the truthy save guard then wrote the old points back as a "successful" save.
+        value = next;
+
+        if (saveTimeout) {
+            clearTimeout(saveTimeout);
+        }
+
+        // Show "saving" status immediately for user feedback
+        status = "saving";
+
+        // Debounce: wait 500ms after last keystroke before saving.
+        saveTimeout = setTimeout(() => {
+            void flushPendingSave();
+        }, 500);
     }
 
     function readLocalStorageBoolean(key: string, defaultValue: boolean) {
@@ -173,7 +207,7 @@
         </label>
     </div>
     <div class="main">
-        {#if value}
+        {#if status !== "loading"}
             <SchemaForm
                 {schema}
                 {value}
@@ -181,6 +215,7 @@
                 {canEdit}
                 {vertical}
                 {collapse}
+                entityType={formSchema.entity_type}
             />
         {/if}
     </div>
@@ -204,6 +239,9 @@
     }
     span.saving {
         color: orange;
+    }
+    span.error {
+        color: red;
     }
     table {
         border-collapse: collapse;

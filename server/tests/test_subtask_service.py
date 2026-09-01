@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 
 from eyened_orm import Creator, SubTask, Task, TaskDefinition
@@ -5,7 +7,7 @@ from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository
 
 from server.services.acting_user import ActingUser
-from server.services.exceptions import NotFoundError
+from server.services.exceptions import ConflictError, NotFoundError
 from server.services.task_service import SubTaskService
 from eyened_orm.utils.factories import admin_scope
 
@@ -21,7 +23,7 @@ class FakeAudit:
 
 
 def _actor(session) -> ActingUser:
-    creator = Creator(CreatorName="alice", IsHuman=True)
+    creator = Creator(CreatorName=f"alice-{uuid.uuid4().hex[:8]}", IsHuman=True)
     session.add(creator)
     session.flush()
     return ActingUser(id=creator.CreatorID, username=creator.CreatorName)
@@ -89,6 +91,131 @@ def test_update_subtask_changes_fields(session):
     assert updated.TaskState == SubTaskState.Ready
 
 
+def test_update_subtask_comments_claims_unassigned_subtask(session):
+    """update_subtask with comments on an unassigned subtask claims it for the actor."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    session.commit()
+
+    _service(session, actor).update_subtask(st.SubTaskID, "hi", None)
+
+    session.refresh(st)
+    assert st.CreatorID == actor.id
+
+
+def test_update_subtask_state_claims_unassigned_subtask(session):
+    """update_subtask with task_state on an unassigned subtask claims it for the actor."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    session.commit()
+
+    _service(session, actor).update_subtask(st.SubTaskID, None, SubTaskState.Ready)
+
+    session.refresh(st)
+    assert st.CreatorID == actor.id
+
+
+def test_update_subtask_comments_already_assigned_unchanged(session):
+    """update_subtask with comments on an already-assigned subtask leaves CreatorID unchanged."""
+    other_creator = Creator(CreatorName="owner", IsHuman=True)
+    session.add(other_creator)
+    session.flush()
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    st.CreatorID = other_creator.CreatorID
+    session.commit()
+
+    _service(session, actor).update_subtask(st.SubTaskID, "hi", None)
+
+    session.refresh(st)
+    assert st.CreatorID == other_creator.CreatorID
+
+
+def test_update_subtask_claim_assigns(session):
+    """claim=True on an unassigned subtask sets CreatorID to the actor."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    session.commit()
+
+    updated = _service(session, actor).update_subtask(
+        st.SubTaskID, None, None, claim=True
+    )
+    assert updated.CreatorID == actor.id
+
+
+def test_update_subtask_claim_conflict_when_assigned(session):
+    """claim=True on an already-assigned subtask raises ConflictError."""
+    owner = _actor(session)
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.id)
+    st = _make_subtask(session, task.TaskID)
+    st.CreatorID = owner.id
+    session.commit()
+
+    with pytest.raises(ConflictError) as exc:
+        _service(session, actor).update_subtask(
+            st.SubTaskID, None, None, claim=True
+        )
+    assert exc.value.detail["code"] == "subtask_already_claimed"
+    assert exc.value.detail["creator_id"] == owner.id
+
+
+def test_update_subtask_claim_succeeds_when_already_owned_by_actor(session):
+    """claim=True is idempotent when the actor already owns the subtask."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    st.CreatorID = actor.id
+    session.commit()
+
+    updated = _service(session, actor).update_subtask(
+        st.SubTaskID, None, None, claim=True
+    )
+    assert updated.CreatorID == actor.id
+
+
+def test_update_subtask_unclaim_releases_own(session):
+    """claim=False clears CreatorID when the actor owns the subtask."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    st = _make_subtask(session, task.TaskID)
+    st.CreatorID = actor.id
+    session.commit()
+
+    updated = _service(session, actor).update_subtask(
+        st.SubTaskID, None, None, claim=False
+    )
+    assert updated.CreatorID is None
+
+
+def test_update_subtask_unclaim_conflict_when_owned_by_other(session):
+    """claim=False raises ConflictError when a different creator owns it."""
+    owner = _actor(session)
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.id)
+    st = _make_subtask(session, task.TaskID)
+    st.CreatorID = owner.id
+    session.commit()
+
+    with pytest.raises(ConflictError) as exc:
+        _service(session, actor).update_subtask(
+            st.SubTaskID, None, None, claim=False
+        )
+    assert exc.value.detail["code"] == "subtask_not_owned"
+
+
 def test_update_subtask_unknown_raises_not_found(session):
     """Updating a missing subtask is translated to NotFoundError (-> 404)."""
     actor = _actor(session)
@@ -102,6 +229,8 @@ def test_update_subtask_logs_update_as_diff(session):
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     st = _make_subtask(session, task.TaskID)
+    st.CreatorID = actor.id  # already assigned: isolate comments diff from auto-claim
+    session.flush()
     audit = FakeAudit()
 
     _service(session, actor, audit=audit).update_subtask(st.SubTaskID, "c", None)
