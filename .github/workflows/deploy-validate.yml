@@ -267,7 +267,6 @@ jobs:
           check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     ""
           check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.host-ports.yaml" "local-db"
           check "compose.yaml:compose.dev.yaml:compose.storage.yaml" "local-db,oidc"
-          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db,tools"
           check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db,backup"
           exit $fail
 
@@ -309,14 +308,6 @@ jobs:
           svc=$(COMPOSE_FILE=$prod COMPOSE_PROFILES= docker compose config --services | sort | tr '\n' ' ')
           echo "external-db services: $svc"
           case "$svc" in *database*) echo "::error::database present with no local-db profile"; exit 1 ;; esac
-
-          # adminer is opt-in. A client install runs with local-db, so if
-          # adminer ever drifts back onto that profile every installation
-          # starts publishing a database admin UI.
-          svc=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config --services | sort | tr '\n' ' ')
-          case "$svc" in *adminer*) echo "::error::adminer is reachable from the local-db profile alone"; exit 1 ;; esac
-          svc=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db,tools docker compose config --services | sort | tr '\n' ' ')
-          case "$svc" in *adminer*) ;; *) echo "::error::adminer missing from the tools profile"; exit 1 ;; esac
 
           # No container but `database` may be handed the MySQL root password.
           # This is what dropping env_file: bought; without a check it silently

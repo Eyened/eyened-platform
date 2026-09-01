@@ -93,12 +93,11 @@ which would defeat the point.)
 the profile. That is deliberate: whether the bundled database runs is one
 setting (`local-db` in `COMPOSE_PROFILES`), not two.
 
-Compose declares four profiles, all defined in `deploy/compose.yaml`:
+Compose declares three profiles, all defined in `deploy/compose.yaml`:
 
 | Profile | Service | What it starts |
 |---|---|---|
 | `local-db` | `database` | the bundled MySQL |
-| `tools` | `adminer` | adminer, a database browser — off by default, see [Sharing a machine](#sharing-a-machine) |
 | `backup` | `xtrabackup` | a `percona/percona-xtrabackup:8.0` one-shot, used only by `deploy/scripts/save_dump.sh` and `load_dump.sh` — never a long-running service. `make db-snapshot` / `make db-restore` do **not** use this profile; see [Backup and rollback](#backup-and-rollback) |
 | `oidc` | `keycloak` | Keycloak, the bundled development OIDC provider |
 
@@ -201,13 +200,11 @@ data, set `MYSQL_ROOT_PASSWORD` and `EYENED_DATABASE_PASSWORD` in
 ## Sharing a machine
 
 On a host shared with other developers, set these in `deploy/.env` to values
-nobody else is using — all four are already present in `.env.example`:
+nobody else is using — all three are already present in `.env.example`:
 
 - `COMPOSE_PROJECT_NAME` — isolates containers, volumes and networks per
   stack.
 - `HTTP_PORT` (default `8080`) — the platform's own port.
-- `ADMINER_PORT` (default `8081`) — only published when `tools` is in
-  `COMPOSE_PROFILES`.
 - `KEYCLOAK_PORT` (default `8180`) — only published when `oidc` is in
   `COMPOSE_PROFILES`.
 
@@ -217,25 +214,15 @@ DBeaver, or a host-side alembic), append `:compose.host-ports.yaml` to
 `COMPOSE_FILE` and set `DB_PUBLISH_PORT` / `REDIS_PUBLISH_PORT` to free
 ports; both bind to `127.0.0.1` only.
 
-Adminer is behind the `tools` profile and off by default: it is a database
-admin UI, and an installed platform should not publish one unless someone
-asked for it. Keycloak is likewise off unless `oidc` is in
-`COMPOSE_PROFILES`.
-
-The two also differ in *where* they bind, and the asymmetry is deliberate:
-
-- **Adminer binds loopback only** (`ADMINER_BIND`, default `127.0.0.1`).
-  Reach it on a remote host through an SSH tunnel
-  (`ssh -L 8081:127.0.0.1:8081 <host>`). Setting `ADMINER_BIND=0.0.0.0` opens
-  a database admin UI to the network.
-- **Keycloak binds every interface** (`KEYCLOAK_BIND`, default `0.0.0.0`).
-  That is not an oversight: the server container reaches Keycloak's metadata
-  document *through the host*, so confining it to loopback makes OIDC login
-  fail while every container still reports healthy. Because the admin console
-  is therefore reachable by anyone who can reach the port,
-  `KEYCLOAK_ADMIN_PASSWORD` is not optional: `make doctor` fails while it is
-  absent, empty, `admin` or `change_me` and `oidc` is enabled, so the stack
-  will not build until you set it.
+Keycloak is off unless `oidc` is in `COMPOSE_PROFILES`, and it **binds every
+interface** (`KEYCLOAK_BIND`, default `0.0.0.0`). That is not an oversight:
+the server container reaches Keycloak's metadata document *through the
+host*, so confining it to loopback makes OIDC login fail while every
+container still reports healthy. Because the admin console is therefore
+reachable by anyone who can reach the port, `KEYCLOAK_ADMIN_PASSWORD` is not
+optional: `make doctor` fails while it is absent, empty, `admin` or
+`change_me` and `oidc` is enabled, so the stack will not build until you set
+it.
 
 ## Migrations
 
