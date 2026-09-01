@@ -124,6 +124,64 @@ esac
 [ -n "$mount_src" ] || die "error: the database container has no volume or bind
       mount at /var/lib/mysql, so there is nothing to snapshot."
 
+# Is there actually a schema in there? The `created`-container branch above
+# exists because tarring a container with no data yet yields "a tarball of
+# nothing ... which this script would call a successful snapshot". A RUNNING
+# container reaches that same outcome whenever the schema was never created:
+# mysqld initialises its own system tables regardless, so the archive is a few
+# MB and looks entirely plausible while the application schema inside it is
+# empty. Measured: a 5.5 MB snapshot whose ./eyened_database/ held exactly one
+# entry — the directory itself, no .ibd files — reported as "snapshot written".
+# The guard above therefore met its stated intent only one level down; this is
+# the same intent applied where it actually bites.
+#
+# It is worse than a useless backup. db-restore.sh trusts that anything under
+# the final $name.tgz is complete, so an empty archive is a loaded gun pointed
+# at whatever populated database it is later restored over.
+#
+# Read off the datadir rather than asking SQL: no credentials, no client, and
+# no dependency on the server container — the state this catches (nobody ran
+# bootstrap.sh) is exactly the state in which the server is least trustworthy.
+db_name=$(env_get EYENED_DATABASE_DATABASE | tr -d '\r')
+[ -n "$db_name" ] || db_name=eyened_database   # compose.yaml's own default
+
+schema_state=$(docker run --rm -v "$mount_src:/data:ro" -e SNAP_DB="$db_name" alpine sh -c '
+    if [ ! -d "/data/$SNAP_DB" ]; then
+        echo missing
+    else
+        set -- "/data/$SNAP_DB"/*.ibd
+        if [ -e "$1" ]; then echo ok; else echo empty; fi
+    fi') || die "error: could not read the database directory inside $mount_desc
+      (see above).
+      Fix: confirm docker can reach $mount_desc (docker info; for a bind
+      mount, check the host path exists and is readable), then re-run
+      make db-snapshot."
+
+case "$schema_state" in
+    ok) ;;
+    missing|empty)
+        case "$schema_state" in
+            missing) why="has no '$db_name' directory at all" ;;
+            *)       why="has a '$db_name' directory holding no tables (no .ibd files)" ;;
+        esac
+        die "error: $mount_desc $why, so this stack
+      has never created its schema — there is nothing here to snapshot.
+      Writing one anyway would produce an archive of MySQL's own system
+      tables and nothing else, which db-restore.sh would later accept as a
+      complete backup.
+      Fix: create the schema first — ./install.sh (production stack) or
+           'make up' (developer stack). Both run bootstrap.sh; a bare
+           '$COMPOSE_BIN up -d' does not, which is how a stack ends up
+           serving traffic on an empty database in the first place." ;;
+    *)
+        die "error: could not tell whether $mount_desc holds a schema — the probe
+      returned '$schema_state'. Refusing to write a snapshot that may be
+      empty.
+      Fix: this is a bug in the probe itself, not an environment problem —
+      do not retry. Report the exact value '$schema_state' when raising
+      this." ;;
+esac
+
 out="$DEPLOY_DIR/snapshots"
 mkdir -p "$out"
 
