@@ -8,7 +8,7 @@ from eyened_orm import (
     AttributeValue,
     AttributesModel,
 )
-from eyened_orm.commands.test_targets import _import_images
+from eyened_orm.commands.tests.test_targets import _import_images
 from eyened_orm.inference.etdrs_summary import resolve_etdrs_inputs
 
 

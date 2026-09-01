@@ -3,7 +3,11 @@ const STORAGE_KEY = "eyened:imageUiPrefs";
 type ImageUiPrefs = Record<string, Record<string, unknown>>;
 
 function canUseStorage(): boolean {
-    return typeof localStorage !== "undefined";
+    try {
+        return typeof localStorage !== "undefined";
+    } catch {
+        return false;
+    }
 }
 
 function readAll(): ImageUiPrefs {

@@ -136,12 +136,24 @@ eorm seed-form-schemas --update
 
 ## TaskConfig for grading tasks
 
-Task-specific form selection is configured on **`TaskDefinition.TaskConfig`**.
+Task-specific form selection is configured on **`TaskDefinition.TaskConfig`**, not hardcoded in the viewer.
 
 ```json
 {
-  "form_schema_name": "New ergo grading form",
+  "form_schema_name": "Naevi grading",
+  "form_image_scope": true,
   "update_subtask_image_links": true,
+  "task_panel": {
+    "enabled": true,
+    "expanded": false,
+    "sections": {
+      "title": true,
+      "nav": true,
+      "status": true,
+      "comments": true,
+      "overview": true
+    }
+  },
   "layout": {
     "hide": ["Form"],
     "prepend": [
@@ -160,7 +172,11 @@ TaskConfig is merged over client defaults (`client/src/lib/config/clientDefaults
 | Field | Meaning |
 |-------|---------|
 | `form_schema_name` | `FormSchema.SchemaName` to pre-select in the Form panel when the task is active (clinical forms only; builtin ETDRS and registration schemas are excluded). Also used by the `quick-form` layout panel. |
+| `form_image_scope` | When `true`, list only form annotations for the current image |
 | `update_subtask_image_links` | Default for the browser overlay “Update task image links” checkbox (overrides client default `false`). |
+| `task_panel.enabled` | When `false`, hide the grading task column. Default `true`. Hiding the panel removes in-app prev/next and status controls; graders must navigate another way |
+| `task_panel.expanded` | Default expanded vs collapsed when the grader has no stored preference. Default `false` (collapsed) |
+| `task_panel.sections.*` | Independently show `title`, `nav`, `status`, `comments`, `overview`. Each defaults to `true`. Missing `task_panel` means the panel is on with all sections, collapsed. Expand/collapse is stored in the browser per task. Hiding `nav` removes prev/next from the grading window |
 | `layout.hide` | Builtin sidebar panel names to omit (e.g. `"Form"`) |
 | `layout.prepend` | Custom panels inserted before the default sidebar list |
 | `layout.prepend[].type` | Panel type — v1 supports `"quick-form"` |

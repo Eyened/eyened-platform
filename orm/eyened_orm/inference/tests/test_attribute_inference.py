@@ -13,7 +13,7 @@ from eyened_orm import (
     AttributeValue,
     AttributesModel,
 )
-from eyened_orm.commands.test_targets import _import_images
+from eyened_orm.commands.tests.test_targets import _import_images
 from eyened_orm.inference.cfi_odfd import CFI_ODFD
 from eyened_orm.inference.model_versions import huggingface_artifact_version
 

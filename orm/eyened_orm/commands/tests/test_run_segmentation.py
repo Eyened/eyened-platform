@@ -10,7 +10,7 @@ pytest.importorskip("torch")
 from click.testing import CliRunner
 
 from eyened_orm.commands.model_processing import run_segmentation
-from eyened_orm.commands.test_targets import _import_images
+from eyened_orm.commands.tests.test_targets import _import_images
 
 
 @pytest.fixture

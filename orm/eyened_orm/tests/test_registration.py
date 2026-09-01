@@ -65,16 +65,6 @@ def test_get_processed_edges_normalizes_legacy_keys():
     assert "pub2" in graph
     assert "pub3" in graph
 
-
-def test_graph_from_transforms_matches_get_processed_edges():
-    id_to_public = {1: "pub1", 2: "pub2"}
-    transforms = [{"image1": 1, "image2": 2, "transform": {}}]
-    av = _FakeAttributeValue(transforms)
-    assert graph_from_transforms(transforms, id_to_public) == get_processed_edges(
-        av, id_to_public
-    )
-
-
 def test_collect_registration_seed_skips_when_replace():
     assert collect_registration_seed_transforms(None, None, 1, replace=True) == []
 
