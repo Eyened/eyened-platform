@@ -14,13 +14,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
 from ..audit_log import AuditLog
 from ..creator import Creator
 from ..project import Project
 from ..repositories.project_member_repository import ProjectMemberRepository
+from ..task import SubTaskImageLink, TaskProject
 from ..utils.db_users import hash_password
 from .roles import ProjectRole
 
@@ -42,6 +43,7 @@ __all__ = [
     "revoke",
     "set_admin",
     "set_password",
+    "unused_declarations",
 ]
 
 
@@ -498,3 +500,38 @@ def set_password(session: Session, *, username: str, password: str) -> None:
         # the same rule init-admin follows.
         changes={"username": username, "password_changed": True},
     )
+
+
+def unused_declarations(session: Session) -> list[tuple[int, int]]:
+    """(task_id, project_id) pairs a task declares but no link uses.
+
+    Only one direction is possible: ``fk_SubTaskImageLink_TaskProject`` makes
+    a link without a matching declaration impossible, so a declaration can
+    only be broader than its links, never narrower. Broader is fail-safe -- it
+    makes a task harder to see, not easier -- which is why this is a report
+    rather than a reconciliation job.
+
+    Rows here are expected, not faults, and two ordinary kinds occupy it. A task
+    declares its projects at creation and acquires its links afterwards, so
+    ``POST /task`` puts every task it creates in this report until something
+    populates it. And removing a task's links -- by removing images, or by
+    deleting a subtask, whose links cascade away under
+    ``fk_SubTaskImageLink_SubTask_Task`` -- leaves the declaration standing,
+    because ``fk_SubTaskImageLink_TaskProject`` carries no ``ondelete``.
+
+    Nothing outside the ``Task``-delete cascade removes a ``TaskProject`` row,
+    so this report names rows it offers no way to act on.
+    """
+    return [
+        (int(t), int(p))
+        for t, p in session.execute(
+            select(TaskProject.TaskID, TaskProject.ProjectID).where(
+                ~exists(
+                    select(1)
+                    .select_from(SubTaskImageLink)
+                    .where(SubTaskImageLink.TaskID == TaskProject.TaskID)
+                    .where(SubTaskImageLink.ProjectID == TaskProject.ProjectID)
+                )
+            )
+        ).all()
+    ]

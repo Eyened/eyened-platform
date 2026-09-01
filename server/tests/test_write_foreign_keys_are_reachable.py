@@ -21,7 +21,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from eyened_orm import SubTask, Task, TaskDefinition
+from eyened_orm import SubTask, Task, TaskDefinition, TaskProject
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.repositories.form_annotation_repository import (
     FormAnnotationRepository,
@@ -92,11 +92,18 @@ def two_projects(session):
         )
         session.add(task)
         session.flush()
+        # Declared before the link below, because Task 6's foreign key checks
+        # the declaration at the moment the link is inserted.
+        session.add(TaskProject(TaskID=task.TaskID, ProjectID=project.ProjectID))
+        session.flush()
         subtask = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
         session.add(subtask)
         session.flush()
-        # The link is what puts the subtask in a project at all: a subtask whose
-        # task holds no images touches no project and is visible to everyone.
+        # The declaration above is what puts the subtask in a project: the read
+        # predicate reads ``TaskProject``, so an undeclared task is the one
+        # that is visible to everyone. The link is kept because it is the
+        # realistic shape and because it exercises the link-against-declaration
+        # foreign key, not because visibility depends on it.
         session.add(
             SubTaskImageLink(
                 SubTaskID=subtask.SubTaskID,

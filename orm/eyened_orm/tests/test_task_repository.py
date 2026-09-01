@@ -1,7 +1,7 @@
 from eyened_orm import Creator, SubTask, Task, TaskDefinition
 from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import TaskRepository, SubTaskRepository
-from eyened_orm.utils.factories import admin_scope, scope_for
+from eyened_orm.utils.factories import admin_scope
 
 
 def _creator(session, name: str = "tester") -> Creator:
@@ -35,6 +35,21 @@ def _make_subtask(session, task_id: int, state: SubTaskState) -> SubTask:
     session.add(st)
     session.flush()
     return st
+
+
+def _declare(session, task_id: int, image_id: int) -> None:
+    """Declare, on ``task_id``, the project the image sits in.
+
+    Read off the image rather than passed in, so the declaration cannot drift
+    from the project ``_make_image`` actually built. The containment foreign key
+    checks a link against its task's declaration at the moment the link is
+    inserted, so the declaration has to exist first.
+    """
+    from eyened_orm import ImageInstance, TaskProject
+
+    project_id = session.get(ImageInstance, image_id).ProjectID
+    session.add(TaskProject(TaskID=task_id, ProjectID=project_id))
+    session.flush()
 
 
 def test_list_all_orders_by_id_with_relations(session):
@@ -235,6 +250,7 @@ def _seed_subtask_with_one_image(session) -> tuple[int, int]:
     task = _make_task(session, td.TaskDefinitionID, creator.CreatorID)
     st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
     image_id = _make_image(session, "pub-1")
+    _declare(session, task.TaskID, image_id)
     session.add(
         SubTaskImageLink(
             SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=0
@@ -337,6 +353,7 @@ def test_next_image_index_starts_at_zero_then_increments(session):
 
     from eyened_orm import SubTaskImageLink
 
+    _declare(session, task.TaskID, image_id)
     session.add(
         SubTaskImageLink(SubTaskID=st.SubTaskID, ImageInstanceID=image_id, ImageIndex=3)
     )
@@ -427,24 +444,3 @@ def test_list_assignees_for_task_returns_distinct_non_null_creators(session):
     assignees = SubTaskRepository(session, scope=admin_scope()).list_assignees_for_task(task.TaskID)
 
     assert [c.CreatorName for c in assignees] == ["amy", "zed"]
-
-
-def test_project_names_are_joined_outside_the_scoped_walk(session, spanning):
-    """Plan shape, not behaviour: Project inside apply_scope's correlated
-    antijoin makes MySQL cross-join it (12.2s vs 2.2s), and SQLite won't
-    reproduce the plan."""
-    repo = TaskRepository(session, scope=scope_for(spanning["projects"]["A"]))
-    walk = str(repo._project_pairs_select([spanning["task"]]))
-    named = str(repo._names_for(repo._project_pairs_select([spanning["task"]]).subquery()))
-
-    # Control: SQLAlchemy quotes mixed-case identifiers, so without this an
-    # identifier-quoting change makes the next assertion unmatchable and the
-    # test passes while checking nothing.
-    assert 'JOIN "Project"' in named
-    # Absence of the *table*, not of the JOIN keyword. An implicit comma-join
-    # renders `FROM "SubTask", "Project"` -- which is precisely the cross-join
-    # shape this test exists to prevent, and which a `JOIN "Project"` check
-    # would wave through. `"Project"` cannot match `"Patient"."ProjectID"`:
-    # that has no closing quote after `Project`.
-    assert '"Project"' not in walk
-    assert "SELECT DISTINCT" in walk  # blocks MySQL's derived-table merge

@@ -27,15 +27,19 @@ def create_task(
     service: TaskService = Depends(get_task_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Create a task owned by the current user."""
-    task = service.create_task(
+    """Create a task owned by the current user, declaring its projects."""
+    task, projects = service.create_task(
         dto.name,
         dto.description,
         dto.contact_id,
         dto.task_definition_id,
+        dto.projects,
     )
-    # A task is created with no subtasks, so it spans nothing yet.
-    return DTOConverter.task_to_get(task, num_tasks=0, num_tasks_ready=0, projects=[])
+    # A task is created with no subtasks but always declares at least one
+    # project, so `projects=[]` here would be a lie.
+    return DTOConverter.task_to_get(
+        task, num_tasks=0, num_tasks_ready=0, projects=projects
+    )
 
 
 @router.get("/task", response_model=List[TaskGET])

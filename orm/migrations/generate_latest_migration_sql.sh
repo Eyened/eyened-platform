@@ -13,10 +13,13 @@ fi
 
 # Generate SQL for migrations between the current revision and head
 if [ "$current_rev" != "$head_rev" ]; then
+  # Git cannot track an empty directory, so the script owns its output location
+  # rather than depending on one being there.
+  mkdir -p sql || exit 1
   # Next to the destination, so the final mv is an atomic same-filesystem rename.
   tmp_sql=$(mktemp sql/.latest_migration.sql.XXXXXX)
   if echo 'y' | alembic upgrade "$current_rev:$head_rev" --sql > "$tmp_sql"; then
-    # mktemp makes it 600; restore the tracked file's mode before the rename.
+    # mktemp makes it 600; the dump is not a secret, so give it the usual mode.
     chmod 644 "$tmp_sql"
     if mv "$tmp_sql" sql/latest_migration.sql; then
       echo "SQL for the latest migration generated: sql/latest_migration.sql"

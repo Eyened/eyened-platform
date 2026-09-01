@@ -84,9 +84,10 @@ export class ApiError extends Error {
         super(message);
         this.name = "ApiError";
         this.status = status;
-        this.detail = detail ?? message;
+        this.detail = detail;
     }
 
+    /** The machine-readable tag a structured FastAPI `detail` carries. */
     get code(): string | undefined {
         if (
             this.detail &&
@@ -99,6 +100,28 @@ export class ApiError extends Error {
         }
         return undefined;
     }
+}
+
+/** The 409 body when an image's project is not among those its task declares. */
+export interface OutOfDeclarationDetail {
+    code: "image_outside_task_declaration";
+    message: string;
+    image_projects: number[];
+    declared_projects: number[];
+}
+
+/**
+ * Narrow an ApiError to the declaration refusal.
+ *
+ * The `error is` return type is what lets a caller read `e.detail.message` and
+ * `e.detail.image_projects` without an `as any`: `detail` is `unknown`. Only
+ * `code` is checked -- it is a runtime tag from a server this client already
+ * trusts, and validating the rest would be a schema validator.
+ */
+export function isOutOfDeclaration(
+    error: ApiError,
+): error is ApiError & { detail: OutOfDeclarationDetail } {
+    return error.code === "image_outside_task_declaration";
 }
 
 /** Pull a human message and structured detail out of a FastAPI error body. */

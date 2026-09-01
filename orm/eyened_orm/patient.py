@@ -2,7 +2,7 @@ import enum
 from datetime import date, datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
-from sqlalchemy import ForeignKey, Index, String, func, select
+from sqlalchemy import ForeignKey, Index, String, UniqueConstraint, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
@@ -41,6 +41,12 @@ class Patient(Base):
             "BirthDate",
         ),
         Index("ix_Patient_PatientIdentifier", "PatientIdentifier"),
+        # The parent half of Study's composite foreign key. Redundant as a
+        # uniqueness claim -- PatientID alone is already the primary key -- but
+        # InnoDB will not let a foreign key reference (PatientID, ProjectID)
+        # unless that exact pair is itself a key, so this is what makes the
+        # child constraint declarable at all.
+        UniqueConstraint("PatientID", "ProjectID", name="uq_Patient_Patient_Project"),
     )
 
     _name_column: ClassVar[str] = "PatientIdentifier"
@@ -53,7 +59,7 @@ class Patient(Base):
         ForeignKey("Project.ProjectID", ondelete="CASCADE")
     )
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Project: Mapped["Project"] = relationship(
         "eyened_orm.project.Project", back_populates="Patients", lazy="selectin"

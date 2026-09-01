@@ -198,7 +198,7 @@ def spanning(session):
     """
     from datetime import date
 
-    from eyened_orm import SubTask, Task, TaskDefinition
+    from eyened_orm import SubTask, Task, TaskDefinition, TaskProject
     from eyened_orm.task import SubTaskImageLink, SubTaskState, TaskState
     from eyened_orm.utils.factories import (
         make_device,
@@ -237,6 +237,20 @@ def spanning(session):
         session.add(task)
         session.flush()
         tasks[label] = task.TaskID
+
+    # Before the subtask/link loop, not after: that loop flushes *inside* each
+    # iteration, so by the end every link is already in the database, and the
+    # containment foreign key rejects a link inserted before the declaration it
+    # needs. `empty` declares nothing on purpose -- it is the vacuity case the
+    # scoping tests turn on, and it holds no links.
+    for label, names in (
+        ("spanning", ("A", "B")),
+        ("a_only", ("A",)),
+        ("b_only", ("B",)),
+    ):
+        for name in names:
+            session.add(TaskProject(TaskID=tasks[label], ProjectID=projects[name]))
+    session.flush()
 
     subtasks = {}
     for label, names in (
@@ -301,7 +315,7 @@ def one_project(session):
     """
     from datetime import date
 
-    from eyened_orm import SubTask, Task, TaskDefinition
+    from eyened_orm import SubTask, Task, TaskDefinition, TaskProject
     from eyened_orm.task import SubTaskImageLink, SubTaskState, TaskState
     from eyened_orm.utils.factories import (
         make_creator,
@@ -341,12 +355,18 @@ def one_project(session):
     )
     session.add(task)
     session.flush()
+    # Declared before the link exists: the containment foreign key checks the
+    # declaration at the moment the link is inserted.
+    session.add(TaskProject(TaskID=task.TaskID, ProjectID=project.ProjectID))
+    session.flush()
     subtask = SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted)
     session.add(subtask)
     session.flush()
-    # The link is what makes the task *populated*: without it the task touches
-    # no projects and every floor on it fails closed, so the project-admin
-    # delete cell would pass for the wrong reason.
+    # The TaskProject row above, not this link, is what keeps the floors on this
+    # task non-vacuous. The link makes the task *populated* in the data sense,
+    # so the project-admin delete cell cascades through a real link row as well
+    # as through the declaration. No assertion depends on it -- removing it
+    # leaves the whole suite green.
     session.add(
         SubTaskImageLink(
             SubTaskID=subtask.SubTaskID,

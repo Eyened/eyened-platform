@@ -17,7 +17,18 @@ import SimpleITK as sitk
 from PIL import Image
 from rtnls_fundusprep.cfi_bounds import CFIBounds
 from rtnls_fundusprep.transformation import ProjectiveTransform
-from sqlalchemy import event, ForeignKey, Index, String, func, select
+from sqlalchemy import (
+    event,
+    FetchedValue,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    String,
+    UniqueConstraint,
+    func,
+    select,
+    text,
+)
 from sqlalchemy.dialects.mysql import BINARY, JSON, TEXT
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from sqlalchemy.types import CHAR
@@ -26,7 +37,7 @@ from eyened_orm.data_access import get_data_access_adapter
 
 from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
-from .types import OptionalEnum
+from .types import CurrentTimestampOnUpdate, OptionalEnum
 
 logger = logging.getLogger(__name__)
 
@@ -163,11 +174,15 @@ class ImageStorage(Base):
     # Whether this is the primary storage location for the image
     # Each image instance can have multiple storage locations, but only one can be primary
     # This is currently not enforced in the database however
-    IsPrimary: Mapped[bool] = mapped_column(default=True)
+    IsPrimary: Mapped[bool] = mapped_column(default=True, server_default=text("1"))
 
     # Datetimes - automatically filled
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(
+        server_default=CurrentTimestampOnUpdate(),
+        server_onupdate=FetchedValue(),
+        onupdate=func.now(),
+    )
 
     ImageInstance: Mapped["ImageInstance"] = relationship(
         "eyened_orm.image_instance.ImageInstance",
@@ -207,6 +222,25 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             "SOPInstanceUid",
             unique=True,
         ),
+        # The parent half of SubTaskImageLink's composite foreign key -- see the
+        # equivalent on Patient for why InnoDB needs it declared.
+        UniqueConstraint(
+            "ImageInstanceID", "ProjectID", name="uq_ImageInstance_Image_Project"
+        ),
+        # Declared rather than left to InnoDB, which would create the
+        # referencing-side index itself under a generated name no later
+        # migration can predict or drop. Additional to
+        # fk_ImageInstance_Series1_idx above, which indexes SeriesID alone.
+        Index("ix_ImageInstance_Series_Project", "SeriesID", "ProjectID"),
+        # This REPLACES the single-column FK that used to sit on SeriesID -- see
+        # the equivalent on Study for why it cannot be added alongside it.
+        ForeignKeyConstraint(
+            ["SeriesID", "ProjectID"],
+            ["Series.SeriesID", "Series.ProjectID"],
+            name="fk_ImageInstance_Series_Project",
+            onupdate="CASCADE",
+            ondelete="CASCADE",
+        ),
     )
     _name_column = "PublicID"
 
@@ -219,10 +253,17 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         nullable=False,
     )
 
-    # The series that the image belongs to
-    SeriesID: Mapped[int] = mapped_column(
-        ForeignKey("Series.SeriesID", ondelete="CASCADE")
-    )
+    # The series that the image belongs to. No column-level ForeignKey: the key
+    # on this column is the composite in __table_args__ above.
+    SeriesID: Mapped[int]
+    # Denormalized from Patient.ProjectID so that authorization scoping is an
+    # indexed lookup rather than a five-hop join, held equal to the parent
+    # Series' copy by the composite foreign key above; also populated by the
+    # before_flush listener in authz/denormalization.py, which covers the
+    # writers foreign-key sync never fires for. Deliberately no single-column
+    # ForeignKey to Project: a second path straight to Project would let the two
+    # disagree about which project this image is in.
+    ProjectID: Mapped[int]
     # The source that the image belongs to (optional, not used by platform)
     SourceInfoID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("SourceInfo.SourceInfoID"), nullable=True
@@ -327,7 +368,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     FDAIdentifier: Mapped[Optional[int]]
 
     # Considered removed from the database (soft delete)
-    Inactive: Mapped[bool] = mapped_column(default=False)
+    Inactive: Mapped[bool] = mapped_column(default=False, server_default=text("0"))
 
     # Fundus-specific columns
     # will be removed in the future, using Attributes instead
@@ -365,8 +406,12 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     )
 
     # Datetimes - automatically filled
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(
+        server_default=CurrentTimestampOnUpdate(),
+        server_onupdate=FetchedValue(),
+        onupdate=func.now(),
+    )
     # DatePreprocessed is the date and time the image was last preprocessed
     DatePreprocessed: Mapped[Optional[datetime]]
 

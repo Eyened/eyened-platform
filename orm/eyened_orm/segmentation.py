@@ -4,12 +4,13 @@ from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
 from eyened_orm.data_access import get_data_access_adapter
-from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, event, func
+from sqlalchemy import JSON, FetchedValue, ForeignKey, Index, String, UniqueConstraint, event, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
 
 from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
+from .types import CurrentTimestampOnUpdate
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -441,8 +442,11 @@ class Segmentation(SegmentationBase):
         ForeignKey("SubTask.SubTaskID", ondelete="SET NULL")
     )
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    DateModified: Mapped[Optional[datetime]]
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(
+        server_default=CurrentTimestampOnUpdate(),
+        server_onupdate=FetchedValue(),
+    )
 
     ReferenceSegmentationID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("Segmentation.SegmentationID")
@@ -600,7 +604,7 @@ class Feature(Base):
     SegmentationModels: Mapped[List["SegmentationModel"]] = relationship(
         "eyened_orm.segmentation.SegmentationModel", back_populates="Feature"
     )
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     # Relationships for parent-child feature hierarchy
     FeatureAssociations: Mapped[List["FeatureFeatureLink"]] = relationship(
@@ -758,7 +762,7 @@ class Model(Base):
     # segmentation models have a feature and segmentations
     # attribute models have only attributes
     Description: Mapped[Optional[str]] = mapped_column(String(255))
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     # relationships
     ProducedAttributeValues: Mapped[List["AttributeValue"]] = relationship(
@@ -794,7 +798,7 @@ class ModelSegmentation(SegmentationBase):
     ModelSegmentationID: Mapped[int] = mapped_column(primary_key=True)
     ModelID: Mapped[int] = mapped_column(ForeignKey("Model.ModelID"))
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Model: Mapped["SegmentationModel"] = relationship(
         "eyened_orm.segmentation.SegmentationModel",

@@ -33,6 +33,8 @@ The following commands are available:
 - set-password: Set an existing user's password.
 - deactivate: Revoke all of a user's memberships.
 - reactivate: Restore a deactivated user's memberships.
+- check-declarations: List (task, project) declarations no image link uses.
+- check-dangling-references: Report rows whose parent is missing, before the declaration cutover.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """
@@ -88,6 +90,16 @@ def _register_rbac_commands():
 
 
 _register_rbac_commands()
+
+
+def _register_integrity_commands():
+    from .commands.integrity import integrity_commands
+
+    for command in integrity_commands:
+        eorm.add_command(command)
+
+
+_register_integrity_commands()
 
 
 @eorm.command()

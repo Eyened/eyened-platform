@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from eyened_orm import SubTask, Task, TaskDefinition
+from eyened_orm import SubTask, Task, TaskDefinition, TaskProject
 from eyened_orm.task import SubTaskImageLink, SubTaskState, TaskState
 from eyened_orm.utils.factories import (
     make_device,
@@ -49,6 +49,16 @@ def spanning(session):
         session.add(task)
         session.flush()
         tasks[label] = task.TaskID
+
+    # Before the subtask/link loop, not after: that loop flushes *inside* each
+    # iteration, so every link but the last is already in the database by the
+    # time it ends, and the containment foreign key rejects a link inserted
+    # before the declaration it needs. `empty` declares nothing on purpose --
+    # it is the vacuity case the scoping tests turn on, and holds no links.
+    for label, names in (("spanning", ("A", "B")), ("a_only", ("A",))):
+        for name in names:
+            session.add(TaskProject(TaskID=tasks[label], ProjectID=projects[name]))
+    session.flush()
 
     subtasks = {}
     for label, names in (("spanning", ("A", "B")), ("a_only", ("A",))):
