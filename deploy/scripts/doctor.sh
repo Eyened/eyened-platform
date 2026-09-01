@@ -252,7 +252,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     fi
 
     # KEYCLOAK_ADMIN_PASSWORD cannot join the change_me loop above, because
-    # its published default is not the string 'change_me': compose.yaml has
+    # its published default is not the string 'change_me': compose.oidc.yaml has
     # ${KEYCLOAK_ADMIN_PASSWORD:-admin}, so ABSENT and EMPTY are just as much
     # "runs on admin/admin" as the literal value is. All four values are tested
     # so this holds however .env was produced: first_run_env now generates one,

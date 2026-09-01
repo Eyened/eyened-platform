@@ -290,8 +290,8 @@ first_run_env() {
         # The bundled Keycloak's bootstrap admin. Generated for the same reason
         # as the four above: .env.example cannot ship a credential, and this
         # console is published (see KEYCLOAK_BIND). Generated even when the
-        # oidc profile is off — it costs nothing, and it means enabling the
-        # profile later does not need a second trip through this function.
+        # oidc layer is off — it costs nothing, and it means enabling the
+        # layer later does not need a second trip through this function.
         _kc_pw=$(gen_password) || die "error: could not generate a Keycloak admin password; see above."
         cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env" ||
             die "error: could not create $DEPLOY_DIR/.env from .env.example; see above."

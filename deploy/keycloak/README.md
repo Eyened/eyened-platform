@@ -10,16 +10,19 @@ In `deploy/.env`, **before starting the stack**:
 
 - append `:compose.oidc.yaml` to `COMPOSE_FILE`
 - set `PUBLIC_HOST` to the hostname or LAN IP you type in the browser — **not `localhost`**,
-  which is what `.env.example` ships. Inside the server container that name resolves to the
-  container itself, and while this layer is enabled with a loopback `KEYCLOAK_BIND` (see
-  below), `doctor.sh` treats it as a hard failure and refuses to build anything (see
+  which is what `.env.example` ships. It must be the same hostname you use inside the three
+  `EYENED_OIDC_*` values below — nothing checks this for you.
+- leave `KEYCLOAK_BIND` at its default (`0.0.0.0`) rather than a loopback address. With this
+  layer enabled, `doctor.sh` refuses to build over a loopback `KEYCLOAK_BIND` (see
   [Troubleshooting](../README.md#troubleshooting) in `deploy/README.md`).
 - set `EYENED_API_AUTH_OIDC_ENABLED=true`
 - set `EYENED_OIDC_CLIENT_ID=eyened-platform`
 - set `EYENED_OIDC_CLIENT_SECRET=eyened-dev-secret`
 - uncomment the three **bundled-realm** `EYENED_OIDC_METADATA_URL` /
   `EYENED_OIDC_REDIRECT_URL` / `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS` lines
-  in `.env.example` (replace `localhost` with `PUBLIC_HOST` if you set one).
+  in `deploy/.env` — `deploy/.env.example` is where the ready-to-copy lines
+  live, not the file that gets read; copy them into `.env` and replace
+  `<PUBLIC_HOST>` with the value you set above.
   Nothing derives these any more: the bundled Keycloak and an external
   provider are configured identically, by hand, and all three must move
   together — see `deploy/compose.yaml` and `deploy/compose.oidc.yaml`.
@@ -99,6 +102,9 @@ Open `http://<PUBLIC_HOST>:<HTTP_PORT>/users/login` and sign in with **`testuser
   fixed string or boolean; the other three (`METADATA_URL`, `REDIRECT_URL`,
   `ADDITIONAL_TOKEN_VALIDATIONS`) default to the empty string, so all three have to be set
   by hand for either the bundled realm or an external provider — see [Start](#start) above.
+  `METADATA_URL` in particular is fetched by the **server**, not the browser, so it must
+  name an address the server container can reach — not `PUBLIC_URL`, which is the
+  browser-facing origin behind a TLS proxy.
 - `PUBLIC_URL` moves the realm's redirect URI and `webOrigins` — but **not** Keycloak's
   own `KC_HOSTNAME`, so this bundled provider is for **direct-access development only**.
   Behind a TLS-terminating proxy the browser would be sent to an `authorization_endpoint`
