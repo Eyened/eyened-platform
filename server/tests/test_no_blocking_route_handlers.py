@@ -129,8 +129,8 @@ def test_no_route_handler_is_async_without_awaiting():
 
     # Positive control: a walk that silently found nothing would pass an empty
     # offender list. Assert the scan actually reached the endpoints.
-    assert scanned == 78, (
-        f"expected 78 router-decorated endpoints, found {scanned}. If a route was "
+    assert scanned == 79, (
+        f"expected 79 router-decorated endpoints, found {scanned}. If a route was "
         "deliberately added or removed, bump this number; if not, the walk is "
         "missing files and the empty offender list below proves nothing."
     )

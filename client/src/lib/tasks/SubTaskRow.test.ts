@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { ApiError } from "$lib/api/client";
-import { addSubTaskImage } from "$lib/data/helpers";
-import { toast } from "svelte-sonner";
 import type { SubTaskWithImagesGET } from "../../types/openapi_types";
-import SubTaskRow from "./SubTaskRow.svelte";
 
 // The picker is the only route into confirmImages, and the real one mounts the
 // whole search UI. Stand in for it and keep the callback it was handed.
@@ -21,13 +18,110 @@ vi.mock("$lib/browser/BrowserPicker.svelte", () => ({
     },
 }));
 
+vi.mock("$lib/browser/InstanceComponent.svelte", () => ({
+    default: {
+        name: "InstanceComponent",
+        render: () => ({ $$slots: {}, $$events: {} }),
+    },
+}));
+
+vi.mock("svelte-sonner", () => ({
+    toast: {
+        success: vi.fn(),
+        error: vi.fn(),
+        message: vi.fn(),
+    },
+}));
+
+vi.mock("$lib/data/api", () => ({
+    updateSubTask: vi.fn(),
+}));
+
 vi.mock("$lib/data/helpers", () => ({
     addSubTaskImage: vi.fn(),
     removeSubTaskImage: vi.fn(),
     updateSubTaskComments: vi.fn(),
 }));
 
-vi.mock("svelte-sonner", () => ({ toast: { error: vi.fn() } }));
+const { updateSubTask } = await import("$lib/data/api");
+const { addSubTaskImage } = await import("$lib/data/helpers");
+const { toast } = await import("svelte-sonner");
+const { default: SubTaskRow } = await import("./SubTaskRow.svelte");
+
+function makeRow(
+    overrides: Partial<SubTaskWithImagesGET> = {},
+): SubTaskWithImagesGET {
+    return {
+        id: 11,
+        index: 2,
+        task_id: 9,
+        task_state: "todo",
+        comments: "",
+        images: [],
+        creator: null,
+        creator_id: null,
+        ...overrides,
+    } as SubTaskWithImagesGET;
+}
+
+// The row reads the signed-in user out of context to decide whose claim it is.
+function renderRow(props: Record<string, unknown>) {
+    return render(SubTaskRow, {
+        props,
+        context: new Map([["globalContext", { user: { id: 5 } }]]),
+    } as never);
+}
+
+beforeEach(() => {
+    pickerProps.length = 0;
+    vi.mocked(updateSubTask).mockReset();
+    vi.mocked(addSubTaskImage).mockReset();
+    vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.error).mockClear();
+});
+
+describe("SubTaskRow", () => {
+    it("claims an unassigned subtask", async () => {
+        vi.mocked(updateSubTask).mockResolvedValue({});
+        const onAssignmentChange = vi.fn();
+        renderRow({ subtask: makeRow(), taskId: 9, onAssignmentChange });
+
+        await fireEvent.click(screen.getByRole("button", { name: "Claim" }));
+        expect(updateSubTask).toHaveBeenCalledWith(11, { claim: true });
+        expect(toast.success).toHaveBeenCalledWith("Subtask claimed");
+        expect(onAssignmentChange).toHaveBeenCalled();
+    });
+
+    it("unclaims a subtask assigned to the current user", async () => {
+        vi.mocked(updateSubTask).mockResolvedValue({});
+        renderRow({
+            subtask: makeRow({
+                creator: { id: 5, name: "me" } as never,
+                creator_id: 5,
+            }),
+            taskId: 9,
+        });
+
+        expect(screen.getByText("me")).toBeInTheDocument();
+        await fireEvent.click(screen.getByRole("button", { name: "Unclaim" }));
+        expect(updateSubTask).toHaveBeenCalledWith(11, { claim: false });
+        expect(toast.success).toHaveBeenCalledWith("Subtask unclaimed");
+    });
+
+    it("toasts and refreshes when claim fails", async () => {
+        vi.mocked(updateSubTask).mockRejectedValue(
+            new ApiError(409, "SubTask is already assigned", {
+                code: "subtask_already_claimed",
+            }),
+        );
+        const onAssignmentChange = vi.fn();
+        renderRow({ subtask: makeRow(), taskId: 9, onAssignmentChange });
+
+        await fireEvent.click(screen.getByRole("button", { name: "Claim" }));
+        expect(toast.error).toHaveBeenCalledWith("SubTask is already assigned");
+        expect(onAssignmentChange).toHaveBeenCalled();
+    });
+});
 
 const REFUSED_ID = "88213";
 
@@ -39,14 +133,8 @@ const refusal = new ApiError(409, "conflict", {
 });
 
 // A subtask with no images yet, so confirming a selection is purely an add.
-const subtask = {
-    id: 31,
-    index: 0,
-    images: [],
-} as unknown as SubTaskWithImagesGET;
-
 async function confirmSelection() {
-    render(SubTaskRow, { props: { subtask, taskId: 7 } });
+    renderRow({ subtask: makeRow({ id: 31, index: 0 }), taskId: 7 });
 
     await fireEvent.click(
         screen.getByRole("button", { name: /Browse images/i }),
@@ -58,10 +146,6 @@ async function confirmSelection() {
 }
 
 describe("SubTaskRow image selection", () => {
-    beforeEach(() => {
-        pickerProps.length = 0;
-    });
-
     it("tells the grader which earlier changes were kept when one is refused", async () => {
         vi.mocked(addSubTaskImage).mockRejectedValue(refusal);
 

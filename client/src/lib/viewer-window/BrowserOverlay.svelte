@@ -7,6 +7,10 @@
     } from "$lib/browser/browserContext.svelte";
     import { ApiError, isOutOfDeclaration } from "$lib/api/client";
     import { Button } from "$lib/components/ui/button";
+    import {
+        CLIENT_DEFAULTS,
+        mergeClientConfig,
+    } from "$lib/config/clientDefaults";
     import { addSubTaskImage, removeSubTaskImage } from "$lib/data/helpers";
     import { instances } from "$lib/data/stores.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
@@ -31,8 +35,13 @@
     const taskContext = getContext<TaskContext>("taskContext");
     const subTask = taskContext?.subTask;
 
+    const resolvedConfig = mergeClientConfig(
+        CLIENT_DEFAULTS,
+        taskContext?.task.task_definition.config,
+    );
+
     // whether to update the image links in the database
-    let updateImageLinks = $state(false);
+    let updateImageLinks = $state(resolvedConfig.update_subtask_image_links);
 
     // Default query: all images for the patients in the current selection.
     const initialConditions: Condition[] = (() => {

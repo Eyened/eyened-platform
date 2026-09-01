@@ -27,6 +27,10 @@
                     action: "Add image as side panel",
                     keys: "Shift + click thumbnail",
                 },
+                {
+                    action: "Update linked cursor from thumbnail",
+                    keys: "Shift + move",
+                },
             ],
         },
         {

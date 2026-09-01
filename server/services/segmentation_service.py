@@ -18,6 +18,7 @@ from eyened_orm.repositories.segmentation_repository import (
     SegmentationRepository,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.repositories.task_repository import SubTaskRepository
 from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
@@ -49,6 +50,7 @@ class SegmentationService:
         image_repository: ImageInstanceRepository,
         tag_repository: TagRepository,
         data_store: SegmentationDataStore,
+        subtask_repository: SubTaskRepository,
         *,
         scope: AccessScope,
         audit: AuditService | None = None,
@@ -57,6 +59,7 @@ class SegmentationService:
         self.images = image_repository
         self.tags = tag_repository
         self.store = data_store
+        self.subtasks = subtask_repository
         self.scope = scope
         self._actor = ActingUser.from_scope(scope)
         self.audit = audit
@@ -189,6 +192,8 @@ class SegmentationService:
             self.store.write(segmentation, data)
         except ValueError as e:
             raise BadRequestError(str(e)) from e
+        if subtask_id is not None:
+            self.subtasks.claim_if_unassigned(subtask_id, self.scope.actor_id)
 
         if self.audit is not None:
             self.audit.record(
@@ -647,6 +652,7 @@ def get_segmentation_service(
         ImageInstanceRepository(db, scope=scope),
         TagRepository(db, scope=scope),
         get_segmentation_data_store(),
+        SubTaskRepository(db, scope=scope),
         scope=scope,
         audit=get_audit_service(db),
     )

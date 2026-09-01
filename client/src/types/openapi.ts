@@ -1007,10 +1007,11 @@ export interface paths {
         };
         /**
          * List Subtasks
-         * @description List subtasks of a task (pagination, optional images, optional status filter).
+         * @description List subtasks of a task (pagination, optional images, status/assignee filters).
          *
          *     ``index`` is the 0-based position within all subtasks of the task ordered by
-         *     SubTaskID (computed before any subtask_status filtering).
+         *     SubTaskID (computed before any filtering). ``unassigned`` and ``creator_id``
+         *     are mutually exclusive.
          */
         get: operations["list_subtasks_task__task_id__subtasks_get"];
         put?: never;
@@ -1033,6 +1034,26 @@ export interface paths {
          * @description Get a single subtask by index, optionally with images and the next subtask.
          */
         get: operations["get_subtask_task__task_id__subtask__subtask_index__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/task/{task_id}/subtask-assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Subtask Assignees
+         * @description Distinct creators who have claimed at least one subtask on this task.
+         */
+        get: operations["list_subtask_assignees_task__task_id__subtask_assignees_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1064,7 +1085,7 @@ export interface paths {
         head?: never;
         /**
          * Patch Subtask
-         * @description Update a subtask's comments and/or state.
+         * @description Update a subtask's comments, state, and/or claim. Returns 409 if already claimed or not owned.
          */
         patch: operations["patch_subtask_subtasks__subtaskid__patch"];
         trace?: never;
@@ -2258,6 +2279,19 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** SubTaskConflict */
+        SubTaskConflict: {
+            detail: components["schemas"]["SubTaskConflictDetail"];
+        };
+        /** SubTaskConflictDetail */
+        SubTaskConflictDetail: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Creator Id */
+            creator_id?: number | null;
+        };
         /** SubTaskGET */
         SubTaskGET: {
             /** Task Id */
@@ -2269,6 +2303,7 @@ export interface components {
             id: number;
             /** Creator Id */
             creator_id?: number | null;
+            creator?: components["schemas"]["CreatorMeta"] | null;
             /** Index */
             index?: number | null;
             next_task?: components["schemas"]["SubTaskGET"] | null;
@@ -2278,6 +2313,8 @@ export interface components {
             /** Comments */
             comments?: string | null;
             task_state?: components["schemas"]["SubTaskState"] | null;
+            /** Claim */
+            claim?: boolean | null;
         };
         /**
          * SubTaskState
@@ -2298,6 +2335,7 @@ export interface components {
             id: number;
             /** Creator Id */
             creator_id?: number | null;
+            creator?: components["schemas"]["CreatorMeta"] | null;
             /** Index */
             index?: number | null;
             next_task?: components["schemas"]["SubTaskGET"] | null;
@@ -5071,6 +5109,8 @@ export interface operations {
                 limit?: number;
                 page?: number;
                 subtask_status?: components["schemas"]["SubTaskState"] | null;
+                unassigned?: boolean;
+                creator_id?: number | null;
             };
             header?: {
                 authorization?: string;
@@ -5132,6 +5172,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubTaskWithImagesGET"] | components["schemas"]["SubTaskGET"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subtask_assignees_task__task_id__subtask_assignees_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                task_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatorMeta"][];
                 };
             };
             /** @description Validation Error */
@@ -5244,6 +5320,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubTaskGET"];
+                };
+            };
+            /** @description Subtask already claimed or not owned by the actor */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubTaskConflict"];
                 };
             };
             /** @description Validation Error */

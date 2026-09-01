@@ -76,21 +76,29 @@ async function handleTokenRefresh(): Promise<void> {
     }
 }
 
-/**
- * A FastAPI `detail`: a plain sentence for most errors, an object for the ones
- * that carry a machine-readable code (see `OutOfDeclarationDetail`).
- */
-export type ApiErrorDetail = string | Record<string, unknown>;
-
 export class ApiError extends Error {
     readonly status: number;
-    readonly detail?: ApiErrorDetail;
+    readonly detail: unknown;
 
-    constructor(status: number, message: string, detail?: ApiErrorDetail) {
+    constructor(status: number, message: string, detail?: unknown) {
         super(message);
         this.name = "ApiError";
         this.status = status;
         this.detail = detail;
+    }
+
+    /** The machine-readable tag a structured FastAPI `detail` carries. */
+    get code(): string | undefined {
+        if (
+            this.detail &&
+            typeof this.detail === "object" &&
+            !Array.isArray(this.detail) &&
+            "code" in this.detail
+        ) {
+            const code = (this.detail as { code?: unknown }).code;
+            return typeof code === "string" ? code : undefined;
+        }
+        return undefined;
     }
 }
 
@@ -106,54 +114,59 @@ export interface OutOfDeclarationDetail {
  * Narrow an ApiError to the declaration refusal.
  *
  * The `error is` return type is what lets a caller read `e.detail.message` and
- * `e.detail.image_projects` without an `as any`: `ApiErrorDetail` types every
- * field `unknown`. Only `code` is checked -- it is a runtime tag from a server
- * this client already trusts, and validating the rest would be a schema
- * validator.
+ * `e.detail.image_projects` without an `as any`: `detail` is `unknown`. Only
+ * `code` is checked -- it is a runtime tag from a server this client already
+ * trusts, and validating the rest would be a schema validator.
  */
 export function isOutOfDeclaration(
     error: ApiError,
 ): error is ApiError & { detail: OutOfDeclarationDetail } {
-    const d = error.detail;
-    return (
-        typeof d === "object" &&
-        d !== null &&
-        (d as { code?: unknown }).code === "image_outside_task_declaration"
-    );
+    return error.code === "image_outside_task_declaration";
 }
 
-/**
- * Split a parsed FastAPI error body into what an ApiError carries: the `detail`
- * itself, plus the server's own sentence when it sent one.
- */
-export function readErrorBody(body: unknown): {
-    detail?: ApiErrorDetail;
-    message?: string;
-} {
-    if (typeof body !== "object" || body === null) return {};
-    const detail = (body as { detail?: unknown }).detail;
-    if (typeof detail === "string") return { detail, message: detail };
-    if (typeof detail === "object" && detail !== null) {
-        const record = detail as Record<string, unknown>;
-        const message = record.message;
-        return {
-            detail: record,
-            message: typeof message === "string" ? message : undefined,
-        };
+/** Pull a human message and structured detail out of a FastAPI error body. */
+export function messageFromApiErrorBody(
+    error: unknown,
+    fallback: string,
+): { message: string; detail: unknown } {
+    const detail =
+        error &&
+        typeof error === "object" &&
+        error !== null &&
+        "detail" in error
+            ? (error as { detail: unknown }).detail
+            : error;
+    if (typeof detail === "string" && detail.trim()) {
+        return { message: detail, detail };
     }
-    return {};
+    if (
+        detail &&
+        typeof detail === "object" &&
+        !Array.isArray(detail) &&
+        "message" in detail &&
+        typeof (detail as { message: unknown }).message === "string"
+    ) {
+        const message = (detail as { message: string }).message.trim();
+        if (message) return { message, detail };
+    }
+    return { message: fallback, detail };
 }
 
-/** Build an ApiError from a FastAPI error response. */
+/** Build an ApiError from a FastAPI error response (`detail` may be a string or dict). */
 export async function apiErrorFromResponse(
     response: Response,
 ): Promise<ApiError> {
-    const { detail, message } = readErrorBody(await response.json());
-    return new ApiError(
-        response.status,
-        message ?? `Request failed: ${response.status}`,
-        detail,
+    let body: unknown;
+    try {
+        body = await response.json();
+    } catch {
+        return new ApiError(response.status, response.statusText);
+    }
+    const { message, detail } = messageFromApiErrorBody(
+        body,
+        response.statusText || `Request failed: ${response.status}`,
     );
+    return new ApiError(response.status, message, detail);
 }
 
 export function isUnauthorizedStatus(status: number): boolean {

@@ -361,3 +361,86 @@ def test_next_image_index_starts_at_zero_then_increments(session):
 
     assert repo.next_image_index(st.SubTaskID) == 4
 
+
+def test_claim_if_unassigned_sets_creator(session):
+    """Unassigned subtask is claimed by the given creator_id."""
+    actor = _creator(session, "claimer")
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.CreatorID)
+    st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    session.commit()
+
+    claimed = SubTaskRepository(session, scope=admin_scope()).claim_if_unassigned(
+        st.SubTaskID, actor.CreatorID
+    )
+    session.commit()
+
+    assert claimed is True
+    assert session.get(SubTask, st.SubTaskID).CreatorID == actor.CreatorID
+
+
+def test_claim_if_unassigned_does_not_steal(session):
+    """Already-assigned subtask is left unchanged."""
+    owner = _creator(session, "owner")
+    other = _creator(session, "other")
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.CreatorID)
+    st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    st.CreatorID = owner.CreatorID
+    session.commit()
+
+    claimed = SubTaskRepository(session, scope=admin_scope()).claim_if_unassigned(
+        st.SubTaskID, other.CreatorID
+    )
+    session.commit()
+
+    assert claimed is False
+    assert session.get(SubTask, st.SubTaskID).CreatorID == owner.CreatorID
+
+
+def test_list_for_task_filters_unassigned_and_creator(session):
+    """list_for_task honors unassigned=True and creator_id filters."""
+    owner = _creator(session, "owner")
+    other = _creator(session, "other")
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.CreatorID)
+    unassigned = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    owned = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    owned.CreatorID = owner.CreatorID
+    other_st = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    other_st.CreatorID = other.CreatorID
+    session.commit()
+
+    repo = SubTaskRepository(session, scope=admin_scope())
+    only_unassigned = repo.list_for_task(
+        task.TaskID, unassigned=True, limit=50, offset=0
+    )
+    assert [r.SubTaskID for r in only_unassigned] == [unassigned.SubTaskID]
+
+    only_owner = repo.list_for_task(
+        task.TaskID,
+        creator_id=owner.CreatorID,
+        limit=50,
+        offset=0,
+    )
+    assert [r.SubTaskID for r in only_owner] == [owned.SubTaskID]
+
+
+def test_list_assignees_for_task_returns_distinct_non_null_creators(session):
+    """list_assignees_for_task returns distinct creators, ordered by name."""
+    zed = _creator(session, "zed")
+    amy = _creator(session, "amy")
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, amy.CreatorID)
+    unassigned = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    st1 = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    st1.CreatorID = zed.CreatorID
+    st2 = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    st2.CreatorID = amy.CreatorID
+    st3 = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    st3.CreatorID = amy.CreatorID
+    session.commit()
+
+    assignees = SubTaskRepository(session, scope=admin_scope()).list_assignees_for_task(task.TaskID)
+
+    assert [c.CreatorName for c in assignees] == ["amy", "zed"]

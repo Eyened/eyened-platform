@@ -14,6 +14,7 @@ from eyened_orm.repositories.image_instance_repository import (
     ImageInstanceRepository,
 )
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.repositories.task_repository import SubTaskRepository
 from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
@@ -47,6 +48,7 @@ class FormAnnotationService:
         repository: FormAnnotationRepository,
         image_repository: ImageInstanceRepository,
         tag_repository: TagRepository,
+        subtask_repository: SubTaskRepository,
         *,
         scope: AccessScope,
         audit: AuditService | None = None,
@@ -54,6 +56,7 @@ class FormAnnotationService:
         self.repository = repository
         self.images = image_repository
         self.tags = tag_repository
+        self.subtasks = subtask_repository
         self.scope = scope
         self._actor = ActingUser.from_scope(scope)
         self.audit = audit
@@ -213,6 +216,8 @@ class FormAnnotationService:
         # refused. ``None`` is assigned too: loaded-and-empty, not unasked.
         annotation.ImageInstance = image
         self.repository.add(annotation)
+        if sub_task_id is not None:
+            self.subtasks.claim_if_unassigned(sub_task_id, self.scope.actor_id)
         if self.audit is not None:
             self.audit.record(
                 action="INSERT",
@@ -605,6 +610,7 @@ def get_form_annotation_service(
         FormAnnotationRepository(db, scope=scope),
         ImageInstanceRepository(db, scope=scope),
         TagRepository(db, scope=scope),
+        SubTaskRepository(db, scope=scope),
         scope=scope,
         audit=get_audit_service(db),
     )

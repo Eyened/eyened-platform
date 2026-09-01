@@ -58,7 +58,12 @@ async function renderOverlay() {
         setInstanceIDs,
     } as unknown as ViewerWindowContext;
 
-    const taskContext = { subTask: { id: 31 } } as unknown as TaskContext;
+    // The overlay reads its client config off the task definition; an empty
+    // one leaves CLIENT_DEFAULTS in place.
+    const taskContext = {
+        subTask: { id: 31 },
+        task: { task_definition: {} },
+    } as unknown as TaskContext;
 
     const { unmount } = render(BrowserOverlay, {
         props: { viewerWindowContext },

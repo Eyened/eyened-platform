@@ -31,6 +31,7 @@ from eyened_orm.repositories.image_instance_repository import (
 )
 from eyened_orm.repositories.segmentation_repository import SegmentationRepository
 from eyened_orm.repositories.tag_repository import TagRepository
+from eyened_orm.repositories.task_repository import SubTaskRepository
 from eyened_orm.segmentation import DataRepresentation, Datatype
 from eyened_orm.task import SubTaskImageLink, SubTaskState, TaskState
 from eyened_orm.utils.factories import (
@@ -151,6 +152,7 @@ def _annotations(session, scope) -> FormAnnotationService:
         FormAnnotationRepository(session, scope=scope),
         ImageInstanceRepository(session, scope=scope),
         TagRepository(session, scope=scope),
+        SubTaskRepository(session, scope=scope),
         scope=scope,
         audit=None,
     )
@@ -162,6 +164,7 @@ def _segmentations(session, scope) -> SegmentationService:
         ImageInstanceRepository(session, scope=scope),
         TagRepository(session, scope=scope),
         FakeSegmentationDataStore(),
+        SubTaskRepository(session, scope=scope),
         scope=scope,
         audit=None,
     )

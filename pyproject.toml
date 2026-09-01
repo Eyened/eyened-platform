@@ -1,5 +1,7 @@
 [tool.pytest.ini_options]
-pythonpath = ["."]
+# "orm" before "." so pytest in a linked worktree resolves eyened_orm from
+# this checkout even when the shared venv's editable install points elsewhere.
+pythonpath = ["orm", "."]
 testpaths = [
     "server",
     "orm",

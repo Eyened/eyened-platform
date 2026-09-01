@@ -32,6 +32,8 @@ describe("apiErrorFromResponse", () => {
 
         expect(err.status).toBe(502);
         expect(err.message).toBe("Request failed: 502");
-        expect(err.detail).toBeUndefined();
+        // The unrecognised body is still carried rather than dropped, so a
+        // caller that knows the gateway's shape can read it.
+        expect(err.detail).toEqual({ error: "bad gateway" });
     });
 });

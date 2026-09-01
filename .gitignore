@@ -3,6 +3,7 @@ docker/.env
 *.zip
 *.pyc
 notebooks/hrfav/**/*
+notebooks/schema.json
 node_modules/**/*
 extensions.ts
 client/src/lib/extensions.ts
@@ -36,6 +37,10 @@ graphify-out/
 .superpowers/
 CLAUDE.md
 docs/superpowers/
+
+# Agent / superpowers working docs (local only)
+.agents/
+
 .coverage
 coverage.xml
 htmlcov/

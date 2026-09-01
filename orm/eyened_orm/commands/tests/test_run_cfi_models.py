@@ -11,7 +11,7 @@ from eyened_orm.commands.model_processing import (
     CFI_ATTRIBUTE_MODEL_SLUGS,
     run_cfi_models,
 )
-from eyened_orm.commands.test_targets import _import_images
+from eyened_orm.commands.tests.test_targets import _import_images
 
 
 @pytest.fixture

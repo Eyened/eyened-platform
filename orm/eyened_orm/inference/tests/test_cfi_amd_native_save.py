@@ -15,7 +15,7 @@ from eyened_orm import (
     AttributesModel,
     ModelSegmentation,
 )
-from eyened_orm.commands.test_targets import _import_images
+from eyened_orm.commands.tests.test_targets import _import_images
 from eyened_orm.inference.cfi_amd_segmentation import (
     CFI_AMD,
     image_projection_matrix_from_cfi_roi,
