@@ -93,25 +93,30 @@ which would defeat the point.)
 the profile. That is deliberate: whether the bundled database runs is one
 setting (`local-db` in `COMPOSE_PROFILES`), not two.
 
-Compose declares three profiles, all defined in `deploy/compose.yaml`:
+Compose declares two profiles, both defined in `deploy/compose.yaml`:
 
 | Profile | Service | What it starts |
 |---|---|---|
 | `local-db` | `database` | the bundled MySQL |
 | `backup` | `xtrabackup` | a `percona/percona-xtrabackup:8.0` one-shot, used only by `deploy/scripts/save_dump.sh` and `load_dump.sh` — never a long-running service. `make db-snapshot` / `make db-restore` do **not** use this profile; see [Backup and rollback](#backup-and-rollback) |
-| `oidc` | `keycloak` | Keycloak, the bundled development OIDC provider |
 
-Profiles compose: a developer who wants Keycloak *and* the bundled database
-sets `COMPOSE_PROFILES=local-db,oidc`. A profile absent from
-`COMPOSE_PROFILES` means those services simply do not start — nothing warns
-you if you forgot one.
+A profile absent from `COMPOSE_PROFILES` means that service simply does not
+start — nothing warns you if you forgot one.
 
-**OIDC.** What you set here is the `oidc` profile, `KEYCLOAK_PORT` (default
-`8180`), and `KEYCLOAK_ADMIN_PASSWORD`. Note that `PUBLIC_HOST=localhost` —
-which is the value `.env.example` ships — together with `oidc` is a `make
-doctor` **failure**, not a warning: `doctor.sh` has no warning level, and
-`stack.sh` runs it before anything else, so the run stops at `preflight
-failed — nothing was built` (see [Troubleshooting](#troubleshooting)). For realm and client setup, see
+Layers append to `COMPOSE_FILE` the same way; the two optional ones are
+`compose.host-ports.yaml` (see [Sharing a machine](#sharing-a-machine)) and
+`compose.oidc.yaml` (the bundled Keycloak).
+
+**OIDC.** What you set here is `:compose.oidc.yaml` on `COMPOSE_FILE`,
+`KEYCLOAK_PORT` (default `8180`), and `KEYCLOAK_ADMIN_PASSWORD`. The
+`EYENED_OIDC_*` values themselves are never derived — they are plain
+operator values in `deploy/.env`, the same for the bundled Keycloak and an
+external provider.
+`./eyened doctor` refuses to build while `compose.oidc.yaml` is enabled and
+`KEYCLOAK_ADMIN_PASSWORD` is still a published default: `doctor.sh` has no
+warning level, and `stack.sh` runs it before anything else, so the run stops
+at `preflight failed — nothing was built` (see
+[Troubleshooting](#troubleshooting)). For realm and client setup, see
 **[`deploy/keycloak/README.md`](keycloak/README.md)** — that document is the
 source of truth for OIDC configuration and is not repeated here.
 
@@ -205,8 +210,8 @@ nobody else is using — all three are already present in `.env.example`:
 - `COMPOSE_PROJECT_NAME` — isolates containers, volumes and networks per
   stack.
 - `HTTP_PORT` (default `8080`) — the platform's own port.
-- `KEYCLOAK_PORT` (default `8180`) — only published when `oidc` is in
-  `COMPOSE_PROFILES`.
+- `KEYCLOAK_PORT` (default `8180`) — only published when `compose.oidc.yaml`
+  is in `COMPOSE_FILE`.
 
 No database or redis port is published by default — that is the commonest
 source of collisions between developers on one machine. If you need one (for
@@ -214,15 +219,15 @@ DBeaver, or a host-side alembic), append `:compose.host-ports.yaml` to
 `COMPOSE_FILE` and set `DB_PUBLISH_PORT` / `REDIS_PUBLISH_PORT` to free
 ports; both bind to `127.0.0.1` only.
 
-Keycloak is off unless `oidc` is in `COMPOSE_PROFILES`, and it **binds every
-interface** (`KEYCLOAK_BIND`, default `0.0.0.0`). That is not an oversight:
-the server container reaches Keycloak's metadata document *through the
-host*, so confining it to loopback makes OIDC login fail while every
-container still reports healthy. Because the admin console is therefore
-reachable by anyone who can reach the port, `KEYCLOAK_ADMIN_PASSWORD` is not
-optional: `make doctor` fails while it is absent, empty, `admin` or
-`change_me` and `oidc` is enabled, so the stack will not build until you set
-it.
+Keycloak is off unless `compose.oidc.yaml` is in `COMPOSE_FILE`, and it
+**binds every interface** (`KEYCLOAK_BIND`, default `0.0.0.0`). That is not
+an oversight: the server container reaches Keycloak's metadata document
+*through the host*, so confining it to loopback makes OIDC login fail while
+every container still reports healthy. Because the admin console is
+therefore reachable by anyone who can reach the port, `KEYCLOAK_ADMIN_PASSWORD`
+is not optional: `./eyened doctor` fails while it is absent, empty, `admin` or
+`change_me` and `compose.oidc.yaml` is enabled, so the stack will not build
+until you set it.
 
 ## Migrations
 
@@ -358,20 +363,18 @@ The `dc.sh` rows are not a special case: `deploy/scripts/dc.sh` is just
 
 - **Port already in use.** `make doctor` checks `HTTP_PORT` and names the
   fix (pick a free port in `deploy/.env`).
-- **`oidc` is enabled and `PUBLIC_HOST` is `localhost`.** `make doctor`
-  **fails** on this — it is not advisory, and nothing is built. Since
-  `.env.example` ships `PUBLIC_HOST=localhost`, this is the usual first OIDC
-  attempt. Inside the server container that name resolves to the container
-  itself before it resolves to the host, so reaching Keycloak would work only
-  after two refused connections. The fix doctor prints is to set
-  `PUBLIC_HOST` in `deploy/.env` to this machine's hostname or LAN IP — the
-  same value you type in the browser. The same applies to `127.0.0.1` and
-  `::1`.
-- **`oidc` is enabled and `KEYCLOAK_ADMIN_PASSWORD` is still the default.**
-  Also a `make doctor` failure, for the same reason: compose defaults it to
-  `admin`, so absent, empty, `admin` and `change_me` all mean the Keycloak
-  admin console comes up on `admin`/`admin` — and that console is the
-  identity provider for every account on the platform. Set it in
+- **`compose.oidc.yaml` is enabled and `KEYCLOAK_BIND` is loopback.**
+  `./eyened doctor` **fails** on this — it is not advisory, and nothing is
+  built. The server container reaches Keycloak's metadata document *through
+  the host*, not over the compose network, so a loopback bind leaves token
+  exchange failing while every container still reports healthy. The fix
+  doctor prints is to leave `KEYCLOAK_BIND` unset (`0.0.0.0`) and confine the
+  console with `KEYCLOAK_ADMIN_PASSWORD` instead.
+- **`compose.oidc.yaml` is enabled and `KEYCLOAK_ADMIN_PASSWORD` is still the
+  default.** Also a `./eyened doctor` failure, for the same reason: compose
+  defaults it to `admin`, so absent, empty, `admin` and `change_me` all mean
+  the Keycloak admin console comes up on `admin`/`admin` — and that console
+  is the identity provider for every account on the platform. Set it in
   `deploy/.env` to a long random value.
 - **Compose older than 2.26.** `make doctor` refuses to continue and names
   the required upgrade — see [Compose 2.26 or newer is

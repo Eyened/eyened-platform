@@ -1,29 +1,35 @@
 # Keycloak OIDC (dev)
 
-A local OIDC provider for testing the login flow. It is defined in the base
-`deploy/compose.yaml` behind the `oidc` profile, so it stays off — and its image is
-never pulled — until you ask for it.
+A local OIDC provider for testing the login flow. It is defined in
+`deploy/compose.oidc.yaml`, an opt-in **layer**, so it stays off — and its
+image is never pulled — until you ask for it.
 
 ## Start
 
 In `deploy/.env`, **before starting the stack**:
 
+- append `:compose.oidc.yaml` to `COMPOSE_FILE`
 - set `PUBLIC_HOST` to the hostname or LAN IP you type in the browser — **not `localhost`**,
   which is what `.env.example` ships. Inside the server container that name resolves to the
-  container itself, and while `oidc` is enabled `doctor.sh` treats it as a hard failure and
-  refuses to build anything (see
+  container itself, and while this layer is enabled with a loopback `KEYCLOAK_BIND` (see
+  below), `doctor.sh` treats it as a hard failure and refuses to build anything (see
   [Troubleshooting](../README.md#troubleshooting) in `deploy/README.md`).
 - set `EYENED_API_AUTH_OIDC_ENABLED=true`
 - set `EYENED_OIDC_CLIENT_ID=eyened-platform`
 - set `EYENED_OIDC_CLIENT_SECRET=eyened-dev-secret`
-- add `oidc` to `COMPOSE_PROFILES`
+- uncomment the three **bundled-realm** `EYENED_OIDC_METADATA_URL` /
+  `EYENED_OIDC_REDIRECT_URL` / `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS` lines
+  in `.env.example` (replace `localhost` with `PUBLIC_HOST` if you set one).
+  Nothing derives these any more: the bundled Keycloak and an external
+  provider are configured identically, by hand, and all three must move
+  together — see `deploy/compose.yaml` and `deploy/compose.oidc.yaml`.
 
-`KEYCLOAK_ADMIN_PASSWORD` is **not** in that list: `install.sh` generates it into
+`KEYCLOAK_ADMIN_PASSWORD` is **not** in that list: `./eyened install` generates it into
 `deploy/.env` on first run, alongside the database passwords and the API signing key. Read
 it out of that file when you need the admin console. It is on the list only if you wrote
 `deploy/.env` by hand or your copy predates that behaviour — see below.
 
-The two `EYENED_OIDC_CLIENT_*` lines ship **commented out** in `deploy/.env.example`, and
+The `EYENED_OIDC_CLIENT_*` lines ship **commented out** in `deploy/.env.example`, and
 `server/config.py` defaults both to the empty string with no validation error. Leave them
 commented and everything still starts and looks healthy — then Keycloak rejects the
 authorization request for an unknown client, with nothing on either side naming the empty
@@ -37,17 +43,18 @@ between fails Keycloak's exact-match check.)
 
 ## The admin console, and why the password carries the weight
 
-Unlike adminer, Keycloak is published on **every interface** (`KEYCLOAK_BIND`, default
-`0.0.0.0`), and it has to be. The server container fetches the metadata document *through
-the host* rather than over the compose network, so a loopback-only bind leaves OIDC login
-failing at the metadata fetch while every container reports healthy — `doctor.sh` refuses
-that combination for exactly that reason. The port being reachable is the point, which is
-why the credential is what has to carry the weight: that console administers the realm the
-platform trusts for logins.
+Keycloak is published on **every interface** (`KEYCLOAK_BIND`, default `0.0.0.0`), and it
+has to be. The server container fetches the metadata document *through the host* rather
+than over the compose network, so a loopback-only bind leaves OIDC login failing at the
+metadata fetch while every container reports healthy — `doctor.sh` refuses that combination
+for exactly that reason. The port being reachable is the point, which is why the credential
+is what has to carry the weight: that console administers the realm the platform trusts for
+logins.
 
-So `install.sh` generates the password rather than shipping one, and `doctor.sh` refuses to
-build with the `oidc` profile while it is absent, empty, `admin` or `change_me` — the
-backstop for a hand-written `deploy/.env`, or one created before generation existed.
+So `./eyened install` generates the password rather than shipping one, and `doctor.sh`
+refuses to build with `compose.oidc.yaml` in `COMPOSE_FILE` while it is absent, empty,
+`admin` or `change_me` — the backstop for a hand-written `deploy/.env`, or one created
+before generation existed.
 
 ## It is a development provider, and its state is disposable
 
@@ -70,8 +77,9 @@ deliberate, and together they mean:
 One setting is genuinely optional:
 
 - `KEYCLOAK_PORT` — the host port Keycloak is published on, default `8180`. Change it if
-  `8180` is already taken; the metadata URL and the `iss=` token check are both derived
-  from it.
+  `8180` is already taken, and update `EYENED_OIDC_METADATA_URL` and
+  `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS` in `deploy/.env` to match — nothing derives
+  them from it any more.
 
 Then:
 
@@ -86,27 +94,30 @@ Open `http://<PUBLIC_HOST>:<HTTP_PORT>/users/login` and sign in with **`testuser
 - `entrypoint.sh` + `realm-eyened-dev.json.template` — import a ready-made realm,
   client (`eyened-platform` / `eyened-dev-secret`) and test user.
 - Every `EYENED_OIDC_*` setting is read from `.env`. `deploy/compose.yaml` passes all seven
-  through as `${EYENED_OIDC_…:-<default>}`, so four of them (`CLIENT_ID`, `CLIENT_SECRET`,
-  `PROVIDER_NAME`, `CREATE_NEW_ACCOUNTS`) are yours to fill in, and three
-  (`METADATA_URL`, `REDIRECT_URL`, `ADDITIONAL_TOKEN_VALIDATIONS`) default to a derivation
-  from this folder's Keycloak that you can override.
+  through as `${EYENED_OIDC_…:-<default>}` — plain operator values, none of them derived.
+  Four (`CLIENT_ID`, `CLIENT_SECRET`, `PROVIDER_NAME`, `CREATE_NEW_ACCOUNTS`) default to a
+  fixed string or boolean; the other three (`METADATA_URL`, `REDIRECT_URL`,
+  `ADDITIONAL_TOKEN_VALIDATIONS`) default to the empty string, so all three have to be set
+  by hand for either the bundled realm or an external provider — see [Start](#start) above.
 - `PUBLIC_URL` moves the realm's redirect URI and `webOrigins` — but **not** Keycloak's
   own `KC_HOSTNAME`, so this bundled provider is for **direct-access development only**.
   Behind a TLS-terminating proxy the browser would be sent to an `authorization_endpoint`
   on `http://<PUBLIC_HOST>:<KEYCLOAK_PORT>`, a port such a deployment does not publish.
   Nobody has run that topology; do not assume `PUBLIC_URL` alone makes it work. To put a
-  proxy in front, either route `/realms/` through it and move `KC_HOSTNAME`, the `iss=`
-  in `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS` and `EYENED_OIDC_METADATA_URL` together
-  (`deploy/compose.yaml` says so at each of them), or use a real IdP instead.
+  proxy in front, either route `/realms/` through it and move `KC_HOSTNAME`
+  (`deploy/compose.oidc.yaml`), the `iss=` in `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS`
+  and `EYENED_OIDC_METADATA_URL` (`deploy/compose.yaml`) together, or use a real IdP
+  instead.
 
 ## Against a real provider
 
-To use a real IdP (e.g. SURFconext) instead, skip this folder entirely: leave `oidc` out of
-`COMPOSE_PROFILES`, keep `EYENED_API_AUTH_OIDC_ENABLED=true`, and set the `EYENED_OIDC_*`
-values in `deploy/.env`. All seven reach the server from there.
+To use a real IdP (e.g. SURFconext) instead, skip this folder entirely: leave
+`compose.oidc.yaml` out of `COMPOSE_FILE`, keep `EYENED_API_AUTH_OIDC_ENABLED=true`, and set
+the `EYENED_OIDC_*` values in `deploy/.env`. All seven reach the server from there, exactly
+the same way as for the bundled realm.
 
 Three of them must move **together**: `EYENED_OIDC_METADATA_URL`, `EYENED_OIDC_REDIRECT_URL`
-and `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS`. Their defaults are all derived from this
-folder's Keycloak, so overriding one and not the others leaves a mismatched set — a metadata
-URL at the real provider next to an `iss=` still naming the dev realm, say — and that fails
-token validation with nothing in the log to say why.
+and `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS`. All three default to the empty string, so
+switching from the bundled realm to a real provider (or back) means setting all three at
+once — a metadata URL at the real provider next to a redirect URL or an `iss=` still naming
+the dev realm fails token validation with nothing in the log to say why.

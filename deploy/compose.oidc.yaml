@@ -1,0 +1,96 @@
+# Development/testing OIDC provider, as an opt-in LAYER rather than a profile.
+#
+# Enable by appending :compose.oidc.yaml to COMPOSE_FILE in deploy/.env, the
+# same way compose.host-ports.yaml is enabled, and setting the EYENED_OIDC_*
+# block in .env. Nothing derives those values any more: the bundled Keycloak
+# and an external IdP (SURFconext, Entra, Okta) are configured identically.
+#
+# The realm here is a DEV realm. This is not a production identity provider.
+
+services:
+
+  # The server reaches Keycloak through the HOST, not over the compose
+  # network: EYENED_OIDC_METADATA_URL is the browser-facing URL, so the call
+  # leaves the container and comes back in through the published port. That
+  # alias is why this line lives here and not in compose.dev.yaml — it is the
+  # only thing that needs it, and confining it to this layer means a dev stack
+  # without OIDC gains no host-gateway alias at all.
+  server:
+    extra_hosts:
+      - "${PUBLIC_HOST:-localhost}:host-gateway"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    # YAML anchors do not cross files: compose.yaml's x-logging/x-restart only
+    # reach services defined in compose.yaml, so a service introduced by a
+    # layer inherits neither and must restate them. Literal values, matching
+    # the base's — not a re-declared anchor. Without this, Keycloak's stdout
+    # is an UNCAPPED json-file log on a host several stacks share.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+    # No `env_file: .env` — every variable Keycloak needs is listed below, and
+    # that file also holds the MySQL root password and the API signing key.
+    #
+    # No `depends_on` on the server pointing here either, and do not add one:
+    # the server is defined in compose.yaml, which is loaded without this
+    # layer, so the reference would be to a service that does not exist. The
+    # server discovers the provider lazily over HTTP; start order is not a
+    # concern here.
+    entrypoint: ["/bin/bash", "/opt/keycloak/entrypoint.sh"]
+    environment:
+      # Hostname v2 (the default since Keycloak 25): ONE absolute URL, and no
+      # hostname-port / hostname-strict-https — those are v1 options. Keycloak
+      # 26.0.8 does not abort on them, it logs an ERROR at every startup and
+      # ignores them, which is worse. A BARE hostname is not enough either:
+      # v2 takes scheme and port from the REQUEST for one of those (probed
+      # with `Host: elsewhere.example:9999` — the port moved, the host stayed
+      # pinned). An absolute URL pins all of it, which matters because
+      # EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS compares the issuer by exact
+      # string.
+      #
+      # KC_HOSTNAME_STRICT is deliberately absent. It is NOT a v1 option — it
+      # survives into v2 — it is simply inert next to an absolute hostname,
+      # and Keycloak says so itself at every boot. Re-adding "false" changes
+      # nothing WHILE this line stands; it only matters if KC_HOSTNAME is ever
+      # removed, and then it re-enables exactly the request-header inference
+      # this line exists to prevent.
+      KC_HOSTNAME: http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}
+      # KC_BOOTSTRAP_ADMIN_*, not KEYCLOAK_ADMIN/KEYCLOAK_ADMIN_PASSWORD: the
+      # old pair still works in 26 but logs KC-SERVICES0110 deprecation
+      # warnings, and this is a first-boot bootstrap credential either way.
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Read by entrypoint.sh INSIDE the container, not by compose. Dropping
+      # `env_file: .env` above is what makes listing them here mandatory:
+      # entrypoint.sh runs `set -u` with `${PUBLIC_HOST:?}`, so if these are
+      # absent it exits before kc.sh and this layer silently starts nothing.
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+      HTTP_PORT: ${HTTP_PORT:-8080}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+    # KEYCLOAK_BIND exists so this admin console can be confined, but its
+    # default is NOT 127.0.0.1 the way compose.host-ports.yaml's are —
+    # loopback provably breaks the only flow this layer supports. Measured on
+    # this host: with a listener bound to 127.0.0.1 a connection from the
+    # docker0 bridge (172.17.0.1) is REFUSED; on 0.0.0.0 it succeeds. So
+    # KEYCLOAK_BIND=127.0.0.1 leaves OIDC login failing at metadata fetch with
+    # every container up and healthy. Confine it with KEYCLOAK_ADMIN_PASSWORD
+    # instead, and remember the realm here is a DEV realm either way.
+    #
+    # KNOWING EXCEPTION to "never publish a service on 0.0.0.0 on this host":
+    # this default is a deliberate, previously-taken decision, carried forward
+    # unchanged from the profile this layer replaces — not a new exposure.
+    # Three consumers (the browser, the server container via host-gateway, and
+    # an operator reading the admin console) each need a different reachable
+    # address, and a loopback default silently breaks the dev layer for one of
+    # them. The compensating control is KEYCLOAK_ADMIN_PASSWORD, which
+    # ./eyened install generates on first run, and doctor.sh refuses to
+    # proceed with this layer enabled while it is still a published default.
+    ports:
+      - "${KEYCLOAK_BIND:-0.0.0.0}:${KEYCLOAK_PORT:-8180}:8080"
+    volumes:
+      - ./keycloak/entrypoint.sh:/opt/keycloak/entrypoint.sh:ro
+      - ./keycloak/realm-eyened-dev.json.template:/opt/keycloak/import-template/realm-eyened-dev.json:ro

@@ -144,81 +144,51 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # MYSQL_ROOT_PASSWORD="change_me" would otherwise compare unequal to the
     # bare value being tested for and pass every check that depends on it.
     compose_file=$(norm "$(env_get COMPOSE_FILE)")
-    profiles=$(norm "$(env_get COMPOSE_PROFILES)")
 
-    # OIDC endpoints are built from PUBLIC_HOST because the issuer the SERVER
-    # validates must be byte-identical to the one the BROWSER was redirected
-    # to. The dev override maps PUBLIC_HOST to host-gateway so the server can
-    # reach a host-published Keycloak — but if PUBLIC_HOST is 'localhost',
-    # /etc/hosts resolves it to the container itself first (::1, then
-    # 127.0.0.1, then the gateway), so every token validation pays two
-    # refused connections before it succeeds.
-    case "$profiles" in
-        *oidc*)
-            public_host=$(norm "$(env_get PUBLIC_HOST)")
-            case "${public_host:-localhost}" in
-                localhost|127.0.0.1|::1)
-                    problem "COMPOSE_PROFILES enables 'oidc' but PUBLIC_HOST is
-      '${public_host:-localhost}'. Inside the server container that name resolves to
-      the container itself before it resolves to the host, so reaching
-      Keycloak works only after two failed connections — and any change to
-      the retry behaviour turns it into an outright failure.
-      Fix: set PUBLIC_HOST in deploy/.env to this machine's hostname or LAN
-           IP — the same value you type in the browser." ;;
-                *) ok "PUBLIC_HOST '$public_host' is usable for OIDC" ;;
-            esac
-            # KEYCLOAK_BIND looks like a hardening knob and behaves like a trap.
-            # The server does not reach Keycloak over the compose network: its
-            # metadata URL is the BROWSER-facing one (compose.yaml), so the call
-            # leaves the container and comes back in through the published port
-            # via the dev layer's host-gateway alias. Measured on the docker0
-            # bridge: with the listener on 127.0.0.1 a connection from
-            # 172.17.0.1 is REFUSED; on 0.0.0.0 it succeeds. So confining the
-            # port to loopback leaves every container healthy, the login page
-            # reachable in the browser, and token exchange failing with nothing
-            # naming the cause. Scoped to the dev layer because that is the only
-            # one that adds the host-gateway alias.
+    # The bundled Keycloak is a LAYER now, not a profile — so the gate is
+    # COMPOSE_FILE, not COMPOSE_PROFILES.
+    case "$compose_file" in
+        *compose.oidc.yaml*)
+            # KEYCLOAK_BIND looks like a hardening knob and behaves like a
+            # trap. The server does not reach Keycloak over the compose
+            # network: EYENED_OIDC_METADATA_URL is the BROWSER-facing URL, so
+            # the call leaves the container and comes back in through the
+            # published port via this layer's host-gateway alias. Measured on
+            # the docker0 bridge: with the listener on 127.0.0.1 a connection
+            # from 172.17.0.1 is REFUSED; on 0.0.0.0 it succeeds. So confining
+            # the port to loopback therefore leaves every container healthy,
+            # the login page reachable in the browser, and token exchange
+            # failing with nothing naming the cause.
             kc_bind=$(norm "$(env_get KEYCLOAK_BIND)")
-            case "$compose_file:$kc_bind" in
-                *compose.dev.yaml*:127.0.0.1|*compose.dev.yaml*:::1|*compose.dev.yaml*:localhost)
+            case "$kc_bind" in
+                127.0.0.1|::1|localhost)
                     problem "KEYCLOAK_BIND is '$kc_bind', which confines the bundled Keycloak to
       loopback — but the server container reaches it through the host gateway,
       not over the compose network, so token exchange will fail while every
       container still reports healthy.
       Fix: leave KEYCLOAK_BIND unset (0.0.0.0) and restrict the console with
-           KEYCLOAK_ADMIN_PASSWORD instead, which install.sh generates." ;;
+           KEYCLOAK_ADMIN_PASSWORD instead, which ./eyened install generates." ;;
                 *) ok "KEYCLOAK_BIND '${kc_bind:-0.0.0.0}' leaves Keycloak reachable from the server" ;;
             esac ;;
-        *)
-            # The profile and the switch are independent, and this branch used
-            # to report only the profile — printing a green "oidc profile is
-            # off" over a server configured to do OIDC with no provider to do
-            # it against. Running OIDC against an EXTERNAL IdP with the
-            # bundled Keycloak switched off is a SUPPORTED configuration, so
-            # what separates the two is not the switch on its own but
-            # EYENED_OIDC_METADATA_URL: compose.yaml defaults it to the
-            # BUNDLED Keycloak's realm URL, so leaving it empty while the
-            # profile is off points the server at a Keycloak nothing started.
-            # An external IdP always names its own metadata URL, so it never
-            # lands in the failing branch.
-            oidc_switch=$(norm "$(env_get EYENED_API_AUTH_OIDC_ENABLED)" | tr 'A-Z' 'a-z')
-            case "$oidc_switch" in
-                true|1|yes|on)
-                    if [ -n "$(norm "$(env_get EYENED_OIDC_METADATA_URL)")" ]; then
-                        ok "oidc profile is off and EYENED_OIDC_METADATA_URL names an external provider"
-                    else
-                        problem "EYENED_API_AUTH_OIDC_ENABLED is '$oidc_switch', so the server will do OIDC —
-      but 'oidc' is not in COMPOSE_PROFILES, so the bundled Keycloak is not
-      started, and EYENED_OIDC_METADATA_URL is empty, so the server falls back
-      to the bundled Keycloak's own URL. Nothing will be listening on it and
-      every login will fail at the metadata fetch.
-      Fix: add 'oidc' to COMPOSE_PROFILES to run the bundled Keycloak, or set
-           EYENED_OIDC_METADATA_URL to your own provider's
-           .well-known/openid-configuration, or set
-           EYENED_API_AUTH_OIDC_ENABLED=false."
-                    fi ;;
-                *) ok "oidc profile is off and OIDC is not enabled (PUBLIC_HOST not checked)" ;;
-            esac ;;
+    esac
+
+    # Independent of which provider: nothing derives the metadata URL any
+    # more, so an OIDC-enabled server with an empty one has no provider at
+    # all and every login fails at the metadata fetch. server/config.py
+    # defaults it to "", which pydantic accepts, so nothing else catches this.
+    case "$(norm "$(env_get EYENED_API_AUTH_OIDC_ENABLED)" | tr 'A-Z' 'a-z')" in
+        true|1|yes|on)
+            if [ -n "$(norm "$(env_get EYENED_OIDC_METADATA_URL)")" ]; then
+                ok "OIDC is enabled and EYENED_OIDC_METADATA_URL names a provider"
+            else
+                problem "EYENED_API_AUTH_OIDC_ENABLED is on, so the server will do OIDC — but
+      EYENED_OIDC_METADATA_URL is empty, so there is no provider to do it
+      against and every login fails at the metadata fetch.
+      Fix: set EYENED_OIDC_METADATA_URL (and REDIRECT_URL and
+           ADDITIONAL_TOKEN_VALIDATIONS — all three together) in deploy/.env,
+           or set EYENED_API_AUTH_OIDC_ENABLED=false."
+            fi ;;
+        *) ok "OIDC is not enabled" ;;
     esac
 
     # A COMPOSE_FILE naming both layers is accepted silently by compose itself
@@ -290,21 +260,21 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # hand-written or pre-generation .env may carry any of the rest. This is
     # the backstop for those, not the primary mechanism.
     #
-    # Gated on the profile: the bundled Keycloak only exists when 'oidc' is in
-    # COMPOSE_PROFILES, and the majority who never enable it should not get a
-    # line about a container they do not run.
-    case "$profiles" in
-        *oidc*)
+    # Gated on the LAYER: the bundled Keycloak only exists when
+    # compose.oidc.yaml is in COMPOSE_FILE, and the majority who never enable
+    # it should not get a line about a container they do not run.
+    case "$compose_file" in
+        *compose.oidc.yaml*)
             case "$(norm "$(env_get KEYCLOAK_ADMIN_PASSWORD)")" in
                 ''|admin|change_me)
-                    problem "COMPOSE_PROFILES enables 'oidc', which starts the bundled Keycloak, but
+                    problem "COMPOSE_FILE includes compose.oidc.yaml, which starts the bundled Keycloak, but
       KEYCLOAK_ADMIN_PASSWORD is not set to a real value in deploy/.env.
       Compose defaults it to 'admin', so the Keycloak admin console comes up
       on admin/admin — and that console is the identity provider for every
       account on this platform.
       Fix: set KEYCLOAK_ADMIN_PASSWORD in deploy/.env to a long random value.
-           ./install.sh generates one on a first run; a .env written by hand,
-           or created before that was added, has to be given one." ;;
+           ./eyened install generates one on a first run; a .env written by
+           hand, or created before that was added, has to be given one." ;;
                 *) ok "KEYCLOAK_ADMIN_PASSWORD is not the published default" ;;
             esac ;;
     esac

@@ -266,7 +266,7 @@ jobs:
           check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db"
           check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     ""
           check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.host-ports.yaml" "local-db"
-          check "compose.yaml:compose.dev.yaml:compose.storage.yaml" "local-db,oidc"
+          check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.oidc.yaml" "local-db"
           check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db,backup"
           exit $fail
 

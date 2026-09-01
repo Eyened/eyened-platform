@@ -14,9 +14,6 @@ services:
       - ../orm:/app/orm
     environment:
       EYENED_API_DEBUG: "true"
-    extra_hosts:
-      # Lets the server reach a Keycloak published on the host (oidc profile).
-      - "${PUBLIC_HOST:-localhost}:host-gateway"
     # Many developers share one machine; keep one stack from starving the rest.
     deploy:
       resources:
