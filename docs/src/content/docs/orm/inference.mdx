@@ -7,6 +7,8 @@ sidebar:
 
 The ORM runs inference through `eorm` commands that write results to the database (`AttributeValue`, `ModelSegmentation`, or patient-level registration JSON). All image-scoped commands share the same **[targeting flags](/eyened-platform/orm/cli#targeting)**.
 
+**Where to run them** depends on the model. The server image does **not** include PyTorch. `cfi-roi` is OpenCV + `retinalysis-fundusprep` and can run in the server container or the slim ROI worker. GPU models need the images under `worker/` — see [Workers and images](#workers-and-images).
+
 ## Attribute models (`run-cfi-models`)
 
 Runs **AttributesModel** pipelines — CFI ROI, keypoints, quality scores, etc. Each model:
@@ -24,7 +26,7 @@ eorm run-cfi-models --path ids.txt
 eorm run-cfi-models -m cfi-keypoints --upgrade
 ```
 
-With no targeting flags, processes all active images. 
+With no targeting flags, processes all active ColorFundus images. With no `-m`, all four CFI models run — keypoints, ODFD, and quality need the GPU inference image; `cfi-roi` alone can run in the server container.
 
 `run-models` is a deprecated alias for `run-cfi-models`.
 
@@ -83,9 +85,46 @@ eorm run-etdrs-model --project "My Study" -s <segmentation-model-id>
 
 See also **[ETDRS Panel](/eyened-platform/client/panels/etdrs)** and **[CLI](/eyened-platform/orm/cli)**.
 
-## Workers and queues
+## Workers and images
 
-Async API endpoints enqueue the same jobs on Redis. A worker with `EYENED_RQ_WORKER_QUEUES` including the relevant queue must be running — see **[Thumbnails](/eyened-platform/thumbnails#worker)** for worker setup pattern.
+| Work | Image | Compose |
+|------|--------|---------|
+| `cfi-roi`, thumbnails (`default` queue) | `worker/Dockerfile.cfi-roi` (no torch) | `worker/docker-compose.cfi-roi.yml` |
+| `cfi-keypoints`, `cfi-odfd`, `cfi-quality` | `worker/Dockerfile.inference` (PyTorch + `retinalysis-inference`) | `worker/docker-compose.inference.yml` |
+| `cfi-amd` | `worker/Dockerfile.cfi-amd` | `worker/docker-compose.cfi-amd.yml` |
+| `layer-segmentation` | `worker/Dockerfile.layersegmentation` | `worker/docker-compose.layersegmentation.yml` |
+
+Copy `worker/.env.example` to `worker/.env` (Redis, database, `EYENED_STORAGE_ROOT`). If you run both the slim ROI worker and the GPU worker, omit `cfi-roi` (and optionally `default`) from the GPU worker's `EYENED_RQ_WORKER_QUEUES` so each job is handled once.
+
+### Queue via the API (usual production path)
+
+The API only **enqueues**. A worker that listens on the matching queue must be running:
+
+```bash
+cd worker
+docker compose -f docker-compose.cfi-roi.yml up --build
+docker compose -f docker-compose.inference.yml up --build
+```
+
+`POST /api/import/run_cfi_models` (and `eorm` enqueue helpers) put `cfi-roi` on the `cfi-roi` queue and the torch models on their own queues. Thumbnail jobs use `default` — see **[Thumbnails](/eyened-platform/thumbnails#worker)**.
+
+### Run `eorm` inside a worker image (one-shot / backfill)
+
+The server container can run `cfi-roi`:
+
+```bash
+docker compose run --rm server eorm run-cfi-models -m cfi-roi --project "My Study"
+```
+
+GPU CFI models must run in the inference image (torch, CUDA, `retinalysis-inference`):
+
+```bash
+cd worker
+docker compose -f docker-compose.inference.yml run --rm worker \
+  eorm run-cfi-models -m cfi-keypoints --project "My Study"
+```
+
+Same pattern for segmentation: `docker compose -f docker-compose.cfi-amd.yml run --rm worker-cfi-amd eorm run-segmentation -m cfi-amd ...` and `docker compose -f docker-compose.layersegmentation.yml run --rm worker-layersegmentation eorm run-segmentation -m layer-segmentation ...`.
 
 ## Related data model docs
 
