@@ -263,6 +263,48 @@ def test_image_attrs_uses_highest_version(session):
     assert attrs_by_model["CFI_ROI"]["CFI_ROI"]["center"] == [5, 5]
 
 
+def test_image_attrs_includes_unmodeled_photolocators(session):
+    """Device PhotoLocators have no producing model and must still reach the API."""
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+
+    locators_attr = AttributeDefinition.get_or_create(
+        session,
+        match_by={
+            "AttributeName": "PhotoLocators",
+            "AttributeDataType": AttributeDataType.JSON,
+        },
+    )
+    locators = [
+        {
+            "type": "LinePhotoLocator",
+            "image_id": "v88xz6i6",
+            "index": 0,
+            "start": {"x": 836, "y": 437.0},
+            "end": {"x": 1600, "y": 437.0},
+        }
+    ]
+    session.add(
+        AttributeValue(
+            AttributeID=locators_attr.AttributeID,
+            ModelID=None,
+            ImageInstanceID=image.ImageInstanceID,
+            ValueJSON=locators,
+        )
+    )
+    _seed_cfi_roi_values(
+        session,
+        image.ImageInstanceID,
+        versions={"2.0": {"center": [5, 5], "radius": 5, "lines": {}}},
+    )
+    session.commit()
+    session.refresh(image)
+
+    attrs_flat, attrs_by_model = image.attrs
+    assert attrs_flat["PhotoLocators"] == locators
+    assert attrs_by_model["CFI_ROI"]["CFI_ROI"]["center"] == [5, 5]
+
+
 def test_image_roi_uses_highest_version(session, caplog):
     import logging
 
