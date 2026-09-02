@@ -3,10 +3,12 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
-from eyened_orm.data_access import get_data_access_adapter
+from rtnls_fundusprep.transformation import Interpolation, ProjectiveTransform
 from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, event, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
+
+from eyened_orm.data_access import get_data_access_adapter
 
 from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
@@ -151,6 +153,76 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
         if self.ImageProjectionMatrix is None:
             return None
         return np.linalg.inv(np.array(self.ImageProjectionMatrix))
+
+    def warp_to_image(
+        self,
+        data: np.ndarray | None = None,
+        *,
+        mode: Interpolation | None = None,
+    ) -> np.ndarray:
+        """Warp 2D segmentation data into original ``ImageInstance`` space.
+
+        Uses ``ImageProjectionMatrix`` (segmentation → image), matching::
+
+            ProjectiveTransform(matrix, in_size=data.shape[:2], out_size=image_hw)
+            transform.warp(data, image_hw)
+
+        ``data`` may be a 2D array or a 3D volume with one singleton axis
+        (as returned by ``read_data()``). If omitted, ``read_data()`` is used.
+        Integer / label representations default to nearest-neighbor; probability
+        maps default to bilinear. Pass ``mode`` to override.
+
+        If ``ImageProjectionMatrix`` is ``None``, the array is already in image
+        space and is returned after squeezing.
+        """
+        if not self.is_2d:
+            raise ValueError("warp_to_image is only supported for 2D segmentations")
+
+        if not self.ImageInstance:
+            raise ValueError("Segmentation has no associated ImageInstance")
+
+        if data is None:
+            data = self.read_data()
+            if data is None:
+                raise ValueError("Segmentation has no data")
+
+        data = np.asarray(data)
+        if data.ndim == 3:
+            singleton_axes = tuple(i for i, s in enumerate(data.shape) if s == 1)
+            if len(singleton_axes) != 1:
+                raise ValueError(
+                    "Expected a 2D array or a 3D array with exactly one "
+                    f"singleton axis, got shape {data.shape}"
+                )
+            data = np.squeeze(data, axis=singleton_axes)
+        if data.ndim != 2:
+            raise ValueError(
+                f"Expected 2D segmentation data, got shape {data.shape}"
+            )
+
+        image = self.ImageInstance
+        out_size = (image.Rows_y, image.Columns_x)
+        matrix = self.projection_matrix
+        if matrix is None:
+            if data.shape[:2] != out_size:
+                raise ValueError(
+                    f"Segmentation shape {data.shape[:2]} does not match image "
+                    f"{out_size} and ImageProjectionMatrix is None"
+                )
+            return data
+
+        if mode is None:
+            if self.DataRepresentation == DataRepresentation.Probability:
+                mode = Interpolation.BILINEAR
+            else:
+                mode = Interpolation.NEAREST
+
+        transform = ProjectiveTransform(
+            np.asarray(matrix, dtype=float),
+            in_size=data.shape[:2],
+            out_size=out_size,
+        )
+        return transform.warp(data, out_size, mode=mode)
 
     def _api_data_path(self) -> str:
         seg_id = getattr(self, "SegmentationID", None)
