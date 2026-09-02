@@ -936,9 +936,11 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         """Attribute values for API payloads, using version-aware selection.
 
         Returns ``(attrs_flat, attrs_by_model)`` where each attribute appears
-        at most once per scope, selected by
+        at most once per scope. Modeled rows are selected by
         :func:`~eyened_orm.inference.model_inputs.select_attribute_value`
-        (highest producing-model version among available rows).
+        (highest producing-model version among available rows). Rows with no
+        producing model (e.g. device PhotoLocators) are returned in
+        ``attrs_flat``.
         """
         from collections import defaultdict
 
@@ -960,11 +962,17 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         attrs_flat: dict[str, object] = {}
 
         for (model_name, attr_name), candidates in grouped.items():
-            av = select_attribute_value(
-                candidates,
-                attribute_name=attr_name,
-                producing_model_name=model_name,
-            )
+            if model_name is None:
+                av = None
+                for candidate in candidates:
+                    if attribute_value_data(candidate) is not None:
+                        av = candidate
+            else:
+                av = select_attribute_value(
+                    candidates,
+                    attribute_name=attr_name,
+                    producing_model_name=model_name,
+                )
             if av is None:
                 continue
             value = attribute_value_data(av)

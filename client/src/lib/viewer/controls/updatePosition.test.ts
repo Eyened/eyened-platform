@@ -53,10 +53,14 @@ describe("UpdatePosition", () => {
         });
     });
 
-    it("does not update the linked cursor on main-viewer hover while Shift is held", () => {
+    it("updates the linked cursor on main-viewer hover while Shift is held", () => {
         const { event, setPosition } = makeEvent({ shift: true });
         control.pointermove(event);
-        expect(setPosition).not.toHaveBeenCalled();
+        expect(setPosition).toHaveBeenCalledWith("img-1", {
+            x: 3,
+            y: 4,
+            index: 7,
+        });
     });
 
     it("does not update the linked cursor on top-row hover without Shift", () => {
