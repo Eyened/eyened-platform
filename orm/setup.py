@@ -40,7 +40,6 @@ setup(
         "pyyaml==6.*",
         "google_crc32c==1.8.0",
         "simpleitk==2.*",
-        "torch>=2.13.0",
         "zarr>=2.18.0",
         "passlib==1.7.4",
         "argon2-cffi>=25.1.0",
