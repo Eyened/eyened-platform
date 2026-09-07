@@ -94,4 +94,13 @@ describe("UpdatePosition", () => {
         control.pointermove(event);
         expect(setPosition).not.toHaveBeenCalled();
     });
+
+    it("does not update the linked cursor while dragging the main viewer", () => {
+        const { event, setPosition } = makeEvent({
+            shift: true,
+            buttons: 1,
+        });
+        control.pointermove(event);
+        expect(setPosition).not.toHaveBeenCalled();
+    });
 });
