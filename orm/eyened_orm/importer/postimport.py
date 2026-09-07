@@ -43,13 +43,16 @@ def _local_cfi_attribute(
     *,
     device: str | None,
 ) -> None:
-    from eyened_orm.commands.model_processing import _get_device, run_cfi_attribute_pipeline
+    from eyened_orm.commands.model_processing import (
+        _device_for_cfi_slug,
+        run_cfi_attribute_pipeline,
+    )
 
     run_cfi_attribute_pipeline(
         session,
         image_ids,
         model_slug,
-        device=_get_device(device),
+        device=_device_for_cfi_slug(model_slug, device),
     )
 
 

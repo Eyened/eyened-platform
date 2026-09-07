@@ -42,16 +42,18 @@ def run_cfi_model_for_image_ids(
 ) -> bool:
     """Run one CFI attribute pipeline (``cfi-roi``, ``cfi-quality``, ...)."""
     from eyened_orm import Database
-    from eyened_orm.commands.model_processing import _get_device, run_cfi_attribute_pipeline
+    from eyened_orm.commands.model_processing import (
+        _device_for_cfi_slug,
+        run_cfi_attribute_pipeline,
+    )
 
     database = Database()
-    device = _get_device(None)
     with database.get_session() as session:
         run_cfi_attribute_pipeline(
             session,
             image_ids,
             model,
-            device=device,
+            device=_device_for_cfi_slug(model, None),
             batch_size=batch_size,
             n_workers=n_workers,
             overwrite=overwrite,
