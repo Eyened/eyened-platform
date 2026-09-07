@@ -27,8 +27,9 @@ yet). **The revision ids this step used to name no longer resolve.** The alembic
 squash folded every migration before it into a single `orm_baseline` revision and
 moved the originals to `versions_archive/`, which is off alembic's search path --
 see `docs/runbooks/2026-08-20-alembic-squash-cutover.md`. Take the target from
-`alembic heads`, never from this document. The server container runs as `eyened_wr`, which holds no DDL rights, so
-alembic needs the `eyened_ddl` credentials rather than the ambient environment:
+`alembic heads`, never from this document. Where the server's database account
+holds no DDL rights, alembic needs a DDL-capable account rather than the ambient
+environment:
 
 ```bash
 cd /app/orm/migrations

@@ -23,7 +23,7 @@ Check on the target database:
 
 Expect it to be clean. Every hop it walks already carries an enforced foreign key with `ON DELETE CASCADE`, so ordinary writes cannot produce one of these rows. The route that stays open is a load with checks off: `mysqldump` output sets `FOREIGN_KEY_CHECKS=0`, so a violating row loads silently and stays. Run it against the restored copy you rehearse on as well as against the target.
 
-Alembic needs the `eyened_ddl` credentials; the server's `eyened_wr` holds no DDL rights. Run every Alembic command from `orm/migrations`, with `-x env_file=` before the subcommand. `upgrade` prompts for confirmation and raises `EOFError` without a TTY — run it interactively or set `EYENED_ALEMBIC_ASSUME_YES=1`.
+Alembic needs an account with DDL rights, which the application's own database account may not have. Run every Alembic command from `orm/migrations`, with `-x env_file=` before the subcommand. `upgrade` prompts for confirmation and raises `EOFError` without a TTY — run it interactively or set `EYENED_ALEMBIC_ASSUME_YES=1`.
 
 **Estimating the window.** Almost all of it is InnoDB rewriting two tables. Take `DATA_LENGTH + INDEX_LENGTH` for `ImageInstance` and `Series` from `information_schema.TABLES` and scale from the dev-scale figures below; row counts will mislead, because `ImageInstance` carries 1.5x the rows of `Series` and 2.6x the time.
 
