@@ -194,13 +194,23 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # .env is written once and never rewritten, so COMPOSE_FILE says which
     # entry point created it and a mismatch has exactly one cure. This used to
     # be three branches with three different messages.
+    #
+    # 'client' is recognised by *compose.prod.yaml*, not by "didn't match
+    # dev" — that used to be the same thing, but only because a stale, empty
+    # or hand-mangled COMPOSE_FILE could not happen without something
+    # rewriting the file, and nothing does that any more. Falling through to
+    # 'client' on ANYTHING that is not dev used to be self-correcting (the
+    # next run's rewrite would fix it); now it is a silent 'ok' on a value
+    # that is not a stack either entry point builds, so it gets its own
+    # bucket below instead.
     case "$compose_file" in
         *compose.dev.yaml*)
             case "$compose_file" in
                 *compose.prod.yaml*) env_stack=both ;;
                 *)                   env_stack=dev ;;
             esac ;;
-        *) env_stack=client ;;
+        *compose.prod.yaml*) env_stack=client ;;
+        *)                   env_stack=unrecognised ;;
     esac
 
     case "$env_stack:$MODE" in
@@ -221,6 +231,22 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       nginx config it uses — one of them is not doing what you think.
       Fix: delete deploy/.env and re-run, or edit COMPOSE_FILE to name only
            one of the two." ;;
+        unrecognised:*)
+            # Empty, or a value naming neither compose.dev.yaml nor
+            # compose.prod.yaml — that covers a lot more than "the other
+            # entry point wrote this": an empty or 0-byte .env, a hand-edit
+            # gone wrong, or a layer list meant for somewhere else entirely
+            # (for example a remote worker box's COMPOSE_FILE, copied into
+            # this .env by mistake). Naming all three keeps the message
+            # honest instead of asserting the one cause doctor cannot verify.
+            problem "deploy/.env's COMPOSE_FILE is '$compose_file', which does not name
+      compose.dev.yaml or compose.prod.yaml, so it is not a stack either
+      entry point builds. This can happen with an empty or corrupted .env,
+      one hand-edited into an unrecognised value, or a layer list meant for
+      somewhere else (e.g. a remote worker box's COMPOSE_FILE) ending up
+      here by mistake.
+      Fix: delete deploy/.env and re-run. That keeps your data — './eyened
+           reset' is what deletes it." ;;
         *)
             problem "deploy/.env's COMPOSE_FILE is '$compose_file', which is not the stack
       the '$MODE' entry point builds. .env is written once and never

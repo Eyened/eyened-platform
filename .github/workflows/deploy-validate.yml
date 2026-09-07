@@ -273,6 +273,54 @@ jobs:
           [ "$n" = "0" ] || { echo "::error::compose.storage.yaml has $n worker section(s) with compose.workers.yaml absent from COMPOSE_FILE, want 0 — every combination without the workers layer is now unresolvable"; exit 1; }
           echo "ok: storage fixture generated 2 nginx locations, 4 bind mounts and 0 worker sections"
 
+      # D7's whole design rests on compose taking the LAST assignment when a
+      # key is duplicated: write_env (deploy/scripts/lib.sh) writes deploy/.env
+      # as .env.example PLUS one appended block, so COMPOSE_FILE appears
+      # TWICE and an operator's own appended layer only survives because of
+      # that behaviour. Nothing above exercises it — the fixture step above
+      # appends only the five secrets, never a second COMPOSE_FILE= line, so
+      # the two-assignment file write_env actually produces has had no CI
+      # coverage at all. This runs the REAL write_env, in its own scratch
+      # copy so the shared deploy/.env fixture below (and the ONE
+      # ^COMPOSE_FILE= line the next step's sed depends on) is untouched.
+      - name: write_env's last-assignment-wins is real, not assumed
+        run: |
+          set -e
+          scratch=$(mktemp -d)
+          cp -a deploy "$scratch/deploy"
+          # The checkout itself never carries a deploy/.env (gitignored), but
+          # an EARLIER job step might have created one by the time this step
+          # runs — copied straight into the scratch tree by the line above.
+          # Remove it explicitly so write_env's own "exists, left alone" path
+          # can never fire here and turn this into a check of nothing.
+          rm -f "$scratch/deploy/.env"
+
+          ( REPO_ROOT="$scratch"; . "$scratch/deploy/scripts/lib.sh"; write_env dev )
+          env="$scratch/deploy/.env"
+          [ -f "$env" ] || { echo "::error::write_env did not create $env"; exit 1; }
+
+          n=$(command grep -c '^COMPOSE_FILE=' "$env" || true)
+          [ "$n" = "2" ] || { echo "::error::$env has $n '^COMPOSE_FILE=' line(s), want 2 (the template's and write_env's appended one) — write_env no longer produces the two-assignment file the whole mechanism depends on"; exit 1; }
+
+          # Append an operator layer onto the LAST COMPOSE_FILE= line only —
+          # the one write_env itself wrote — exactly as an operator
+          # hand-editing deploy/.env would. compose.host-ports.yaml's
+          # 'database' service publishes 127.0.0.1:13306 by default, so that
+          # string MOVES between the two states this checks, unlike a
+          # substring that is present either way (a service NAME, or a key
+          # that is set regardless of which layer resolved).
+          last=$(command grep -n '^COMPOSE_FILE=' "$env" | tail -n 1 | cut -d: -f1)
+          [ -n "$last" ] || { echo "::error::could not find a COMPOSE_FILE line in $env to edit"; exit 1; }
+          command sed -i "${last}s/\$/:compose.host-ports.yaml/" "$env"
+
+          rendered=$( cd "$scratch/deploy" && docker compose config ) \
+            || { echo "::error::docker compose config failed against the generated .env"; exit 1; }
+          n=$(printf '%s\n' "$rendered" | command grep -c 'published: "13306"' || true)
+          [ "$n" = "1" ] || { echo "::error::deploy/.env with compose.host-ports.yaml appended to the LAST COMPOSE_FILE line rendered 'published: \"13306\"' $n time(s), want 1 — compose is not reading the last assignment, or write_env's appended block is not actually the last COMPOSE_FILE line"; exit 1; }
+          echo "ok: write_env's appended COMPOSE_FILE line is the one compose reads (last-assignment-wins, on the real generated file)"
+
+          rm -rf "$scratch"
+
       # Pre-flight: the layer combinations below merge compose.workers.yaml
       # against the storage overlay generated ABOVE, which has no worker
       # sections in it — so on their own they would pass whether or not

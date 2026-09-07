@@ -225,6 +225,16 @@ write_env() {
 
     {
         cat "$DEPLOY_DIR/.env.example" &&
+        # UNQUOTED <<EOF, deliberately: $_secret, $_redis_pw, $_root_pw,
+        # $_db_pw, $_kc_pw and $_layers must be expanded here, or the block
+        # below would write out the literal variable names instead of their
+        # values. That is safe today only because gen_secret/gen_password
+        # emit plain hex and the two $_layers lists are constants — none of
+        # them can contain a $, backtick or backslash for the shell to
+        # re-expand. Whoever changes what those five generators or the layer
+        # lists produce must keep that property, or re-quote this heredoc (and
+        # switch every $var below to `printf` instead, since a quoted heredoc
+        # does not expand them at all).
         cat <<EOF
 
 # ============================================================================

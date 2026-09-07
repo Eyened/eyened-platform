@@ -267,10 +267,13 @@ PLATFORM_STORAGE_PATH=<absolute path to platform storage on this box>
 
 **Do not run `./eyened` on this box.** Nothing rewrites the `COMPOSE_FILE` you
 set above — `deploy/.env` is written once and never touched again — so the
-hand-set value is safe. But `./eyened` still builds the *platform* stack, and
-its preflight refuses a `COMPOSE_FILE` that is not the one its entry point
-builds, so the run stops before it does anything. Use the plain
-`docker compose -f ...` invocation below instead.
+hand-set value is safe. `./eyened` still only knows how to build the
+*platform* stack, and its preflight does refuse this `.env`: `COMPOSE_FILE`
+above names neither `compose.dev.yaml` nor `compose.prod.yaml`, so
+`./eyened doctor` reports it as matching no entry point and the run stops
+before anything is built (measured). Use the plain `docker compose -f ...`
+invocation below instead — it needs no platform-stack preflight to do the
+right thing here.
 
 Fill in `storage-mounts.conf` the same way as on the platform host, run
 `deploy/scripts/gen-storage.sh`, then:
@@ -496,7 +499,7 @@ The `dc.sh` rows are not a special case: `deploy/scripts/dc.sh` is just
   detects a dev-mode `.env` under `./install.sh` (or vice versa). Because
   `.env` is written once and never rewritten, the fix is to delete it and
   re-run — that is what switching between the two stacks means. Deleting it
-  keeps your data; `make reset` is what deletes that.
+  keeps your data; `./eyened reset` is what deletes that.
 - **`COMPOSE_FILE` names both `compose.dev.yaml` and `compose.prod.yaml`.**
   Compose accepts this silently — it does not error, and does not warn —
   but the two layers disagree about which image serves the client and which
