@@ -501,10 +501,18 @@ else
 fi
 
 storage_bad=""
+# Counts paths actually examined below, not just failures — a stock install
+# (.env from .env.example, storage-mounts.conf from the .example, both with
+# every storage line commented) examines zero, and that "ok" must read
+# differently from an "ok" that walked a real list. Initialized here,
+# unconditionally, so neither branch below can leave it unset under set -u
+# if its guard never enters.
+storage_checked=0
 if [ -r "$DEPLOY_DIR/.env" ]; then
     platform_path=$(norm "$(env_get PLATFORM_STORAGE_PATH)")
-    if [ -n "$platform_path" ] && [ ! -d "$platform_path" ]; then
-        storage_bad="$storage_bad
+    if [ -n "$platform_path" ]; then
+        storage_checked=$((storage_checked + 1))
+        [ -d "$platform_path" ] || storage_bad="$storage_bad
      PLATFORM_STORAGE_PATH  $platform_path"
     fi
 fi
@@ -515,21 +523,28 @@ if [ -r "$DEPLOY_DIR/storage-mounts.conf" ]; then
     while read -r _key _path _rest || [ -n "$_key" ]; do
         case "$_key" in ''|\#*) continue ;; esac
         [ -n "$_path" ] || continue
+        storage_checked=$((storage_checked + 1))
         [ -d "$_path" ] || storage_bad="$storage_bad
      $_key  $_path"
     done < "$DEPLOY_DIR/storage-mounts.conf"
 fi
 
 if [ -z "$storage_bad" ]; then
-    ok "every configured storage path exists on this host"
+    if [ "$storage_checked" -eq 0 ]; then
+        ok "no host storage paths configured (platform storage is this stack's named volume)"
+    else
+        ok "$storage_checked configured storage path(s) all exist"
+    fi
 else
-    problem "These configured storage paths do not exist on this host:$storage_bad
+    problem "doctor found no directory at these configured storage paths:$storage_bad
       Docker does not refuse a bind mount whose source is missing — it CREATES
       an empty directory there. The stack would come up healthy, thumbnails
       and segmentations would be written into it, and image reads would return
-      nothing.
-      Fix: correct the path, or create the directory (and mount the real
-           storage on it) before starting the stack."
+      nothing. A CRLF line ending or a space in the path produces this exact
+      symptom too, by making storage-mounts.conf's line get misread.
+      Fix: check storage-mounts.conf for those two shapes; otherwise correct
+           the path, or create the directory (and mount the real storage on
+           it), before starting the stack."
 fi
 
 # --- Disk --------------------------------------------------------------
