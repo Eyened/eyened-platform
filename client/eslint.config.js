@@ -8,12 +8,15 @@ import svelteConfig from "./svelte.config.js";
 export default tseslint.config(
     {
         // Ignores derived from the Makefile generator outputs (gen-openapi ->
-        // openapi.json, gen-types -> openapi.ts) plus framework build output.
+        // openapi.json, gen-types -> openapi.ts) plus framework build output
+        // and vitest's coverage report, kept in step with .prettierignore so
+        // the two halves of `npm run lint` agree on what is generated.
         // Hand-written files under src/types/ (openapi_types.ts,
         // openapi_constants.ts, *.d.ts) are intentionally NOT ignored.
         ignores: [
             ".svelte-kit/",
             "build/",
+            "coverage/",
             "dist/",
             "node_modules/",
             "src/types/openapi.ts",

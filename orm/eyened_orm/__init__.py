@@ -14,3 +14,9 @@ from .tag import *          # Depends on Annotation, Study, ImageInstance
 from .annotation import *   # Depends on Patient, Study, Series, ImageInstance, Creator~
 from .segmentation import * # Depends on ImageInstance, Feature, Creator, SubTask
 from .attributes import *   # Depends on Model, ImageInstance
+
+# Populate-on-insert for the denormalized ProjectID columns. Imported for its
+# side effect: the listener has to be attached before any Session flushes.
+from .authz.denormalization import register as _register_project_denormalization
+
+_register_project_denormalization()

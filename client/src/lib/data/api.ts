@@ -93,10 +93,14 @@ export async function apiInvoke<T = unknown>(
     return withAuthRetry(async () => {
         const res = await call();
         if (res.error || isUnauthorizedStatus(res.response.status)) {
-            throw new ApiError(
-                res.response.status,
+            // openapi-fetch parks the parsed error body on `res.error`. Pass it
+            // through: some errors carry a code a component branches on, and
+            // discarding it left the user with "Failed to request: 409".
+            const { message, detail } = messageFromApiErrorBody(
+                res.error,
                 `Failed to ${operation}: ${res.response.status}`,
             );
+            throw new ApiError(res.response.status, message, detail);
         }
         return res;
     });
@@ -109,10 +113,11 @@ export async function apiInvokeAllowEmpty<T = unknown>(
     return withAuthRetry(async () => {
         const res = await call();
         if (isUnauthorizedStatus(res.response.status)) {
-            throw new ApiError(
-                res.response.status,
+            const { message, detail } = messageFromApiErrorBody(
+                res.error,
                 `Request failed: ${res.response.status}`,
             );
+            throw new ApiError(res.response.status, message, detail);
         }
         return res;
     });

@@ -10,7 +10,7 @@ from alembic import context
 from eyened_orm import *
 from eyened_orm.base import Base
 from eyened_orm.config import load_database_settings
-from eyened_orm.utils.alembic_render import render_optional_enum
+from eyened_orm.utils.alembic_render import render_custom_item
 from eyened_orm.utils.env import env_flag_enabled, load_env_file
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -64,18 +64,27 @@ if cmd not in no_prompt_cmds and injected_connection is None:
     confirm_target = (
         f"{db_settings.user}@{db_settings.host}:{db_settings.port}/{db_settings.database}"
     )
+    # Everything this guard writes goes to stderr. Under ``upgrade --sql`` stdout
+    # is the generated SQL and nothing else; a prompt written there arrives as a
+    # prefix glued onto the first statement, which is not valid SQL.
     if assume_yes:
         print(
             f"Target database: {confirm_target}. "
             "Proceeding without confirmation (EYENED_ALEMBIC_ASSUME_YES).",
+            file=sys.stderr,
             flush=True,
         )
     else:
-        response = input(
-            f"Target database: {confirm_target}. Proceed? [y/N] "
-        ).strip().lower()
+        # input()'s own prompt argument writes to stdout, so it is passed none.
+        print(
+            f"Target database: {confirm_target}. Proceed? [y/N] ",
+            end="",
+            file=sys.stderr,
+            flush=True,
+        )
+        response = input().strip().lower()
         if response not in {"y", "yes"}:
-            print("Aborted by user.")
+            print("Aborted by user.", file=sys.stderr)
             sys.exit(1)
 config.set_main_option("sqlalchemy.url", db_url)
 
@@ -117,7 +126,8 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
-            render_item=render_optional_enum,
+            compare_server_default=True,
+            render_item=render_custom_item,
         )
         with context.begin_transaction():
             context.run_migrations()

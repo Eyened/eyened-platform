@@ -49,12 +49,24 @@ def test_read_only_cannot_update_task_status(client_scoped, spanning):
     ).status_code == 403
 
 
-def test_anyone_can_create_a_task(session, client_scoped, spanning):
-    """A new task holds no images and therefore touches no projects.
+def test_creating_a_task_is_authorized_against_its_declaration(
+    session, client_scoped, spanning
+):
+    """Creation is authorized against the task's declaration.
 
-    v0.3's matrix marks create/delete tasks project-admin-only, but its own
-    project permission note says creation is unrestricted. The row is two cells,
-    and this is the create half asserting the vacuous behaviour, not the matrix.
+    v0.3's "creation is unrestricted" reading rested on a new task touching no
+    projects, which no longer holds: a task declares its projects at creation.
+
+    The two requests here are the **schema's** directions, not the floor's:
+    declaring nothing is refused by ``Field(min_length=1)`` (422), and a
+    creator who holds the declared project at ``grader`` succeeds and gets it
+    back (200). Neither can fail if ``create_task``'s ``scope.require`` is
+    deleted -- both actors pass it. The floor's own two directions are the two
+    tests below.
+
+    The first ``POST /task`` test in the suite under a **non-admin** scope --
+    ``test_subtask_add_image_declaration.py`` covers the admin, which
+    ``Creator.IsAdmin`` makes nobody in production.
     """
     from eyened_orm.utils.factories import make_creator
 
@@ -64,15 +76,117 @@ def test_anyone_can_create_a_task(session, client_scoped, spanning):
     session.commit()
 
     client, set_scope = client_scoped
-    set_scope(scope_for(actor_id=creator_id))
-    resp = client.post(
+    set_scope(
+        scope_for(
+            spanning["projects"]["A"],
+            role=ProjectRole.grader,
+            actor_id=creator_id,
+        )
+    )
+
+    undeclared = client.post(
         "/task",
         json={
             "name": "brand new",
             "task_definition_id": spanning["task_definition"],
         },
     )
-    assert resp.status_code == 200
+    assert undeclared.status_code == 422
+
+    declared = client.post(
+        "/task",
+        json={
+            "name": "brand new",
+            "task_definition_id": spanning["task_definition"],
+            "projects": [spanning["projects"]["A"]],
+        },
+    )
+    assert declared.status_code == 200
+    assert [p["id"] for p in declared.json()["projects"]] == [
+        spanning["projects"]["A"]
+    ]
+
+
+def test_creating_a_task_declaring_an_unheld_project_is_refused(
+    session, client_scoped, spanning
+):
+    """The create floor's *refused* direction, which nothing else supplies.
+
+    ``create_task``'s ``scope.require`` is the only *authorization* standing
+    here, and it is what makes the refusal an answer rather than a crash. The
+    scoped re-read that follows was vacuously true while the read predicate
+    walked image links -- the task it would write has none -- and would have
+    handed this actor back a task in a project they cannot see. Now that the
+    predicate reads the declaration, that re-read refuses the row instead, so
+    neutering the ``require`` yields a 500 (``create_task`` dereferences the
+    ``None``), not a 200. Still discriminating: 404 is the only outcome here
+    that is a decision rather than a failure.
+
+    404, not 403: the actor holds no role at all in B, so ``require`` raises
+    ``NotVisibleError`` from its ``missing`` branch, and a 403 would confirm a
+    project this actor may not know exists.
+    """
+    from eyened_orm.utils.factories import make_creator
+
+    # Seeded even though the refusal precedes the insert: without a Creator row
+    # a neutered ``require`` dies on Task.CreatorID's FK at the insert, never
+    # reaching the scoped re-read. The seed is what lets the control get that
+    # far, and so what shows which check is doing the refusing.
+    creator_id = make_creator(session, "outsider").CreatorID
+    session.commit()
+
+    client, set_scope = client_scoped
+    set_scope(
+        scope_for(
+            spanning["projects"]["A"],
+            role=ProjectRole.grader,
+            actor_id=creator_id,
+        )
+    )
+    resp = client.post(
+        "/task",
+        json={
+            "name": "brand new",
+            "task_definition_id": spanning["task_definition"],
+            "projects": [spanning["projects"]["B"]],
+        },
+    )
+    assert resp.status_code == 404
+
+
+def test_read_only_in_the_declared_project_cannot_create_a_task(
+    session, client_scoped, spanning
+):
+    """The same check's other refusal: the project is held, but under ``grader``.
+
+    403, not 404 -- ``require`` resolves a role for A and falls through to its
+    ``under`` branch, raising ``PermissionDeniedError``. This is what pins the
+    ``ProjectRole.grader`` argument itself: lower it to ``read_only`` and the
+    test above still passes, because a project the actor cannot see is missing
+    at every floor.
+    """
+    from eyened_orm.utils.factories import make_creator
+
+    creator_id = make_creator(session, "reader").CreatorID
+    session.commit()
+
+    client, set_scope = client_scoped
+    set_scope(
+        scope_for(
+            spanning["projects"]["A"],
+            role=ProjectRole.read_only,
+            actor_id=creator_id,
+        )
+    )
+    resp = client.post(
+        "/task",
+        json={
+            "name": "brand new",
+            "task_definition_id": spanning["task_definition"],
+            "projects": [spanning["projects"]["A"]],
+        },
+    )
+    assert resp.status_code == 403
 
 
 def test_a_grader_in_a_cannot_add_an_image_from_b(client_scoped, spanning):
@@ -126,10 +240,17 @@ def test_a_grader_in_a_who_only_reads_b_cannot_add_an_image_from_b(
 
 
 def test_a_grader_in_both_can_add_an_image_from_either(client_scoped, spanning):
+    """A grader who holds both projects can add either into a task that declares both.
+
+    Posting into `a_only` (which declares A only) is now refused by
+    fk_SubTaskImageLink_TaskProject -- a different axis (containment) than the
+    role floor this test pins. Point it at `spanning` (declares A and B)
+    instead, so the only thing under test is the floor.
+    """
     client, set_scope = client_scoped
     set_scope(scope_for(*spanning["projects"].values(), role=ProjectRole.grader))
     resp = client.post(
-        f"/subtasks/{spanning['subtasks']['a_only-A']}/images",
+        f"/subtasks/{spanning['subtasks']['spanning-A']}/images",
         json={"instance_id": spanning["public_ids"]["B"]},
     )
     assert resp.status_code == 200

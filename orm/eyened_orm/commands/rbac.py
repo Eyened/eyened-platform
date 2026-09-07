@@ -1,9 +1,11 @@
 """RBAC administration commands.
 
 v0.3 places the CLI and ``eorm`` outside RBAC enforcement as trusted paths, so
-these commands do not authorize their operator. They **do** attribute: every one
-writes an ``AuditLog`` row with ``TrustedPath`` set and ``ActorID`` NULL, which
-is what the AuditLog model documents that combination for.
+these commands do not authorize their operator. They **do** attribute: every
+state change writes an ``AuditLog`` row with ``TrustedPath`` set and ``ActorID``
+NULL, which is what the AuditLog model documents that combination for. What
+changes nothing writes nothing: a no-op branch (an already-revoked membership,
+an already-inactive user) and read-only reports such as ``check-declarations``.
 """
 from __future__ import annotations
 
@@ -23,6 +25,7 @@ from ..authz.administration import (
     revoke,
     set_admin,
     set_password,
+    unused_declarations,
 )
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
 from ..authz.roles import ProjectRole
@@ -357,8 +360,27 @@ def set_password_cmd(username: str, password: str):
     click.echo(f"{username}: password set")
 
 
+@click.command("check-declarations")
+def check_declarations() -> None:
+    """List (task, project) declarations no image link uses.
+
+    Rows are expected rather than faults: a task declares its projects at
+    creation and acquires its links afterwards, and removing links leaves the
+    declaration standing. No ``eorm`` operation removes one -- this reports, it
+    does not reconcile.
+    """
+    database = get_database()
+    with database.get_session() as session:
+        rows = unused_declarations(session)
+    if not rows:
+        click.echo("No unused declarations.")
+        return
+    for task_id, project_id in rows:
+        click.echo(f"task {task_id}\tproject {project_id}")
+
+
 rbac_commands = [
     init_admin, grant_cmd, revoke_cmd, grant_for_task_cmd,
     grant_all_cmd, deactivate_cmd, reactivate_cmd, set_admin_cmd,
-    set_password_cmd,
+    set_password_cmd, check_declarations,
 ]
