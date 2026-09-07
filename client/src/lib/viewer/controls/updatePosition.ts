@@ -20,7 +20,8 @@ export class UpdatePosition implements ViewerEventListener {
         const isTopViewer =
             viewerContext.viewerWindowContext.topViewers.get(image) ===
             viewerContext;
-        if (e.modifiers.shift !== isTopViewer) {
+        // Top viewers require Shift; main viewers always update.
+        if (isTopViewer && !e.modifiers.shift) {
             return;
         }
 
