@@ -102,7 +102,7 @@ fi
 # rejects nothing --copy-back would have accepted, it only moves the refusal to
 # before the wipe instead of after it.
 checkpoints="$SRC/xtrabackup_checkpoints"
-[ -f "$checkpoints" ] || { rm -rf "$untarred" 2>/dev/null; die "error: $SRC has no xtrabackup_checkpoints, so it is not an xtrabackup
+[ -f "$checkpoints" ] || { rm -rf "$untarred" 2>/dev/null; die "error: $ORIG_SRC has no xtrabackup_checkpoints, so it is not an xtrabackup
       backup directory. Nothing was changed.
       Fix: pass a directory db-backup.sh produced, or a .tgz written by
            'db-backup.sh -t'."; }
@@ -110,14 +110,14 @@ checkpoints="$SRC/xtrabackup_checkpoints"
 backup_type=$(sed -n 's/^backup_type[[:space:]]*=[[:space:]]*//p' "$checkpoints" | tr -d '[:space:]')
 if [ "$backup_type" != "full-prepared" ]; then
     rm -rf "$untarred" 2>/dev/null
-    die "error: the backup at $SRC is not prepared (backup_type =
+    die "error: the backup at $ORIG_SRC is not prepared (backup_type =
       '${backup_type:-<unreadable>}'; 'full-prepared' is required).
       xtrabackup --copy-back would refuse it, but only after this script had
       already emptied the data directory. Nothing was changed.
       Fix: run 'xtrabackup --prepare --target-dir=$SRC' first."
 fi
 
-printf "Replace this stack's ENTIRE MySQL data directory from %s? [y/N] " "$SRC"
+printf "Replace this stack's ENTIRE MySQL data directory from %s? [y/N] " "$ORIG_SRC"
 read -r answer || answer=""
 case "$answer" in
     y|Y|yes|YES) ;;
@@ -208,4 +208,4 @@ compose start database
 restarted=1
 trap - EXIT INT TERM HUP
 rm -rf "$sentinel_dir" "$untarred" 2>/dev/null
-echo "restored from $SRC"
+echo "restored from $ORIG_SRC"

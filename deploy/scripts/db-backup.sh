@@ -63,16 +63,20 @@ case "$DEST"     in /*) ;; *) DEST="$DEPLOY_DIR/${DEST#./}" ;; esac
 # is a public repository: 'git add -A' would otherwise pick up a raw MySQL
 # datadir (potentially patient data) written under it. A DEST outside the
 # checkout entirely is not this repo's problem, so the case below only ever
-# looks at paths under $REPO_ROOT.
+# looks at $REPO_ROOT itself and paths under it.
 #
-# `git check-ignore -q` needs no existing file (it is a pure pattern match,
-# verified against both an existing and a not-yet-created DEST) and, on a
-# path it cannot place inside REPO_ROOT at all, exits 128 with a `fatal:` —
-# which is exactly why the case below gates on the path prefix itself rather
-# than trusting check-ignore's own exit status to tell "outside" apart from
-# "not ignored".
+# `git check-ignore -q` does not require DEST to exist for an ordinary
+# pattern, but it DOES for a directory-only one ('foo/', trailing slash):
+# such a pattern only matches once git can tell the path is a directory,
+# which for a not-yet-created DEST means "not yet, until something creates
+# it" — measured directly against this .gitignore's own entry, which is why
+# it is 'deploy/backups' with no trailing slash rather than 'deploy/backups/'.
+# Separately, on a path it cannot place inside REPO_ROOT at all,
+# check-ignore exits 128 with a `fatal:` — which is exactly why the case
+# below gates on the path prefix itself rather than trusting check-ignore's
+# own exit status to tell "outside" apart from "not ignored".
 case "$DEST" in
-    "$REPO_ROOT"/*)
+    "$REPO_ROOT"|"$REPO_ROOT"/*)
         # `cmd || rc=$?`, not a bare `cmd` followed by `$?`: under this
         # script's `set -e`, a plain non-zero simple command exits the whole
         # script immediately — before a following `case "$?"` is ever
@@ -87,8 +91,8 @@ case "$DEST" in
       in a public repository.
       Fix: use a path under deploy/backups/ (already gitignored), or an
            absolute path outside the checkout." ;;
-            *) die "error: could not tell whether git ignores $DEST ('git
-      check-ignore' exited abnormally).
+            *) die "error: could not tell whether git ignores $DEST
+      ('git check-ignore' exited abnormally).
       Fix: check that $REPO_ROOT is a git checkout, or pass a path outside
            it." ;;
         esac
