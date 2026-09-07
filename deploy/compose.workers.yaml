@@ -46,7 +46,7 @@
 # NOTHING IN THIS FILE MAY GAIN A `depends_on`. Measured: standalone, compose
 # refuses the whole project before starting anything —
 #
-#     service "worker" depends on undefined service "redis":
+#     service "worker-cfi-roi" depends on undefined service "redis":
 #     invalid compose project
 #
 # — because `redis` is declared in compose.yaml, which is not loaded on the
@@ -131,7 +131,20 @@ services:
       - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
     logging: *worker-logging
     restart: unless-stopped
-    gpus: all
+    # `gpus: all` is a late Compose Spec field the 2.26 floor this project
+    # promises does not carry — measured: the standalone docker-compose 2.15.1
+    # rejects the WHOLE FILE at parse time ('Additional property gpus is not
+    # allowed', rc=15), taking down the profile-less worker-cfi-roi path with
+    # it, not just this profile. This older deploy.resources form is
+    # equivalent and works at 2.26. See deploy/scripts/doctor.sh and
+    # .github/workflows/deploy-validate.yml for the floor itself — not raised.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   worker-cfi-amd:
     profiles: ["gpu-cfi-amd"]
@@ -146,7 +159,15 @@ services:
       - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
     logging: *worker-logging
     restart: unless-stopped
-    gpus: all
+    # See worker-inference above: `gpus: all` breaks the 2.26 compose floor,
+    # this older form does not.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   worker-layersegmentation:
     profiles: ["gpu-layer-segmentation"]
@@ -164,7 +185,15 @@ services:
       - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
     logging: *worker-logging
     restart: unless-stopped
-    gpus: all
+    # See worker-inference above: `gpus: all` breaks the 2.26 compose floor,
+    # this older form does not.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 # Declared so this file resolves on its own — see the header. Same name and
 # same (default) configuration as compose.yaml's, so merging the two layers

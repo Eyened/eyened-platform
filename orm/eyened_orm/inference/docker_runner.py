@@ -93,6 +93,17 @@ def platform_root() -> Path:
 
 def _deploy_dir() -> Path:
     """Where compose.workers.yaml and .env live. ``deploy/``, not ``worker/``."""
+    if "EYENED_WORKER_DIR" in os.environ and "EYENED_DEPLOY_DIR" not in os.environ:
+        # EYENED_WORKER_DIR was the old name, for a layout this replaced
+        # (worker/ held its own compose files and .env; now it holds only
+        # Dockerfiles). Nothing else in the repo reads it any more, so it is
+        # silently ignored below unless we say so — which matters for anyone
+        # who set it because their layout genuinely differs from the default.
+        _log(
+            "EYENED_WORKER_DIR is set but is no longer read (renamed to "
+            "EYENED_DEPLOY_DIR); ignoring it and falling back to "
+            f"{platform_root() / 'deploy'}. Set EYENED_DEPLOY_DIR instead."
+        )
     return Path(os.environ.get("EYENED_DEPLOY_DIR", platform_root() / "deploy"))
 
 

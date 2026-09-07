@@ -265,6 +265,11 @@ EYENED_DATABASE_HOST=<platform host>
 PLATFORM_STORAGE_PATH=<absolute path to platform storage on this box>
 ```
 
+**Do not run `./eyened` on this box.** It rewrites `COMPOSE_FILE` back onto a
+full platform stack (`compose.yaml:compose.dev.yaml:compose.storage.yaml:
+compose.workers.yaml`), keeping only the hand-set value as an unrecognised
+extra layer — use the plain `docker compose -f ...` invocation below instead.
+
 Fill in `storage-mounts.conf` the same way as on the platform host, run
 `deploy/scripts/gen-storage.sh`, then:
 
