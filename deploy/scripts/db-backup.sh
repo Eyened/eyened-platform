@@ -2,7 +2,7 @@
 # Hot backup of the bundled MySQL datadir: xtrabackup --backup, then
 # --prepare, into <output-dir>. The database keeps serving throughout.
 #
-#   ./eyened backup <output-dir> [-t]
+#   ./eyened backup [-t] <output-dir>
 #   deploy/scripts/db-backup.sh [-e envfile] [-t] <output-dir>
 #
 # -t also writes <output-dir>.tgz, so moving a backup to another machine is
@@ -23,17 +23,20 @@ resolve_compose
 ENV_FILE="$DEPLOY_DIR/.env"
 TAR=no
 
-usage() {
-    die "usage: db-backup.sh [-e envfile] [-t] <output-dir>
-      <output-dir>  an absolute path, or a path under deploy/ (e.g. tmp)
+USAGE="usage: db-backup.sh [-e envfile] [-t] <output-dir>
+      <output-dir>  an absolute path, or a path under deploy/ (e.g. backups)
       -e envfile    read credentials from this file instead of deploy/.env
       -t            also write <output-dir>.tgz"
+
+usage() {
+    die "$USAGE"
 }
 
 while getopts "e:th" opt; do
     case "$opt" in
         e) ENV_FILE=$OPTARG ;;
         t) TAR=yes ;;
+        h) printf '%s\n' "$USAGE"; exit 0 ;;
         *) usage ;;
     esac
 done
@@ -42,9 +45,85 @@ shift $((OPTIND - 1))
 DEST=${1:-}
 [ -n "$DEST" ] || usage
 
+# getopts stops at the first non-option word, so with the flag AFTER the
+# positional (`db-backup.sh /srv/bk -t`) OPTIND never reaches '-t': it is
+# left sitting unconsumed in $2, TAR stays 'no', and nothing says so. Refuse
+# rather than silently ignore it — the documented order (see the header and
+# $USAGE above) is flags first.
+shift
+[ $# -eq 0 ] || die "error: unexpected extra argument(s) after <output-dir>: $*
+      Fix: options come before the output directory, e.g.
+           db-backup.sh [-e envfile] [-t] <output-dir>."
+
 # Bind mounts need an absolute host path; resolve relative paths against deploy/.
 case "$ENV_FILE" in /*) ;; *) ENV_FILE="$DEPLOY_DIR/${ENV_FILE#./}" ;; esac
 case "$DEST"     in /*) ;; *) DEST="$DEPLOY_DIR/${DEST#./}" ;; esac
+
+# Refuse to write into the checkout unless git ignores the destination. This
+# is a public repository: 'git add -A' would otherwise pick up a raw MySQL
+# datadir (potentially patient data) written under it. A DEST outside the
+# checkout entirely is not this repo's problem, so the case below only ever
+# looks at paths under $REPO_ROOT.
+#
+# `git check-ignore -q` needs no existing file (it is a pure pattern match,
+# verified against both an existing and a not-yet-created DEST) and, on a
+# path it cannot place inside REPO_ROOT at all, exits 128 with a `fatal:` —
+# which is exactly why the case below gates on the path prefix itself rather
+# than trusting check-ignore's own exit status to tell "outside" apart from
+# "not ignored".
+case "$DEST" in
+    "$REPO_ROOT"/*)
+        # `cmd || rc=$?`, not a bare `cmd` followed by `$?`: under this
+        # script's `set -e`, a plain non-zero simple command exits the whole
+        # script immediately — before a following `case "$?"` is ever
+        # reached — which would silently turn "not ignored" into a bare
+        # exit 1 with no message at all. Measured directly.
+        _gi_rc=0
+        git -C "$REPO_ROOT" check-ignore -q "$DEST" 2>/dev/null || _gi_rc=$?
+        case "$_gi_rc" in
+            0) ;;
+            1) die "error: $DEST is inside this checkout and git does not ignore it.
+      Writing a backup there risks 'git add' picking up a raw MySQL datadir
+      in a public repository.
+      Fix: use a path under deploy/backups/ (already gitignored), or an
+           absolute path outside the checkout." ;;
+            *) die "error: could not tell whether git ignores $DEST ('git
+      check-ignore' exited abnormally).
+      Fix: check that $REPO_ROOT is a git checkout, or pass a path outside
+           it." ;;
+        esac
+        ;;
+    *) ;;
+esac
+
+# This stack must own a database before any of this makes sense. On an
+# external-database deployment ('./eyened prod', no 'local-db' profile) no
+# 'database' service resolves at all (D1's CI invariant), so the schema
+# probe below would instead read whatever unrelated, unconnected volume
+# ${DB_DATA_PATH:-db_data} happens to name and report a false 'missing'
+# schema with advice ("create the schema first") that is wrong for that
+# deployment. Checked here, after argument parsing (so a bad invocation or
+# '-h' never has to touch Docker) and before anything that does.
+#
+# `compose ps -a -q database`, not a COMPOSE_PROFILES text check: this asks
+# compose itself, so it can't disagree with what 'down -v' (reset.sh) or D1's
+# own external-database case resolve to, even when COMPOSE_PROFILES was
+# overridden from the calling shell rather than deploy/.env (see reset.sh's
+# header comment on that divergence). Same mechanism the deleted cold-tar
+# db-snapshot.sh used. `-a`, not a bare `ps -q`: a stopped-but-existing
+# container (this stack owns a database that just isn't running right now)
+# must not be misdiagnosed as "external".
+#
+# An empty result here is ambiguous between "external database" and "never
+# started" — measured: both give an empty, zero-status `ps -a -q database`
+# when no container has ever been created — so the message below names both.
+cid=$(compose ps -a -q database) || cid=""
+[ -n "$cid" ] || die "error: this stack has no 'database' container. Either it has never
+      been started, or it uses an external database (no 'local-db' profile)
+      — in which case there is nothing here for db-backup.sh to back up.
+      Fix: run './eyened up' first if you meant to create one, or back up an
+           external database with its own tooling ('eorm save_dump'). See
+           deploy/README.md's 'Backup and rollback' section."
 
 [ -f "$ENV_FILE" ] || die "error: $ENV_FILE does not exist, so there are no database
       credentials to back up with.
@@ -123,7 +202,9 @@ case "$schema_state" in
 esac
 
 mkdir -p "$(dirname "$DEST")" ||
-    die "error: could not create $(dirname "$DEST")."
+    die "error: could not create $(dirname "$DEST").
+      Fix: check permissions on its parent directory, or pass a different
+           <output-dir>."
 
 # $DEST is operator-supplied and the next line is a recursive delete of it, so
 # 'db-backup.sh /home/user' used to wipe a home directory without asking.
@@ -141,7 +222,9 @@ if [ -e "$DEST" ]; then
 fi
 
 rm -rf "$DEST"
-mkdir -p "$DEST" || die "error: could not create $DEST."
+mkdir -p "$DEST" || die "error: could not create $DEST.
+      Fix: check permissions on $(dirname "$DEST"), or pass a different
+           <output-dir>."
 
 # -e for the container, because docker-compose v1 has no --env-file on `run`.
 # \$ expands inside the container, not here.

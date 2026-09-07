@@ -18,6 +18,35 @@ SRC=${1:-}
 # Bind mounts need an absolute host path; resolve relative paths against deploy/.
 case "$SRC" in /*) ;; *) SRC="$DEPLOY_DIR/${SRC#./}" ;; esac
 
+# Captured before the .tgz branch below can reassign SRC to a scratch
+# directory that cleanup() deletes — the mid-restore recovery message names
+# this, and it has to be something the operator can actually re-run
+# db-restore.sh against, not the (by then removed) scratch directory.
+ORIG_SRC=$SRC
+
+# This is the exact scenario compose.yaml's xtrabackup service comment warns
+# about: without this check, an external-database stack ('./eyened prod', no
+# 'local-db' profile — D1) falls straight into 'compose stop database' below
+# and then the wipe container, which mounts ${DB_DATA_PATH:-db_data}
+# regardless of whether this stack owns a database at all. That volume is
+# unrelated and (on a fresh host) empty, so the result is: wipe and restore
+# into nothing, reported as success, while the live external database sits
+# untouched. Checked here, after basic argument validation (so a bad
+# invocation never has to touch Docker first) and before anything — in
+# particular the tarball extraction below — that does.
+#
+# Same mechanism as db-backup.sh (see its header comment for why `compose ps
+# -a -q database` rather than a COMPOSE_PROFILES text check), ported from the
+# deleted cold-tar db-restore.sh, which opened with exactly this.
+cid=$(compose ps -a -q database) || cid=""
+[ -n "$cid" ] || die "error: this stack has no 'database' container. Either it has never
+      been started, or it uses an external database (no 'local-db' profile)
+      — in which case there is nothing here for db-restore.sh to restore
+      into.
+      Fix: run './eyened up' first if you meant to create one, or restore an
+           external database with its own tooling. See deploy/README.md's
+           'Backup and rollback' section."
+
 # A .tgz written by 'db-backup.sh -t' is unpacked to a scratch directory first,
 # so the rest of this script only ever deals with a directory. Accepting the
 # tarball here rather than telling the operator to untar it by hand is the
@@ -28,9 +57,12 @@ if [ -f "$SRC" ]; then
     case "$SRC" in
         *.tgz|*.tar.gz)
             untarred=$(mktemp -d) ||
-                die "error: could not create a temp directory to unpack $SRC."
+                die "error: could not create a temp directory to unpack $SRC.
+      Fix: check that ${TMPDIR:-/tmp} exists and is writable."
             tar xzf "$SRC" -C "$untarred" ||
-                { rm -rf "$untarred"; die "error: could not unpack $SRC (see above)."; }
+                { rm -rf "$untarred"; die "error: could not unpack $SRC (see above).
+      Fix: check the tar error above — the archive may be corrupt or
+           truncated."; }
             # A tarball made by db-backup.sh -t contains exactly one top-level
             # directory. Anything else is not one of ours; refuse rather than
             # guess which of several directories is the datadir.
@@ -48,7 +80,9 @@ if [ -f "$SRC" ]; then
     esac
 fi
 
-[ -d "$SRC" ] || { rm -rf "$untarred" 2>/dev/null; die "error: not a directory: $SRC"; }
+[ -d "$SRC" ] || { rm -rf "$untarred" 2>/dev/null; die "error: not a directory: $SRC
+      Fix: check the path for a typo, or pass a prepared xtrabackup
+           directory, or a .tgz written by 'db-backup.sh -t'."; }
 
 # Validate the source BEFORE anything is destroyed. The container command
 # below runs `rm -rf /var/lib/mysql/*` first and only then lets
@@ -69,7 +103,9 @@ fi
 # before the wipe instead of after it.
 checkpoints="$SRC/xtrabackup_checkpoints"
 [ -f "$checkpoints" ] || { rm -rf "$untarred" 2>/dev/null; die "error: $SRC has no xtrabackup_checkpoints, so it is not an xtrabackup
-      backup directory. Nothing was changed."; }
+      backup directory. Nothing was changed.
+      Fix: pass a directory db-backup.sh produced, or a .tgz written by
+           'db-backup.sh -t'."; }
 
 backup_type=$(sed -n 's/^backup_type[[:space:]]*=[[:space:]]*//p' "$checkpoints" | tr -d '[:space:]')
 if [ "$backup_type" != "full-prepared" ]; then
@@ -138,8 +174,8 @@ cleanup() {
       only partially copied back. The database has been left STOPPED on
       purpose: starting MySQL on a half-written datadir risks it coming up on
       corrupt files instead of failing loudly.
-      Fix: re-run './eyened restore $SRC' to finish the restore before using
-      this database again." >&2
+      Fix: re-run './eyened restore $ORIG_SRC' to finish the restore before
+      using this database again." >&2
         else
             echo "==> interrupted or failed: restarting the database" >&2
             compose start database ||
@@ -162,7 +198,7 @@ compose --profile backup run --rm --user 0:0 \
     --entrypoint sh \
     xtrabackup -c 'set -eu
 touch /state/wiping || exit 90
-rm -rf /var/lib/mysql/*
+rm -rf /var/lib/mysql/* /var/lib/mysql/.[!.]* /var/lib/mysql/..?*
 xtrabackup --copy-back --target-dir=/restore --datadir=/var/lib/mysql
 chown -R 999:999 /var/lib/mysql
 rm -f /state/wiping'

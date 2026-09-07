@@ -258,6 +258,12 @@ InnoDB datadir, so the machine you restore onto must run a compatible MySQL
 8.0 — true by construction here, since the stack pins `mysql:8.0.46`. Add
 `-t` for a single `.tgz`; `./eyened restore` accepts either form.
 
+A relative `<dir>` is resolved under `deploy/` — `deploy/backups/` is the
+suggested one and is gitignored. `<dir>` is refused outright if it resolves
+inside the checkout and git does **not** ignore it, so a backup (a raw
+MySQL datadir) can never end up in `git add -A`'s path in this public repo;
+pass an absolute path outside the checkout, or a gitignored one, instead.
+
 `./eyened restore` stops the database, replaces the entire datadir, and starts
 it again. There is no undo. An interrupt is safe: it leaves the database
 stopped and tells you to re-run.
