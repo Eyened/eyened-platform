@@ -1,166 +1,152 @@
 #!/bin/sh
-# Restore a snapshot written by db-snapshot.sh, replacing the data volume.
+# Restore a prepared xtrabackup directory (or the .tgz db-backup.sh -t writes)
+# into the bundled MySQL datadir. The database is stopped for the duration.
 #
-# Usage: make db-restore NAME=<name>
+#   ./eyened restore <backup-dir|backup.tgz>
+#
+# The source must already be PREPARED (xtrabackup --prepare), which db-backup.sh
+# does for you. There is no undo: this replaces the whole datadir.
 set -eu
 
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 . "$REPO_ROOT/deploy/scripts/lib.sh"
 resolve_compose
 
-name=${1:-}
-[ -n "$name" ] || die "usage: make db-restore NAME=<name>"
+SRC=${1:-}
+[ -n "$SRC" ] || die "usage: db-restore.sh <backup-dir|backup.tgz>"
 
-# NAME is interpolated into a file path AND into a container's `sh -c`
-# string below, so anything outside this set (in particular `;`, `/`, `..`)
-# is refused rather than reaching either.
-case "$name" in
-    *[!A-Za-z0-9._-]*) die "error: NAME '$name' contains characters other than
-      letters, digits, '.', '_' and '-'.
-      Pick a name matching [A-Za-z0-9._-]." ;;
-esac
+# Bind mounts need an absolute host path; resolve relative paths against deploy/.
+case "$SRC" in /*) ;; *) SRC="$DEPLOY_DIR/${SRC#./}" ;; esac
 
-# Same lookup as db-snapshot.sh — resolve the mount from the container, never
-# by rebuilding "${project}_db_data" (compose normalises project names).
+# A .tgz written by 'db-backup.sh -t' is unpacked to a scratch directory first,
+# so the rest of this script only ever deals with a directory. Accepting the
+# tarball here rather than telling the operator to untar it by hand is the
+# whole point of the -t flag: cross-machine transport stays one scp and one
+# command.
+untarred=""
+if [ -f "$SRC" ]; then
+    case "$SRC" in
+        *.tgz|*.tar.gz)
+            untarred=$(mktemp -d) ||
+                die "error: could not create a temp directory to unpack $SRC."
+            tar xzf "$SRC" -C "$untarred" ||
+                { rm -rf "$untarred"; die "error: could not unpack $SRC (see above)."; }
+            # A tarball made by db-backup.sh -t contains exactly one top-level
+            # directory. Anything else is not one of ours; refuse rather than
+            # guess which of several directories is the datadir.
+            set -- "$untarred"/*
+            if [ "$#" -ne 1 ] || [ ! -d "$1" ]; then
+                rm -rf "$untarred"
+                die "error: $SRC does not contain exactly one top-level directory, so it
+      is not an archive db-backup.sh -t wrote.
+      Fix: unpack it yourself and pass the prepared directory instead."
+            fi
+            SRC=$1 ;;
+        *) die "error: $SRC is a file, not a directory, and not a .tgz.
+      Fix: pass a prepared xtrabackup directory, or a .tgz written by
+           'db-backup.sh -t'." ;;
+    esac
+fi
+
+[ -d "$SRC" ] || { rm -rf "$untarred" 2>/dev/null; die "error: not a directory: $SRC"; }
+
+# Validate the source BEFORE anything is destroyed. The container command
+# below runs `rm -rf /var/lib/mysql/*` first and only then lets
+# `xtrabackup --copy-back` look at /restore, so a wrong or unprepared
+# directory took the datadir with it before the error was even printed.
 #
-# `-a`, not a bare `ps -q`: a plain `compose ps -q` only lists RUNNING
-# containers. This script itself is the reason a stopped-but-existing
-# database container is the common case to hit here — an interrupted restore
-# leaves the database deliberately STOPPED (see the mid-restore case in
-# cleanup() below) and tells the operator to re-run this exact script, which
-# would otherwise immediately die with "no database container to restore
-# into" instead of finding the very container it just stopped.
-cid=$(compose ps -a -q database || true)
-[ -n "$cid" ] || die "error: this stack has no 'database' container to restore into."
+# xtrabackup_checkpoints is the marker, and this is measured against
+# percona/percona-xtrabackup:8.0 (xtrabackup 8.0.35-36), the image this script
+# runs, not inferred:
+#   * `xtrabackup --backup` writes it with `backup_type = full-backuped`;
+#     `xtrabackup --prepare` rewrites the same line to `full-prepared`.
+#   * `--copy-back` reads ./xtrabackup_checkpoints first of all.
+#   * Given `full-backuped` OR `log-applied` (what `--prepare --apply-log-only`
+#     leaves), `--copy-back` refuses and copies nothing. Given `full-prepared`
+#     it restores.
+# So `full-prepared` is exactly xtrabackup's own accept/reject boundary: this
+# rejects nothing --copy-back would have accepted, it only moves the refusal to
+# before the wipe instead of after it.
+checkpoints="$SRC/xtrabackup_checkpoints"
+[ -f "$checkpoints" ] || { rm -rf "$untarred" 2>/dev/null; die "error: $SRC has no xtrabackup_checkpoints, so it is not an xtrabackup
+      backup directory. Nothing was changed."; }
 
-# `-a` can also match more than one id: a leftover `docker compose run
-# database ...` one-off container is included alongside the real service
-# container. Left unguarded, the `docker inspect` calls below would fail on
-# whichever id happens to come first with a raw "No such object" instead of
-# a `die` naming the actual problem.
-case "$(printf '%s\n' "$cid" | wc -l | tr -d ' ')" in
-    1) ;;
-    *) die "error: found more than one 'database' container:
-$cid
-      This is usually a leftover 'docker compose run database ...' one-off
-      alongside the real service container.
-      Fix: remove the extra one, e.g. '(cd deploy && $COMPOSE_BIN rm -f
-      <container-id>)', so exactly one 'database' container remains, then
-      re-run make db-restore." ;;
+backup_type=$(sed -n 's/^backup_type[[:space:]]*=[[:space:]]*//p' "$checkpoints" | tr -d '[:space:]')
+if [ "$backup_type" != "full-prepared" ]; then
+    rm -rf "$untarred" 2>/dev/null
+    die "error: the backup at $SRC is not prepared (backup_type =
+      '${backup_type:-<unreadable>}'; 'full-prepared' is required).
+      xtrabackup --copy-back would refuse it, but only after this script had
+      already emptied the data directory. Nothing was changed.
+      Fix: run 'xtrabackup --prepare --target-dir=$SRC' first."
+fi
+
+printf "Replace this stack's ENTIRE MySQL data directory from %s? [y/N] " "$SRC"
+read -r answer || answer=""
+case "$answer" in
+    y|Y|yes|YES) ;;
+    *) rm -rf "$untarred" 2>/dev/null; die "cancelled — nothing was changed." ;;
 esac
 
-# A durable deployment sets DB_DATA_PATH (see compose.yaml), which makes
-# /var/lib/mysql a bind mount, not a named volume — `.Name` is empty for
-# those. Resolve `.Type` first, then pull the right identifier: `.Name` for
-# a named volume, `.Source` (the host path) for a bind mount. `docker run
-# -v` accepts either in the same position.
-mount_type=$(docker inspect "$cid" \
-    --format '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Type}}{{end}}{{end}}')
-case "$mount_type" in
-    volume)
-        mount_src=$(docker inspect "$cid" \
-            --format '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Name}}{{end}}{{end}}')
-        mount_desc="volume $mount_src"
-        ;;
-    bind)
-        mount_src=$(docker inspect "$cid" \
-            --format '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Source}}{{end}}{{end}}')
-        mount_desc="bind mount $mount_src"
-        ;;
-    *)
-        mount_src=""
-        ;;
-esac
-[ -n "$mount_src" ] || die "error: the database container has no volume or bind
-      mount at /var/lib/mysql."
-
-archive="$DEPLOY_DIR/snapshots/$name.tgz"
-[ -f "$archive" ] || die "error: no snapshot at $archive"
-
-printf "Replace the contents of %s from %s? [y/N] " "$mount_desc" "$name.tgz"
-read -r answer
-case "$answer" in y|Y|yes|YES) ;; *) die "cancelled." ;; esac
-
-# Same reasoning as db-snapshot.sh: an interrupt here has a worse window,
-# since the datadir may already have been wiped by the time it lands. INT,
-# TERM and HUP are trapped explicitly because an EXIT trap alone does not
+# Signal handling, ported from the cold-tar db-restore.sh this replaces. The
+# xtrabackup path had NO traps at all: an interrupt during the container
+# command below left a half-wiped datadir, a stopped database, and no message.
+#
+# INT, TERM and HUP are trapped explicitly because an EXIT trap alone does not
 # fire on a signal in every shell this might run under — HUP specifically
-# because a dropped SSH session sends the foreground process group SIGHUP,
-# and a restore is exactly the kind of command an operator runs over SSH.
+# because a dropped SSH session sends the foreground process group SIGHUP, and
+# a restore is exactly the kind of command an operator runs over SSH.
 #
-# A trap that only runs `cleanup` and returns does NOT stop the script — the
-# shell resumes at the next statement, so a signal during `compose stop
-# database` would restart the (now running) database via the trap and then
-# carry on into the `rm -rf`/`tar xzf` step below, wiping and extracting over
-# a live datadir as if nothing happened (measured: dash, bash and busybox sh
-# all resume this way). The INT/TERM/HUP handlers below run `cleanup`,
-# restore the signal's default action, then re-raise it against this process
-# so the shell actually dies instead of limping forward. `cleanup` stays
-# idempotent (guarded by $restarted) because the re-raise can also trigger
-# the EXIT trap.
+# A trap that only runs `cleanup` and returns does NOT stop the script: the
+# shell resumes at the next statement (measured — dash, bash and busybox sh all
+# do), so a signal during `compose stop database` would restart the database
+# via the trap and then carry on into the wipe. Each handler runs `cleanup`,
+# restores the signal's default action, then re-raises it against this process.
+# `cleanup` stays idempotent (guarded by $restarted) because the re-raise can
+# also trigger the EXIT trap.
 #
-# $wipe_started used to be a HOST-side flag, set immediately before the
-# `docker run` below and cleared immediately after, and cleanup() read it to
-# decide whether the datadir is INCONSISTENT. That tracked the host's INTENT
-# to run the wipe, not whether the wipe actually happened: a `docker run`
-# that fails before touching anything — an unavailable image is the
-# realistic case, since this is exactly the script that runs on a fresh DR
-# host and nothing else in the stack pulls `alpine` — still set the flag, so
-# cleanup() reported "INCONSISTENT... previous contents were removed"
-# against a datadir that was never touched (measured directly). The same gap
-# existed at the other end: a signal landing after a fully successful
-# `docker run` returns, but before the host's next statement cleared the
-# flag, reported the same false INCONSISTENT message against a fully
-# restored datadir.
+# The source of truth for "was the datadir touched?" lives INSIDE the
+# container, not in a host-side flag. $sentinel_dir is bind-mounted at /state;
+# the container touches /state/wiping immediately before `rm -rf` and removes
+# it immediately after `--copy-back` succeeds. A host-side flag tracked the
+# host's INTENT to run the wipe instead: a `docker run` that failed before
+# touching anything still set it (reporting a false INCONSISTENT), and a
+# signal landing between a successful run returning and the host clearing the
+# flag did the same. The file's state on disk IS the datadir's state.
 #
-# Fixed by moving the source of truth INSIDE the container instead of
-# tracking host-side timing at all. $sentinel_dir is a host-owned scratch
-# directory bind-mounted at /state; the container itself touches
-# /state/wiping immediately before `rm -rf` and removes it immediately after
-# `tar xzf` succeeds. cleanup() below tests for that file's presence. A
-# `docker run` that never got far enough to run `touch` leaves no file
-# (correctly read as untouched); a `docker run` that finished the whole `&&`
-# chain has already removed it before control returns to the host, so there
-# is no timing window left in which a signal can land between "the work
-# finished" and "the host notices" — the file's state on disk IS the
-# datadir's state, not a proxy the host has to keep in sync by hand.
-#
-# The `touch` is a PRECONDITION of the wipe, not a best-effort annotation of
-# it, which is why it is `|| exit 90` and not `;`. If the sentinel cannot be
-# written, the script has no way left to report a half-restored datadir — so
-# it must not create one. Left unchecked, a failed touch fell through to the
-# `rm -rf` and cleanup() then read the missing file as "nothing was touched"
-# and restarted MySQL on a datadir that had just been emptied, silently:
-# precisely the failure this sentinel exists to prevent, reached from the
-# other direction (measured with an unwritable /state — datadir came back
-# empty with no warning). Aborting first makes cleanup()'s "restarting the
-# database" branch true rather than merely quiet, because nothing has been
-# destroyed yet. Reachable whenever the bind mount is not writable: SELinux
-# enforcing without a :z/:Z label (where `-v .../snapshots:/in:ro` above is
-# refused by the same rule), or a full or read-only TMPDIR. 90 is chosen to
-# not collide with tar's 1/2 or docker's own 125-127.
+# The `touch` is a PRECONDITION of the wipe, not an annotation of it, which is
+# why it is `|| exit 90` and not `;`. If the sentinel cannot be written this
+# script has no way left to report a half-restored datadir — so it must not
+# create one. Left unchecked, a failed touch fell through to the `rm -rf`, and
+# cleanup() then read the missing file as "nothing was touched" and restarted
+# MySQL on a datadir that had just been emptied, silently. Reachable whenever
+# the bind mount is not writable: SELinux enforcing without a :z/:Z label, or a
+# full or read-only TMPDIR. 90 does not collide with tar's 1/2 or docker's
+# 125-127.
 restarted=0
 sentinel_dir="${TMPDIR:-/tmp}/db-restore-state.$$"
-mkdir "$sentinel_dir" || die "error: could not create a temp directory at
-      $sentinel_dir to track restore progress.
+mkdir "$sentinel_dir" || die "error: could not create a temp directory at $sentinel_dir to
+      track restore progress.
       Fix: check that ${TMPDIR:-/tmp} exists and is writable."
+
 cleanup() {
     if [ "$restarted" -eq 0 ]; then
         restarted=1
         if [ -e "$sentinel_dir/wiping" ]; then
-            printf '%s\n' "==> interrupted mid-restore: the datadir for $mount_desc is now
-      INCONSISTENT — the previous contents were removed and the archive was
-      only partially extracted. The database has been left STOPPED on
-      purpose: starting MySQL on a half-written datadir risks it coming up
-      on corrupt files instead of failing loudly.
-      Fix: re-run 'make db-restore NAME=$name' to finish the restore before
-      using this database again." >&2
+            printf '%s\n' "==> interrupted mid-restore: this stack's MySQL datadir is now
+      INCONSISTENT — the previous contents were removed and the backup was
+      only partially copied back. The database has been left STOPPED on
+      purpose: starting MySQL on a half-written datadir risks it coming up on
+      corrupt files instead of failing loudly.
+      Fix: re-run './eyened restore $SRC' to finish the restore before using
+      this database again." >&2
         else
             echo "==> interrupted or failed: restarting the database" >&2
-            compose start database || echo "error: could not restart the database — start it by hand: (cd deploy && $COMPOSE_BIN start database)" >&2
+            compose start database ||
+                echo "error: could not restart the database — start it by hand: (cd $DEPLOY_DIR && $COMPOSE_BIN start database)" >&2
         fi
     fi
-    rm -rf "$sentinel_dir" 2>/dev/null
+    rm -rf "$sentinel_dir" "$untarred" 2>/dev/null
 }
 trap cleanup EXIT
 trap 'cleanup; trap - INT; kill -INT $$' INT
@@ -170,15 +156,20 @@ trap 'cleanup; trap - HUP; kill -HUP $$' HUP
 echo "==> stopping the database"
 compose stop database
 
-docker run --rm \
-    -v "$mount_src:/data" \
-    -v "$DEPLOY_DIR/snapshots:/in:ro" \
+compose --profile backup run --rm --user 0:0 \
+    -v "$SRC:/restore" \
     -v "$sentinel_dir:/state" \
-    alpine sh -c "touch /state/wiping || exit 90; rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null; tar xzf /in/$name.tgz -C /data && rm -f /state/wiping"
+    --entrypoint sh \
+    xtrabackup -c 'set -eu
+touch /state/wiping || exit 90
+rm -rf /var/lib/mysql/*
+xtrabackup --copy-back --target-dir=/restore --datadir=/var/lib/mysql
+chown -R 999:999 /var/lib/mysql
+rm -f /state/wiping'
 
 echo "==> starting the database"
 compose start database
 restarted=1
 trap - EXIT INT TERM HUP
-rm -rf "$sentinel_dir" 2>/dev/null
-echo "restored from $archive"
+rm -rf "$sentinel_dir" "$untarred" 2>/dev/null
+echo "restored from $SRC"

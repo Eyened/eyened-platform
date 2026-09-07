@@ -31,7 +31,7 @@ OPENAPI_JSON := $(OPENAPI_DIR)/openapi.json
 OPENAPI_TS := $(REPO_ROOT)/client/src/types/openapi.ts
 
 .PHONY: install doctor up down logs prod migrate db-shell help \
-        reset check-storage db-snapshot db-restore \
+        reset check-storage \
         gen-openapi gen-types gen-client-types
 
 .DEFAULT_GOAL := install
@@ -83,14 +83,6 @@ reset:
 ## check-storage: report configured mounts with no StorageBackend row, and vice versa.
 check-storage:
 	$(DEPLOY)/scripts/check-storage.sh
-
-## db-snapshot NAME=x: cold snapshot of the bundled database volume.
-db-snapshot:
-	$(DEPLOY)/scripts/db-snapshot.sh $(NAME)
-
-## db-restore NAME=x: restore a snapshot taken by db-snapshot.
-db-restore:
-	$(DEPLOY)/scripts/db-restore.sh $(NAME)
 
 ## help: list these targets and what they do.
 help:

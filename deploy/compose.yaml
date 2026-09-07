@@ -53,10 +53,10 @@ services:
       start_period: 30s
     # No host port by default — see compose.host-ports.yaml.
 
-  # Used only by deploy/scripts/{load,save}_dump.sh. Must mount the SAME
-  # source as the database service above — a bare `db_data` here would attach
-  # to an unrelated, empty named volume whenever DB_DATA_PATH is set (a
-  # durable deployment's bind mount), so load_dump.sh would wipe and restore
+  # Used only by deploy/scripts/db-backup.sh and db-restore.sh. Must mount the
+  # SAME source as the database service above — a bare `db_data` here would
+  # attach to an unrelated, empty named volume whenever DB_DATA_PATH is set (a
+  # durable deployment's bind mount), so db-restore.sh would wipe and restore
   # into nothing while reporting success and the live database sat untouched.
   xtrabackup:
     profiles: ["backup"]

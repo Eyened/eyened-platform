@@ -73,11 +73,11 @@ project=$(env_get COMPOSE_PROJECT_NAME)
       deploy/.env and re-run."
 
 # Ask compose which volumes it would actually remove, rather than rebuilding
-# them as "${project}_db_data". db-snapshot.sh already documents why the
-# string-built form is wrong — compose normalises the project name, so the
-# reconstruction can name something that does not exist — and here it was
-# wrong about WHICH volumes exist too: it listed db_data unconditionally, even
-# in the DB_DATA_PATH case above where there is no such volume at all.
+# them as "${project}_db_data" — compose normalises the project name, so the
+# reconstruction can name something that does not exist. A string-built form
+# would also be wrong about WHICH volumes exist: it would list db_data
+# unconditionally, even in the DB_DATA_PATH case above where there is no such
+# volume at all.
 #
 # `config` resolves the same .env AND the same shell environment compose
 # itself does, so this list cannot disagree with what `down -v` will remove,

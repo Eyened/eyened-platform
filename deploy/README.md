@@ -98,7 +98,7 @@ Compose declares two profiles, both defined in `deploy/compose.yaml`:
 | Profile | Service | What it starts |
 |---|---|---|
 | `local-db` | `database` | the bundled MySQL |
-| `backup` | `xtrabackup` | a `percona/percona-xtrabackup:8.0` one-shot, used only by `deploy/scripts/save_dump.sh` and `load_dump.sh` — never a long-running service. `make db-snapshot` / `make db-restore` do **not** use this profile; see [Backup and rollback](#backup-and-rollback) |
+| `backup` | `xtrabackup` | a `percona/percona-xtrabackup:8.0` one-shot, used by `./eyened backup` and `./eyened restore` (`deploy/scripts/db-backup.sh` / `db-restore.sh`) — never a long-running service. See [Backup and rollback](#backup-and-rollback) |
 
 A profile absent from `COMPOSE_PROFILES` means that service simply does not
 start — nothing warns you if you forgot one.
@@ -247,41 +247,40 @@ already has a schema.
 
 ## Backup and rollback
 
-```bash
-make db-snapshot NAME=<name>
-make db-restore NAME=<name>
-```
+| Case | Tool |
+|---|---|
+| The bundled database — live, fast, byte-exact | `./eyened backup <dir>` / `./eyened restore <dir>` |
+| Any database including an external one; portable across MySQL versions | `eorm save_dump` / `eorm load_dump` (a HOST tool — needs `mysqlsh` installed) |
 
-Data snapshots are **cold** (the database is stopped for the duration):
-MySQL commits DDL per statement, so a half-applied migration cannot be
-reliably rolled back with `alembic downgrade`, and `db-snapshot` /
-`db-restore` are the actual safety net for `make migrate`.
+`./eyened backup` runs Percona XtraBackup in a one-shot container under the
+`backup` profile. The database keeps serving throughout. The output is a raw
+InnoDB datadir, so the machine you restore onto must run a compatible MySQL
+8.0 — true by construction here, since the stack pins `mysql:8.0.46`. Add
+`-t` for a single `.tgz`; `./eyened restore` accepts either form.
 
-Snapshots are written to **`deploy/snapshots/`** as `<NAME>.tgz`. That
-directory is gitignored, so moving the checkout does not disturb it — worth
-knowing, because a snapshot taken before an upgrade sits inside the very tree
-you are about to `git checkout` across.
+`./eyened restore` stops the database, replaces the entire datadir, and starts
+it again. There is no undo. An interrupt is safe: it leaves the database
+stopped and tells you to re-run.
 
-**Both of these need the `alpine` image, and nothing else in the stack pulls
-it.** Neither goes through the `backup` profile: they stop the database and
-run a plain `docker run --rm … alpine` over its data volume (the `backup`
-profile's xtrabackup service belongs to `save_dump.sh` / `load_dump.sh`
-instead). On an air-gapped or disaster-recovery host, pre-pulling the MySQL
-and xtrabackup images is therefore not enough — pull `alpine` as well, or the
-restore fails at the one moment it is needed.
+`eorm save_dump` / `eorm load_dump` are a different mechanism — a logical dump
+via `mysqlsh`, with a `--legacy-sql` mysqldump fallback — and the tool for a
+database this stack does not own. They run on the HOST, not in a container:
+`Dockerfile.server` carries no MySQL client at all, so neither mode works
+inside the stack. **`mysqlsh` is a host prerequisite for this path** and is not
+installed by anything here.
 
 For the application itself: check out the commit-ish you moved *from* and
-re-run `./install.sh`. **Images are built from source, so the checkout is the
-artifact** — there is nothing else to roll back, and equally nothing that
+re-run `./eyened install`. **Images are built from source, so the checkout is
+the artifact** — there is nothing else to roll back, and equally nothing that
 rolls back on its own. Record the revision (`git rev-parse --short HEAD`)
 before you move, or there is nothing to return to.
 
-> **On an external database** — a site deployment (`make prod`, no
-> `local-db` profile) — `make db-snapshot` does **not** apply. It snapshots
-> this stack's own volume, and there isn't one. Take a backup with that
-> database server's own tooling **before** running `make migrate`. MySQL
-> commits DDL per statement, so a half-applied migration cannot be reliably
-> rolled back with `alembic downgrade`.
+> **On an external database** — a site deployment (`./eyened prod`, no
+> `local-db` profile) — `./eyened backup` does **not** apply. It backs up
+> this stack's own datadir, and there isn't one. Take a backup with that
+> database server's own tooling, or `eorm save_dump`, **before** running
+> `./eyened migrate`. MySQL commits DDL per statement, so a half-applied
+> migration cannot be reliably rolled back with `alembic downgrade`.
 
 ## `make reset`
 
@@ -347,8 +346,6 @@ are relative to the root.
 | `make db-shell` | `deploy/scripts/dc.sh exec -it database sh -c 'exec mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'` | a MySQL shell in the bundled database. |
 | `make reset` | `deploy/scripts/reset.sh` | stop this stack and delete its volumes. Guarded; asks for confirmation. |
 | `make check-storage` | `deploy/scripts/check-storage.sh` | report configured mounts with no `StorageBackend` row, and vice versa. |
-| `make db-snapshot NAME=x` | `deploy/scripts/db-snapshot.sh x` | cold snapshot of the bundled database volume. Note the name is **positional** here, not `NAME=`. |
-| `make db-restore NAME=x` | `deploy/scripts/db-restore.sh x` | restore a snapshot taken by `db-snapshot`. Positional, as above. |
 | `make help` | *(none — it reads the Makefile itself)* | list the targets above (and their one-line descriptions) at the terminal. |
 | `make gen-openapi` | `python3 deploy/scripts/generate_openapi.py client/src/types` | regenerate `client/src/types/openapi.json` from the server's schema. Not listed by `make help`. |
 | `make gen-types` | `gen-openapi`, then `npx --yes openapi-typescript@7 client/src/types/openapi.json -o client/src/types/openapi.ts` | generate `client/src/types/openapi.ts`. Not listed by `make help`. |
