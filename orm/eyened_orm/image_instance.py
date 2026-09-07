@@ -1008,10 +1008,11 @@ class ImageInstance(AttributeValueLookupMixin, Base):
 
         for (model_name, attr_name), candidates in grouped.items():
             if model_name is None:
-                av = None
-                for candidate in candidates:
-                    if attribute_value_data(candidate) is not None:
-                        av = candidate
+                av = max(
+                    (c for c in candidates if attribute_value_data(c) is not None),
+                    key=lambda c: c.AttributeValueID,
+                    default=None,
+                )
             else:
                 av = select_attribute_value(
                     candidates,

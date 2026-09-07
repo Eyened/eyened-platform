@@ -305,6 +305,95 @@ def test_image_attrs_includes_unmodeled_photolocators(session):
     assert attrs_by_model["CFI_ROI"]["CFI_ROI"]["center"] == [5, 5]
 
 
+def _photo_locators_attr(session):
+    return AttributeDefinition.get_or_create(
+        session,
+        match_by={
+            "AttributeName": "PhotoLocators",
+            "AttributeDataType": AttributeDataType.JSON,
+        },
+    )
+
+
+def test_image_attrs_skips_unmodeled_row_with_no_value(session):
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    session.add(
+        AttributeValue(
+            AttributeID=_photo_locators_attr(session).AttributeID,
+            ModelID=None,
+            ImageInstanceID=image.ImageInstanceID,
+            ValueJSON=None,
+        )
+    )
+    session.commit()
+    session.refresh(image)
+
+    attrs_flat, _attrs_by_model = image.attrs
+    assert "PhotoLocators" not in attrs_flat
+
+
+def test_image_attrs_picks_highest_id_among_unmodeled_duplicates(session):
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    locators_attr = _photo_locators_attr(session)
+    older = AttributeValue(
+        AttributeID=locators_attr.AttributeID,
+        ModelID=None,
+        ImageInstanceID=image.ImageInstanceID,
+        ValueJSON=[{"type": "older"}],
+    )
+    newer = AttributeValue(
+        AttributeID=locators_attr.AttributeID,
+        ModelID=None,
+        ImageInstanceID=image.ImageInstanceID,
+        ValueJSON=[{"type": "newer"}],
+    )
+    session.add_all([older, newer])
+    session.commit()
+    session.refresh(image)
+
+    # Relationship order is undefined; put the newer row first so last-wins
+    # would pick the older value.
+    image.AttributeValues.sort(
+        key=lambda av: av.AttributeValueID, reverse=True
+    )
+
+    attrs_flat, _attrs_by_model = image.attrs
+    assert older.AttributeValueID < newer.AttributeValueID
+    assert attrs_flat["PhotoLocators"] == [{"type": "newer"}]
+
+
+def test_image_attrs_keeps_modeled_and_unmodeled_rows_of_the_same_name(session):
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    unmodeled = {"center": [9, 9], "radius": 9, "lines": {}}
+    _seed_cfi_roi_values(
+        session,
+        image.ImageInstanceID,
+        versions={"2.0": {"center": [5, 5], "radius": 5, "lines": {}}},
+    )
+    roi_attr = AttributeDefinition.by_column(
+        session,
+        AttributeName="CFI_ROI",
+        AttributeDataType=AttributeDataType.JSON,
+    )
+    session.add(
+        AttributeValue(
+            AttributeID=roi_attr.AttributeID,
+            ModelID=None,
+            ImageInstanceID=image.ImageInstanceID,
+            ValueJSON=unmodeled,
+        )
+    )
+    session.commit()
+    session.refresh(image)
+
+    attrs_flat, attrs_by_model = image.attrs
+    assert attrs_flat["CFI_ROI"] == unmodeled
+    assert attrs_by_model["CFI_ROI"]["CFI_ROI"]["center"] == [5, 5]
+
+
 def test_image_roi_uses_highest_version(session, caplog):
     import logging
 
