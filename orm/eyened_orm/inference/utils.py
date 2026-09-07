@@ -159,7 +159,8 @@ def assert_cuda_kernel_compatible(device) -> None:
         raise RuntimeError(
             f"PyTorch {ver} does not support {name} (sm_{cap[0]}{cap[1]}). "
             "Rebuild the worker image:\n"
-            "  cd worker && docker compose -f docker-compose.layersegmentation.yml build"
+            "  cd deploy && docker compose -f compose.workers.yaml "
+            "--profile gpu-layer-segmentation build worker-layersegmentation"
         )
     try:
         torch.zeros(1, device=device).add_(1)
@@ -169,7 +170,8 @@ def assert_cuda_kernel_compatible(device) -> None:
             raise RuntimeError(
                 f"PyTorch {ver} cannot execute CUDA kernels on {name} (sm_{cap[0]}{cap[1]}). "
                 "Rebuild the worker image:\n"
-                "  cd worker && docker compose -f docker-compose.layersegmentation.yml build"
+                "  cd deploy && docker compose -f compose.workers.yaml "
+                "--profile gpu-layer-segmentation build worker-layersegmentation"
             ) from exc
         raise
 

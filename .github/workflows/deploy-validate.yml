@@ -5,6 +5,9 @@ on:
     branches: [main, development]
     paths:
       - 'deploy/**'
+      # compose.workers.yaml builds from worker/Dockerfile.*, so a change to
+      # one of those has to run this job.
+      - 'worker/**'
       - 'install.sh'
       - 'Makefile'
       - '.dockerignore'
@@ -18,6 +21,9 @@ on:
     branches: [main, development]
     paths:
       - 'deploy/**'
+      # compose.workers.yaml builds from worker/Dockerfile.*, so a change to
+      # one of those has to run this job.
+      - 'worker/**'
       - 'install.sh'
       - 'Makefile'
       - '.dockerignore'
@@ -248,7 +254,78 @@ jobs:
           [ "$n" = "2" ] || { echo "::error::storage.d/storage.conf has $n 'location /' block(s), want 2 — the storage fixture did not reach nginx, so nginx -t below would validate nothing storage-related"; exit 1; }
           n=$(command grep -c ':/tmp/eyened-ci-storage-[ab]:ro$' deploy/compose.storage.yaml || true)
           [ "$n" = "4" ] || { echo "::error::compose.storage.yaml has $n storage bind mount(s), want 4 (server + fileserver x 2) — the storage fixture did not reach compose"; exit 1; }
-          echo "ok: storage fixture generated 2 nginx locations and 4 bind mounts"
+          # .env.example's COMPOSE_FILE does NOT name compose.workers.yaml, so
+          # this run must emit NO worker sections. That is the silent-green
+          # direction of the next step's check: emit them unconditionally and
+          # every layer combination below that lacks the workers layer breaks
+          # with "has neither an image nor a build context".
+          n=$(command grep -c '^  worker-' deploy/compose.storage.yaml || true)
+          [ "$n" = "0" ] || { echo "::error::compose.storage.yaml has $n worker section(s) with compose.workers.yaml absent from COMPOSE_FILE, want 0 — every combination without the workers layer is now unresolvable"; exit 1; }
+          echo "ok: storage fixture generated 2 nginx locations, 4 bind mounts and 0 worker sections"
+
+      # Pre-flight: the layer combinations below merge compose.workers.yaml
+      # against the storage overlay generated ABOVE, which has no worker
+      # sections in it — so on their own they would pass whether or not
+      # gen-storage.sh's COMPOSE_FILE condition works at all. This step is
+      # where that condition is actually observed, in both directions, by
+      # regenerating with the workers layer named in deploy/.env.
+      - name: The storage layer follows COMPOSE_FILE
+        run: |
+          set -e
+          base=$(command grep '^COMPOSE_FILE=' deploy/.env)
+          restore() { command sed -i "s|^COMPOSE_FILE=.*|$base|" deploy/.env; deploy/scripts/gen-storage.sh >/dev/null; }
+
+          # --- co-located: compose.yaml AND compose.workers.yaml ---
+          command sed -i 's|^COMPOSE_FILE=.*|COMPOSE_FILE=compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.workers.yaml|' deploy/.env
+          deploy/scripts/gen-storage.sh
+          n=$(command grep -c '^  worker-' deploy/compose.storage.yaml || true)
+          [ "$n" = "4" ] || { restore; echo "::error::compose.storage.yaml has $n worker section(s) with compose.workers.yaml in COMPOSE_FILE, want 4 — the workers would run with no image dataset mounts and silently read nothing"; exit 1; }
+          n=$(command grep -c 'EYENED_STORAGE_MOUNTS' deploy/compose.storage.yaml || true)
+          [ "$n" = "5" ] || { restore; echo "::error::compose.storage.yaml sets EYENED_STORAGE_MOUNTS $n time(s), want 5 (server + 4 workers, not the fileserver)"; exit 1; }
+
+          # It resolves WITH the layer...
+          ( cd deploy && COMPOSE_FILE="compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.workers.yaml" \
+              COMPOSE_PROFILES=local-db,gpu-inference,gpu-cfi-amd,gpu-layer-segmentation docker compose config -q ) \
+            || { restore; echo "::error::the workers layer does not resolve against a storage overlay that names the workers"; exit 1; }
+          # ...and the mounts genuinely reach a worker in the RENDERED project,
+          # not just the generated file. Counted, not grep -q: with the ROI
+          # worker in play the ci_a source appears 3 times (server, fileserver,
+          # worker-cfi-roi) and the mount map twice (server, worker-cfi-roi);
+          # with the worker sections missing it is 2 and 1, which a presence
+          # test could not tell apart. `docker compose config` renders volumes
+          # in long form, so match `source:`, never `PATH:PATH:ro`.
+          ( cd deploy && COMPOSE_FILE="compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.workers.yaml" \
+              COMPOSE_PROFILES=local-db docker compose config ) > /tmp/workers-config.yaml \
+            || { restore; echo "::error::could not render the co-located workers config"; exit 1; }
+          n=$(command grep -c 'source: /tmp/eyened-ci-storage-a$' /tmp/workers-config.yaml || true)
+          [ "$n" = "3" ] || { restore; echo "::error::the rendered project binds ci_a $n time(s), want 3 (server + fileserver + worker-cfi-roi) — the generated worker sections did not survive the merge"; exit 1; }
+          n=$(command grep -c 'EYENED_STORAGE_MOUNTS' /tmp/workers-config.yaml || true)
+          [ "$n" = "2" ] || { restore; echo "::error::the rendered project sets EYENED_STORAGE_MOUNTS $n time(s), want 2 (server + worker-cfi-roi) — the worker cannot resolve image paths without it"; exit 1; }
+
+          # ...and the SAME overlay must NOT resolve without the layer. This is
+          # the direction that makes the condition load-bearing rather than
+          # cosmetic: a service that exists only in the storage overlay has
+          # neither an image nor a build context.
+          if ( cd deploy && COMPOSE_FILE="compose.yaml:compose.dev.yaml:compose.storage.yaml" \
+                 COMPOSE_PROFILES=local-db docker compose config -q ) 2>/dev/null; then
+            restore
+            echo "::error::a storage overlay naming the workers still resolved in the DEFAULT stack — compose no longer rejects an image-less service, so gen-storage.sh's COMPOSE_FILE condition is no longer proven by this step and its comment is stale"
+            exit 1
+          fi
+
+          # --- remote: compose.workers.yaml and NO compose.yaml ---
+          command sed -i 's|^COMPOSE_FILE=.*|COMPOSE_FILE=compose.workers.yaml:compose.storage.yaml|' deploy/.env
+          deploy/scripts/gen-storage.sh
+          n=$(command grep -c '^  server:\|^  fileserver:' deploy/compose.storage.yaml || true)
+          [ "$n" = "0" ] || { restore; echo "::error::compose.storage.yaml names server/fileserver ($n section(s)) with compose.yaml absent from COMPOSE_FILE — the remote GPU host cannot load this overlay at all"; exit 1; }
+          ( cd deploy && PLATFORM_STORAGE_PATH=/tmp/eyened-ci-storage-b docker compose \
+              -f compose.workers.yaml -f compose.storage.yaml config -q ) \
+            || { restore; echo "::error::the remote invocation (workers + storage, no compose.yaml) does not resolve"; exit 1; }
+
+          restore
+          n=$(command grep -c '^  worker-' deploy/compose.storage.yaml || true)
+          [ "$n" = "0" ] || { echo "::error::restoring COMPOSE_FILE left $n worker section(s) behind; every later step in this job is now testing the wrong fixture"; exit 1; }
+          echo "ok: gen-storage.sh follows COMPOSE_FILE in both directions, and both directions were observed"
 
       - name: Every layer combination resolves
         working-directory: deploy
@@ -268,6 +345,8 @@ jobs:
           check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.host-ports.yaml" "local-db"
           check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.oidc.yaml" "local-db"
           check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db,backup"
+          check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.workers.yaml" "local-db"
+          check "compose.yaml:compose.storage.yaml:compose.prod.yaml:compose.workers.yaml" "local-db,gpu-inference,gpu-cfi-amd,gpu-layer-segmentation"
           exit $fail
 
       # The two invariants that are cheap to check and expensive to discover.
@@ -319,6 +398,21 @@ jobs:
           else
             echo "::error::MYSQL_ROOT_PASSWORD appears $n times, want 1 (database only)"; exit 1
           fi
+
+          # The workers layer must resolve on its own, with no compose.yaml
+          # beside it — that is the remote-GPU-host path, and the failure mode
+          # is a `depends_on` someone adds for tidiness, which breaks ONLY
+          # that path. `required: false` does not rescue it: the flag covers
+          # a service that is declared and profile-disabled, not one that is
+          # not declared at all.
+          docker compose -f compose.workers.yaml config -q \
+            || { echo "::error::compose.workers.yaml does not resolve standalone — the remote GPU host path is broken, most likely by a depends_on"; exit 1; }
+          # ...and it must bring exactly the slim ROI worker with no profile,
+          # so a stock co-located install always has a `default` consumer.
+          svc=$(docker compose -f compose.workers.yaml config --services | sort | tr '\n' ' ')
+          [ "$svc" = "worker-cfi-roi " ] \
+            || { echo "::error::compose.workers.yaml with no profile brings '$svc', want 'worker-cfi-roi ' — the thumbnail queue would have no consumer"; exit 1; }
+          echo "ok: compose.workers.yaml resolves standalone and brings only worker-cfi-roi"
 
       - name: nginx config is valid in both modes
         run: |

@@ -100,12 +100,24 @@ Compose declares two profiles, both defined in `deploy/compose.yaml`:
 | `local-db` | `database` | the bundled MySQL |
 | `backup` | `xtrabackup` | a `percona/percona-xtrabackup:8.0` one-shot, used by `./eyened backup` and `./eyened restore` (`deploy/scripts/db-backup.sh` / `db-restore.sh`) — never a long-running service. See [Backup and rollback](#backup-and-rollback) |
 
+`deploy/compose.workers.yaml` declares three more, one per GPU model worker:
+
+| Profile | Service |
+|---|---|
+| `gpu-inference` | `worker-inference` |
+| `gpu-cfi-amd` | `worker-cfi-amd` |
+| `gpu-layer-segmentation` | `worker-layersegmentation` |
+
 A profile absent from `COMPOSE_PROFILES` means that service simply does not
 start — nothing warns you if you forgot one.
 
-Layers append to `COMPOSE_FILE` the same way; the two optional ones are
-`compose.host-ports.yaml` (see [Sharing a machine](#sharing-a-machine)) and
-`compose.oidc.yaml` (the bundled Keycloak).
+Layers append to `COMPOSE_FILE` the same way. The optional ones are:
+
+| Layer | What it adds |
+|---|---|
+| `compose.host-ports.yaml` | loopback host ports for the database and Redis — see [Sharing a machine](#sharing-a-machine) |
+| `compose.oidc.yaml` | the bundled Keycloak |
+| `compose.workers.yaml` | the RQ workers — see [Workers](#workers) |
 
 **OIDC.** What you set here is `:compose.oidc.yaml` on `COMPOSE_FILE`,
 `KEYCLOAK_PORT` (default `8180`), and `KEYCLOAK_ADMIN_PASSWORD`. The
@@ -214,6 +226,84 @@ data, set `MYSQL_ROOT_PASSWORD` and `EYENED_DATABASE_PASSWORD` in
    separate registration step.
 4. Run `make check-storage` to confirm `storage-mounts.conf` and the
    database's `StorageBackend` rows agree.
+
+## Workers
+
+RQ workers run the image models and generate thumbnails. They are one layer,
+`deploy/compose.workers.yaml`, and it serves both deployments — workers beside
+the platform, and workers on a separate GPU box. The `worker/` directory holds
+only Dockerfiles now.
+
+**Co-located** — the workers on the platform host:
+
+1. Append `:compose.workers.yaml` to `COMPOSE_FILE` in `deploy/.env`.
+2. Add a GPU profile to `COMPOSE_PROFILES` if you want a model worker, e.g.
+   `local-db,gpu-inference`.
+3. `./eyened up`.
+
+They join this project's default network and reach `redis` and the `database`
+**by service name**, with nothing published on the host at all.
+
+**The slim ROI worker starts with the layer and needs no profile.** It listens
+on `cfi-roi` and on `default` — and `default` is the queue the API enqueues
+thumbnail jobs to. Without a consumer for it a stack silently never generates
+thumbnails, which is what `deploy/` did until this layer existed. Adding the
+layer is the opt-in; there is nothing further to switch on for the common case.
+
+The GPU inference worker defaults to `default,cfi-roi,cfi-keypoints,cfi-odfd,
+cfi-quality`, so running it beside the slim one double-consumes two queues.
+Set `EYENED_RQ_QUEUES_INFERENCE` in `deploy/.env` to drop them if you want each
+job handled once.
+
+**Remote** — the workers on a separate GPU box. Copy the repo there and set, in
+that box's `deploy/.env`:
+
+```
+COMPOSE_FILE=compose.workers.yaml:compose.storage.yaml
+EYENED_REDIS_HOST=<platform host>
+EYENED_DATABASE_HOST=<platform host>
+PLATFORM_STORAGE_PATH=<absolute path to platform storage on this box>
+```
+
+Fill in `storage-mounts.conf` the same way as on the platform host, run
+`deploy/scripts/gen-storage.sh`, then:
+
+```bash
+docker compose -f deploy/compose.workers.yaml -f deploy/compose.storage.yaml \
+  --profile gpu-inference up -d --build
+```
+
+There is **no second env file**: compose reads `.env` from the compose file's
+own directory rather than the working directory, so `deploy/.env` is picked up
+from anywhere. Image datasets are configured exactly once, the same way in both
+deployments — `storage-mounts.conf` → `gen-storage.sh` → `compose.storage.yaml`
+— and `COMPOSE_FILE` is what decides which services that generated layer hands
+the mounts to.
+
+**`PLATFORM_STORAGE_PATH` is required on a remote box, and nothing enforces
+it.** Its default is this stack's own named volume; on another machine that is
+a new, empty one. The workers would start, report healthy, and write thumbnails
+and segmentations where nothing on either host can read them. `./eyened doctor`
+checks configured storage paths, but it runs on the platform host, not on the
+GPU box — set it by hand there.
+
+**Nothing in `compose.workers.yaml` may gain a `depends_on`.** Standalone,
+compose refuses the entire project before starting anything —
+`service "worker-cfi-roi" depends on undefined service "redis": invalid compose
+project` — because `redis` is declared in `compose.yaml`, which the remote path
+does not load. `required: false` does not rescue it: that flag covers a service
+that is *declared* and profile-disabled (`compose.yaml`'s external-database
+toggle), not one that is not declared at all. The tidy-up is invisible
+co-located and breaks only the remote path, so CI asserts the standalone
+project resolves. Nothing is lost: RQ retries its connection and every worker
+restarts unless stopped.
+
+To rebuild one worker image:
+
+```bash
+cd deploy
+docker compose -f compose.workers.yaml --profile gpu-cfi-amd build worker-cfi-amd
+```
 
 ## Sharing a machine
 

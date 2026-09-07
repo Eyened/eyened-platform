@@ -1,5 +1,6 @@
 # Slim RQ worker: CFI ROI only (fundusprep + OpenCV). No PyTorch / retinalysis-inference.
-# Listen with EYENED_RQ_WORKER_QUEUES=cfi-roi (see docker-compose.cfi-roi.yml).
+# Listen with EYENED_RQ_WORKER_QUEUES=cfi-roi,default (see the worker-cfi-roi
+# service in deploy/compose.workers.yaml).
 
 FROM python:3.12-slim
 

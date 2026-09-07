@@ -19,12 +19,13 @@ PathLike = Union[str, Path]
 LayerVolumeInput = Union[np.ndarray, PathLike]
 CfiImageInput = Union[np.ndarray, PathLike]
 
-_WORKER_COMPOSE = {
-    "layer-segmentation": (
-        "docker-compose.layersegmentation.yml",
-        "worker-layersegmentation",
-    ),
-    "cfi-amd": ("docker-compose.cfi-amd.yml", "worker-cfi-amd"),
+# One compose file for every worker now (``deploy/compose.workers.yaml``
+# replaced the four per-model files that used to live in ``worker/``), so what
+# varies per model is the service and the profile that service sits behind.
+_WORKER_COMPOSE_FILE = "compose.workers.yaml"
+_WORKER_SERVICE = {
+    "layer-segmentation": ("worker-layersegmentation", "gpu-layer-segmentation"),
+    "cfi-amd": ("worker-cfi-amd", "gpu-cfi-amd"),
 }
 
 _LAYER_PREDICT_PY = (
@@ -47,7 +48,16 @@ def _log(msg: str) -> None:
     print(f"[docker-runner] {msg}", flush=True)
 
 
-def _preflight_cuda_image(image: str, compose_file: str) -> None:
+def _build_hint(model: str) -> str:
+    """The exact command that rebuilds this model's worker image."""
+    service, profile = _WORKER_SERVICE[model]
+    return (
+        f"cd {_deploy_dir()} && docker compose -f {_WORKER_COMPOSE_FILE} "
+        f"--profile {profile} build {service}"
+    )
+
+
+def _preflight_cuda_image(image: str, model: str) -> None:
     """Quick CUDA smoke test so stale images fail before a long nnU-Net run."""
     probe = subprocess.run(
         [
@@ -68,9 +78,7 @@ def _preflight_cuda_image(image: str, compose_file: str) -> None:
     )
     if probe.returncode == 0:
         return
-    hint = (
-        f"cd {_worker_dir()} && docker compose -f {compose_file} build"
-    )
+    hint = _build_hint(model)
     detail = (probe.stderr or probe.stdout or "").strip()[:800]
     raise RuntimeError(
         f"Worker image {image!r} cannot run CUDA on this GPU "
@@ -83,15 +91,22 @@ def platform_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
-def _worker_dir() -> Path:
-    return Path(os.environ.get("EYENED_WORKER_DIR", platform_root() / "worker"))
+def _deploy_dir() -> Path:
+    """Where compose.workers.yaml and .env live. ``deploy/``, not ``worker/``."""
+    return Path(os.environ.get("EYENED_DEPLOY_DIR", platform_root() / "deploy"))
 
 
-def _image_for_service(compose_file: str, service: str) -> str:
+def _image_for_model(model: str) -> str:
     """Resolve built image ref (``docker compose images -q`` is often empty)."""
+    service, _profile = _WORKER_SERVICE[model]
+    # Naming the service explicitly is what keeps this to ONE image ref: all
+    # four workers live in one file now, so a bare ``--images`` would return
+    # whichever of them the active profiles happen to select. It also means no
+    # ``--profile`` flag is needed — an explicitly named service is resolved
+    # whether or not its profile is enabled.
     result = subprocess.run(
-        ["docker", "compose", "-f", compose_file, "config", "--images"],
-        cwd=_worker_dir(),
+        ["docker", "compose", "-f", _WORKER_COMPOSE_FILE, "config", "--images", service],
+        cwd=_deploy_dir(),
         capture_output=True,
         text=True,
     )
@@ -99,7 +114,7 @@ def _image_for_service(compose_file: str, service: str) -> str:
         raise RuntimeError(
             f"Could not resolve Docker image for {service}:\n{result.stderr}"
         )
-    for ref in reversed(result.stdout.splitlines()):
+    for ref in result.stdout.splitlines():
         ref = ref.strip()
         if not ref:
             continue
@@ -110,8 +125,7 @@ def _image_for_service(compose_file: str, service: str) -> str:
         if probe.returncode == 0:
             return ref
     raise RuntimeError(
-        f"Image for {service} not found. Build it first:\n"
-        f"  cd {_worker_dir()} && docker compose -f {compose_file} build"
+        f"Image for {service} not found. Build it first:\n  {_build_hint(model)}"
     )
 
 
@@ -123,8 +137,7 @@ def _run_container(
     use_gpu: bool = True,
 ) -> None:
     """``docker run`` one-off; stream stdout/stderr to the notebook terminal."""
-    compose_file, _service = _WORKER_COMPOSE[model]
-    image = _image_for_service(compose_file, _service)
+    image = _image_for_model(model)
     orm_dir = platform_root() / "orm"
     use_gpu = use_gpu and os.environ.get("EYENED_INFERENCE_NO_GPU") != "1"
 
@@ -162,7 +175,7 @@ def _run_container(
     cmd.extend(container_args)
 
     if use_gpu:
-        _preflight_cuda_image(image, compose_file)
+        _preflight_cuda_image(image, model)
     t0 = time.perf_counter()
     result = subprocess.run(cmd)
     if result.returncode != 0:

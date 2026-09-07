@@ -1,0 +1,173 @@
+# RQ workers. ONE file, two ways to run it.
+#
+# CO-LOCATED — workers on the same host as the platform:
+#   append :compose.workers.yaml to COMPOSE_FILE in deploy/.env, then
+#   ./eyened up.  The workers join this project's default network and reach
+#   `redis` and `database` BY SERVICE NAME, with nothing published on the host
+#   at all. Add a GPU profile to COMPOSE_PROFILES for the model workers.
+#
+# REMOTE — workers on a separate GPU box:
+#   copy the repo there, set EYENED_REDIS_HOST / EYENED_DATABASE_HOST and
+#   PLATFORM_STORAGE_PATH in deploy/.env to point at the platform host and at
+#   this box's platform storage, put compose.workers.yaml into COMPOSE_FILE,
+#   fill in storage-mounts.conf and run deploy/scripts/gen-storage.sh, then
+#     docker compose -f deploy/compose.workers.yaml -f deploy/compose.storage.yaml \
+#       --profile gpu-inference up -d --build
+#   Compose reads .env from the COMPOSE FILE'S OWN directory, not the CWD
+#   (measured), so deploy/.env is picked up from anywhere and there is no
+#   second env file to keep in sync. compose.storage.yaml is where the image
+#   dataset mounts and EYENED_STORAGE_MOUNTS live — there is exactly ONE way
+#   to express those (storage-mounts.conf -> gen-storage.sh), and remote uses
+#   the same one as co-located rather than a second, drifting copy.
+#
+# PLATFORM_STORAGE_PATH is optional co-located and REQUIRED on a remote box,
+# and nothing enforces the second half. Co-located the default below resolves
+# to the very same named volume the server uses; on another machine it is a
+# fresh EMPTY volume, so a remote worker would write thumbnails and
+# segmentations where nothing on either host can read them. `./eyened doctor`
+# catches a path that does not exist, but it runs on the platform host, not on
+# the GPU box — set PLATFORM_STORAGE_PATH there by hand.
+#
+# The `volumes:` block at the bottom of this file declares that named volume.
+# It is a duplicate of compose.yaml's and it is deliberate: without it the file
+# does not resolve standalone at all —
+#
+#     service "worker-cfi-roi" refers to undefined volume platform_storage:
+#     invalid compose project
+#
+# — which is measured, and applies to `config --images` and `config -q` just
+# as much as to `up`. Leaving it out to force the remote operator's hand was
+# considered and rejected: it would refuse only the UNSET case (a wrong path
+# is silently wrong either way), with a message naming a compose internal
+# rather than the fix, while breaking every standalone validation of this file
+# — CI's, the notebook one-shot runner's, and a plain `docker compose config`.
+#
+# ============================================================================
+# NOTHING IN THIS FILE MAY GAIN A `depends_on`. Measured: standalone, compose
+# refuses the whole project before starting anything —
+#
+#     service "worker" depends on undefined service "redis":
+#     invalid compose project
+#
+# — because `redis` is declared in compose.yaml, which is not loaded on the
+# remote path. `required: false` does NOT rescue this: that flag covers
+# "declared but profile-disabled" (compose.yaml's external-database toggle),
+# not "not declared at all". Adding `depends_on: redis` is exactly the tidy-up
+# someone will make, and it breaks only the remote path, which is the one
+# nobody tests first. Losing start ordering costs nothing: RQ retries its
+# connection and every service below restarts unless stopped.
+# ============================================================================
+#
+# There is no `env_file: .env` here, matching compose.yaml: that file holds
+# MYSQL_ROOT_PASSWORD and the API signing key, and `docker inspect` hands a
+# container's environment to anyone who can reach the daemon. Workers need
+# neither. Every variable they DO need is listed explicitly below.
+#
+# YAML anchors do not cross files, so compose.yaml's x-logging/x-restart do not
+# reach services introduced here; the values are restated per service. Without
+# them a GPU worker's stdout is an UNCAPPED json-file log on a shared host.
+
+x-worker-env: &worker-env
+  # `redis` and `database` are the co-located service names; override both in
+  # deploy/.env for a remote box. Same expressions compose.yaml uses, so a
+  # managed Redis or an external MySQL is a one-line change here too.
+  EYENED_REDIS_HOST: ${EYENED_REDIS_HOST:-redis}
+  EYENED_REDIS_PORT: ${EYENED_REDIS_PORT:-6379}
+  EYENED_REDIS_DB: ${EYENED_REDIS_DB:-0}
+  EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?set EYENED_REDIS_PASSWORD in deploy/.env}
+  EYENED_DATABASE_HOST: ${EYENED_DATABASE_HOST:-database}
+  EYENED_DATABASE_PORT: ${EYENED_DATABASE_PORT:-3306}
+  EYENED_DATABASE_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
+  EYENED_DATABASE_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
+  EYENED_DATABASE_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
+  # Always /storage, exactly as compose.yaml pins it for the server. A literal,
+  # NOT ${EYENED_STORAGE_ROOT:-/storage}: the container path is canonical and
+  # must not become a function of host layout. The four worker compose files
+  # this replaces bind-mounted ${EYENED_STORAGE_ROOT}:${EYENED_STORAGE_ROOT} —
+  # an identity mount left over from the OldPath era, before image records
+  # moved to relative keys resolved through EYENED_STORAGE_MOUNTS.
+  EYENED_STORAGE_ROOT: /storage
+
+x-worker-logging: &worker-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  # The slim ROI worker. CPU-only (python:3.12-slim), and it listens on
+  # `default` — the queue the API enqueues THUMBNAIL jobs to. NO PROFILE, on
+  # purpose: without a consumer for `default`, a stack silently never generates
+  # thumbnails, and until this layer existed the deploy stack had none. Adding
+  # the layer is the opt-in; nothing further is needed for the common case.
+  worker-cfi-roi:
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.cfi-roi
+    environment:
+      <<: *worker-env
+      EYENED_RQ_WORKER_QUEUES: ${EYENED_RQ_QUEUES_CFI_ROI:-cfi-roi,default}
+    volumes:
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
+    logging: *worker-logging
+    restart: unless-stopped
+
+  # The general GPU worker. Sets no queue list of its own by default, so it
+  # falls back to RqSettings.worker_queues in server/config.py:
+  # default,cfi-roi,cfi-keypoints,cfi-odfd,cfi-quality. Running it BESIDE the
+  # slim worker above therefore double-consumes `default` and `cfi-roi`; set
+  # EYENED_RQ_QUEUES_INFERENCE in deploy/.env to drop both if you want each job
+  # handled once.
+  worker-inference:
+    profiles: ["gpu-inference"]
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.inference
+    environment:
+      <<: *worker-env
+      EYENED_RQ_WORKER_QUEUES: ${EYENED_RQ_QUEUES_INFERENCE:-default,cfi-roi,cfi-keypoints,cfi-odfd,cfi-quality}
+    volumes:
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
+    logging: *worker-logging
+    restart: unless-stopped
+    gpus: all
+
+  worker-cfi-amd:
+    profiles: ["gpu-cfi-amd"]
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.cfi-amd
+    environment:
+      <<: *worker-env
+      EYENED_RQ_WORKER_QUEUES: cfi-amd
+      CFI_AMD_MODELS_DIR: /models/cfi-amd
+    volumes:
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
+    logging: *worker-logging
+    restart: unless-stopped
+    gpus: all
+
+  worker-layersegmentation:
+    profiles: ["gpu-layer-segmentation"]
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.layersegmentation
+    environment:
+      <<: *worker-env
+      EYENED_RQ_WORKER_QUEUES: layer-segmentation
+      NNUNET_RESULTS: /nnUNet_results
+      nnUNet_results: /nnUNet_results
+      nnUNet_raw: /nnUNet_results
+      nnUNet_preprocessed: /nnUNet_results
+    volumes:
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
+    logging: *worker-logging
+    restart: unless-stopped
+    gpus: all
+
+# Declared so this file resolves on its own — see the header. Same name and
+# same (default) configuration as compose.yaml's, so merging the two layers
+# co-located yields one volume, shared with the server, not two.
+volumes:
+  platform_storage:
