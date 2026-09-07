@@ -66,10 +66,10 @@ def _make_2d_seg(
 
 
 def test_warp_to_image_matches_projective_transform(session):
-    """Scale-2 matrix warps a 4×4 mask onto the 8×8 image the same way as the snippet."""
-    seg = _make_2d_seg(session, matrix=SCALE2)
+    """Scale-2 matrix warps a 4×4 mask onto a non-square image the same way as the snippet."""
+    image_hw = (6, 10)
+    seg = _make_2d_seg(session, image_hw=image_hw, matrix=SCALE2)
     data = np.arange(16, dtype=np.uint8).reshape(4, 4)
-    image_hw = (seg.ImageInstance.Rows_y, seg.ImageInstance.Columns_x)
 
     expected = ProjectiveTransform(
         np.asarray(SCALE2, dtype=float),
@@ -104,16 +104,49 @@ def test_warp_to_image_without_matrix_returns_2d_data(session):
     seg = _make_2d_seg(session, seg_hw=(8, 8), image_hw=(8, 8), matrix=None)
     data = np.arange(64, dtype=np.uint8).reshape(8, 8)
 
-    np.testing.assert_array_equal(seg.warp_to_image(data), data)
+    result = seg.warp_to_image(data)
+    np.testing.assert_array_equal(result, data)
+    assert result is not data
+    result[0, 0] = 255
+    assert data[0, 0] != 255
+
+
+def test_warp_to_image_without_matrix_copies_squeezed_volume(session):
+    """Squeezing (1, H, W) must not return a live view of storage."""
+    seg = _make_2d_seg(session, seg_hw=(8, 8), image_hw=(8, 8), matrix=None)
+    volume = np.arange(64, dtype=np.uint8).reshape(1, 8, 8)
+
+    result = seg.warp_to_image(volume)
+    np.testing.assert_array_equal(result, volume[0])
+    result[0, 0] = 255
+    assert volume[0, 0, 0] != 255
 
 
 def test_warp_to_image_rejects_3d_segmentation(session):
+    """is_2d guard fires even when the caller already passed a 2D plane."""
     seg = _make_2d_seg(
         session, seg_hw=(4, 4), image_hw=(4, 4), matrix=None, depth=4
     )
-    data = np.ones((4, 4, 4), dtype=np.uint8)
+    data = np.ones((4, 4), dtype=np.uint8)
 
-    with pytest.raises(ValueError, match="2D"):
+    with pytest.raises(ValueError, match="only supported for 2D segmentations"):
+        seg.warp_to_image(data)
+
+
+def test_warp_to_image_rejects_missing_image_size(session):
+    seg = _make_2d_seg(session, matrix=SCALE2)
+    seg.ImageInstance.Rows_y = None
+    data = np.ones((4, 4), dtype=np.uint8)
+
+    with pytest.raises(ValueError, match="missing Rows_y or Columns_x"):
+        seg.warp_to_image(data)
+
+
+def test_warp_to_image_rejects_height_singleton_volume(session):
+    seg = _make_2d_seg(session, matrix=SCALE2)
+    data = np.ones((4, 1, 4), dtype=np.uint8)
+
+    with pytest.raises(ValueError, match=r"\(1, H, W\)"):
         seg.warp_to_image(data)
 
 
@@ -147,3 +180,25 @@ def test_warp_to_image_probability_defaults_to_bilinear(session):
     ).warp(data, (8, 8), mode=Interpolation.BILINEAR)
 
     np.testing.assert_allclose(result, bilinear)
+
+
+def test_warp_to_image_uint32_nearest_preserves_bits(session):
+    """R32UI has no OpenCV type; an int32 view under NEAREST keeps high bits."""
+    seg = _make_2d_seg(session, matrix=SCALE2)
+    seg.DataType = Datatype.R32UI
+    data = np.zeros((4, 4), dtype=np.uint32)
+    data[1, 2] = 1 << 17
+
+    result = seg.warp_to_image(data)
+
+    assert result.dtype == np.uint32
+    assert result.shape == (8, 8)
+    assert result[2, 4] == 1 << 17
+
+
+def test_warp_to_image_rejects_uint32_bilinear(session):
+    seg = _make_2d_seg(session, matrix=SCALE2)
+    data = np.ones((4, 4), dtype=np.uint32)
+
+    with pytest.raises(ValueError, match="nearest-neighbor"):
+        seg.warp_to_image(data, mode=Interpolation.BILINEAR)

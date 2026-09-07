@@ -167,19 +167,27 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
             ProjectiveTransform(matrix, in_size=data.shape[:2], out_size=image_hw)
             transform.warp(data, image_hw)
 
-        ``data`` may be a 2D array or a 3D volume with one singleton axis
-        (as returned by ``read_data()``). If omitted, ``read_data()`` is used.
+        ``data`` may be a 2D ``(H, W)`` array or a ``(1, H, W)`` volume
+        (depth singleton / ``SparseAxis=0``, as returned by ``read_data()``).
+        Height or width singletons (``SparseAxis`` 1/2) are not supported.
+        If omitted, ``read_data()`` is used.
         Integer / label representations default to nearest-neighbor; probability
         maps default to bilinear. Pass ``mode`` to override.
 
         If ``ImageProjectionMatrix`` is ``None``, the array is already in image
-        space and is returned after squeezing.
+        space and a copy is returned after squeezing.
+
+        Always returns a newly allocated array (never an alias of ``data`` or
+        storage).
         """
         if not self.is_2d:
             raise ValueError("warp_to_image is only supported for 2D segmentations")
 
-        if not self.ImageInstance:
+        image = self.ImageInstance
+        if not image:
             raise ValueError("Segmentation has no associated ImageInstance")
+        if image.Rows_y is None or image.Columns_x is None:
+            raise ValueError("ImageInstance is missing Rows_y or Columns_x")
 
         if data is None:
             data = self.read_data()
@@ -188,19 +196,17 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
 
         data = np.asarray(data)
         if data.ndim == 3:
-            singleton_axes = tuple(i for i, s in enumerate(data.shape) if s == 1)
-            if len(singleton_axes) != 1:
+            if data.shape[0] != 1:
                 raise ValueError(
-                    "Expected a 2D array or a 3D array with exactly one "
-                    f"singleton axis, got shape {data.shape}"
+                    "Expected a 2D array or a (1, H, W) volume, "
+                    f"got shape {data.shape}"
                 )
-            data = np.squeeze(data, axis=singleton_axes)
+            data = data[0]
         if data.ndim != 2:
             raise ValueError(
                 f"Expected 2D segmentation data, got shape {data.shape}"
             )
 
-        image = self.ImageInstance
         out_size = (image.Rows_y, image.Columns_x)
         matrix = self.projection_matrix
         if matrix is None:
@@ -209,7 +215,7 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
                     f"Segmentation shape {data.shape[:2]} does not match image "
                     f"{out_size} and ImageProjectionMatrix is None"
                 )
-            return data
+            return np.array(data, copy=True)
 
         if mode is None:
             if self.DataRepresentation == DataRepresentation.Probability:
@@ -217,12 +223,26 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
             else:
                 mode = Interpolation.NEAREST
 
+        warp_data = data
+        restore_uint32 = False
+        if data.dtype == np.uint32:
+            # OpenCV has no CV_32U; an int32 view is bit-preserving under NEAREST.
+            if mode != Interpolation.NEAREST:
+                raise ValueError(
+                    "uint32 (R32UI) warping requires nearest-neighbor interpolation"
+                )
+            warp_data = data.view(np.int32)
+            restore_uint32 = True
+
         transform = ProjectiveTransform(
             np.asarray(matrix, dtype=float),
             in_size=data.shape[:2],
             out_size=out_size,
         )
-        return transform.warp(data, out_size, mode=mode)
+        result = transform.warp(warp_data, out_size, mode=mode)
+        if restore_uint32:
+            return result.view(np.uint32)
+        return result
 
     def _api_data_path(self) -> str:
         seg_id = getattr(self, "SegmentationID", None)
