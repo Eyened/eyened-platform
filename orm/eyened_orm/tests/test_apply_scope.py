@@ -38,7 +38,7 @@ def _scope(*project_ids: int, is_admin: bool = False) -> AccessScope:
 
 def _fixture(session):
     """Two projects, one image each, and a task spanning both."""
-    from eyened_orm import SubTaskImageLink, TaskDefinition
+    from eyened_orm import SubTaskImageLink, TaskDefinition, TaskProject
 
     backend = make_storage_backend(session)
     device = make_device(session, "d")
@@ -64,6 +64,14 @@ def _fixture(session):
     subtask = SubTask(TaskID=spanning.TaskID, TaskState=SubTaskState.NotStarted)
     lone = SubTask(TaskID=empty.TaskID, TaskState=SubTaskState.NotStarted)
     session.add_all([subtask, lone])
+    session.flush()
+    # Declared before the links: the containment foreign key checks the
+    # declaration at the moment a link is inserted. ``empty`` declares nothing
+    # on purpose -- it is this file's vacuity case and holds no links.
+    for name in ("A", "B"):
+        session.add(
+            TaskProject(TaskID=spanning.TaskID, ProjectID=made[name][0].ProjectID)
+        )
     session.flush()
     for index, name in enumerate(("A", "B")):
         session.add(

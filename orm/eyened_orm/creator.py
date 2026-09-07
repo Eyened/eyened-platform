@@ -43,7 +43,7 @@ class Creator(Base):
     PasswordHash: Mapped[Optional[str]] = mapped_column(String(255), info={"private": True})
 
     # Timestamps
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     # Relationships
     Annotations: Mapped[List["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="Creator")

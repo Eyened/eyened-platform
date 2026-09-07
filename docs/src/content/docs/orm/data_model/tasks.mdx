@@ -23,6 +23,13 @@ task = Task.create_from_imagesets(
 )
 ```
 
+The factory also writes the task's **project declaration** (`TaskProject`): which
+projects the task is allowed to hold images from. With no `projects=` argument it
+derives the declaration from the images given; pass `projects=[...]` for the
+stricter form, which declares exactly those whatever the images are. A task that
+would declare nothing raises `ValueError` — it would be visible to everyone and
+able to accept no image at all.
+
 ## SubTask
 
 Unit of work within a task: assigned annotator, state (NotStarted, Busy, Ready), linked `ImageInstance`s via `SubTaskImageLink`, optional `Comments`, and produced `Segmentations` / `FormAnnotations`.
