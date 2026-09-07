@@ -155,6 +155,19 @@ error instead of that same silent failure — which is also why the floor is
 
 ## Storage, in two layers
 
+The container path is canonical. `/storage` inside the container, always;
+`compose.yaml` pins it and `deploy/.env` cannot override it. Host locations
+appear only in volume mappings — `PLATFORM_STORAGE_PATH` for platform storage,
+`storage-mounts.conf` for image datasets. Image records store **relative** keys
+resolved through `EYENED_STORAGE_MOUNTS`, so no host path is ever written into
+the database and moving the data to a different host is a mount change, not a
+migration.
+
+Every configured host path must exist before the stack starts. Docker creates
+an empty directory at a missing bind-mount source instead of refusing, which
+turns a typo into a healthy stack that reads nothing and writes into limbo.
+`./eyened doctor` checks this.
+
 **Platform storage** (thumbnails and `segmentations.zarr`) is always
 `/storage` inside the containers. By default that is this stack's own named
 volume — a clean clone writes nothing outside itself. Set

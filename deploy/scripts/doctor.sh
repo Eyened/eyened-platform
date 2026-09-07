@@ -469,6 +469,69 @@ case "$http_port" in
         fi ;;
 esac
 
+# --- Storage paths --------------------------------------------------------
+# Docker CREATES an empty directory at a bind-mount source that does not
+# exist; it does not fail. So a typo in any host path below yields a brand-new
+# empty directory, a stack where every container reports healthy, and reads
+# that quietly return nothing. gen-storage.sh validates each path's SHAPE
+# (absolute, no ':' '\' '#' '..', not '/') and never its existence, which is
+# the half that bites.
+#
+# The same class cost real data once: a stack whose EYENED_STORAGE_ROOT was a
+# HOST path while the zarr was mounted at a CONTAINER path composed a path
+# with no mount behind it, and the container's overlay layer absorbed the
+# writes until the container was recreated. Either convention applied
+# consistently would have worked; mixing them is the bug, which is why the
+# first check below refuses the variable outright rather than reconciling it.
+
+# EYENED_STORAGE_ROOT is pinned to /storage as a LITERAL in compose.yaml, not
+# as ${EYENED_STORAGE_ROOT:-/storage}, so a value here reaches no container and
+# changes nothing. A variable that is set, looks authoritative, and is ignored
+# is worse than one that is absent.
+if [ -r "$DEPLOY_DIR/.env" ] && [ -n "$(env_get EYENED_STORAGE_ROOT)" ]; then
+    problem "EYENED_STORAGE_ROOT is set in deploy/.env, where it does nothing: the
+      container path is pinned to /storage in compose.yaml and cannot be
+      overridden. Setting it here looks like it configures storage and does
+      not.
+      Fix: remove the line. To put platform storage somewhere else on this
+           HOST, set PLATFORM_STORAGE_PATH instead — the host path belongs in
+           the volume mapping, never in the container's own view of itself."
+else
+    ok "EYENED_STORAGE_ROOT is not overridden (the container path is always /storage)"
+fi
+
+storage_bad=""
+if [ -r "$DEPLOY_DIR/.env" ]; then
+    platform_path=$(norm "$(env_get PLATFORM_STORAGE_PATH)")
+    if [ -n "$platform_path" ] && [ ! -d "$platform_path" ]; then
+        storage_bad="$storage_bad
+     PLATFORM_STORAGE_PATH  $platform_path"
+    fi
+fi
+
+# storage-mounts.conf may not exist yet on a first run — gen-storage.sh
+# creates it from the .example. Absent is not a problem here.
+if [ -r "$DEPLOY_DIR/storage-mounts.conf" ]; then
+    while read -r _key _path _rest || [ -n "$_key" ]; do
+        case "$_key" in ''|\#*) continue ;; esac
+        [ -n "$_path" ] || continue
+        [ -d "$_path" ] || storage_bad="$storage_bad
+     $_key  $_path"
+    done < "$DEPLOY_DIR/storage-mounts.conf"
+fi
+
+if [ -z "$storage_bad" ]; then
+    ok "every configured storage path exists on this host"
+else
+    problem "These configured storage paths do not exist on this host:$storage_bad
+      Docker does not refuse a bind mount whose source is missing — it CREATES
+      an empty directory there. The stack would come up healthy, thumbnails
+      and segmentations would be written into it, and image reads would return
+      nothing.
+      Fix: correct the path, or create the directory (and mount the real
+           storage on it) before starting the stack."
+fi
+
 # --- Disk --------------------------------------------------------------
 # "Where Docker will build" is Docker's data root (default /var/lib/docker)
 # plus its volumes — usually a different filesystem from this checkout, and
