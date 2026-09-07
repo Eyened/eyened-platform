@@ -126,14 +126,14 @@ fi
 # --- Whose .env is this, and is OIDC configured usably? --------------------
 if [ -f "$DEPLOY_DIR/.env" ]; then
   if [ ! -r "$DEPLOY_DIR/.env" ]; then
-    # Same case lib.sh's env_set already guards against (lib.sh:126-129, with
-    # the same rationale): an unreadable file looks exactly like "key not
-    # present" to env_get's `sed | tail` (tail exits 0 on the empty input a
-    # failed sed leaves behind), so every derived check below would silently
-    # see empty values and report a WRONG answer (oidc off, wrong entry
-    # point, defaults cleared) instead of "could not tell". Report the one
-    # real problem and skip the checks that depend on reading the file,
-    # rather than let them guess.
+    # Existence and readability are different questions, and env_get cannot
+    # tell them apart: an unreadable file looks exactly like "key not present"
+    # to its `sed | tail` (tail exits 0 on the empty input a failed sed leaves
+    # behind), so every derived check below would silently see empty values
+    # and report a WRONG answer (oidc off, wrong entry point, defaults
+    # cleared) instead of "could not tell". Report the one real problem and
+    # skip the checks that depend on reading the file, rather than let them
+    # guess.
     problem "deploy/.env exists but is not readable by this user, so the checks that
       depend on it (entry point, OIDC host, secrets) could not run.
       Fix: chmod u+r deploy/.env, or re-run as the user that owns it."
@@ -191,36 +191,43 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
         *) ok "OIDC is not enabled" ;;
     esac
 
-    # A COMPOSE_FILE naming both layers is accepted silently by compose itself
-    # (exit 0, no warning): 'dev:prod' yields the prod image with a stray
-    # unrouted client container that fileserver still depends on; 'prod:dev'
-    # mounts dev.conf onto the SPA image so nginx proxies to vite while the
-    # built SPA sits unused. The has_dev/MODE check below cannot catch this —
-    # with both named it reads as a normal dev stack.
-    case "$compose_file" in *compose.dev.yaml*) has_dev=yes ;; *) has_dev=no ;; esac
-    case "$compose_file" in *compose.prod.yaml*) has_prod=yes ;; *) has_prod=no ;; esac
+    # .env is written once and never rewritten, so COMPOSE_FILE says which
+    # entry point created it and a mismatch has exactly one cure. This used to
+    # be three branches with three different messages.
+    case "$compose_file" in
+        *compose.dev.yaml*)
+            case "$compose_file" in
+                *compose.prod.yaml*) env_stack=both ;;
+                *)                   env_stack=dev ;;
+            esac ;;
+        *) env_stack=client ;;
+    esac
 
-    if [ "$has_dev" = yes ] && [ "$has_prod" = yes ]; then
-        problem "deploy/.env's COMPOSE_FILE names BOTH compose.dev.yaml and
+    case "$env_stack:$MODE" in
+        dev:dev|client:client)
+            ok "deploy/.env matches the '$MODE' entry point" ;;
+        both:*)
+            # Kept, not folded into the message below: compose accepts a
+            # COMPOSE_FILE naming both layers SILENTLY (exit 0, no warning),
+            # and the two layers disagree about which image serves the client
+            # and which nginx config it uses. 'dev:prod' yields the prod image
+            # with a stray unrouted client container; 'prod:dev' mounts dev.conf
+            # onto the SPA image so nginx proxies to a vite that is not there.
+            # Writing .env once does not make this unreachable — a hand-edited
+            # COMPOSE_FILE still gets here — so the detection stays.
+            problem "deploy/.env's COMPOSE_FILE names BOTH compose.dev.yaml and
       compose.prod.yaml ('$compose_file'). Compose accepts this silently, but
       the two layers disagree about which image serves the client and which
       nginx config it uses — one of them is not doing what you think.
-      Fix: remove deploy/.env and let ./install.sh or 'make up' write it
-           fresh, or edit COMPOSE_FILE to name only one of the two layers."
-    elif [ "$MODE" = client ] && [ "$has_dev" = yes ]; then
-        problem "deploy/.env was written by 'make up' (it names the dev layer), but you
-      are running ./install.sh, which builds the production stack. Continuing
-      would quietly build the other stack.
-      Fix: run 'make up' instead, or remove deploy/.env to start over.
-           (Removing .env keeps your data; 'make reset' is what deletes it.)"
-    elif [ "$MODE" = dev ] && [ "$has_dev" = no ]; then
-        problem "deploy/.env was written by ./install.sh (it has no dev layer), but you
-      are running 'make up', which expects the developer stack.
-      Fix: run ./install.sh instead, or remove deploy/.env to start over.
-           (Removing .env keeps your data; 'make reset' is what deletes it.)"
-    else
-        ok "deploy/.env matches the '$MODE' entry point"
-    fi
+      Fix: delete deploy/.env and re-run, or edit COMPOSE_FILE to name only
+           one of the two." ;;
+        *)
+            problem "deploy/.env's COMPOSE_FILE is '$compose_file', which is not the stack
+      the '$MODE' entry point builds. .env is written once and never
+      rewritten, so it was created by the other entry point.
+      Fix: delete deploy/.env and re-run. That keeps your data — './eyened
+           reset' is what deletes it." ;;
+    esac
 
     if [ -n "$(norm "$(env_get EYENED_API_SECRET_KEY)")" ]; then
         ok "EYENED_API_SECRET_KEY is set"
@@ -230,35 +237,25 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       Fix: remove deploy/.env and re-run, or set it to a long random value."
     fi
 
-    # deploy/.env.example ships change_me for all three; first_run_env only
-    # generates real values when .env does not yet exist, so a .env copied
-    # from the template by hand (rather than created by an entry point) boots
-    # the whole stack on published default passwords, silently.
-    bad_secrets=""
-    for _var in MYSQL_ROOT_PASSWORD EYENED_DATABASE_PASSWORD EYENED_REDIS_PASSWORD; do
-        _val=$(norm "$(env_get "$_var")")
-        case "$_val" in
-            change_me) bad_secrets="$bad_secrets $_var" ;;
-        esac
-    done
-    if [ -z "$bad_secrets" ]; then
-        ok "database and Redis passwords are not the published default"
-    else
-        problem "These variables in deploy/.env are still the published default
-      'change_me', so the stack would boot on a known password:
-     $bad_secrets
-      Fix: remove deploy/.env and re-run so real secrets are generated, or set
-           each one by hand to a long random value."
-    fi
-
-    # KEYCLOAK_ADMIN_PASSWORD cannot join the change_me loop above, because
-    # its published default is not the string 'change_me': compose.oidc.yaml has
-    # ${KEYCLOAK_ADMIN_PASSWORD:-admin}, so ABSENT and EMPTY are just as much
-    # "runs on admin/admin" as the literal value is. All four values are tested
-    # so this holds however .env was produced: first_run_env now generates one,
-    # .env.example ships 'change_me' as the placeholder it replaces, and a
-    # hand-written or pre-generation .env may carry any of the rest. This is
-    # the backstop for those, not the primary mechanism.
+    # There is no change_me sweep for MYSQL_ROOT_PASSWORD,
+    # EYENED_DATABASE_PASSWORD and EYENED_REDIS_PASSWORD any more, and its
+    # absence is structural rather than an oversight. .env.example no longer
+    # carries the string at all — write_env appends generated values instead of
+    # replacing placeholders — so no .env derived from the template can hold
+    # it, and a .env with the key ABSENT is refused by compose.yaml's own
+    # ${MYSQL_ROOT_PASSWORD:?...} (measured: exit 1, "required variable ... is
+    # missing a value", before anything is built). That is a layer nothing can
+    # bypass, unlike a doctor check that only runs through the entry points.
+    #
+    # KEYCLOAK_ADMIN_PASSWORD below is the exception, and the reason this
+    # paragraph is here rather than nothing at all: its published default is
+    # not 'change_me' and compose does not require it. compose.oidc.yaml has
+    # ${KEYCLOAK_ADMIN_PASSWORD:-admin}, a DEFAULT — so absent and empty are
+    # just as much "runs on admin/admin" as a literal 'admin' is, and compose
+    # accepts all three in silence (measured: exit 0, rendering
+    # KC_BOOTSTRAP_ADMIN_PASSWORD: admin). Nothing else catches it, so this one
+    # check stays. 'change_me' is kept in its list for a hand-written .env or
+    # one written before this change; it costs one word.
     #
     # Gated on the LAYER: the bundled Keycloak only exists when
     # compose.oidc.yaml is in COMPOSE_FILE, and the majority who never enable

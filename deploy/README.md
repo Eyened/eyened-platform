@@ -265,10 +265,12 @@ EYENED_DATABASE_HOST=<platform host>
 PLATFORM_STORAGE_PATH=<absolute path to platform storage on this box>
 ```
 
-**Do not run `./eyened` on this box.** It rewrites `COMPOSE_FILE` back onto a
-full platform stack (`compose.yaml:compose.dev.yaml:compose.storage.yaml:
-compose.workers.yaml`), keeping only the hand-set value as an unrecognised
-extra layer — use the plain `docker compose -f ...` invocation below instead.
+**Do not run `./eyened` on this box.** Nothing rewrites the `COMPOSE_FILE` you
+set above — `deploy/.env` is written once and never touched again — so the
+hand-set value is safe. But `./eyened` still builds the *platform* stack, and
+its preflight refuses a `COMPOSE_FILE` that is not the one its entry point
+builds, so the run stops before it does anything. Use the plain
+`docker compose -f ...` invocation below instead.
 
 Fill in `storage-mounts.conf` the same way as on the platform host, run
 `deploy/scripts/gen-storage.sh`, then:
@@ -491,15 +493,15 @@ The `dc.sh` rows are not a special case: `deploy/scripts/dc.sh` is just
   the required upgrade — see [Compose 2.26 or newer is
   required](#compose-226-or-newer-is-required).
 - **`deploy/.env` was written by the other entry point.** `make doctor`
-  detects a dev-mode `.env` under `./install.sh` (or vice versa) and tells
-  you to either use the matching entry point or remove `deploy/.env` to
-  start over.
+  detects a dev-mode `.env` under `./install.sh` (or vice versa). Because
+  `.env` is written once and never rewritten, the fix is to delete it and
+  re-run — that is what switching between the two stacks means. Deleting it
+  keeps your data; `make reset` is what deletes that.
 - **`COMPOSE_FILE` names both `compose.dev.yaml` and `compose.prod.yaml`.**
   Compose accepts this silently — it does not error, and does not warn —
   but the two layers disagree about which image serves the client and which
-  nginx config it uses. `deploy/scripts/doctor.sh:173-188` is what actually
-  catches it; the fix it gives is to remove `deploy/.env` and let
-  `./install.sh` or `make up` write it fresh, or to edit `COMPOSE_FILE` by
+  nginx config it uses. `deploy/scripts/doctor.sh` catches it; the fix it
+  gives is to delete `deploy/.env` and re-run, or to edit `COMPOSE_FILE` by
   hand to name only one of the two layers.
 - **MySQL never becomes healthy.** Check `docker compose logs database`;
   `make doctor` cannot detect this ahead of time since it only checks

@@ -224,15 +224,25 @@ jobs:
         run: |
           set -e
           cp deploy/.env.example deploy/.env
-          # AMENDMENT (f): .env.example ships EYENED_API_SECRET_KEY empty on
-          # purpose — only first_run_env() generates it, and a plain `cp` never
-          # calls that. compose.yaml:125 requires it with `${...:?}`, which
-          # rejects empty as well as unset, so without this line EVERY
-          # `docker compose config` below fails and the job is red on every PR.
-          # Config-only validation never starts the stack, so a fixed
-          # placeholder is correct and keeps the run deterministic.
-          sed 's/^EYENED_API_SECRET_KEY=$/EYENED_API_SECRET_KEY=ci-config-validation-only-not-a-secret/' \
-              deploy/.env > deploy/.env.ci && mv deploy/.env.ci deploy/.env
+          # .env.example ships the five secrets ABSENT on purpose (see D7): the
+          # installer appends them, and a hand-copied .env is meant to fail
+          # loudly on compose.yaml's ${...:?} rather than boot on a published
+          # password. A plain `cp` is exactly that hand copy, so this fixture
+          # has to append them itself. Config-only validation never starts the
+          # stack, so fixed placeholders are correct and keep the run
+          # deterministic.
+          #
+          # Appended, not sed-ed in, for the same reason the installer appends:
+          # compose reads the LAST assignment. Note this leaves exactly ONE
+          # `^COMPOSE_FILE=` line in the fixture — the template's — which the
+          # `sed -i 's|^COMPOSE_FILE=.*|...|'` in the next step depends on.
+          cat >> deploy/.env <<'ENVEOF'
+          EYENED_API_SECRET_KEY=ci-config-validation-only-not-a-secret
+          EYENED_REDIS_PASSWORD=ci-config-validation-only-not-a-secret
+          MYSQL_ROOT_PASSWORD=ci-config-validation-only-not-a-secret
+          EYENED_DATABASE_PASSWORD=ci-config-validation-only-not-a-secret
+          KEYCLOAK_ADMIN_PASSWORD=ci-config-validation-only-not-a-secret
+          ENVEOF
           # storage-mounts.conf.example is COMMENT-ONLY by design, so copying
           # it alone makes gen-storage.sh take its no-mounts branch: a
           # storage.conf of two header lines and a compose.storage.yaml of

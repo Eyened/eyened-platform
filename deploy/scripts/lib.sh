@@ -90,240 +90,172 @@ env_get() {
     sed -n "s/^[[:space:]]*$1=//p" "$_file" | tail -n 1
 }
 
-# Write a value into an env file, replacing any existing assignment.
-# `sed -i` is not portable (GNU takes no argument, BSD requires one), so this
-# writes a temp file and moves it.
+# `sudo` is refused rather than compensated for. Docker itself does not need it
+# (the daemon SOCKET needs privilege, not this script), and under sudo
+# everything written here lands root-owned — a deploy/.env at mode 600 that the
+# invoking user's own later 'docker compose logs' cannot read. That used to be
+# handled by chowning the files back afterwards, which needed ~50 lines and had
+# to be called from every write path; one of them was missed for months.
+# Refusing is five lines and cannot be half-applied.
 #
-# Every step that can fail is checked, and a temp file that was not built
-# correctly is REMOVED rather than moved into place. That is not defensive
-# padding: `mv` needs only write permission on the DIRECTORY, so an unguarded
-# one will cheerfully publish a half-built or empty temp over a populated .env
-# and return 0. A `set -e` in the caller does not help — the failures that
-# matter here were already being swallowed before they could set a status.
-#
-# The value is escaped for sed's REPLACEMENT side, where & means "the whole
-# match" and | is the delimiter. Generated hex secrets contain neither, but a
-# hand-set PLATFORM_STORAGE_PATH or COMPOSE_FILE could, and a silently
-# corrupted .env line is a very hard failure to trace back to here.
-env_set() {
-    _key=$1
-    _val=$2
-    _file=${3:-$DEPLOY_DIR/.env}
-    _tmp="$_file.tmp.$$"
+# The condition is the same one the chown used: `sudo` sets SUDO_UID, so a
+# genuine root shell (SUDO_UID unset) is still allowed through — this refuses
+# the sudo WRAPPER, which is what leaves files owned by someone other than the
+# person who will run the next command.
+refuse_sudo() {
+    if [ "$(id -u)" = 0 ] && [ -n "${SUDO_UID:-}" ]; then
+        die "error: do not run this under sudo. Everything it writes — deploy/.env at
+      mode 600 above all — would end up owned by root, and your own later
+      'docker compose' calls could not read it. Docker needs a privileged
+      DAEMON, not a privileged client.
+      Fix: run it as yourself. If docker refuses, add yourself to the docker
+           group once: sudo usermod -aG docker \"\$USER\", then log out and in."
+    fi
+}
 
-    # A newline ends the sed expression mid-script. sed then fails — but the
-    # `> "$_tmp"` redirect has already truncated the temp, so unrefused this
-    # arrives as an empty .env rather than as a rejected value.
-    if [ "$_val" != "$(printf '%s' "$_val" | tr -d '\n')" ]; then
-        die "error: refusing to write a multi-line value for '$_key' into $_file.
-      An env file holds one KEY=VALUE per line, so a value containing a
-      newline cannot round-trip through it."
+# Create storage-mounts.conf from its template if it is not there.
+#
+# Deliberately NOT part of write_env: the two files have independent lifetimes.
+# storage-mounts.conf can be deleted (or never created, on a checkout that
+# predates it) while .env is perfectly good, and write_env returns early in
+# exactly that case — so folding this in would leave gen-storage.sh dying on a
+# missing file that the entry point could have replaced for free.
+ensure_storage_mounts() {
+    if [ ! -f "$DEPLOY_DIR/storage-mounts.conf" ]; then
+        cp "$DEPLOY_DIR/storage-mounts.conf.example" "$DEPLOY_DIR/storage-mounts.conf" ||
+            die "error: could not create $DEPLOY_DIR/storage-mounts.conf from its
+      .example (see above)."
+    fi
+}
+
+# Write deploy/.env ONCE, whole, and never touch it again.
+#
+# No in-place sed, no rewriting of COMPOSE_FILE, no chowning the result back
+# afterwards — the three things that made writing this file ~220 lines. The
+# consequences are worth stating, because they are improvements and not merely
+# simplifications:
+#
+#   * A layer the operator appends to COMPOSE_FILE by hand — the documented way
+#     to enable compose.host-ports.yaml, compose.oidc.yaml and
+#     compose.workers.yaml — is now PERMANENTLY safe. Previously every re-run
+#     regenerated the base list and merged the extras back in, and the merge
+#     could not fully fix a CRLF-latched entry (its own comments said so).
+#   * Switching between the dev and client stacks means deleting .env and
+#     re-running. That is already what doctor tells you to do.
+#   * A variable added to .env.example in a later release does not reach an
+#     existing .env. That was ALREADY true — the old in-place writer only ever
+#     touched COMPOSE_FILE and the five secrets — so it is not a regression.
+#     Give anything new a ${VAR:-default} in compose.yaml.
+#
+# The file is .env.example plus ONE appended block. Not a second copy of the
+# template as a heredoc: that would be a second source of truth for 176 lines
+# of documented settings, and it would drift. Compose's dotenv parser takes the
+# LAST assignment (measured), as does env_get above, so the appended block wins
+# over the template's own COMPOSE_FILE line.
+write_env() {
+    _mode=$1
+    case "$_mode" in
+        dev)    _layers=$COMPOSE_FILE_DEV ;;
+        client) _layers=$COMPOSE_FILE_CLIENT ;;
+        *)      die "write_env: expected 'dev' or 'client', got '$_mode'" ;;
+    esac
+
+    # Written once, and a re-run must not touch it. This is not tidiness: an
+    # existing .env's MYSQL_ROOT_PASSWORD is already baked into an INITIALISED
+    # MySQL datadir, which applies its passwords only while the data directory
+    # is empty. Regenerating over it leaves the file and the datadir
+    # disagreeing — every connection refused with 'Access denied', on a stack
+    # where every container still reports healthy. Saying so rather than
+    # returning in silence, because "nothing happened" is the one thing an
+    # operator re-running to change something needs told. (A run of the OTHER
+    # entry point is a different case, and doctor refuses it before this is
+    # ever reached.)
+    if [ -f "$DEPLOY_DIR/.env" ]; then
+        echo "==> deploy/.env exists — left exactly as it is, secrets and all."
+        echo "    To start over (the other stack, or fresh secrets) delete it and"
+        echo "    re-run. Deleting it keeps your data; './eyened reset' deletes that."
+        return 0
     fi
 
-    # Existence and readability are different questions, and a swallowed grep
-    # cannot tell them apart: an unreadable file looks exactly like "key not
-    # present", which sends a populated .env down the build-from-nothing path.
-    if [ -e "$_file" ] && [ ! -r "$_file" ]; then
-        die "error: $_file exists but is not readable by this user.
-      Fix: chmod u+r '$_file', or re-run as the user that owns it."
-    fi
+    [ -f "$DEPLOY_DIR/.env.example" ] ||
+        die "error: $DEPLOY_DIR/.env.example is missing, so there is no template to
+      build deploy/.env from.
+      Fix: restore it — git checkout deploy/.env.example"
 
-    _esc=$(printf '%s' "$_val" | sed -e 's/[|&\\]/\\&/g') ||
-        die "error: could not escape the value for '$_key' (see above)."
+    # Generate BEFORE the write, each through a plain assignment whose status
+    # is checked. Inside a command substitution in the heredoc below, a
+    # generator's `die` would exit only that subshell: the key would be written
+    # EMPTY and the run would carry on with status 0.
+    _secret=$(gen_secret)    || die "error: could not generate a signing key; see above."
+    _redis_pw=$(gen_secret)  || die "error: could not generate a Redis password; see above."
+    _root_pw=$(gen_password) || die "error: could not generate a database root password; see above."
+    _db_pw=$(gen_password)   || die "error: could not generate a database password; see above."
+    # The bundled Keycloak's bootstrap admin. Generated even when
+    # compose.oidc.yaml is not in play — it costs nothing, and it means
+    # appending that layer later needs no second trip through this function,
+    # which by then would refuse to run. It is also the ONE key here that
+    # compose does not require: compose.oidc.yaml has ${KEYCLOAK_ADMIN_PASSWORD
+    # :-admin}, so absent means 'admin' rather than a refusal (measured, exit
+    # 0). That is why doctor keeps its own check of this one and not of the
+    # four above.
+    _kc_pw=$(gen_password)   || die "error: could not generate a Keycloak admin password; see above."
 
-    # Create the temp EMPTY and restrict it BEFORE anything is written into it:
-    # `>` truncates without changing an existing file's mode, so no secret is
-    # ever briefly group- or world-readable, and the mv below carries 600 onto
-    # the target. 600 is a deliberate hardening decision — .env holds four
-    # secrets — and NOT preservation of whatever mode was there before. Do not
-    # "restore" this to the umask default.
-    : > "$_tmp" || die "error: could not create the temp file $_tmp.
-      Fix: check that its directory exists and is writable."
+    # Create the temp EMPTY and restrict it BEFORE anything goes in: `>`
+    # truncates without changing an existing file's mode, so no secret is ever
+    # briefly group- or world-readable, and `mv` carries 600 onto the target.
+    # 600 is a deliberate hardening decision — this file holds five secrets —
+    # not preservation of whatever mode was there before.
+    #
+    # The name matches .gitignore's deploy/.env.* so a temp left behind by a
+    # crash can never be committed by accident.
+    #
+    # `true >`, NOT `: >`. They look interchangeable and are not: `:` is a
+    # SPECIAL built-in, and POSIX says a redirection error on one of those
+    # exits a non-interactive shell outright — so the `|| die` after it can
+    # never run. Measured on this host: with an unwritable deploy/, `: >` gave
+    # dash and /bin/sh exit 2 and a bare "cannot create ...: Permission
+    # denied", with or without `set -e`, while `true >` reached the die in
+    # every shell. bash catches both, which is exactly why a guard written
+    # this way survives being tested.
+    _tmp="$DEPLOY_DIR/.env.tmp.$$"
+    true > "$_tmp" || die "error: could not create $_tmp.
+      Fix: check that $DEPLOY_DIR exists and is writable by you."
     chmod 600 "$_tmp" ||
         { rm -f "$_tmp"; die "error: could not restrict permissions on $_tmp."; }
 
-    if grep -q "^[[:space:]]*$_key=" "$_file" 2>/dev/null; then
-        sed "s|^[[:space:]]*$_key=.*|$_key=$_esc|" "$_file" > "$_tmp" ||
-            { rm -f "$_tmp"; die "error: could not rewrite '$_key' in $_file (see above)."; }
-    else
-        if [ -e "$_file" ]; then
-            cat "$_file" > "$_tmp" ||
-                { rm -f "$_tmp"; die "error: could not read $_file (see above)."; }
-        fi
-        printf '%s=%s\n' "$_key" "$_val" >> "$_tmp" ||
-            { rm -f "$_tmp"; die "error: could not append '$_key' to $_tmp."; }
-    fi
+    {
+        cat "$DEPLOY_DIR/.env.example" &&
+        cat <<EOF
 
-    mv "$_tmp" "$_file" ||
-        { rm -f "$_tmp"; die "error: could not put $_tmp into place as $_file."; }
-}
+# ============================================================================
+# Written once, by the installer, and never rewritten. Everything below
+# overrides the same key above it: compose reads the LAST assignment.
+#
+# Editing this block is fine — nothing here will overwrite your changes. To
+# start over (a different stack, regenerated secrets), DELETE this whole file
+# and re-run the installer. Deleting it keeps your data; './eyened reset' is
+# what deletes that.
+#
+# Appending your own layer to COMPOSE_FILE below is safe and permanent:
+#   :compose.host-ports.yaml   publish MySQL and Redis on the host
+#   :compose.oidc.yaml         the bundled Keycloak
+#   :compose.workers.yaml      RQ workers on this host
+# ============================================================================
+COMPOSE_FILE=$_layers
+EYENED_API_SECRET_KEY=$_secret
+EYENED_REDIS_PASSWORD=$_redis_pw
+MYSQL_ROOT_PASSWORD=$_root_pw
+EYENED_DATABASE_PASSWORD=$_db_pw
+KEYCLOAK_ADMIN_PASSWORD=$_kc_pw
+EOF
+    } >> "$_tmp" || { rm -f "$_tmp"; die "error: could not write $_tmp (see above)."; }
 
-# Rewrite COMPOSE_FILE's BASE layer list while preserving any layer the
-# operator appended by hand (deploy/.env.example documents appending
-# :compose.host-ports.yaml). Only the four known base layers are ever
-# replaced; anything else already in COMPOSE_FILE is kept, in order, deduped
-# against the new base.
-#
-# This is called on EVERY first_run_env call, not just the first, because
-# first_run_env itself runs on every stack.sh invocation, not only when .env
-# is created. A plain re-run of the SAME mode — 're-run ./install.sh',
-# 'make up' twice — is reachable and common, and without preserving non-base
-# entries it would silently strip an operator's appended host-ports layer
-# back out of COMPOSE_FILE on every one of those re-runs. (A dev/client mode
-# switch through stack.sh is NOT the scenario this guards: doctor.sh refuses
-# a mismatched mode before first_run_env is ever reached, so that path never
-# gets here at all.)
-_set_compose_file() {
-    _new_base=$1
-    # A CRLF .env (hand-edited on Windows/WSL) puts a trailing \r on the last
-    # layer name. Left in, that \r becomes part of the layer's own identity
-    # here: it no longer matches any of the four known base names below, so
-    # it is kept as an "extra" and re-appended forever, including onto a
-    # freshly-generated base list. Compose itself tolerates the stray \r
-    # (trailing whitespace in -f is ignored), so today this only latches a
-    # harmless duplicate — but the same mechanism would just as happily
-    # preserve a CR-suffixed compose.prod.yaml into a dev COMPOSE_FILE.
-    _existing=$(env_get COMPOSE_FILE | tr -d '\r')
-    _extra=""
-    if [ -n "$_existing" ]; then
-        _old_ifs=$IFS
-        IFS=':'
-        for _layer in $_existing; do
-            case "$_layer" in
-                compose.yaml|compose.dev.yaml|compose.storage.yaml|compose.prod.yaml|"") ;;
-                *)
-                    case ":$_extra:" in
-                        *":$_layer:"*) ;;
-                        *) _extra=${_extra:+$_extra:}$_layer ;;
-                    esac
-                    ;;
-            esac
-        done
-        IFS=$_old_ifs
-    fi
-    if [ -n "$_extra" ]; then
-        env_set COMPOSE_FILE "$_new_base:$_extra"
-    else
-        env_set COMPOSE_FILE "$_new_base"
-    fi
-}
+    mv "$_tmp" "$DEPLOY_DIR/.env" ||
+        { rm -f "$_tmp"; die "error: could not put $_tmp into place as $DEPLOY_DIR/.env."; }
 
-# Give deploy/.env (and storage-mounts.conf) back to the invoking user after a
-# run under sudo.
-#
-# Its own function because TWO paths write .env, not one. install.sh is the
-# published client door, and some operators will run it under sudo. Docker
-# itself does not need that (the daemon socket is what needs root, not this
-# script), but nothing here stops them. Under sudo this process is root, so
-# anything it writes ends up root-owned — unreadable, or in
-# storage-mounts.conf's case merely un-editable, by the invoking user's own
-# later `make up` or plain `docker compose`, which is a worse failure than the
-# file being briefly group-readable.
-#
-# This lived inside first_run_env until it was measured that stack.sh's `prod`
-# branch deliberately bypasses first_run_env and calls _set_compose_file (i.e.
-# env_set) directly — so `sudo make prod` wrote .env through the same `mv` and
-# then never reached the chown, leaving exactly the root-owned mode-600 file
-# described above. The reasoning had been done for one .env-writing path and
-# not carried to the second. Every path that writes .env must end here.
-#
-# CALL IT LAST, after every write to those files, never right after .env is
-# created: env_set's `mv` (and the storage-mounts.conf `cp`) replace the file
-# with a fresh copy owned by the current euid, re-owning it as root and
-# undoing an earlier chown. Measured: chowning before _set_compose_file's
-# env_set call left .env back at 0:0 after that call ran.
-#
-# Safe to call on EVERY run and more than once: chowning an already-correct
-# owner to itself is a no-op, so this costs nothing on the common case where
-# the invoking user was never root to begin with (SUDO_UID unset, block
-# skipped entirely). That also means a second sudo run against an
-# already-chowned .env must not skip it — the file could have been touched by
-# a root run in between.
-#
-# `sudo` sets SUDO_UID/SUDO_GID to the invoking user, so chown back to that
-# rather than leave secrets only root can read.
-chown_back_to_invoker() {
-    if [ "$(id -u)" = 0 ] && [ -n "${SUDO_UID:-}" ]; then
-        chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$DEPLOY_DIR/.env" ||
-            die "error: could not chown $DEPLOY_DIR/.env back to the invoking user
-      (uid $SUDO_UID). It was written root-owned at mode 600 and a later
-      non-sudo 'make up' or 'docker compose' would not be able to read it.
-      Fix: chown $SUDO_UID:${SUDO_GID:-$SUDO_UID} $DEPLOY_DIR/.env by hand."
-        if [ -f "$DEPLOY_DIR/storage-mounts.conf" ]; then
-            chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$DEPLOY_DIR/storage-mounts.conf" ||
-                die "error: could not chown $DEPLOY_DIR/storage-mounts.conf back to the
-      invoking user (uid $SUDO_UID). It was written root-owned and the
-      invoking user would not be able to edit their own mount list.
-      Fix: chown $SUDO_UID:${SUDO_GID:-$SUDO_UID} $DEPLOY_DIR/storage-mounts.conf by hand."
-        fi
-    fi
-}
-
-# First-run setup for the dev and install modes of stack.sh. MODE is dev or
-# client and decides which layer list is recorded — that one line is what lets
-# every later command be a bare `docker compose ...` with no -f flags.
-#
-# Every secret is generated BEFORE .env is created, and each generator's status
-# is checked through a plain assignment. Inside `env_set K "$(gen_secret)"` the
-# generator's `die` would exit only the command substitution's subshell: the
-# key would be written EMPTY and the run would continue with status 0.
-#
-# The `cp` needs its own check for the same reason and is not covered by the
-# hoist: without one, a missing .env.example produces a plausible-looking .env
-# holding nothing but the four generated secrets, the "created" banner, and
-# exit 0 — and since the guard below is `[ ! -f .env ]`, no later run ever
-# repairs it.
-#
-# CONTRACT: COMPOSE_FILE's base layer list is rewritten on every call (via
-# _set_compose_file above), not only when .env is first created — only the
-# four known base layer names are ever touched, so a layer the operator
-# appended by hand survives. doctor.sh and bootstrap.sh only ever READ
-# COMPOSE_FILE and neither assumes it is left untouched across runs, so
-# neither is affected by this.
-first_run_env() {
-    _mode=$1
-    if [ ! -f "$DEPLOY_DIR/.env" ]; then
-        _secret=$(gen_secret) || die "error: could not generate a signing key; see above."
-        _redis_pw=$(gen_secret) || die "error: could not generate a Redis password; see above."
-        _root_pw=$(gen_password) || die "error: could not generate a database root password; see above."
-        _db_pw=$(gen_password) || die "error: could not generate a database password; see above."
-        # The bundled Keycloak's bootstrap admin. Generated for the same reason
-        # as the four above: .env.example cannot ship a credential, and this
-        # console is published (see KEYCLOAK_BIND). Generated even when the
-        # oidc layer is off — it costs nothing, and it means enabling the
-        # layer later does not need a second trip through this function.
-        _kc_pw=$(gen_password) || die "error: could not generate a Keycloak admin password; see above."
-        cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env" ||
-            die "error: could not create $DEPLOY_DIR/.env from .env.example; see above."
-        # Restrict it before the first secret goes in, not after.
-        chmod 600 "$DEPLOY_DIR/.env" ||
-            die "error: could not restrict permissions on $DEPLOY_DIR/.env."
-        env_set EYENED_API_SECRET_KEY "$_secret"
-        env_set EYENED_REDIS_PASSWORD "$_redis_pw"
-        env_set MYSQL_ROOT_PASSWORD "$_root_pw"
-        env_set EYENED_DATABASE_PASSWORD "$_db_pw"
-        env_set KEYCLOAK_ADMIN_PASSWORD "$_kc_pw"
-
-        echo "==> created deploy/.env with generated secrets"
-        echo "    On a shared machine, set COMPOSE_PROJECT_NAME and HTTP_PORT"
-        echo "    in deploy/.env to something nobody else is using."
-    fi
-
-    case "$_mode" in
-        dev)    _set_compose_file "$COMPOSE_FILE_DEV" ;;
-        client) _set_compose_file "$COMPOSE_FILE_CLIENT" ;;
-        *)      die "first_run_env: expected 'dev' or 'client', got '$_mode'" ;;
-    esac
-
-    if [ ! -f "$DEPLOY_DIR/storage-mounts.conf" ]; then
-        cp "$DEPLOY_DIR/storage-mounts.conf.example" "$DEPLOY_DIR/storage-mounts.conf" ||
-            die "error: could not create $DEPLOY_DIR/storage-mounts.conf from its .example; see above."
-    fi
-
-    # Last, after _set_compose_file and the storage-mounts.conf cp above — see
-    # chown_back_to_invoker's own header for why the order matters and why
-    # this runs on every call rather than only on first run.
-    chown_back_to_invoker
+    echo "==> created deploy/.env with generated secrets"
+    echo "    On a shared machine, set COMPOSE_PROJECT_NAME and HTTP_PORT in"
+    echo "    deploy/.env to something nobody else is using, then re-run."
 }
 
 # The day-2 commands, printed with the binary THIS host actually has. Naming

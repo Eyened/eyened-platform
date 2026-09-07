@@ -20,6 +20,13 @@ case "$MODE" in
     *) die "usage: stack.sh dev|install|prod" ;;
 esac
 
+# Before anything is read or written, including doctor: under sudo every file
+# this run creates lands root-owned, and deploy/.env at mode 600 is then
+# unreadable to the invoking user's own later `docker compose`. Refusing costs
+# five lines; compensating for it afterwards cost fifty and had to be repeated
+# at every write path.
+refuse_sudo
+
 # doctor takes dev|client: 'install' and 'prod' both build the client stack.
 case "$MODE" in
     dev) doctor_mode=dev ;;
@@ -32,8 +39,8 @@ echo "==> checking this machine"
 resolve_compose
 
 case "$MODE" in
-    dev)     first_run_env dev ;;
-    install) first_run_env client ;;
+    dev)     write_env dev ;;
+    install) write_env client ;;
     prod)
         # A site deployment is never bootstrapped from a template: the .env
         # must already point at the external database for THIS site.
@@ -50,26 +57,20 @@ case "$MODE" in
       Fix: remove 'local-db' from COMPOSE_PROFILES in deploy/.env, or run
            ./install.sh if you do want the bundled database." ;;
         esac
-
-        # _set_compose_file, not a bare env_set: prod's .env is by definition
-        # hand-configured (the error above sends the operator to edit it
-        # themselves), so this is the mode where an operator-appended layer
-        # like compose.host-ports.yaml is most likely to already be present
-        # — and a bare env_set here would silently drop it.
-        _set_compose_file "$COMPOSE_FILE_CLIENT"
-
-        # dev and install reach this through first_run_env, which ends in the
-        # same call; prod bypasses first_run_env entirely, so without this it
-        # is the one .env-writing path with no chown back. env_set's `mv`
-        # replaces .env with a fresh copy owned by the current euid, so
-        # `sudo make prod` otherwise left it root-owned at mode 600 and the
-        # invoking user's own later `make down` or `make logs` could not read
-        # it. Last in this branch for the reason its header gives: anything
-        # that writes .env after it would re-own the file as root again.
-        chown_back_to_invoker
+        # Nothing writes .env in this branch. A site's .env is hand-configured
+        # by definition — the refusal above sends the operator to edit it
+        # themselves — so rewriting COMPOSE_FILE underneath them was never
+        # this mode's business. doctor has already refused a COMPOSE_FILE that
+        # does not name the client stack.
         ;;
 esac
 
+# .env and storage-mounts.conf have independent lifetimes, so this is not part
+# of write_env: .env can be perfectly good while storage-mounts.conf is absent
+# (deleted, or a checkout that predates it), and write_env returns early in
+# exactly that case. gen-storage.sh dies on a missing storage-mounts.conf, and
+# all three modes reach it — including prod, which never had this before.
+ensure_storage_mounts
 "$DEPLOY_DIR/scripts/gen-storage.sh"
 
 echo "==> building images and starting the stack"
