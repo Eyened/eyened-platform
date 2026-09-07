@@ -59,6 +59,10 @@ class ConflictError(ServiceError):
     status_code = 409
 
 
+class OutOfDeclarationError(ConflictError):
+    """An image's project is not among those its task declares."""
+
+
 def service_error_to_response(exc: ServiceError) -> JSONResponse:
     """Map a ServiceError to the JSON error response shape used by the API."""
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})

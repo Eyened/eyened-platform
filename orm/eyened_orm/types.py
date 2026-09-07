@@ -6,6 +6,8 @@ from enum import Enum
 from typing import Any, Optional, Type
 
 from sqlalchemy import Enum as SAEnum
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.expression import ColumnElement
 from sqlalchemy.types import TypeDecorator
 
 
@@ -32,11 +34,11 @@ class OptionalEnum(TypeDecorator):
     def process_result_value(self, value: Any, dialect: Any) -> Optional[Enum]:
         """
         Convert empty strings to None when reading from the database.
-        
+
         Args:
             value: The value from the database
             dialect: SQLAlchemy dialect (unused)
-            
+
         Returns:
             The enum value, or None if value is empty string or None
         """
@@ -44,3 +46,28 @@ class OptionalEnum(TypeDecorator):
             return None
         return value
 
+
+class CurrentTimestampOnUpdate(ColumnElement):
+    """CURRENT_TIMESTAMP, which MySQL also maintains on UPDATE.
+
+    As a ``server_default`` this makes the database maintain the column for
+    every writer -- ORM, importer, CLI, raw SQL -- not just for writes through
+    a mapped class. Other dialects fall back to a plain default so the same
+    models can build a SQLite schema for tests.
+
+    Pair it with ``server_onupdate=FetchedValue()``: without that the ORM does
+    not know the database changed the column, and a flush without a commit
+    serves the caller a stale timestamp.
+    """
+
+    inherit_cache = True
+
+
+@compiles(CurrentTimestampOnUpdate)
+def _render_current_timestamp(element, compiler, **kw) -> str:  # noqa: ANN001
+    return "CURRENT_TIMESTAMP"
+
+
+@compiles(CurrentTimestampOnUpdate, "mysql")
+def _render_current_timestamp_mysql(element, compiler, **kw) -> str:  # noqa: ANN001
+    return "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"

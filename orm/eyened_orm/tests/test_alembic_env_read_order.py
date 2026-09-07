@@ -113,11 +113,48 @@ def test_the_confirmation_prompt_still_exists():
     )
 
 
+def test_the_confirmation_guard_writes_only_to_stderr():
+    """`upgrade --sql` sends SQL to stdout; a prompt there corrupts the first statement."""
+    tree = _module_ast()
+
+    for call in _module_level_calls(tree, "print"):
+        assert any(
+            kw.arg == "file" and ast.unparse(kw.value) == "sys.stderr"
+            for kw in call.keywords
+        ), (
+            f"the print(...) at line {call.lineno} has no file=sys.stderr, so its text "
+            "lands in the SQL that `alembic upgrade --sql` writes to stdout"
+        )
+
+    for call in _module_level_calls(tree, "input"):
+        assert not call.args, (
+            f"input(...) at line {call.lineno} passes a prompt argument, which Python "
+            "writes to stdout -- print it to sys.stderr and call input() bare"
+        )
+
+
 def test_online_configure_passes_render_item():
     """A correct renderer that nothing calls is worth nothing."""
     call = _configure_call(_module_ast(), "run_migrations_online")
-    assert _keyword_is_name(call, "render_item", "render_optional_enum"), (
+    assert _keyword_is_name(call, "render_item", "render_custom_item"), (
         "run_migrations_online()'s context.configure(...) does not pass "
-        "render_item=render_optional_enum; OptionalEnum columns would autogenerate as "
-        "code that cannot run"
+        "render_item=render_custom_item; OptionalEnum columns would autogenerate as "
+        "code the generated module cannot run, and ON UPDATE clauses would be dropped"
+    )
+
+
+def test_online_configure_compares_server_defaults():
+    """Correcting the model spellings was what made this switchable on. Dropped,
+    the schema drifts again and nothing fails -- which is how it drifted before."""
+    tree = _module_ast()
+
+    assert _keyword_is_true(_configure_call(tree, "run_migrations_online"), "compare_server_default"), (
+        "run_migrations_online()'s context.configure(...) no longer passes "
+        "compare_server_default=True, so alembic check cannot see default drift"
+    )
+    assert not _keyword_is_true(
+        _configure_call(tree, "run_migrations_offline"), "compare_server_default"
+    ), (
+        "compare_server_default in run_migrations_offline is inert churn -- "
+        "autogenerate and check are online-only"
     )

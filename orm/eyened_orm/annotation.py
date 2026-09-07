@@ -5,11 +5,12 @@ from typing import TYPE_CHECKING, Any, ClassVar, List, Optional
 
 import numpy as np
 from PIL import Image
-from sqlalchemy import Column, ForeignKey, Index, UniqueConstraint, String, func
+from sqlalchemy import Column, FetchedValue, ForeignKey, Index, UniqueConstraint, String, func
 from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
+from .types import CurrentTimestampOnUpdate
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -59,7 +60,7 @@ class Annotation(Base):
     )
     Inactive: Mapped[bool] = mapped_column(default=False)
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Patient: Mapped[Optional["Patient"]] = relationship("eyened_orm.patient.Patient", back_populates="Annotations")
     Study: Mapped[Optional["Study"]] = relationship("eyened_orm.study.Study", back_populates="Annotations")
@@ -143,7 +144,11 @@ class AnnotationData(Base):
     ValueBlob: Mapped[Optional[bytes]] = mapped_column(LONGBLOB)
 
     DatasetIdentifier: Mapped[str] = mapped_column(String(45), unique=True)
-    DateModified: Mapped[Optional[datetime]] = mapped_column(onupdate=func.now())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(
+        server_default=CurrentTimestampOnUpdate(),
+        server_onupdate=FetchedValue(),
+        onupdate=func.now(),
+    )
     MediaType: Mapped[str] = mapped_column(String(45))
 
     Annotation: Mapped["Annotation"] = relationship("eyened_orm.annotation.Annotation", back_populates="AnnotationData")

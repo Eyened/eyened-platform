@@ -1,9 +1,10 @@
 """A task names the projects it spans, for anyone who can see the task."""
 from __future__ import annotations
 
-from eyened_orm import Task
+from eyened_orm import Task, TaskProject
 from eyened_orm.authz.scoping import projects_of
 from eyened_orm.repositories.task_repository import TaskRepository
+from eyened_orm.task import TaskState
 from eyened_orm.utils.factories import admin_scope, scope_for
 
 
@@ -61,3 +62,34 @@ def test_a_task_touching_an_invisible_project_resolves_to_nothing(session, spann
     assert got[spanning["task"]] == []
     # ...and it does not over-filter: what the scope *can* see still resolves.
     assert got[spanning["a_only"]] == [(spanning["projects"]["A"], "A")]
+
+
+def test_a_declared_project_the_scope_lacks_resolves_to_nothing(session, spanning):
+    """The same predicate on ``declared_projects``, on the shape it exists for.
+
+    That method answers the create route, where the task has a declaration and
+    no image links yet. While the read predicate walked the image links, such a
+    task was visible to every scope, so its ``apply_scope`` call could not bite
+    on its own subject -- structural coverage only. Reading ``TaskProject``
+    makes it bite.
+
+    Repository-level for the same reason as the test above, and the held-scope
+    half is the control: without it, a method that returned ``[]`` for
+    everything would pass.
+    """
+    task = Task(
+        TaskName="declared, no images",
+        TaskDefinitionID=spanning["task_definition"],
+        TaskState=TaskState.NotStarted,
+    )
+    session.add(task)
+    session.flush()
+    task_id = task.TaskID
+    session.add(TaskProject(TaskID=task_id, ProjectID=spanning["projects"]["B"]))
+    session.commit()
+
+    held = TaskRepository(session, scope=scope_for(spanning["projects"]["B"]))
+    assert held.declared_projects(task_id) == [(spanning["projects"]["B"], "B")]
+
+    lacking = TaskRepository(session, scope=scope_for(spanning["projects"]["A"]))
+    assert lacking.declared_projects(task_id) == []
