@@ -23,7 +23,7 @@ from ..project import Project
 from ..repositories.project_member_repository import ProjectMemberRepository
 from ..task import SubTaskImageLink, TaskProject
 from ..utils.db_users import hash_password
-from .roles import ProjectRole
+from .roles import ProjectRole, parse_role
 
 __all__ = [
     "GrantResult",
@@ -45,19 +45,6 @@ __all__ = [
     "set_password",
     "unused_declarations",
 ]
-
-
-def parse_role(value: str) -> ProjectRole:
-    """Convert a CLI string to a ProjectRole, naming the valid roles on failure.
-
-    The conversion happens once, at the boundary; everything past it deals in
-    the enum, so no downstream code compares role strings.
-    """
-    try:
-        return ProjectRole[value]
-    except KeyError:
-        valid = ", ".join(r.name for r in ProjectRole)
-        raise ValueError(f"unknown role {value!r}; valid roles are: {valid}") from None
 
 
 def resolve_creator(session: Session, username: str) -> Creator:

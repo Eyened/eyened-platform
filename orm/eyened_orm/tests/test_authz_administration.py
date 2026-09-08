@@ -533,3 +533,24 @@ def test_unused_declarations_reports_a_project_no_link_uses(session, spanning):
     assert (spanning["a_only"], spanning["projects"]["B"]) in found
     # ...and it does not report the ones that ARE used, or the report is noise.
     assert (spanning["a_only"], spanning["projects"]["A"]) not in found
+
+
+def test_admin_entity_not_found_is_not_a_lookup_error():
+    """LookupError is the base class of KeyError and IndexError, so catching it
+    to build a 404 -- or a clean ClickException -- turns any dict or list miss
+    inside the call into "not found". The dedicated type catches only what was
+    raised on purpose."""
+    from eyened_orm.authz.errors import AdminEntityNotFound
+
+    assert not issubclass(AdminEntityNotFound, LookupError)
+
+
+def test_admin_entity_not_found_names_which_lookup_failed():
+    """The 404 it becomes in step 2 carries no body, so the entity has to ride
+    on the exception -- the same argument errors.py already makes for
+    AuthorizationError. The message stays the operator-facing string."""
+    from eyened_orm.authz.errors import AdminEntityNotFound
+
+    exc = AdminEntityNotFound("no creator named 'bob'", entity="Creator")
+    assert exc.entity == "Creator"
+    assert str(exc) == "no creator named 'bob'"

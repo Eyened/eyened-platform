@@ -15,7 +15,12 @@ from __future__ import annotations
 
 from collections.abc import Set as AbstractSet
 
-__all__ = ["AuthorizationError", "NotVisibleError", "PermissionDeniedError"]
+__all__ = [
+    "AdminEntityNotFound",
+    "AuthorizationError",
+    "NotVisibleError",
+    "PermissionDeniedError",
+]
 
 
 class AuthorizationError(Exception):
@@ -55,3 +60,31 @@ class PermissionDeniedError(AuthorizationError):
 
     ``projects`` holds the ones whose role was too low.
     """
+
+
+class AdminEntityNotFound(Exception):
+    """An administration call named a creator, project or task that does not exist.
+
+    Deliberately **not** ``LookupError``: that is the base class of ``KeyError``
+    and ``IndexError``, so catching it to build a 404 -- or, in the CLI, a clean
+    ``ClickException`` -- silently converts any dict or list miss inside the
+    call into "not found".
+
+    Deliberately not an ``AuthorizationError`` either: nothing here is a denial,
+    and the 404 policy that keeps an ``AuthorizationError``'s detail out of the
+    response body does not apply. The message names the missing entity, and the
+    CLI prints it verbatim via ``ClickException(str(exc))``.
+
+    ``entity`` is carried separately from the message for the reason this
+    module's own docstring gives about ``AuthorizationError``: a bare
+    ``class ...: ...`` satisfies the status mapping and leaves nobody able to
+    answer *which* lookup failed. Step 2 maps this to a 404 whose body says
+    nothing, so the one fact the handler cannot recover from a formatted string
+    is the one that goes here. It is a separate argument rather than an
+    interpolation because the three messages do not share a shape -- two read
+    "no X named Y", the task one reads "no task with ids A, B".
+    """
+
+    def __init__(self, message: str, *, entity: str) -> None:
+        self.entity = entity
+        super().__init__(message)
