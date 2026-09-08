@@ -57,12 +57,17 @@ issuer.
 
 ---
 
-## 2. Nothing gates the `oidc` profile against `make prod`
+## 2. Nothing gates the `oidc` layer against `./eyened prod`
 
-**Status:** open
+**Status:** open — mechanism updated, gap unchanged
 
-`COMPOSE_PROFILES=oidc` can be combined with `make prod`. Nothing in `compose.prod.yaml` or
-`stack.sh` references the profile at all.
+Phase 2 of the `deploy/` consolidation replaced `COMPOSE_PROFILES=oidc` with the
+`:compose.oidc.yaml` layer on `COMPOSE_FILE`, and `make prod` / `stack.sh` with `./eyened prod`
+(`deploy/scripts/doctor.sh` and `lib.sh`). The gap this item describes moved with it rather
+than closing: `:compose.oidc.yaml` can still be appended to `COMPOSE_FILE` alongside
+`:compose.prod.yaml`, and nothing in `compose.prod.yaml` or `deploy/scripts/doctor.sh` refuses
+that combination — checked against `doctor.sh`'s current oidc block, which only tests
+`KEYCLOAK_ADMIN_PASSWORD`, not which other layers are present.
 
 The bundled Keycloak runs `kc.sh start-dev` with no volume: embedded H2, no HTTPS
 enforcement, all state discarded on every container recreate. Keycloak's own documentation
@@ -75,7 +80,7 @@ alias that lets the server reach the published Keycloak port lives in `compose.d
 only, so under the prod layer the metadata fetch has no route at all. That should be
 confirmed rather than assumed.
 
-**Proposed fix:** have `doctor.sh` refuse `oidc` together with the prod layer, pointing the
-operator at an external IdP — the configuration the `EYENED_OIDC_*` settings already
-support. Decide first whether the combination is genuinely unsupported or merely unwise; the
-refusal should match.
+**Proposed fix:** have `doctor.sh` refuse `:compose.oidc.yaml` together with the prod layer,
+pointing the operator at an external IdP — the configuration the `EYENED_OIDC_*` settings
+already support. Decide first whether the combination is genuinely unsupported or merely
+unwise; the refusal should match.

@@ -79,25 +79,26 @@ git rev-parse --short HEAD
 
 Then work through all four steps, in order.
 
-1. **Snapshot the database.** Nothing further down does this for you, and a migration cannot be
+1. **Back up the database.** Nothing further down does this for you, and a migration cannot be
    reliably undone once it has run:
 
     ```bash
-    make db-snapshot NAME=before-upgrade
-    # or: deploy/scripts/db-snapshot.sh before-upgrade
+    ./eyened backup backups/before-upgrade
     ```
 
-    The archive is written to `deploy/snapshots/` — inside the checkout you are about to move.
-    It is not tracked by git, so step 2 leaves it where it is.
+    This is a hot backup — the database keeps serving throughout — and writes a raw MySQL
+    datadir to `deploy/backups/before-upgrade` (a relative path resolves under `deploy/`; add
+    `-t` to also get a single `.tgz`). `deploy/backups/` is gitignored, so step 2 leaves it in
+    place. See `deploy/README.md`'s **Backup and rollback** section for the full mechanics.
 
 2. **Move the checkout and rebuild:**
 
     ```bash
     git pull                    # or: git checkout <branch-or-commit>
-    ./install.sh                # rebuilds the images and restarts the stack
+    ./eyened install    # rebuilds the images and restarts the stack
     ```
 
-3. **Apply migrations yourself.** `./install.sh` deliberately does not migrate a database that
+3. **Apply migrations yourself.** `./eyened install` deliberately does not migrate a database that
    already has a schema. It only *reports* which revision that schema is at and, when it is
    behind, prints the command to run — nothing is changed until you run it:
 
@@ -119,19 +120,21 @@ Then work through all four steps, in order.
 
 :::caution
 `docker compose up -d` on its own does **not** pick up a new version — it restarts the images you
-already built. After moving the checkout, always go through `./install.sh` (or
+already built. After moving the checkout, always go through `./eyened install` (or
 `docker compose up -d --build`).
 :::
 
-To roll back, check out the commit-ish you recorded above and run `./install.sh` again. **A
+To roll back, check out the commit-ish you recorded above and run `./eyened install` again. **A
 rollback of the code is not a rollback of the database:** MySQL commits each schema change as it
-is applied, so if the upgrade ran `make migrate`, returning to the old code leaves the new schema
-in place. That is what the step-1 snapshot is for — restore it as well:
+is applied, so if the upgrade ran `./eyened migrate`, returning to the old code leaves the new
+schema in place. That is what the step-1 backup is for — restore it as well:
 
 ```bash
-make db-restore NAME=before-upgrade
-# or: deploy/scripts/db-restore.sh before-upgrade
+./eyened restore backups/before-upgrade
 ```
+
+`./eyened restore` stops the database, replaces the entire datadir, and starts it again — there
+is no undo.
 
 ### Adding your first dataset
 
@@ -144,7 +147,7 @@ but blank viewer. To point the platform at a directory of images:
     my-dataset  /data/my-dataset
     ```
 
-2. Re-run `./install.sh`. From that one file it regenerates the container mounts, the nginx
+2. Re-run `./eyened install`. From that one file it regenerates the container mounts, the nginx
    routes, and the `EYENED_STORAGE_MOUNTS` setting the ORM reads.
 
 3. Import images with `storage_backend_key: "my-dataset"` — see
@@ -163,9 +166,15 @@ For local development with hot reload, see
 :::
 
 :::caution
-Set up regular backups for both the database and the storage directories. `make db-snapshot NAME=x`
-(or `deploy/scripts/db-snapshot.sh x`) takes a cold snapshot of the bundled database into
-`deploy/snapshots/`; see `deploy/README.md`.
+Set up regular backups for both the database and the storage directories.
+
+| Case | Tool |
+|---|---|
+| The bundled database — live, fast, byte-exact | `./eyened backup <dir>` / `./eyened restore <dir>` |
+| Any database including an external one; portable across MySQL versions | `eorm save_dump` / `eorm load_dump` (a HOST tool — needs `mysqlsh` installed) |
+
+`./eyened backup` never stops the database. See `deploy/README.md`'s **Backup and rollback**
+section for both mechanisms in full.
 :::
 
 :::tip

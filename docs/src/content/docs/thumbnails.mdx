@@ -160,14 +160,14 @@ The API only **enqueues** jobs. Execution happens in an RQ worker that shares:
 Thumbnail jobs are placed on the **`default`** queue. The worker must listen to it:
 
 ```bash
-# worker/.env
+# set in the environment, or in deploy/.env for the Docker workers
 EYENED_RQ_WORKER_QUEUES=default,cfi-roi,...   # must include default for thumbnails
 
 # from repo root
 PYTHONPATH=. python -m server.rq_worker
 ```
 
-Docker example: [`worker/docker-compose.inference.yml`](https://github.com/Eyened/eyened-platform/blob/main/worker/docker-compose.inference.yml) and [`worker/.env.example`](https://github.com/Eyened/eyened-platform/blob/main/worker/.env.example).
+Docker example: [`deploy/compose.workers.yaml`](https://github.com/Eyened/eyened-platform/blob/main/deploy/compose.workers.yaml) — see [`worker/README.md`](https://github.com/Eyened/eyened-platform/blob/main/worker/README.md) for how to run and rebuild each image.
 
 If you split workers (e.g. slim ROI-only container), ensure **at least one** worker lists `default` and has storage access — otherwise thumbnail jobs stay queued forever.
 

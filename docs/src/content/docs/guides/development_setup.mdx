@@ -10,9 +10,8 @@ database stack to start first.
 ## Prerequisites
 
 - [Docker](https://www.docker.com/), with **Compose 2.26 or newer** (`docker compose version`).
-  `make doctor` checks this and explains why if it fails.
+  `./eyened doctor` checks this and explains why if it fails.
 - [Git](https://git-scm.com/)
-- `make` (developer convenience; clients install without it)
 
 To run `eorm` or `pytest` on the host, install the ORM — see
 **[ORM setup](/eyened-platform/orm/getting_started)**.
@@ -22,36 +21,36 @@ To run `eorm` or `pytest` on the host, install the ORM — see
 ```bash
 git clone https://github.com/Eyened/eyened-platform.git
 cd eyened-platform
-make up
+./eyened up
 ```
 
-That is the whole thing. `make up` runs preflight checks, creates `deploy/.env` from the template
+That is the whole thing. `./eyened up` runs preflight checks, creates `deploy/.env` from the template
 with generated secrets, builds the images, starts the stack, and — because the database is empty
 on a fresh clone — creates the schema, seeds the builtin form schemas, and creates an `admin`
 account whose password it prints once.
 
 ### On a machine shared with other developers
 
-Before the first `make up`, or any time afterwards, set these in `deploy/.env` to values nobody
-else is using:
+Before the first `./eyened up`, or any time afterwards, set these in `deploy/.env` to values
+nobody else is using:
 
 | Variable | Purpose |
 | --- | --- |
 | `COMPOSE_PROJECT_NAME` | Prefix for containers and volumes — makes your stack independent |
 | `HTTP_PORT` | The port you open in a browser |
-| `ADMINER_PORT` | The bundled database browser |
 
 The bundled MySQL and Redis publish **no** host ports by default, which removes the commonest
-source of collisions. If you need one — DBeaver, or a host-side alembic — append
+source of collisions. For a MySQL shell with no port exposed at all, use `./eyened db-shell`. If
+you need a host port instead — DBeaver, or a host-side alembic — append
 `:compose.host-ports.yaml` to `COMPOSE_FILE` in `deploy/.env` and set `DB_PUBLISH_PORT`.
 
 ## Daily use
 
 ```bash
-make up          # start (also rebuilds and re-bootstraps; safe to repeat)
-make logs        # follow logs
-make down        # stop
-make doctor      # preflight checks on their own
+./eyened up          # start (also rebuilds and re-bootstraps; safe to repeat)
+./eyened logs        # follow logs
+./eyened down        # stop
+./eyened doctor      # preflight checks on their own
 ```
 
 The **client** container runs Vite with hot reload; the **server** container runs uvicorn with
@@ -67,47 +66,47 @@ Platform storage (thumbnails, `segmentations.zarr`) lives at `/storage` inside t
 backed by this stack's own named volume — a clean clone never writes into shared or production
 storage. To attach to shared storage instead, set `PLATFORM_STORAGE_PATH` in `deploy/.env`.
 
-Image datasets are configured in `deploy/storage-mounts.conf` alone; re-running `make up`
+Image datasets are configured in `deploy/storage-mounts.conf` alone; re-running `./eyened up`
 regenerates the container mounts, the nginx routes, and `EYENED_STORAGE_MOUNTS` from it. Full
 detail in `deploy/README.md`.
 
 ## Migrations
 
 ```bash
-make migrate     # alembic upgrade head, inside the server container
+./eyened migrate     # alembic upgrade head, inside the server container
 ```
 
-It stays interactive on purpose: alembic prompts before touching a populated database. Take a
-snapshot first — MySQL commits DDL per statement, so a half-applied migration cannot be reliably
-undone:
+It stays interactive on purpose: alembic prompts before touching a populated database. Back up
+first — MySQL commits DDL per statement, so a half-applied migration cannot be reliably undone:
 
 ```bash
-make db-snapshot NAME=before-migration
-make db-restore  NAME=before-migration
+./eyened backup backups/before-migration    # hot backup, does not stop the database
+./eyened restore backups/before-migration   # if something goes wrong
 ```
 
 ## Optional: OIDC login
 
-The base stack uses password auth only. To test OpenID Connect locally, add `oidc` to
-`COMPOSE_PROFILES` in `deploy/.env` and set `PUBLIC_HOST`, then `make up` — see
-`deploy/keycloak/README.md`.
+The base stack uses password auth only. To test OpenID Connect locally, append
+`:compose.oidc.yaml` to `COMPOSE_FILE` in `deploy/.env` and set `PUBLIC_HOST`, then `./eyened up`
+— see `deploy/keycloak/README.md`.
 
 Set `EYENED_API_AUTH_OIDC_ENABLED=true` and the `EYENED_OIDC_*` vars in `deploy/.env`. Full options: [Authentication](/eyened-platform/guides/authentication).
 
 ## Optional: existing data
 
-Load a prepared XtraBackup snapshot (`deploy/scripts/save_dump.sh` produces one from a running
-database; `make db-snapshot` produces a `.tgz` for `make db-restore` rather than a directory, so
-use `save_dump.sh` / `load_dump.sh` when moving data between machines):
+| Case | Tool |
+|---|---|
+| The bundled database — live, fast, byte-exact | `./eyened backup <dir>` / `./eyened restore <dir>` |
+| Any database including an external one; portable across MySQL versions | `eorm save_dump` / `eorm load_dump` (a HOST tool — needs `mysqlsh` installed) |
 
-```bash
-deploy/scripts/load_dump.sh /path/to/backup-dir
-```
+Load a prepared dump with `eorm load_dump` when moving data between machines. See
+`deploy/README.md`'s **Backup and rollback** section for both mechanisms in full, including
+flags.
 
 Apply pending migrations from `orm/migrations/`:
 
 ```bash
-make migrate
+./eyened migrate
 ```
 
 ## Tests
