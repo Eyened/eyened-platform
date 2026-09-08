@@ -7,10 +7,10 @@ import svelteConfig from "./svelte.config.js";
 
 export default tseslint.config(
     {
-        // Ignores derived from the Makefile generator outputs (gen-openapi ->
-        // openapi.json, gen-types -> openapi.ts) plus framework build output.
-        // Hand-written files under src/types/ (openapi_types.ts,
-        // openapi_constants.ts, *.d.ts) are intentionally NOT ignored.
+        // Ignores for the generated openapi client types (openapi.json,
+        // openapi.ts) plus framework build output. Hand-written files under
+        // src/types/ (openapi_types.ts, openapi_constants.ts, *.d.ts) are
+        // intentionally NOT ignored.
         ignores: [
             ".svelte-kit/",
             "build/",

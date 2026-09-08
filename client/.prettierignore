@@ -7,9 +7,9 @@ dist/
 node_modules/
 package-lock.json
 
-# Generator output per the Makefile (gen-openapi -> openapi.json, gen-types ->
-# openapi.ts) — reformatting these would re-diverge on the next regen and make
-# the gate flaky. Hand-written files under src/types/ are NOT ignored.
+# Ignores for the generated openapi client types (openapi.json, openapi.ts) —
+# reformatting these would re-diverge on the next regen and make the gate
+# flaky. Hand-written files under src/types/ are NOT ignored.
 src/types/openapi.ts
 src/types/openapi.json
 
