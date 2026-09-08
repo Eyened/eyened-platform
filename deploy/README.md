@@ -472,9 +472,9 @@ its own location, and so does every script it calls.
 and Docker. It is also the only entry point: the separate installer and the
 four thin scripts that used to sit beside it are now subcommands of it.
 
-The rows marked `eyened` hold no privileged machinery. `./eyened down` and
-`./eyened logs` are `docker compose` (or `docker-compose`) run from `deploy/`,
-so `cd deploy && docker compose down` is equally correct — see [The compose
+`./eyened down` and `./eyened logs` hold no machinery: they are `docker
+compose` (or `docker-compose`) run from `deploy/`, so `cd deploy && docker
+compose down` is equally correct — see [The compose
 binary](#the-compose-binary). The three delegated scripts are ordinary
 `#!/bin/sh` files and can still be invoked directly; `./eyened <command>` is
 the supported spelling.

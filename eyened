@@ -42,7 +42,7 @@ Day to day
 Data
   backup           hot backup of the bundled database:  ./eyened backup <dir> [-t]
   restore          restore one:  ./eyened restore <dir|backup.tgz>
-  reset            stop this stack and DELETE its volumes. Guarded; asks twice.
+  reset            stop this stack and DELETE its volumes. Guarded; asks for confirmation.
 
 Optional layers — append to COMPOSE_FILE in deploy/.env, which is safe and
 permanent (nothing rewrites that file):
@@ -108,9 +108,23 @@ stack() {
       bundled MySQL. './eyened prod' is for a database this stack does not own.
       Fix: remove 'local-db' from COMPOSE_PROFILES in deploy/.env, or run
            './eyened install' if you do want the bundled database." ;;
-            esac ;;
+            esac
+            # Nothing writes .env in this branch. A site's .env is
+            # hand-configured for THIS site by definition — the refusal above
+            # sends the operator to edit it themselves, so rewriting
+            # COMPOSE_FILE underneath them was never this mode's business.
+            # .env, once written by any mode, stays exactly as written until
+            # someone deletes it; prod's job here is only to verify that
+            # configuration, never to touch it.
+            ;;
     esac
 
+    # Not folded into write_env above: .env and storage-mounts.conf have
+    # independent lifetimes — .env can be perfectly good while
+    # storage-mounts.conf is missing (deleted, or a checkout that predates
+    # it) — and write_env returns early whenever .env already exists, which
+    # would silently skip this call too if it lived inside write_env. Calling
+    # it here instead means every mode reaches it, prod included.
     ensure_storage_mounts
     "$DEPLOY_DIR/scripts/gen-storage.sh"
 

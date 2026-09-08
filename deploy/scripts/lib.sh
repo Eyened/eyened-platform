@@ -112,7 +112,9 @@ refuse_sudo() {
       root — deploy/.env at mode 600 worst of all, but a generated compose
       layer or a backup datadir just as surely — and your own later
       'docker compose' calls could not read it. Docker needs a privileged
-      DAEMON, not a privileged client.
+      DAEMON, not a privileged client. Even where nothing is created — reset,
+      which only deletes volumes — sudo in front of it usually means you are
+      working around a permission problem rather than intending it.
       Fix: run it as yourself. If docker refuses, add yourself to the docker
            group once: sudo usermod -aG docker \"\$USER\", then log out and in."
     fi
