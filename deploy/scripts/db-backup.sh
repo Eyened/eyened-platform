@@ -11,7 +11,7 @@
 # The output is a raw InnoDB datadir, NOT logical SQL, so the destination must
 # run a compatible MySQL 8.0 — satisfied by construction, since compose.yaml
 # pins mysql:8.0.46. For a portable, cross-version dump, or for a database
-# this stack does not own, use the HOST tool `eorm save_dump` instead. See
+# this stack does not own, use the HOST tool `eorm save-dump` instead. See
 # deploy/README.md; the two are different mechanisms with different restore
 # semantics, which is why they no longer share a name.
 set -eu
@@ -136,7 +136,7 @@ cid=$(compose ps -a -q database) || cid=""
       been started, or it uses an external database (no 'local-db' profile)
       — in which case there is nothing here for db-backup.sh to back up.
       Fix: run './eyened up' first if you meant to create one, or back up an
-           external database with its own tooling ('eorm save_dump'). See
+           external database with its own tooling ('eorm save-dump'). See
            deploy/README.md's 'Backup and rollback' section."
 
 [ -f "$ENV_FILE" ] || die "error: $ENV_FILE does not exist, so there are no database

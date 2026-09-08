@@ -363,7 +363,7 @@ already has a schema.
 | Case | Tool |
 |---|---|
 | The bundled database — live, fast, byte-exact | `./eyened backup <dir>` / `./eyened restore <dir>` |
-| Any database including an external one; portable across MySQL versions | `eorm save_dump` / `eorm load_dump` (a HOST tool — needs `mysqlsh` installed) |
+| Any database including an external one; portable across MySQL versions | `eorm save-dump` / `eorm load-dump` (a HOST tool — needs `mysqlsh` installed) |
 
 `./eyened backup` runs Percona XtraBackup in a one-shot container under the
 `backup` profile. The database keeps serving throughout. The output is a raw
@@ -381,7 +381,7 @@ pass an absolute path outside the checkout, or a gitignored one, instead.
 it again. There is no undo. An interrupt is safe: it leaves the database
 stopped and tells you to re-run.
 
-`eorm save_dump` / `eorm load_dump` are a different mechanism — a logical dump
+`eorm save-dump` / `eorm load-dump` are a different mechanism — a logical dump
 via `mysqlsh`, with a `--legacy-sql` mysqldump fallback — and the tool for a
 database this stack does not own. They run on the HOST, not in a container:
 `Dockerfile.server` carries no MySQL client at all, so neither mode works
@@ -397,7 +397,7 @@ before you move, or there is nothing to return to.
 > **On an external database** — a site deployment (`./eyened prod`, no
 > `local-db` profile) — `./eyened backup` does **not** apply. It backs up
 > this stack's own datadir, and there isn't one. Take a backup with that
-> database server's own tooling, or `eorm save_dump`, **before** running
+> database server's own tooling, or `eorm save-dump`, **before** running
 > `./eyened migrate`. MySQL commits DDL per statement, so a half-applied
 > migration cannot be reliably rolled back with `alembic downgrade`.
 

@@ -10,22 +10,22 @@ description: EyeNED Platform v2026.07.0 release notes
 - **Upgrading an existing stack: rebuild once.** Routine `docker compose up -d` reuses the
   images you already built, and the dev client's entrypoint is baked into its image rather
   than mounted. Anyone who had a stack running before this release must run
-  `docker compose up -d --build` (or re-run `./install.sh` / `make up`, which do it) one time.
+  `docker compose up -d --build` (or re-run `./eyened install`, which does it) one time.
   Without it the new dependency handling never engages and a stale `node_modules` volume keeps
   serving old packages, with nothing reporting a problem. Plain `up -d` is correct again
   afterwards.
-- **Keycloak is part of the stack, behind a profile.** `dev/keycloak/` moved to
+- **Keycloak is part of the stack.** `dev/keycloak/` moved to
   `deploy/keycloak/` and the standalone `keycloak/docker-compose.keycloak.yml` overlay is gone.
-  At the time, that meant adding `oidc` to `COMPOSE_PROFILES` in `deploy/.env` and setting
-  `PUBLIC_HOST`, with no second compose file to layer — **superseded below**: `oidc` is now a
-  compose layer, not a profile, and an old `COMPOSE_PROFILES=oidc` is silently inert rather
-  than an error. Existing OIDC setups must also rename `DEV_KEYCLOAK_PORT` to
-  `KEYCLOAK_PORT` — see the renames below — and set the `EYENED_OIDC_*` client settings, which
-  `deploy/.env.example` now carries.
+  OIDC setup used to mean adding `oidc` to `COMPOSE_PROFILES` in `deploy/.env` and setting
+  `PUBLIC_HOST`, with no second compose file to layer; it now means appending
+  `:compose.oidc.yaml` to `COMPOSE_FILE` instead, and an old `COMPOSE_PROFILES=oidc` is
+  silently inert rather than an error. Existing OIDC setups must also rename
+  `DEV_KEYCLOAK_PORT` to `KEYCLOAK_PORT` — see the renames below — and set the
+  `EYENED_OIDC_*` client settings, which `deploy/.env.example` now carries.
 - **One Docker stack.** `dev/`, `docker/`, and `database/` are replaced by a single `deploy/`
-  directory. Clients install with `./install.sh` (Docker is the only prerequisite); developers
-  use `make up`; site deployments against an external database use `make prod`. The database is
-  part of the stack rather than a second compose project.
+  directory. Clients install with `./eyened install` (Docker is the only prerequisite);
+  developers use `./eyened up`; site deployments against an external database use
+  `./eyened prod`. The database is part of the stack rather than a second compose project.
 - **Upgrading: bring the old stacks down before you pull.** Deleting those directories takes their
   compose files with them, so afterwards `cd dev && docker compose down` fails with "no
   configuration file" and the legacy volumes — `db_data` from the `database` stack,
@@ -36,7 +36,7 @@ description: EyeNED Platform v2026.07.0 release notes
 - **Breaking: Docker Compose 2.26 or newer is now required.** The server's dependency on the
   bundled database uses `depends_on: required: false`, which is what lets the same stack run
   with a bundled or an external database. Older Compose either rejects it or silently drops the
-  dependency, which makes the server race MySQL and crash-loop on first boot. `make doctor`
+  dependency, which makes the server race MySQL and crash-loop on first boot. `./eyened doctor`
   refuses to continue below the floor rather than letting it fail obscurely later.
 - **The production frontend is served by nginx, not by Node.** The app is a static SPA
   (`adapter-static`), so production no longer runs `vite preview` behind a proxy — the built
@@ -59,10 +59,10 @@ description: EyeNED Platform v2026.07.0 release notes
 - **Fixed: in-process image reads.** Once datasets are configured in `deploy/storage-mounts.conf`,
   the server container receives `EYENED_STORAGE_MOUNTS`, so Python-side pixel reads (thumbnail
   regeneration, inference, reports) use local files instead of failing in the API adapter.
-- **Breaking, again: `make` and `./install.sh` are gone.** Later in this same cycle, the
-  `Makefile` and `install.sh` above were themselves replaced by one script, `./eyened`, which
-  absorbs every target and `./install.sh` — `make` is no longer a prerequisite, and there is
-  no Makefile. An operator upgrading through this whole cycle meets every item below at once.
+- **Breaking: `make` and `./install.sh` are gone.** Both were replaced by one script,
+  `./eyened`, which absorbs every `make` target and everything `./install.sh` did — `make` is
+  no longer a prerequisite, and there is no Makefile. An operator upgrading through this whole
+  cycle meets every item below at once.
 - **`oidc` is a compose layer, not a profile.** Append `:compose.oidc.yaml` to `COMPOSE_FILE`
   in `deploy/.env` instead of adding `oidc` to `COMPOSE_PROFILES` — see the Keycloak bullet
   above, which described the profile-based form this replaces.

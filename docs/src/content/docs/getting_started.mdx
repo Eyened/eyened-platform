@@ -171,7 +171,7 @@ Set up regular backups for both the database and the storage directories.
 | Case | Tool |
 |---|---|
 | The bundled database — live, fast, byte-exact | `./eyened backup <dir>` / `./eyened restore <dir>` |
-| Any database including an external one; portable across MySQL versions | `eorm save_dump` / `eorm load_dump` (a HOST tool — needs `mysqlsh` installed) |
+| Any database including an external one; portable across MySQL versions | `eorm save-dump` / `eorm load-dump` (a HOST tool — needs `mysqlsh` installed) |
 
 `./eyened backup` never stops the database. See `deploy/README.md`'s **Backup and rollback**
 section for both mechanisms in full.

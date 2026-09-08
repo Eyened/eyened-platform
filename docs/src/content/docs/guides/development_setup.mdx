@@ -97,9 +97,9 @@ Set `EYENED_API_AUTH_OIDC_ENABLED=true` and the `EYENED_OIDC_*` vars in `deploy/
 | Case | Tool |
 |---|---|
 | The bundled database — live, fast, byte-exact | `./eyened backup <dir>` / `./eyened restore <dir>` |
-| Any database including an external one; portable across MySQL versions | `eorm save_dump` / `eorm load_dump` (a HOST tool — needs `mysqlsh` installed) |
+| Any database including an external one; portable across MySQL versions | `eorm save-dump` / `eorm load-dump` (a HOST tool — needs `mysqlsh` installed) |
 
-Load a prepared dump with `eorm load_dump` when moving data between machines. See
+Load a prepared dump with `eorm load-dump` when moving data between machines. See
 `deploy/README.md`'s **Backup and rollback** section for both mechanisms in full, including
 flags.
 
