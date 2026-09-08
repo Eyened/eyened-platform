@@ -39,7 +39,9 @@ Current authenticated user (id, username, role, starred tags).
 
 ### POST /api/auth/register
 
-Register a new user (may require admin privileges depending on deployment).
+Register a new user. **Requires no authentication**, and returns **409** if the username is taken.
+
+The new account holds no project memberships and is not an administrator, so it can log in and see nothing until someone grants it access — see **[Access control](/eyened-platform/guides/access_control)**.
 
 ### POST /api/auth/refresh
 
@@ -48,5 +50,38 @@ Refresh the access-token cookie using the **refresh-token cookie** (web clients 
 ### POST /api/auth/logout
 
 Clear JWT cookies.
+
+## Login options
+
+### GET /api/auth/options
+
+**No authentication.** Which login methods this deployment offers — the viewer calls it to decide which controls to render.
+
+**Response:** `{ "password_enabled": true, "oidc_enabled": false, "oidc_provider_name": "OpenID Connect" }`
+
+`oidc_enabled` is true only when `EYENED_API_AUTH_OIDC_ENABLED` is set **and** the provider's metadata document is reachable; an unreachable provider is logged and reported as `false` rather than failing the request.
+
+## OIDC
+
+Two endpoints back the browser redirect flow. Configuration is in **[Guides — Authentication](/eyened-platform/guides/authentication)**.
+
+### GET /api/auth/oidc/authorize
+
+**No authentication.** Returns the authorization URL at the OIDC provider.
+
+**Query:** `next` — where to return the user after login.
+
+A CSRF token and a nonce are generated per call: the **hashes** travel to the provider (in `state` and `nonce`), and the originals come back to the client as cookies. Both are validated on the next call.
+
+### POST /api/auth/oidc/authenticate
+
+**No authentication.** Exchanges the provider's authorization code for a session.
+
+**Request body:** `{ "code": "string", "state": "string" }`
+**Cookies:** `oidc_csrf_token`, `oidc_nonce` — set by `/authorize`.
+
+Validates the CSRF token against the hash in `state` and the nonce against the ID token, then returns the user and sets JWT cookies exactly as `POST /api/auth/login` does. Returns **400** on any state, CSRF, or nonce mismatch.
+
+Whether an unknown OIDC identity is provisioned an account is controlled by `EYENED_OIDC_CREATE_NEW_ACCOUNTS`. Newly provisioned accounts hold no memberships — see **[Access control](/eyened-platform/guides/access_control)**.
 
 See also **[Guides — Authentication](/eyened-platform/guides/authentication)** for OIDC and deployment configuration.
