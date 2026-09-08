@@ -128,6 +128,42 @@ ensure_storage_mounts() {
     fi
 }
 
+# Refuse a generated value that is not exactly one line.
+#
+# The heredoc in write_env writes `KEY=$value`. A value carrying a newline is
+# therefore not a QUOTING problem — quoting the heredoc would not help, and
+# neither would escaping — it is a LINE SHAPE problem: the newline ends the
+# assignment and everything after it becomes another line of deploy/.env, which
+# compose's dotenv parser reads as a further assignment (or as junk it rejects).
+# The file that was supposed to be written once and be correct is then wrong
+# from the first run, with a secret half-truncated and a stray key beside it.
+#
+# Checked rather than merely documented, because the near-miss is one keystroke
+# wide: `openssl rand -base64 64` — the obvious alternative spelling of a
+# generator here — WRAPS its output at 64 columns. Today's generators emit one
+# line of hex; this is what keeps that true when they are replaced.
+#
+# Only the generated values go through this. write_env's $_layers comes from
+# COMPOSE_FILE_DEV / COMPOSE_FILE_CLIENT, both literal constants at the top of
+# this file, so a check on it could never fail for any input write_env accepts.
+_one_line_or_die() {
+    # A literal newline. It has to be written out like this: command
+    # substitution strips trailing newlines, so _lf=$(printf '\n') is EMPTY and
+    # the `case` below would then match every value.
+    _lf='
+'
+    case $2 in
+        *"$_lf"*)
+            die "error: the generated $1 is not a single line, so writing it into
+      deploy/.env would add stray lines that compose reads as further
+      assignments — and would truncate the value itself at the first newline.
+      Fix: this is a bug in the generator in deploy/scripts/lib.sh, not in
+           anything you configured. A generator here must emit exactly ONE
+           line: 'openssl rand -hex 32' does, 'openssl rand -base64 64' does
+           not — it wraps at 64 columns." ;;
+    esac
+}
+
 # Write deploy/.env ONCE, whole, and never touch it again.
 #
 # No in-place sed, no rewriting of COMPOSE_FILE, no chowning the result back
@@ -152,6 +188,7 @@ ensure_storage_mounts() {
 # of documented settings, and it would drift. Compose's dotenv parser takes the
 # LAST assignment (measured), as does env_get above, so the appended block wins
 # over the template's own COMPOSE_FILE line.
+
 write_env() {
     _mode=$1
     case "$_mode" in
@@ -200,6 +237,15 @@ write_env() {
     # four above.
     _kc_pw=$(gen_password)   || die "error: could not generate a Keycloak admin password; see above."
 
+    # Shape, not just status: a generator can exit 0 and still hand back
+    # something that cannot be written as one `KEY=value` line. See
+    # _one_line_or_die above for why this is the failure mode that matters.
+    _one_line_or_die "signing key"               "$_secret"
+    _one_line_or_die "Redis password"            "$_redis_pw"
+    _one_line_or_die "database root password"    "$_root_pw"
+    _one_line_or_die "database password"         "$_db_pw"
+    _one_line_or_die "Keycloak admin password"   "$_kc_pw"
+
     # Create the temp EMPTY and restrict it BEFORE anything goes in: `>`
     # truncates without changing an existing file's mode, so no secret is ever
     # briefly group- or world-readable, and `mv` carries 600 onto the target.
@@ -235,6 +281,11 @@ write_env() {
         # lists produce must keep that property, or re-quote this heredoc (and
         # switch every $var below to `printf` instead, since a quoted heredoc
         # does not expand them at all).
+        #
+        # That is the only property left to keep by hand. The other one this
+        # block needs — that each value is a single LINE — is enforced above by
+        # _one_line_or_die rather than trusted, because re-quoting the heredoc
+        # would not fix a newline: it would still end the assignment early.
         cat <<EOF
 
 # ============================================================================

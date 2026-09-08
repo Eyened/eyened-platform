@@ -495,7 +495,7 @@ The `dc.sh` rows are not a special case: `deploy/scripts/dc.sh` is just
 - **Compose older than 2.26.** `make doctor` refuses to continue and names
   the required upgrade — see [Compose 2.26 or newer is
   required](#compose-226-or-newer-is-required).
-- **`deploy/.env` was written by the other entry point.** `make doctor`
+- **`deploy/.env` was written by the other entry point.** `./eyened doctor`
   detects a dev-mode `.env` under `./install.sh` (or vice versa). Because
   `.env` is written once and never rewritten, the fix is to delete it and
   re-run — that is what switching between the two stacks means. Deleting it

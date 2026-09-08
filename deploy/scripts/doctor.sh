@@ -203,14 +203,35 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # next run's rewrite would fix it); now it is a silent 'ok' on a value
     # that is not a stack either entry point builds, so it gets its own
     # bucket below instead.
+    #
+    # deploy/README.md's "Workers" -> "Remote" section promises the operator of
+    # a separate GPU worker box that './eyened' stops there before building
+    # anything, which is why it can also say the hand-set COMPOSE_FILE on that
+    # box is safe. That promise is true SOLELY because of the last two arms
+    # here: a COMPOSE_FILE naming neither compose.dev.yaml nor compose.prod.yaml
+    # is refused rather than classified as 'client'. Widen either arm — above
+    # all, restore a fall-through that treats anything non-dev as 'client' —
+    # and that documented promise silently becomes false, with nothing in this
+    # file failing to say so.
     case "$compose_file" in
         *compose.dev.yaml*)
             case "$compose_file" in
                 *compose.prod.yaml*) env_stack=both ;;
                 *)                   env_stack=dev ;;
             esac ;;
-        *compose.prod.yaml*) env_stack=client ;;
-        *)                   env_stack=unrecognised ;;
+        *compose.prod.yaml*)    env_stack=client ;;
+        # The workers layer with NEITHER platform layer is the documented
+        # remote worker box, where this .env is correct and hand-written. Same
+        # refusal as 'unrecognised', different remedy — see below.
+        *compose.workers.yaml*) env_stack=workers ;;
+        *)                      env_stack=unrecognised ;;
+    esac
+
+    # The layer list this entry point actually builds, for the messages below.
+    # Naming it beats "the other entry point", which is not always the cause.
+    case "$MODE" in
+        dev) want_layers=$COMPOSE_FILE_DEV ;;
+        *)   want_layers=$COMPOSE_FILE_CLIENT ;;
     esac
 
     case "$env_stack:$MODE" in
@@ -231,28 +252,63 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       nginx config it uses — one of them is not doing what you think.
       Fix: delete deploy/.env and re-run, or edit COMPOSE_FILE to name only
            one of the two." ;;
+        workers:*)
+            # The one configuration that reaches this check while being
+            # entirely CORRECT. On a remote worker box deploy/.env holds a
+            # hand-set COMPOSE_FILE, EYENED_REDIS_HOST, EYENED_DATABASE_HOST
+            # and PLATFORM_STORAGE_PATH that exist nowhere else, and nothing
+            # regenerates them. The refusal stays — this stack is still not
+            # one './eyened' knows how to build, and stopping here is what
+            # deploy/README.md's remote-worker section relies on — but the
+            # remedy must not be "delete deploy/.env": that would destroy the
+            # box's entire configuration to fix a problem it does not have.
+            problem "deploy/.env's COMPOSE_FILE is '$compose_file' — the workers layer
+      without compose.dev.yaml or compose.prod.yaml. That is how a REMOTE
+      worker box is configured, and './eyened' only knows how to build the
+      platform stack, so it stops here either way.
+      Fix: on a worker box this .env is correct — do NOT delete it. Start the
+           workers directly, which needs no platform preflight:
+             docker compose -f deploy/compose.workers.yaml \\
+               -f deploy/compose.storage.yaml up -d --build
+           On the platform host this is the wrong .env: delete it and re-run.
+           That keeps your data — './eyened reset' is what deletes it." ;;
         unrecognised:*)
-            # Empty, or a value naming neither compose.dev.yaml nor
-            # compose.prod.yaml — that covers a lot more than "the other
-            # entry point wrote this": an empty or 0-byte .env, a hand-edit
-            # gone wrong, or a layer list meant for somewhere else entirely
-            # (for example a remote worker box's COMPOSE_FILE, copied into
-            # this .env by mistake). Naming all three keeps the message
-            # honest instead of asserting the one cause doctor cannot verify.
+            # Empty, or a value naming none of the three layers above — which
+            # covers more than "the other entry point wrote this": an empty or
+            # 0-byte .env, or a hand-edit gone wrong. Naming both keeps the
+            # message honest instead of asserting a cause doctor cannot verify.
+            # A remote worker box's COMPOSE_FILE used to be listed here as a
+            # third cause and is not any more: it has its own bucket above,
+            # because it is the one cause whose fix is NOT to delete the file.
             problem "deploy/.env's COMPOSE_FILE is '$compose_file', which does not name
       compose.dev.yaml or compose.prod.yaml, so it is not a stack either
-      entry point builds. This can happen with an empty or corrupted .env,
-      one hand-edited into an unrecognised value, or a layer list meant for
-      somewhere else (e.g. a remote worker box's COMPOSE_FILE) ending up
-      here by mistake.
-      Fix: delete deploy/.env and re-run. That keeps your data — './eyened
-           reset' is what deletes it." ;;
+      entry point builds. This can happen with an empty or corrupted .env, or
+      one hand-edited into an unrecognised value.
+      Fix: set COMPOSE_FILE in deploy/.env to
+             $want_layers
+           or delete deploy/.env and re-run. Deleting it keeps your data —
+           './eyened reset' is what deletes it." ;;
         *)
+            # 'so it was created by the other entry point' used to stand here
+            # as fact. It is not one: .env.example's own external-database
+            # recipe (remove 'local-db' from COMPOSE_PROFILES, point
+            # EYENED_DATABASE_* at that server) starts from a HAND COPY of the
+            # template — which stack.sh's prod refusal explicitly tells the
+            # operator to make — and that copy keeps the template's dev
+            # COMPOSE_FILE line, so './eyened prod' lands here having run no
+            # entry point at all (measured). Deleting that .env would throw
+            # away the site's only configuration AND loop: prod refuses to run
+            # without one. Two causes, so two fixes, least destructive first.
             problem "deploy/.env's COMPOSE_FILE is '$compose_file', which is not the stack
-      the '$MODE' entry point builds. .env is written once and never
-      rewritten, so it was created by the other entry point.
-      Fix: delete deploy/.env and re-run. That keeps your data — './eyened
-           reset' is what deletes it." ;;
+      the '$MODE' entry point builds. Either the other entry point wrote this
+      .env — it is written once and never rewritten — or it was copied from
+      deploy/.env.example by hand and still carries the template's own
+      COMPOSE_FILE line.
+      Fix: if you configured this .env for this machine yourself, set
+           COMPOSE_FILE in it to
+             $want_layers
+           Otherwise delete deploy/.env and re-run. Deleting it keeps your
+           data — './eyened reset' is what deletes it." ;;
     esac
 
     if [ -n "$(norm "$(env_get EYENED_API_SECRET_KEY)")" ]; then

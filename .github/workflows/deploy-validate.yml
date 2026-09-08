@@ -283,10 +283,24 @@ jobs:
       # coverage at all. This runs the REAL write_env, in its own scratch
       # copy so the shared deploy/.env fixture below (and the ONE
       # ^COMPOSE_FILE= line the next step's sed depends on) is untouched.
+      #
+      # 'client', deliberately, not 'dev'. write_env dev appends a line that
+      # is BYTE-IDENTICAL to the template's own COMPOSE_FILE line, so nothing
+      # downstream can tell the two apart — and a write_env that emitted its
+      # block BEFORE the template instead of after (D7 broken outright: the
+      # template's dev layer list wins, so a client install silently builds
+      # the dev stack) passed this step green. The client layer list differs
+      # from the template's dev one, which is what makes the assertion below
+      # able to fail at all.
       - name: write_env's last-assignment-wins is real, not assumed
         run: |
           set -e
           scratch=$(mktemp -d)
+          # On EXIT, not at the end: every check below exits non-zero on
+          # failure, and a trailing rm would then never run — leaving the five
+          # freshly generated secrets in $scratch/deploy/.env sitting on the
+          # runner for the rest of the job.
+          trap 'rm -rf "$scratch"' EXIT
           cp -a deploy "$scratch/deploy"
           # The checkout itself never carries a deploy/.env (gitignored), but
           # an EARLIER job step might have created one by the time this step
@@ -295,12 +309,22 @@ jobs:
           # can never fire here and turn this into a check of nothing.
           rm -f "$scratch/deploy/.env"
 
-          ( REPO_ROOT="$scratch"; . "$scratch/deploy/scripts/lib.sh"; write_env dev )
+          ( REPO_ROOT="$scratch"; . "$scratch/deploy/scripts/lib.sh"; write_env client )
           env="$scratch/deploy/.env"
           [ -f "$env" ] || { echo "::error::write_env did not create $env"; exit 1; }
 
           n=$(command grep -c '^COMPOSE_FILE=' "$env" || true)
           [ "$n" = "2" ] || { echo "::error::$env has $n '^COMPOSE_FILE=' line(s), want 2 (the template's and write_env's appended one) — write_env no longer produces the two-assignment file the whole mechanism depends on"; exit 1; }
+
+          # WHICH of the two is last, not merely that there are two. This is
+          # the assertion that moves: it reads write_env's client layer list
+          # when the appended block really is appended, and the template's dev
+          # list the moment it is not — which is the whole of D7, and is not
+          # observable from the port check below (that one only shows compose
+          # reading the last line, whoever wrote it).
+          want='COMPOSE_FILE=compose.yaml:compose.storage.yaml:compose.prod.yaml'
+          last_line=$(command grep '^COMPOSE_FILE=' "$env" | tail -n 1)
+          [ "$last_line" = "$want" ] || { echo "::error::the LAST '^COMPOSE_FILE=' line of a .env written by 'write_env client' is '$last_line', want '$want' — write_env's appended block is not the last assignment in the file, so compose reads the TEMPLATE's layer list and a client install builds the wrong stack"; exit 1; }
 
           # Append an operator layer onto the LAST COMPOSE_FILE= line only —
           # the one write_env itself wrote — exactly as an operator
@@ -318,8 +342,6 @@ jobs:
           n=$(printf '%s\n' "$rendered" | command grep -c 'published: "13306"' || true)
           [ "$n" = "1" ] || { echo "::error::deploy/.env with compose.host-ports.yaml appended to the LAST COMPOSE_FILE line rendered 'published: \"13306\"' $n time(s), want 1 — compose is not reading the last assignment, or write_env's appended block is not actually the last COMPOSE_FILE line"; exit 1; }
           echo "ok: write_env's appended COMPOSE_FILE line is the one compose reads (last-assignment-wins, on the real generated file)"
-
-          rm -rf "$scratch"
 
       # Pre-flight: the layer combinations below merge compose.workers.yaml
       # against the storage overlay generated ABOVE, which has no worker
