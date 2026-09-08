@@ -269,7 +269,9 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       Fix: on a worker box this .env is correct — do NOT delete it. Start the
            workers directly, which needs no platform preflight:
              docker compose -f deploy/compose.workers.yaml \\
-               -f deploy/compose.storage.yaml up -d --build
+               -f deploy/compose.storage.yaml --profile gpu-inference up -d --build
+           Without --profile it starts the slim CPU worker ALONE and says so
+           nowhere; deploy/.env.example's Workers block names the others.
            On the platform host this is the wrong .env: delete it and re-run.
            That keeps your data — './eyened reset' is what deletes it." ;;
         unrecognised:*)
@@ -319,25 +321,31 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       Fix: remove deploy/.env and re-run, or set it to a long random value."
     fi
 
-    # There is no change_me sweep for MYSQL_ROOT_PASSWORD,
-    # EYENED_DATABASE_PASSWORD and EYENED_REDIS_PASSWORD any more, and its
-    # absence is structural rather than an oversight. .env.example no longer
-    # carries the string at all — write_env appends generated values instead of
-    # replacing placeholders — so no .env derived from the template can hold
-    # it, and a .env with the key ABSENT is refused by compose.yaml's own
-    # ${MYSQL_ROOT_PASSWORD:?...} (measured: exit 1, "required variable ... is
-    # missing a value", before anything is built). That is a layer nothing can
-    # bypass, unlike a doctor check that only runs through the entry points.
-    #
-    # KEYCLOAK_ADMIN_PASSWORD below is the exception, and the reason this
-    # paragraph is here rather than nothing at all: its published default is
-    # not 'change_me' and compose does not require it. compose.oidc.yaml has
-    # ${KEYCLOAK_ADMIN_PASSWORD:-admin}, a DEFAULT — so absent and empty are
-    # just as much "runs on admin/admin" as a literal 'admin' is, and compose
-    # accepts all three in silence (measured: exit 0, rendering
-    # KC_BOOTSTRAP_ADMIN_PASSWORD: admin). Nothing else catches it, so this one
-    # check stays. 'change_me' is kept in its list for a hand-written .env or
-    # one written before this change; it costs one word.
+    # ${VAR:?} in compose.yaml rejects these three when ABSENT or EMPTY, never
+    # when SET to 'change_me' — which a .env hand-copied from a pre-D7 template
+    # (the copy stack.sh's prod refusal asks for) still holds.
+    bad_secrets=""
+    for _var in MYSQL_ROOT_PASSWORD EYENED_DATABASE_PASSWORD EYENED_REDIS_PASSWORD; do
+        _val=$(norm "$(env_get "$_var")")
+        case "$_val" in
+            change_me) bad_secrets="$bad_secrets $_var" ;;
+        esac
+    done
+    if [ -z "$bad_secrets" ]; then
+        ok "database and Redis passwords are not the published default"
+    else
+        problem "These variables in deploy/.env are still the published default
+      'change_me', so the stack would boot on a known password:
+     $bad_secrets
+      Fix: remove deploy/.env and re-run so real secrets are generated, or set
+           each one by hand to a long random value."
+    fi
+
+    # KEYCLOAK_ADMIN_PASSWORD cannot join the loop above: its published default
+    # is not 'change_me' but 'admin', because compose.oidc.yaml has
+    # ${KEYCLOAK_ADMIN_PASSWORD:-admin} — a DEFAULT, so ABSENT and EMPTY are
+    # just as much "runs on admin/admin" as the literal value is (measured).
+    # All four are tested below, so this holds however .env was produced.
     #
     # Gated on the LAYER: the bundled Keycloak only exists when
     # compose.oidc.yaml is in COMPOSE_FILE, and the majority who never enable
