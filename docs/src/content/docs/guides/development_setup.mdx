@@ -84,6 +84,17 @@ first — MySQL commits DDL per statement, so a half-applied migration cannot be
 ./eyened restore backups/before-migration   # if something goes wrong
 ```
 
+## Client types
+
+```bash
+npm run gen:types    # from client/, after changing an API route
+```
+
+Regenerates the tracked `client/src/types/openapi.json` and `openapi.ts` from the FastAPI app's
+OpenAPI schema, so the client's request and response types stay in sync with the server. It needs
+the server's settings available — `deploy/.env` from a stack you have brought up covers the
+default case; see `server/scripts/generate_openapi.py --help` for pointing at another one.
+
 ## Optional: OIDC login
 
 The base stack uses password auth only. To test OpenID Connect locally, append

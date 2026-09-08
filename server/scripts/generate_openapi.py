@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 import importlib
@@ -10,6 +11,14 @@ from typing import Optional
 
 from fastapi import FastAPI
 from dotenv import load_dotenv
+
+# The settings that have no default and therefore must come from somewhere
+# (an env file or an already-populated environment) before `server.main` can
+# be imported: `eyened_orm.config.DatabaseSettings.user` / `.password`,
+# pulled in transitively via `server.db`'s module-level `Database()`. Every
+# other settings class in this stack (server.config.Settings and friends)
+# has defaults for all fields, so those alone would never block the import.
+REQUIRED_ENV_VARS = ("EYENED_DATABASE_USER", "EYENED_DATABASE_PASSWORD")
 
 
 
@@ -43,14 +52,17 @@ def default_output_dir() -> Path:
 
 def load_fastapi_app(env_file: Path) -> FastAPI:
     """Import the FastAPI app from `server.main` (prefers `app_api`)."""
-    if not env_file.exists():
+    if env_file.is_file():
+        load_dotenv(env_file)
+    elif not all(var in os.environ for var in REQUIRED_ENV_VARS):
         raise SystemExit(
-            f"error: no env file at {env_file}, and the server's settings cannot be\n"
-            "       loaded without one.\n"
-            "       Fix: run './eyened up' to create deploy/.env, or pass\n"
-            "            --env-file <path> to point at another one."
+            f"error: no env file at {env_file}, and the environment does not\n"
+            "       already carry the server's settings (EYENED_DATABASE_USER\n"
+            "       and EYENED_DATABASE_PASSWORD, at minimum).\n"
+            "       Fix: cp deploy/.env.example deploy/.env and edit it, or run\n"
+            "            './eyened up' to create and bootstrap deploy/.env for\n"
+            "            you, or pass --env-file <path> to point at another one."
         )
-    load_dotenv(env_file)
     root = project_root()
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
