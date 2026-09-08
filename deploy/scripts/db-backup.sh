@@ -18,6 +18,14 @@ set -eu
 
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 . "$REPO_ROOT/deploy/scripts/lib.sh"
+
+# Before anything is read or written, including the compose probe. This writes
+# a whole MySQL datadir (and optionally a .tgz beside it) to a path the
+# operator names; under sudo every byte of it lands root-owned, so the backup
+# cannot be moved, pruned or restored by the person who took it. './eyened
+# backup' does not refuse on its behalf — this is the only guard on this path.
+refuse_sudo
+
 resolve_compose
 
 ENV_FILE="$DEPLOY_DIR/.env"
@@ -110,10 +118,12 @@ esac
 # '-h' never has to touch Docker) and before anything that does.
 #
 # `compose ps -a -q database`, not a COMPOSE_PROFILES text check: this asks
-# compose itself, so it can't disagree with what 'down -v' (reset.sh) or D1's
-# own external-database case resolve to, even when COMPOSE_PROFILES was
-# overridden from the calling shell rather than deploy/.env (see reset.sh's
-# header comment on that divergence). Same mechanism the deleted cold-tar
+# compose itself, so it can't disagree with what 'down -v' or D1's own
+# external-database case resolve to, even when COMPOSE_PROFILES was overridden
+# from the calling shell rather than deploy/.env — compose reads the shell
+# environment in preference to the project .env file, so a guard that consults
+# only the file can disagree with what compose actually does. Same mechanism
+# the deleted cold-tar
 # db-snapshot.sh used. `-a`, not a bare `ps -q`: a stopped-but-existing
 # container (this stack owns a database that just isn't running right now)
 # must not be misdiagnosed as "external".

@@ -21,8 +21,8 @@ resolve_compose
 # 'local-db' against it. Refuse to guess instead.
 [ -f "$DEPLOY_DIR/.env" ] || die "bootstrap: $DEPLOY_DIR/.env does not exist, so bootstrap cannot tell
       whether this stack owns its database.
-      Fix: run ./install.sh or 'make up' first — both create deploy/.env before
-      calling this script."
+      Fix: run './eyened install' or './eyened up' first — both create deploy/.env
+      before calling this script."
 
 # A real exported COMPOSE_PROFILES / EYENED_DATABASE_HOST takes precedence
 # over deploy/.env, because that is also how the compose CLI resolves them
@@ -129,7 +129,7 @@ esac
 # --- 2. Wait for MySQL to report healthy -----------------------------------
 cid=$(compose ps -q database || true)
 [ -n "$cid" ] || die "bootstrap: the 'database' service is not running.
-      Fix: start the stack first (./install.sh or make up)."
+      Fix: start the stack first ('./eyened install' or './eyened up')."
 
 printf 'bootstrap: waiting for MySQL to become healthy'
 status=unknown
@@ -194,9 +194,9 @@ else
     if [ -z "$current" ]; then
         # Tables exist but alembic was never stamped: create_all succeeded
         # and something after it (stamping, or --seed-form-schemas) did not.
-        # This is a broken initialisation, not drift, and 'make migrate'
+        # This is a broken initialisation, not drift, and applying migrations
         # cannot repair a schema that was never fully created — telling the
-        # operator to run it would misdiagnose the problem.
+        # operator to run them would misdiagnose the problem.
         echo "bootstrap: WARNING — this database has tables but no alembic_version row."
         echo "bootstrap: A previous initialisation likely did not finish (schema creation"
         echo "bootstrap: succeeded; stamping or form-schema seeding did not). This is not"
@@ -209,7 +209,7 @@ else
         echo "bootstrap: WARNING — this database is not at the latest revision."
         echo "bootstrap:   current: $current"
         echo "bootstrap:   head:    $head"
-        echo "bootstrap: Run 'make migrate' when you are sure this is the database"
+        echo "bootstrap: Run './eyened migrate' when you are sure this is the database"
         echo "bootstrap: you want to migrate. Nothing was changed."
     fi
 fi

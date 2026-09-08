@@ -4,10 +4,10 @@ One stack: database, redis, server, fileserver — plus a `client` container in
 development only, see [Where the frontend comes
 from](#where-the-frontend-comes-from). Two doors into it:
 
-- **`./install.sh`** — for clients. Builds and runs the production stack
+- **`./eyened install`** — for clients. Builds and runs the production stack
   (built SPA, gunicorn, no source mounts) on a database this stack owns.
   Docker is the only prerequisite.
-- **`make up`** — for developers. Builds and runs the development stack
+- **`./eyened up`** — for developers. Builds and runs the development stack
   (vite hot reload, server and orm source bind-mounted) on the same bundled
   database.
 
@@ -20,10 +20,10 @@ Docker only. Nothing else is required to run the stack.
 
 - Linux and macOS are supported natively.
 - Windows is supported via WSL2.
-- `make` is a developer convenience — a shorter way to invoke the scripts
-  under `deploy/scripts/`. It is never required: `./install.sh` does not use
-  it, and every `make` target has an equivalent direct script invocation
-  (see [Target reference](#target-reference)).
+- `make` is **not** required, and there is no Makefile. `./eyened` is a plain
+  `#!/bin/sh` script at the repository root; the larger pieces it delegates to
+  under `deploy/scripts/` can also be run directly (see [Command
+  reference](#command-reference)).
 
 ## The compose binary
 
@@ -41,7 +41,7 @@ Wherever a command below is shown as `docker compose ...`, `docker-compose
 ```bash
 git clone https://github.com/Eyened/eyened-platform.git
 cd eyened-platform
-./install.sh
+./eyened install
 ```
 
 **Developers** — run the dev stack:
@@ -49,12 +49,12 @@ cd eyened-platform
 ```bash
 git clone https://github.com/Eyened/eyened-platform.git
 cd eyened-platform
-make up
+./eyened up
 ```
 
 Both doors print an admin password once, on first run, and then a "day-to-day
 commands" block. Those commands are run plainly from `deploy/`, with no
-`make` and no `-f` flags — the install already recorded which layers this
+wrapper and no `-f` flags — the install already recorded which layers this
 stack uses in `deploy/.env`:
 
 ```bash
@@ -71,7 +71,7 @@ binary](#the-compose-binary) above.)
 > already have this stack running from before that change, a plain `up -d`
 > is not enough to pick it up — it reuses the existing `client` image, and
 > the fix lives in that image's entrypoint. Run `docker compose up -d
-> --build` once (or just re-run `./install.sh` / `make up`, which both run
+> --build` once (or just re-run `./eyened install` / `./eyened up`, which both run
 > `up -d --build` for you), then plain `up -d` is correct again for every
 > start after that.
 
@@ -85,11 +85,11 @@ which would defeat the point.)
 
 | Entry point | `COMPOSE_FILE` | `COMPOSE_PROFILES` |
 |---|---|---|
-| `./install.sh` | `compose.yaml:compose.storage.yaml:compose.prod.yaml` | `local-db` |
-| `make up` | `compose.yaml:compose.dev.yaml:compose.storage.yaml` | `local-db` |
-| `make prod` | `compose.yaml:compose.storage.yaml:compose.prod.yaml` | *(none)* |
+| `./eyened install` | `compose.yaml:compose.storage.yaml:compose.prod.yaml` | `local-db` |
+| `./eyened up` | `compose.yaml:compose.dev.yaml:compose.storage.yaml` | `local-db` |
+| `./eyened prod` | `compose.yaml:compose.storage.yaml:compose.prod.yaml` | *(none)* |
 
-`./install.sh` and `make prod` run the **same layers** and differ only in
+`./eyened install` and `./eyened prod` run the **same layers** and differ only in
 the profile. That is deliberate: whether the bundled database runs is one
 setting (`local-db` in `COMPOSE_PROFILES`), not two.
 
@@ -126,7 +126,7 @@ operator values in `deploy/.env`, the same for the bundled Keycloak and an
 external provider.
 `./eyened doctor` refuses to build while `compose.oidc.yaml` is enabled and
 `KEYCLOAK_ADMIN_PASSWORD` is still a published default: `doctor.sh` has no
-warning level, and `stack.sh` runs it before anything else, so the run stops
+warning level, and `./eyened` runs it before anything else, so the run stops
 at `preflight failed — nothing was built` (see
 [Troubleshooting](#troubleshooting)). For realm and client setup, see
 **[`deploy/keycloak/README.md`](keycloak/README.md)** — that document is the
@@ -147,12 +147,12 @@ else in `deploy/nginx/default.conf.template` (the API proxy, thumbnails,
 per-dataset storage locations) is identical in both.
 
 Consequence worth stating explicitly: **changing frontend code in production
-means rebuilding the fileserver image.** `./install.sh` (and `make prod`)
+means rebuilding the fileserver image.** `./eyened install` (and `./eyened prod`)
 does this for you every time it runs.
 
 ## Compose 2.26 or newer is required
 
-This is not a nicety — `make doctor` refuses to continue below the floor.
+This is not a nicety — `./eyened doctor` refuses to continue below the floor.
 
 The server's dependency on the bundled database is expressed as
 `depends_on: database: condition: service_healthy, required: false`, so that
@@ -198,13 +198,13 @@ genr     /mnt/genr
 `deploy/scripts/gen-storage.sh` generates everything from that file: the
 container bind mounts and `EYENED_STORAGE_MOUNTS` (`compose.storage.yaml`),
 and the nginx locations (`nginx/storage.d/storage.conf`). It runs as part of
-every `./install.sh` / `make up` / `make prod` invocation.
+every `./eyened install` / `./eyened up` / `./eyened prod` invocation.
 
 **The database's own storage is neither of those two.** `DB_DATA_PATH`
 decides where the bundled MySQL keeps its data: unset, it lives in this
-stack's own named volume and is deleted along with the stack (`make
-reset`); set to an absolute path, it lives there instead and outlives the
-stack.
+stack's own named volume and is deleted along with the stack
+(`./eyened reset`); set to an absolute path, it lives there instead and
+outlives the stack.
 
 Wherever `DB_DATA_PATH` points at storage that outlives the stack, **the
 database passwords must be supplied by hand.** First run generates
@@ -219,12 +219,12 @@ data, set `MYSQL_ROOT_PASSWORD` and `EYENED_DATABASE_PASSWORD` in
 ## Adding your first dataset
 
 1. Add a `<key> <absolute path>` line to `deploy/storage-mounts.conf`.
-2. Re-run the entry point you used before (`./install.sh` or `make up`) —
+2. Re-run the entry point you used before (`./eyened install` or `./eyened up`) —
    this regenerates the mounts and nginx locations and restarts the stack.
 3. Import your data with that key as the `storage_backend_key`. The
    `StorageBackend` row is created automatically on import; there is no
    separate registration step.
-4. Run `make check-storage` to confirm `storage-mounts.conf` and the
+4. Run `./eyened check-storage` to confirm `storage-mounts.conf` and the
    database's `StorageBackend` rows agree.
 
 ## Workers
@@ -345,17 +345,17 @@ until you set it.
 ## Migrations
 
 ```bash
-make migrate
+./eyened migrate
 ```
 
 Runs `alembic upgrade head` inside the server container and stays
 interactive on purpose — alembic's own confirmation prompt is what still
 guards a populated database against the wrong migration being applied.
 
-**Fresh installs never run this.** `./install.sh` and `make up` initialize a
+**Fresh installs never run this.** `./eyened install` and `./eyened up` initialize a
 brand-new database with `eorm initialize-database`, not by replaying the
 whole alembic chain from an empty schema — that is not a path this repo
-maintains. `make migrate` is for applying new migrations to a database that
+maintains. `./eyened migrate` is for applying new migrations to a database that
 already has a schema.
 
 ## Backup and rollback
@@ -401,7 +401,7 @@ before you move, or there is nothing to return to.
 > `./eyened migrate`. MySQL commits DDL per statement, so a half-applied
 > migration cannot be reliably rolled back with `alembic downgrade`.
 
-## `make reset`
+## `./eyened reset`
 
 Stops the stack and **deletes its volumes** — the bundled database and
 platform storage. It asks for confirmation by making you type the exact
@@ -420,7 +420,7 @@ own what it would be deleting — or whenever it cannot tell:
   this stack's named volume, so `down -v` would leave the entire database
   intact. This one *under*-deletes rather than over-deletes, which is not
   data loss but does mean reset cannot do what its name says: the next
-  `./install.sh` would find the old database still there. Delete that
+  `./eyened install` would find the old database still there. Delete that
   directory by hand if you really do mean to destroy the durable copy.
 - `COMPOSE_PROFILES` does not contain `local-db` — this stack uses an
   external database; reset only removes volumes this stack owns, and the
@@ -444,40 +444,44 @@ append the site's compose file to `COMPOSE_FILE` the same way
 `compose.host-ports.yaml` is documented above, and keep the site's `.env.<site>`
 alongside `deploy/.env` (both are already covered by `deploy/.env.*` in
 `.gitignore`), copying the one you want into `deploy/.env` before running
-`make prod` for that site.
+`./eyened prod` for that site.
 
-## Target reference
+## Command reference
 
-Every target the Makefile declares, and the direct invocation it is an alias
-for. Run these from the repository root: each shell script resolves its own
-location and so works from any directory, but the path arguments shown below
-are relative to the root.
+Every command `./eyened` accepts. Run them from anywhere: `./eyened` resolves
+its own location, and so does every script it calls.
 
-| Target | Direct invocation | What it does |
+| Command | Implemented in | What it does |
 |---|---|---|
-| `make install` | `./install.sh` | the client install (production stack, bundled database). |
-| `make doctor` | `deploy/scripts/doctor.sh dev` | preflight checks without building anything. |
-| `make up` | `deploy/scripts/stack.sh dev` | the developer stack — hot reload, source mounted, bundled database. |
-| `make down` | `deploy/scripts/dc.sh down` | stop this stack. |
-| `make logs` | `deploy/scripts/dc.sh logs -f` | follow logs. |
-| `make prod` | `deploy/scripts/stack.sh prod` | a site deployment against an external database. |
-| `make migrate` | `deploy/scripts/dc.sh exec -it server sh -c 'cd orm/migrations && alembic upgrade head'` | apply pending migrations inside the server container. |
-| `make db-shell` | `deploy/scripts/dc.sh exec -it database sh -c 'exec mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'` | a MySQL shell in the bundled database. |
-| `make reset` | `deploy/scripts/reset.sh` | stop this stack and delete its volumes. Guarded; asks for confirmation. |
-| `make check-storage` | `deploy/scripts/check-storage.sh` | report configured mounts with no `StorageBackend` row, and vice versa. |
-| `make help` | *(none — it reads the Makefile itself)* | list the targets above (and their one-line descriptions) at the terminal. |
-| `make gen-openapi` | `python3 deploy/scripts/generate_openapi.py client/src/types` | regenerate `client/src/types/openapi.json` from the server's schema. Not listed by `make help`. |
-| `make gen-types` | `gen-openapi`, then `npx --yes openapi-typescript@7 client/src/types/openapi.json -o client/src/types/openapi.ts` | generate `client/src/types/openapi.ts`. Not listed by `make help`. |
-| `make gen-client-types` | `gen-types`, then `echo` the path | `gen-types`, then print the generated file's path. Not listed by `make help`. |
+| `./eyened install` | `eyened` | the client install: production stack on a database this stack owns. |
+| `./eyened up` | `eyened` | the developer stack — hot reload, source mounted, bundled database. |
+| `./eyened prod` | `eyened` | a site deployment against an external database. |
+| `./eyened down` | `eyened` | stop this stack. Extra arguments go through to compose. |
+| `./eyened logs` | `eyened` | follow logs. Extra arguments go through to compose. |
+| `./eyened doctor [dev\|client]` | `deploy/scripts/doctor.sh` | preflight checks, building nothing. |
+| `./eyened migrate` | `eyened` | `alembic upgrade head` inside the server container, interactively. |
+| `./eyened db-shell` | `eyened` | a MySQL shell in the bundled database. |
+| `./eyened check-storage` | `eyened` | report configured mounts with no `StorageBackend` row, and vice versa. |
+| `./eyened backup <dir> [-t]` | `deploy/scripts/db-backup.sh` | hot backup of the bundled database — see [Backup and rollback](#backup-and-rollback). |
+| `./eyened restore <dir\|backup.tgz>` | `deploy/scripts/db-restore.sh` | restore one. |
+| `./eyened reset` | `eyened` | stop this stack and delete its volumes. Guarded; asks for confirmation. |
+| `./eyened help` | `eyened` | the list above, at the terminal. |
 
-The `dc.sh` rows are not a special case: `deploy/scripts/dc.sh` is just
-`docker compose` (or `docker-compose`) run from `deploy/`, so
-`cd deploy && docker compose down` is equally correct — see
-[The compose binary](#the-compose-binary).
+**`make` is not a prerequisite, and there is no Makefile.** `./eyened` is one
+`#!/bin/sh` file at the repository root and needs nothing but a POSIX shell
+and Docker. It is also the only entry point: the separate installer and the
+four thin scripts that used to sit beside it are now subcommands of it.
+
+The rows marked `eyened` hold no privileged machinery. `./eyened down` and
+`./eyened logs` are `docker compose` (or `docker-compose`) run from `deploy/`,
+so `cd deploy && docker compose down` is equally correct — see [The compose
+binary](#the-compose-binary). The three delegated scripts are ordinary
+`#!/bin/sh` files and can still be invoked directly; `./eyened <command>` is
+the supported spelling.
 
 ## Troubleshooting
 
-- **Port already in use.** `make doctor` checks `HTTP_PORT` and names the
+- **Port already in use.** `./eyened doctor` checks `HTTP_PORT` and names the
   fix (pick a free port in `deploy/.env`).
 - **`compose.oidc.yaml` is enabled and `KEYCLOAK_BIND` is loopback.**
   `./eyened doctor` **fails** on this — it is not advisory, and nothing is
@@ -492,11 +496,11 @@ The `dc.sh` rows are not a special case: `deploy/scripts/dc.sh` is just
   the Keycloak admin console comes up on `admin`/`admin` — and that console
   is the identity provider for every account on the platform. Set it in
   `deploy/.env` to a long random value.
-- **Compose older than 2.26.** `make doctor` refuses to continue and names
+- **Compose older than 2.26.** `./eyened doctor` refuses to continue and names
   the required upgrade — see [Compose 2.26 or newer is
   required](#compose-226-or-newer-is-required).
 - **`deploy/.env` was written by the other entry point.** `./eyened doctor`
-  detects a dev-mode `.env` under `./install.sh` (or vice versa). Because
+  detects a dev-mode `.env` under `./eyened install` (or vice versa). Because
   `.env` is written once and never rewritten, the fix is to delete it and
   re-run — that is what switching between the two stacks means. Deleting it
   keeps your data; `./eyened reset` is what deletes that.
@@ -507,7 +511,7 @@ The `dc.sh` rows are not a special case: `deploy/scripts/dc.sh` is just
   gives is to delete `deploy/.env` and re-run, or to edit `COMPOSE_FILE` by
   hand to name only one of the two layers.
 - **MySQL never becomes healthy.** Check `docker compose logs database`;
-  `make doctor` cannot detect this ahead of time since it only checks
+  `./eyened doctor` cannot detect this ahead of time since it only checks
   configuration, not runtime health.
 - **`duplicate location "/"` at nginx startup.** This means `client.d/` was
   hand-edited or has more than one file mounted at

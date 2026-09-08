@@ -20,7 +20,7 @@ esac
 
 failed=0
 # Both go to stdout: FAIL used to go to stderr, but that means a redirected
-# or piped run (`make doctor 2>&1 | tee log`, or capturing just one stream)
+# or piped run (`./eyened doctor 2>&1 | tee log`, or capturing just one stream)
 # interleaves the report out of order or loses half of it. This file's whole
 # purpose is one readable, ordered list, so both share a stream.
 ok()      { printf 'ok    %s\n' "$1"; }
@@ -307,8 +307,8 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
             # as fact. It is not one: .env.example's own external-database
             # recipe (remove 'local-db' from COMPOSE_PROFILES, point
             # EYENED_DATABASE_* at that server) starts from a HAND COPY of the
-            # template — which stack.sh's prod refusal explicitly tells the
-            # operator to make — and that copy keeps the template's dev
+            # template — which './eyened prod' refuses to run without, and
+            # explicitly tells the operator to make — and that copy keeps the dev
             # COMPOSE_FILE line, so './eyened prod' lands here having run no
             # entry point at all (measured). Deleting that .env would throw
             # away the site's only configuration AND loop: prod refuses to run
@@ -335,7 +335,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
 
     # ${VAR:?} in compose.yaml rejects these three when ABSENT or EMPTY, never
     # when SET to 'change_me' — which a .env hand-copied from a pre-D7 template
-    # (the copy stack.sh's prod refusal asks for) still holds.
+    # (the copy './eyened prod' asks the operator to make) still holds.
     bad_secrets=""
     for _var in MYSQL_ROOT_PASSWORD EYENED_DATABASE_PASSWORD EYENED_REDIS_PASSWORD; do
         _val=$(unquote "$(env_get "$_var")")

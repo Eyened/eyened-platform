@@ -5,7 +5,7 @@
 #   deploy/nginx/storage.d/storage.conf  one internal nginx location per key
 #
 # Both are always written, even with no mounts: COMPOSE_FILE names
-# compose.storage.yaml, so a missing file breaks compose before make runs.
+# compose.storage.yaml, so a missing file breaks compose before it starts.
 #
 # storage-mounts.conf is one "<key> <absolute-path>" pair per line. Blank lines
 # and # comments are ignored. Anything else is an error, never a silently
@@ -14,6 +14,15 @@ set -eu
 
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 . "$REPO_ROOT/deploy/scripts/lib.sh"
+
+# Before anything is written. Both outputs below land in the checkout, and
+# under sudo they land root-owned — after which the invoking user's own next
+# run cannot rewrite them, and `git status` reports files they cannot even
+# delete. Refusing costs one line; the alternative is chowning results back,
+# which has to be repeated at every write path and was missed at one of them
+# for months. This is reachable directly as well as through './eyened', which
+# refuses separately: a remote GPU box runs this script on its own.
+refuse_sudo
 
 SRC="$DEPLOY_DIR/storage-mounts.conf"
 COMPOSE_OUT="$DEPLOY_DIR/compose.storage.yaml"

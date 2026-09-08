@@ -21,7 +21,7 @@ Everything the platform needs — viewer, API, database, Redis, and file server 
 Docker stack.
 
 **Prerequisite: Docker, with Compose 2.26 or newer.** That is the whole list — a current Docker
-Desktop or Docker Engine install already satisfies it, and `./install.sh` checks before it builds
+Desktop or Docker Engine install already satisfies it, and `./eyened install` checks before it builds
 anything. Supported platforms are Linux and macOS natively, and Windows via WSL2.
 
 1. Clone the repository. Images are built from your checkout, so the checkout *is* the version:
@@ -34,7 +34,7 @@ anything. Supported platforms are Linux and macOS natively, and Windows via WSL2
 2. Run the installer:
 
     ```bash
-    ./install.sh
+    ./eyened install
     ```
 
     It checks your machine, creates `deploy/.env` with freshly generated secrets, builds the
@@ -102,8 +102,8 @@ Then work through all four steps, in order.
    behind, prints the command to run — nothing is changed until you run it:
 
     ```bash
-    make migrate
-    # or: deploy/scripts/dc.sh exec -it server sh -c 'cd orm/migrations && alembic upgrade head'
+    ./eyened migrate
+    # or: cd deploy && docker compose exec -it server sh -c 'cd orm/migrations && alembic upgrade head'
     ```
 
     Skipping this is the failure this list exists to prevent: new code running against the old
@@ -112,7 +112,7 @@ Then work through all four steps, in order.
 4. **Verify the schema is where the new code expects it.** The two revision ids must match:
 
     ```bash
-    deploy/scripts/dc.sh exec -T server sh -c 'cd orm/migrations && alembic current && alembic heads'
+    cd deploy && docker compose exec -T server sh -c 'cd orm/migrations && alembic current && alembic heads'
     ```
 
     Then open the viewer and sign in.
@@ -154,7 +154,7 @@ but blank viewer. To point the platform at a directory of images:
 4. Confirm the configuration and the database agree:
 
     ```bash
-    make check-storage      # or: deploy/scripts/check-storage.sh
+    ./eyened check-storage
     ```
 
 :::note

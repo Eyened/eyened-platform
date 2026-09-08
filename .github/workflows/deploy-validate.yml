@@ -8,11 +8,10 @@ on:
       # compose.workers.yaml builds from worker/Dockerfile.*, so a change to
       # one of those has to run this job.
       - 'worker/**'
-      - 'install.sh'
-      - 'Makefile'
+      - 'eyened'
       - '.dockerignore'
       - '.github/workflows/deploy-validate.yml'
-      # The published quick start tells people to clone and run ./install.sh.
+      # The published quick start tells people to clone and run './eyened install'.
       # A step below checks that whatever ref it pins actually carries that
       # installer, so an edit to the quick start alone has to run this job —
       # otherwise that check never sees the change it exists to catch.
@@ -24,8 +23,7 @@ on:
       # compose.workers.yaml builds from worker/Dockerfile.*, so a change to
       # one of those has to run this job.
       - 'worker/**'
-      - 'install.sh'
-      - 'Makefile'
+      - 'eyened'
       - '.dockerignore'
       - '.github/workflows/deploy-validate.yml'
       - 'docs/src/content/docs/getting_started.mdx'
@@ -88,7 +86,7 @@ jobs:
           # all. deploy/scripts/lib.sh is sourced and carries no shebang; it
           # is POSIX sh, which is the default branch here.
           checked=0
-          for f in install.sh $(find deploy -name '*.sh' | sort); do
+          for f in eyened $(find deploy -name '*.sh' | sort); do
             case "$(head -n 1 "$f")" in
               '#!'*bash*) echo "bash -n $f"; bash -n "$f" ;;
               *)          echo "sh   -n $f"; sh -n "$f" ;;
@@ -97,7 +95,7 @@ jobs:
           done
           # An empty file list is a broken check, not a clean bill of health:
           # move or rename deploy/ and the `find` above matches nothing, the
-          # loop runs once for install.sh, and this step goes green having
+          # loop runs once for eyened, and this step goes green having
           # parsed almost nothing.
           if [ "$checked" -le 1 ]; then
             echo "::error::found $checked shell script(s) — the find above matched nothing under deploy/, so this step validated almost nothing"
@@ -105,11 +103,58 @@ jobs:
           fi
           echo "ok: $checked shell script(s) parse"
 
+      # What the deleted Makefile step was actually buying: proof that the
+      # published command list and the dispatcher have not drifted apart.
+      # Both directions, because they fail differently — an undocumented
+      # command is invisible, a documented one that cannot dispatch is a
+      # broken instruction in the help text itself.
+      - name: The CLI's help and its dispatch agree
+        run: |
+          set -e
+          set -o pipefail
+          # Every `|| true` below is load-bearing, not defensive. Both
+          # extractions end in a grep, and a grep that matches nothing exits
+          # 1; under `set -e` + `set -o pipefail` that status comes straight
+          # out of the assignment and kills this step THERE. Measured, on a
+          # copy with the `case` line reindented so the sed anchor no longer
+          # matches: the step went red having printed nothing whatsoever, and
+          # the empty-extraction guard below — the one part of this step whose
+          # whole job is to say so — was never reached. A step that fails
+          # without naming the reason is only half a guard, so the status is
+          # discarded here and the assertions are made on the CONTENT instead.
+          #
+          # Every command the dispatcher accepts, minus the help aliases and
+          # the catch-all.
+          dispatched=$(sed -n '/^case "\$cmd" in$/,/^esac$/p' eyened \
+            | command grep -oE '^    [a-z][a-z|-]*\)' \
+            | tr -d ' )' | tr '|' '\n' \
+            | command grep -vxE 'help|-h|--help' | sort -u || true)
+          # Every command the help text documents: the two-space-indented
+          # words in its command sections.
+          documented=$(./eyened help \
+            | command grep -oE '^  [a-z][a-z-]+ ' | tr -d ' ' | sort -u || true)
+
+          # An extraction that finds nothing is a broken check, not a clean
+          # bill of health — the same trap the Makefile step it replaces had
+          # to guard against twice. Both sides are counted, because they break
+          # independently: the dispatcher's shape and the help text's are two
+          # different things to stop matching.
+          n=$(printf '%s\n' "$dispatched" | command grep -c . || true)
+          m=$(printf '%s\n' "$documented" | command grep -c . || true)
+          [ "$n" -ge 10 ] || { echo "::error::extracted only $n dispatched command(s) from ./eyened — the sed/grep above stopped matching, so this step would validate nothing"; exit 1; }
+          [ "$m" -ge 10 ] || { echo "::error::extracted only $m documented command(s) from './eyened help' — its output or the grep above changed shape, so this step would validate nothing"; exit 1; }
+
+          missing=$(comm -23 <(printf '%s\n' "$dispatched") <(printf '%s\n' "$documented"))
+          extra=$(comm -13 <(printf '%s\n' "$dispatched") <(printf '%s\n' "$documented"))
+          [ -z "$missing" ] || { echo "::error::./eyened dispatches command(s) its help does not document:$(echo $missing)"; exit 1; }
+          [ -z "$extra" ]   || { echo "::error::./eyened help documents command(s) it cannot dispatch:$(echo $extra)"; exit 1; }
+          echo "ok: $n commands, help and dispatch agree"
+
       # The published quick start is the first thing a new operator runs, so
       # a `--branch <ref>` in it must not point at a ref that predates the
       # installer: v2026.07.0, the tag it pinned until this branch, contains
-      # neither install.sh nor deploy/, so the very next line of the quick
-      # start (`./install.sh`) could not work from it. Pinning nothing — the
+      # neither the eyened CLI nor deploy/, so the very next line of the quick
+      # start (`./eyened install`) could not work from it. Pinning nothing — the
       # quick start following the default branch — is a pass.
       - name: The quick start does not pin a ref without the installer
         run: |
@@ -138,86 +183,9 @@ jobs:
               || true
             git rev-parse --verify --quiet "$ref^{commit}" >/dev/null \
               || { echo "::error::$doc pins --branch $ref, which does not resolve in this repository"; exit 1; }
-            git ls-tree -r --name-only "$ref" | command grep -qx 'install.sh' \
-              || { echo "::error::$doc pins --branch $ref, which does not contain install.sh — the quick start's own './install.sh' cannot work from that ref"; exit 1; }
-            echo "ok: $ref resolves and carries install.sh"
-          done
-
-      # `Makefile` is a trigger path for this job but nothing above reads it.
-      # The Makefile deliberately has no `$(shell …)` (its own comments explain
-      # why: it would run at parse time, including on `make help`, and expand
-      # to the empty string when a tool is missing) so dry-running every
-      # .PHONY target is safe here. That precondition is ASSERTED below, not
-      # assumed: `make -n` expands and RUNS `$(shell …)`, so a future one
-      # would quietly turn this dry run into an execution on a CI runner.
-      # It catches parse errors (e.g. a space-indented recipe) and references
-      # to undefined targets, not just a syntax check of one target.
-      - name: Makefile parses and every target dry-runs
-        run: |
-          set -e
-          # Comment lines are stripped first: the Makefile's own header
-          # explains the hazard in prose and quotes `$(shell …)` twice, so a
-          # bare grep matches its documentation and reds every build.
-          ! command grep -vE '^[[:space:]]*#' Makefile | command grep -n '\$(shell' \
-            || { echo "::error::Makefile gained a \$(shell …) — see its header comment; make -n RUNS it, so this step would stop being a dry run"; exit 1; }
-
-          targets=$(awk '/^\.PHONY:/{sub(/^\.PHONY:[ \t]*/,""); line=$0; while (line ~ /\\$/) { sub(/\\$/,"",line); getline cont; line = line " " cont }; print line }' Makefile)
-
-          # An extraction that finds nothing is a broken check, not a clean
-          # bill of health: reformat, indent, or rename `.PHONY` and the awk
-          # above stops matching, `targets` comes back empty, the loop below
-          # runs zero times, and this step goes green having dry-run nothing.
-          if [ -z "$targets" ]; then
-            echo "::error::no .PHONY targets extracted from Makefile — the awk pattern found no match, so this step would validate nothing"
-            exit 1
-          fi
-
-          # Coverage: every rule the Makefile declares must appear in the
-          # extracted .PHONY list, or that rule dry-runs unchecked (e.g. a
-          # target added without a matching .PHONY entry). Strictly stronger
-          # than the empty-extraction guard above.
-          rules=$(command grep -oE '^[a-zA-Z][a-zA-Z0-9_-]*:' Makefile | tr -d ':' | sort -u)
-          missing=""
-          for r in $rules; do
-            covered=0
-            for t in $targets; do
-              [ "$r" = "$t" ] && { covered=1; break; }
-            done
-            [ "$covered" = "1" ] || missing="$missing $r"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::Makefile rule(s) not covered by .PHONY dry-run:$missing"
-            exit 1
-          fi
-
-          # And the reverse. `.PHONY: foo` DEFINES foo as a target, so an
-          # entry whose rule was renamed or deleted does not fail: `make foo`
-          # prints "Nothing to be done for 'foo'" and exits 0, which reads as
-          # success to a person and to a script. No file named foo is
-          # involved — .PHONY alone is enough. Without this, the dry-run loop
-          # below would happily "pass" such a ghost.
-          #
-          # `rules` above only recognises `name:` at the start of a line, so a
-          # multi-target rule (`alpha beta:`) or a pattern rule is invisible
-          # to it and this check reports its .PHONY names as ghosts. That is
-          # a false RED, not a false green: it is loud, it names the targets,
-          # and the fix is to widen the extraction — not to delete this.
-          ghosts=""
-          for t in $targets; do
-            defined=0
-            for r in $rules; do
-              [ "$t" = "$r" ] && { defined=1; break; }
-            done
-            [ "$defined" = "1" ] || ghosts="$ghosts $t"
-          done
-          if [ -n "$ghosts" ]; then
-            echo "::error::.PHONY names target(s) with no rule:$ghosts — 'make' on these prints \"Nothing to be done\" and exits 0, which looks like success"
-            exit 1
-          fi
-
-          for t in $targets; do
-            echo "--- make -n $t ---"
-            make -n "$t" >/dev/null
+            git ls-tree -r --name-only "$ref" | command grep -qx 'eyened' \
+              || { echo "::error::$doc pins --branch $ref, which does not contain the eyened CLI — the quick start's own './eyened install' cannot work from that ref"; exit 1; }
+            echo "ok: $ref resolves and carries the eyened CLI"
           done
 
       - name: Generate the storage layer

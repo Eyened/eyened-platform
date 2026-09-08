@@ -87,7 +87,7 @@ One setting is genuinely optional:
 Then:
 
 ```bash
-make up
+./eyened up
 ```
 
 Open `http://<PUBLIC_HOST>:<HTTP_PORT>/users/login` and sign in with **`testuser` / `testuser`**.

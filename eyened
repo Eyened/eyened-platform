@@ -1,0 +1,337 @@
+#!/bin/sh
+# The eyened-platform command line. One entry point, no make.
+#
+#   git clone https://github.com/Eyened/eyened-platform.git
+#   cd eyened-platform
+#   ./eyened install
+#
+# Docker is the only prerequisite. Run './eyened help' for the command list.
+#
+# This absorbs what used to be install.sh, the Makefile, deploy/scripts/dc.sh,
+# stack.sh, reset.sh and check-storage.sh. The large pieces still live in
+# deploy/scripts/ and are called from here: doctor.sh, bootstrap.sh,
+# gen-storage.sh, db-backup.sh, db-restore.sh.
+#
+# POSIX sh, and sh has no locals: every helper below is one flat namespace
+# shared with deploy/scripts/lib.sh. The `_`-prefixed names here are therefore
+# chosen NOT to collide with the ones lib.sh assigns (_db_pw _file _hex _host
+# _kc_pw _layers _lf _mode _n _port _redis_pw _root_pw _secret _tmp) — see
+# stack()'s _stack_mode, which would otherwise be overwritten by write_env.
+set -eu
+
+REPO_ROOT=$(cd "$(dirname "$0")" && pwd)
+. "$REPO_ROOT/deploy/scripts/lib.sh"
+
+usage() {
+    cat <<'EOF'
+usage: ./eyened <command> [arguments]
+
+Starting a stack
+  install          the client install: production images, bundled database.
+  up               the developer stack: hot reload, source mounted, bundled database.
+  prod             a site deployment against an EXTERNAL database.
+
+Day to day
+  down             stop this stack.
+  logs             follow logs. Extra arguments go through to compose.
+  doctor           preflight checks, building nothing.
+  migrate          apply pending migrations inside the server container.
+  db-shell         a MySQL shell in the bundled database.
+  check-storage    report configured mounts with no StorageBackend row, and vice versa.
+
+Data
+  backup           hot backup of the bundled database:  ./eyened backup <dir> [-t]
+  restore          restore one:  ./eyened restore <dir|backup.tgz>
+  reset            stop this stack and DELETE its volumes. Guarded; asks twice.
+
+Optional layers — append to COMPOSE_FILE in deploy/.env, which is safe and
+permanent (nothing rewrites that file):
+  :compose.host-ports.yaml   publish MySQL and Redis on the host
+  :compose.oidc.yaml         the bundled Keycloak (development OIDC)
+  :compose.workers.yaml      RQ workers here. The slim CPU worker starts with
+                             the layer; the GPU ones need a profile:
+                             gpu-inference, gpu-cfi-amd, gpu-layer-segmentation
+
+See deploy/README.md.
+EOF
+}
+
+# Bring a stack up. One implementation, three modes:
+#
+#   dev      developer stack — hot reload, source mounted, bundled database
+#   install  client install  — production stack on a database this stack owns
+#   prod     site deployment — production stack on an EXTERNAL database
+#
+# Every mode runs the same steps in the same order; a mode only decides which
+# layer list is recorded, whether 'local-db' is expected, and whether the
+# first-run bootstrap applies. Keeping that in one function is the point: the
+# startup order is fixed in one place or it drifts in three.
+#
+# The mode is held in _stack_mode, NOT _mode: write_env is called from the
+# middle of this function and assigns _mode itself, which in a shell without
+# locals overwrites the caller's. Measured — 'install' came back out of
+# write_env as 'client'. The two tests at the end of this function happen to
+# give the same answers for 'client' as for 'install', so nothing observable
+# broke; that is a coincidence of the current mode names and not a property to
+# rely on.
+stack() {
+    _stack_mode=$1
+
+    # doctor takes dev|client: 'install' and 'prod' both build the client stack.
+    case "$_stack_mode" in
+        dev) _doctor_mode=dev ;;
+        *)   _doctor_mode=client ;;
+    esac
+
+    refuse_sudo
+
+    echo "==> checking this machine"
+    "$DEPLOY_DIR/scripts/doctor.sh" "$_doctor_mode"
+
+    resolve_compose
+
+    case "$_stack_mode" in
+        dev)     write_env dev ;;
+        install) write_env client ;;
+        prod)
+            # A site deployment is never bootstrapped from a template: the .env
+            # must already point at the external database for THIS site.
+            [ -f "$DEPLOY_DIR/.env" ] || die "error: deploy/.env does not exist.
+      A site deployment needs it configured for THIS site — at minimum
+      EYENED_DATABASE_* pointing at the external database, and
+      COMPOSE_PROFILES without 'local-db'.
+      Fix: cp deploy/.env.example deploy/.env and edit it. Note that the
+           template ships the secrets ABSENT, so set them too."
+            case "$(env_get COMPOSE_PROFILES)" in
+                *local-db*)
+                    die "error: COMPOSE_PROFILES still contains 'local-db', which starts the
+      bundled MySQL. './eyened prod' is for a database this stack does not own.
+      Fix: remove 'local-db' from COMPOSE_PROFILES in deploy/.env, or run
+           './eyened install' if you do want the bundled database." ;;
+            esac ;;
+    esac
+
+    ensure_storage_mounts
+    "$DEPLOY_DIR/scripts/gen-storage.sh"
+
+    echo "==> building images and starting the stack"
+    [ "$_stack_mode" = dev ] || echo "    (the first run builds everything from source and takes a while)"
+    compose up -d --build
+
+    # Not in prod: bootstrap declines an external database anyway, and a site's
+    # schema is not this script's to create. See deploy/README.md on migrations.
+    [ "$_stack_mode" = prod ] || "$DEPLOY_DIR/scripts/bootstrap.sh"
+
+    print_day2
+}
+
+# Report disagreement between configured mounts and StorageBackend rows.
+#
+# Deliberately not part of `up` or `install`: generation has to work before any
+# database exists, which is exactly the state a first run is in.
+cmd_check_storage() {
+    resolve_compose
+    # NOTE: the python program below is a single-quoted argument, so it must
+    # not contain an apostrophe or any other single quote ANYWHERE, comments
+    # included — one would end the shell string and hand the rest of this file
+    # to sh as commands.
+    compose exec -T server python -c '
+import json, os
+from sqlalchemy import inspect, select
+from eyened_orm import Database, StorageBackend
+
+configured = set(json.loads(os.environ.get("EYENED_STORAGE_MOUNTS") or "{}"))
+
+db = Database()
+# You never bootstrapped this database is an ordinary operator state, not a
+# bug, and without this guard it arrived as a ~60-line SQLAlchemy traceback
+# ending in (1146, "Table ... StorageBackend does not exist"). It is reachable
+# by a completely normal route: a bare docker compose up -d brings the stack up
+# WITHOUT creating the schema. Every container then reports healthy on an empty
+# database.
+#
+# This exits non-zero on purpose. Nothing was compared, so reporting they agree
+# would be a check that cannot fail — which is precisely how an empty schema
+# went unnoticed for 43 minutes of a verification run.
+if not inspect(db.engine).has_table(StorageBackend.__tablename__):
+    raise SystemExit(
+        f"error: this database has no {StorageBackend.__tablename__} table, so there is\n"
+        "      nothing to compare storage-mounts.conf against — the schema has never\n"
+        "      been created here.\n"
+        "      Fix: run ./eyened install (production stack) or ./eyened up (developer\n"
+        "           stack). Both run bootstrap, which creates the schema; a bare\n"
+        "           docker compose up -d does not."
+    )
+
+with db.get_session() as session:
+    rows = set(session.execute(select(StorageBackend.Key)).scalars())
+
+for key in sorted(configured - rows):
+    print(f"configured but no StorageBackend row: {key}")
+for key in sorted(rows - configured):
+    print(f"StorageBackend row but not configured: {key}")
+if configured == rows:
+    print(f"storage-mounts.conf and StorageBackend rows agree ({len(rows)} key(s)).")
+'
+}
+
+# Stop the stack and DELETE its volumes — database and platform storage.
+#
+# Refuses outright when this stack is attached to storage or a database it does
+# not own, so it cannot be aimed at shared or production data.
+#
+# These guards read deploy/.env via env_get. Compose also honours the SHELL
+# environment, which overrides .env — so running this with, say,
+# COMPOSE_PROFILES set in the calling shell diverges from what the guard
+# inspected. Unset PLATFORM_STORAGE_PATH, DB_DATA_PATH, COMPOSE_PROFILES and
+# EYENED_DATABASE_HOST in your shell before relying on these.
+cmd_reset() {
+    # This one writes no host files, so it is not the root-owned-file problem
+    # the other refusals exist for. It is here because the sudo policy is the
+    # same everywhere or it is nothing, and because sudo in front of the one
+    # command that deletes volumes usually means the operator is working
+    # around something rather than intending it.
+    refuse_sudo
+
+    resolve_compose
+
+    # env_get returns empty BOTH for a key that is absent and for a .env that
+    # does not exist at all, and the two are not the same thing. Without this
+    # check every guard below reads empty and the COMPOSE_PROFILES one fires
+    # first: a machine that has never been installed would be told "this stack
+    # uses an external database", a diagnosis of a configuration that does not
+    # exist.
+    [ -f "$DEPLOY_DIR/.env" ] || die "refusing: $DEPLOY_DIR/.env does not exist, so there is no stack here to
+      reset — and nothing to check ownership against either.
+      Fix: run './eyened install' or './eyened up' first if you meant to create one."
+
+    _platform_storage=$(env_get PLATFORM_STORAGE_PATH)
+    [ -z "$_platform_storage" ] || die "refusing: PLATFORM_STORAGE_PATH is set to $_platform_storage.
+      This stack is attached to storage it does not own. Unset it in
+      deploy/.env if you really mean to reset a stack with its own volume."
+
+    # The exact analogue for the database. compose.yaml mounts
+    # ${DB_DATA_PATH:-db_data} at /var/lib/mysql: unset, that is this stack's
+    # own named volume and `down -v` deletes it; SET, it is a bind mount on
+    # durable storage and the db_data volume does not exist at all, so
+    # `down -v` removes nothing of the database. It UNDER-deletes rather than
+    # over-deletes, so this is not data loss — but reset then cannot do what
+    # its name says, and the operator's next install reports "the database
+    # already has N tables" and creates no admin, with nothing along the way
+    # having said the database survived.
+    _db_data_path=$(env_get DB_DATA_PATH)
+    [ -z "$_db_data_path" ] || die "refusing: DB_DATA_PATH is set to $_db_data_path.
+      /var/lib/mysql is then a bind mount on storage this stack does not own,
+      so 'down -v' would leave the entire database intact — reset cannot do
+      what its name says. Unset it in deploy/.env if you really mean to reset a
+      stack with its own volume; delete that directory by hand if you really
+      mean to destroy the durable copy."
+
+    case "$(env_get COMPOSE_PROFILES)" in
+        *local-db*) ;;
+        *) die "refusing: this stack uses an external database (no 'local-db' profile).
+      Reset only removes volumes this stack owns; the external database would
+      be untouched, which is not what 'reset' implies." ;;
+    esac
+
+    _db_host=$(env_get EYENED_DATABASE_HOST)
+    case "${_db_host:-database}" in
+        database) ;;
+        *) die "refusing: EYENED_DATABASE_HOST is '$_db_host', not the bundled 'database'.
+      Point it back at the bundled database, or use the tools of whatever
+      server it names." ;;
+    esac
+
+    _project=$(env_get COMPOSE_PROJECT_NAME)
+    [ -n "$_project" ] || die "refusing: COMPOSE_PROJECT_NAME is not set in deploy/.env.
+      Reset needs a project name to confirm against; an empty one would make an
+      empty answer (a bare Enter) match. Set COMPOSE_PROJECT_NAME in
+      deploy/.env and re-run."
+
+    # Ask compose which volumes it would actually remove, rather than
+    # rebuilding them as "${project}_db_data". Compose normalises project
+    # names, so the reconstruction can name something that does not exist —
+    # and it was wrong about WHICH volumes exist too, listing db_data
+    # unconditionally even in the DB_DATA_PATH case where there is no such
+    # volume. `config` resolves the same .env AND the same shell environment
+    # compose itself does, so this list cannot disagree with `down -v`.
+    #
+    # The parse is anchored on compose's own two-space JSON indentation.
+    # Nothing is invented if that ever stops matching — the list comes back
+    # empty and the check below refuses rather than printing a guess.
+    _volumes=$(compose config --format json 2>/dev/null | awk '
+        /^  "volumes": \{$/ { in_v = 1; next }
+        in_v && /^  \}/     { in_v = 0 }
+        in_v && /^      "name": "/ {
+            _n = $0
+            sub(/^      "name": "/, "", _n)
+            sub(/",?$/, "", _n)
+            print _n
+        }
+    ') || _volumes=""
+
+    [ -n "$_volumes" ] || die "refusing: could not read this stack's volume list from
+      '$COMPOSE_BIN config'. Reset will not name volumes it has not confirmed,
+      and will not run 'down -v' blind.
+      Fix: run '(cd $DEPLOY_DIR && $COMPOSE_BIN config)' and fix what it
+           reports."
+
+    cat <<EOF
+This will stop the '$_project' stack and permanently delete its volumes:
+
+EOF
+    # Annotations are keyed off the resolved name's suffix, not rebuilt
+    # alongside it, so a volume compose reports and this does not recognise is
+    # still listed rather than silently dropped from a destructive prompt.
+    printf '%s\n' "$_volumes" | while IFS= read -r _vol; do
+        case "$_vol" in
+            *_db_data)          printf '  %-30s the entire database\n' "$_vol" ;;
+            *_platform_storage) printf '  %-30s thumbnails and segmentations.zarr\n' "$_vol" ;;
+            *)                  printf '  %s\n' "$_vol" ;;
+        esac
+    done
+    echo
+
+    printf "Type the project name (%s) to confirm: " "$_project"
+    read -r _answer || _answer=""
+    [ "$_answer" = "$_project" ] || die "cancelled — nothing was removed."
+
+    compose down -v
+    echo "removed. Run './eyened install' or './eyened up' to start over."
+}
+
+cmd=${1:-help}
+[ "$#" -eq 0 ] || shift
+
+case "$cmd" in
+    install)        stack install ;;
+    up)             stack dev ;;
+    prod)           stack prod ;;
+    down)           resolve_compose; compose down "$@" ;;
+    logs)           resolve_compose; compose logs -f "$@" ;;
+    doctor)         "$DEPLOY_DIR/scripts/doctor.sh" "${1:-dev}" ;;
+    migrate)
+        # Interactive on purpose: alembic's own confirmation prompt still
+        # guards manual runs against a populated database.
+        #
+        # NOT `alembic -c orm/migrations/alembic.ini upgrade head`:
+        # alembic.ini's script_location is relative to the process CWD, not to
+        # the ini file, so that form resolves against /app and fails with
+        # "FAILED: Path doesn't exist" on STDOUT (rc=255) instead of running.
+        # `cd` into the migrations directory first, the same shape bootstrap.sh
+        # uses.
+        resolve_compose
+        compose exec -it server sh -c 'cd orm/migrations && alembic upgrade head' ;;
+    db-shell)
+        resolve_compose
+        compose exec -it database sh -c 'exec mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' ;;
+    check-storage)  cmd_check_storage ;;
+    backup)         "$DEPLOY_DIR/scripts/db-backup.sh" "$@" ;;
+    restore)        "$DEPLOY_DIR/scripts/db-restore.sh" "$@" ;;
+    reset)          cmd_reset ;;
+    help|-h|--help) usage ;;
+    *)
+        usage >&2
+        printf '\nerror: unknown command %s\n' "$cmd" >&2
+        exit 1 ;;
+esac

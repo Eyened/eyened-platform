@@ -18,9 +18,9 @@ DEPLOY_DIR="$REPO_ROOT/deploy"
 # discovered implicitly, which is why the dev layer is compose.dev.yaml and
 # not compose.override.yaml (the name Compose would auto-load).
 #
-# There is no separate list for a site deployment: install.sh (bundled
-# database) and prod mode (external database) run the SAME layers and differ
-# only in whether 'local-db' is in COMPOSE_PROFILES. That is a consequence of
+# There is no separate list for a site deployment: './eyened install' (bundled
+# database) and './eyened prod' (external database) run the SAME layers and
+# differ only in whether 'local-db' is in COMPOSE_PROFILES. That is a consequence of
 # the server's depends_on using `required: false` — see compose.yaml.
 COMPOSE_FILE_DEV="compose.yaml:compose.dev.yaml:compose.storage.yaml"
 COMPOSE_FILE_CLIENT="compose.yaml:compose.storage.yaml:compose.prod.yaml"
@@ -50,8 +50,9 @@ resolve_compose() {
 # Same guard as print_day2, and for the same reason: with COMPOSE_BIN unset the
 # unquoted expansion vanishes and this runs `up -d` as a command, which fails
 # with `up: not found` and — in a caller without `set -e` — carries on. That is
-# precisely the silent degradation dc.sh's header comment says the design exists
-# to avoid, so both call sites have to be closed, not just one.
+# precisely the silent degradation that resolving the binary at RUN time (rather
+# than naming it in advance) exists to avoid, so both call sites have to be
+# closed, not just one.
 compose() {
     : "${COMPOSE_BIN:?compose: call resolve_compose first}"
     ( cd "$DEPLOY_DIR" && $COMPOSE_BIN "$@" )
@@ -107,8 +108,9 @@ env_get() {
 # person who will run the next command.
 refuse_sudo() {
     if [ "$(id -u)" = 0 ] && [ -n "${SUDO_UID:-}" ]; then
-        die "error: do not run this under sudo. Everything it writes — deploy/.env at
-      mode 600 above all — would end up owned by root, and your own later
+        die "error: do not run this under sudo. Anything it creates would be owned by
+      root — deploy/.env at mode 600 worst of all, but a generated compose
+      layer or a backup datadir just as surely — and your own later
       'docker compose' calls could not read it. Docker needs a privileged
       DAEMON, not a privileged client.
       Fix: run it as yourself. If docker refuses, add yourself to the docker
@@ -340,7 +342,7 @@ The platform is running.
 
   Open:  http://${_host:-localhost}:${_port:-8080}/
 
-Day-to-day commands — run them from the deploy/ directory. No make and no
+Day-to-day commands — run them from the deploy/ directory. No wrapper and no
 -f flags: the install recorded which layers this stack uses.
 
   cd $DEPLOY_DIR
