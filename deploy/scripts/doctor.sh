@@ -269,9 +269,8 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       Fix: on a worker box this .env is correct — do NOT delete it. Start the
            workers directly, which needs no platform preflight:
              docker compose -f deploy/compose.workers.yaml \\
-               -f deploy/compose.storage.yaml --profile gpu-inference up -d --build
-           Without --profile it starts the slim CPU worker ALONE and says so
-           nowhere; deploy/.env.example's Workers block names the others.
+               -f deploy/compose.storage.yaml up -d --build
+           COMPOSE_PROFILES in this .env selects which workers start.
            On the platform host this is the wrong .env: delete it and re-run.
            That keeps your data — './eyened reset' is what deletes it." ;;
         unrecognised:*)
@@ -337,8 +336,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
         problem "These variables in deploy/.env are still the published default
       'change_me', so the stack would boot on a known password:
      $bad_secrets
-      Fix: remove deploy/.env and re-run so real secrets are generated, or set
-           each one by hand to a long random value."
+      Fix: set each one in deploy/.env by hand to a long random value."
     fi
 
     # KEYCLOAK_ADMIN_PASSWORD cannot join the loop above: its published default

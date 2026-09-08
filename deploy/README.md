@@ -280,7 +280,7 @@ Fill in `storage-mounts.conf` the same way as on the platform host, run
 
 ```bash
 docker compose -f deploy/compose.workers.yaml -f deploy/compose.storage.yaml \
-  --profile gpu-inference up -d --build
+  up -d --build
 ```
 
 There is **no second env file**: compose reads `.env` from the compose file's
