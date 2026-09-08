@@ -228,7 +228,7 @@ with Database().get_session() as session:
     require_count "$accounts" "the account count"
 
     if [ "$accounts" = "0" ]; then
-        admin_password=$(gen_password)
+        admin_password=$(gen_hex 12)
         # The password goes in over stdin, not `--password` on the command
         # line: an argv value is visible to any other user on this host who
         # runs `ps` for the life of the exec. `create-user`'s --password is a

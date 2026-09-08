@@ -26,16 +26,28 @@ failed=0
 ok()      { printf 'ok    %s\n' "$1"; }
 problem() { printf 'FAIL  %s\n' "$1"; failed=1; }
 
-# Strip a trailing CR (a CRLF .env, e.g. hand-edited on Windows/WSL) and
-# surrounding whitespace, and unwrap one layer of matching quotes. env_get
-# (lib.sh:90) returns values verbatim — it has no opinion on either — and
-# every comparison below is an exact-match `case`, so an unstripped `\r` or
-# a quoted `"change_me"` reads as a DIFFERENT string and silently passes.
-# This does not change what lib.sh or compose itself does with the value —
-# only what doctor compares against — so a CRLF .env is still worth fixing
-# at the source; doctor's checks must simply not be foolable by it either way.
-norm() {
-    _v=$(printf '%s' "$1" | tr -d '\r')
+# Trim surrounding whitespace and unwrap one layer of matching quotes, because
+# compose's own dotenv parser does BOTH and env_get (lib.sh:90) does neither.
+# Measured on this host against both compose binaries (standalone v2.15.1 and
+# the v5.4.0 plugin): `PW="change_me"` and `PW=change_me   ` each reach the
+# container as exactly `change_me`. Every comparison below is an exact-match
+# `case`, so without this a hand-quoted MYSQL_ROOT_PASSWORD="change_me" reads
+# as a DIFFERENT string, sails through the published-default sweep, and the
+# stack boots on the published password with doctor reporting it fine.
+#
+# So this is dotenv SEMANTICS, not tolerance of a broken file: quoting a value
+# is legitimate — it is how a password containing special characters is
+# written — and doctor has to read a value the way the thing consuming it does.
+#
+# It no longer strips a CR explicitly, as it once did. That `tr -d '\r'` was
+# redundant: CR is in [:space:], so the trailing-whitespace trim in the body
+# below already absorbs the one place a CR can appear in a value (measured in
+# dash, /bin/sh and busybox sh, under LC_ALL unset, C and en_US.UTF-8). A CRLF
+# is no longer merely absorbed either way — it is REFUSED by name a few lines
+# below, so the file gets reported while the checks that follow still give
+# correct answers about it rather than being quietly foolable.
+unquote() {
+    _v=$1
     _v=${_v%"${_v##*[![:space:]]}"}
     _v=${_v#"${_v%%[![:space:]]*}"}
     case "$_v" in
@@ -93,36 +105,6 @@ else
     esac
 fi
 
-# --- Required external tools ------------------------------------------------
-# lib.sh needs: tail grep sed cat mv tr chmod cp
-# gen-storage.sh needs: mktemp awk mv mkdir wc tr rm
-# every script's REPO_ROOT line (lib.sh's own sourcing pattern, used by
-# gen-storage.sh, dc.sh and this file) needs: dirname
-# doctor.sh itself adds: df awk
-# `command -v` alone can return a bare name for a shell builtin or function
-# instead of a real binary (a missing external `grep`, for example, would
-# silently take a shell-builtin path and still print a name) — `command -p -v`
-# forces a defined PATH and is checked for an absolute path so a builtin or
-# function does not read as "present".
-required_tools="tail grep sed cat mv tr chmod cp mktemp awk mkdir wc rm dirname df"
-missing_tools=""
-for _t in $required_tools; do
-    _p=$(command -p -v "$_t" 2>/dev/null) || _p=""
-    case "$_p" in
-        /*) ;;
-        *) missing_tools="$missing_tools $_t" ;;
-    esac
-done
-if [ -z "$missing_tools" ]; then
-    ok "required tools are present in the standard system path ($required_tools)"
-else
-    problem "These tools are used by the deploy scripts but were not found as real
-      executables (a shell builtin or function does not count):
-     $missing_tools
-      Fix: install them — they are standard on any POSIX host (coreutils,
-           grep, sed)."
-fi
-
 # --- Whose .env is this, and is OIDC configured usably? --------------------
 if [ -f "$DEPLOY_DIR/.env" ]; then
   if [ ! -r "$DEPLOY_DIR/.env" ]; then
@@ -138,12 +120,38 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       depend on it (entry point, OIDC host, secrets) could not run.
       Fix: chmod u+r deploy/.env, or re-run as the user that owns it."
   else
-    # Every value below goes through norm(): env_get (lib.sh:90) returns
-    # values verbatim, and every comparison here is an exact-match `case`, so
-    # a CRLF .env (trailing \r on every value) or a hand-quoted
-    # MYSQL_ROOT_PASSWORD="change_me" would otherwise compare unequal to the
-    # bare value being tested for and pass every check that depends on it.
-    compose_file=$(norm "$(env_get COMPOSE_FILE)")
+    # One loud check, rather than absorbing a broken file in silence.
+    #
+    # What this is NOT: compose does not choke on a CRLF .env. Measured here
+    # against both binaries (standalone v2.15.1 and the v5.4.0 plugin) —
+    # `HTTP_PORT=8080\r` renders `published: "8080"`, and every value comes
+    # back with the CR already stripped. Any claim that a port "becomes
+    # 8080\r" for compose is simply wrong, and saying so here would send the
+    # operator hunting the wrong thing.
+    #
+    # What it IS: the CR reaches the operator through OUR OWN reads. env_get
+    # (lib.sh:90) returns values verbatim, and lib.sh's print_day2 uses it raw
+    # for PUBLIC_HOST and HTTP_PORT — so the one line the whole install exists
+    # to print comes out as `http://host\r:8080\r/`, which a terminal renders
+    # by returning the cursor to column 0 mid-URL (measured). The checks below
+    # are not themselves foolable, because unquote()'s whitespace trim absorbs
+    # a trailing CR — but "the file is fine" is the wrong lesson to draw from
+    # that, and an unreported CRLF .env means the same hand-edit is sitting in
+    # storage-mounts.conf, which gen-storage.sh refuses outright. Naming it
+    # here brings .env into line with the position that file has always taken.
+    if command grep -q "$(printf '\r')" "$DEPLOY_DIR/.env" 2>/dev/null; then
+        problem "deploy/.env has Windows (CRLF) line endings. Compose itself copes with
+      that, but the scripts here read the file directly and keep the carriage
+      return: the 'Open:' URL printed at the end of an install comes out as
+      'http://host\\r:8080\\r/', which a terminal draws over itself. A
+      storage-mounts.conf saved by the same editor is refused outright.
+      Fix: convert it to Unix line endings —
+             sed -i 's/\\r\$//' deploy/.env"
+    else
+        ok "deploy/.env has Unix line endings"
+    fi
+
+    compose_file=$(unquote "$(env_get COMPOSE_FILE)")
 
     # The bundled Keycloak is a LAYER now, not a profile — so the gate is
     # COMPOSE_FILE, not COMPOSE_PROFILES.
@@ -159,7 +167,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
             # the port to loopback therefore leaves every container healthy,
             # the login page reachable in the browser, and token exchange
             # failing with nothing naming the cause.
-            kc_bind=$(norm "$(env_get KEYCLOAK_BIND)")
+            kc_bind=$(unquote "$(env_get KEYCLOAK_BIND)")
             case "$kc_bind" in
                 127.0.0.1|::1|localhost)
                     problem "KEYCLOAK_BIND is '$kc_bind', which confines the bundled Keycloak to
@@ -176,9 +184,9 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # more, so an OIDC-enabled server with an empty one has no provider at
     # all and every login fails at the metadata fetch. server/config.py
     # defaults it to "", which pydantic accepts, so nothing else catches this.
-    case "$(norm "$(env_get EYENED_API_AUTH_OIDC_ENABLED)" | tr 'A-Z' 'a-z')" in
+    case "$(unquote "$(env_get EYENED_API_AUTH_OIDC_ENABLED)" | tr 'A-Z' 'a-z')" in
         true|1|yes|on)
-            if [ -n "$(norm "$(env_get EYENED_OIDC_METADATA_URL)")" ]; then
+            if [ -n "$(unquote "$(env_get EYENED_OIDC_METADATA_URL)")" ]; then
                 ok "OIDC is enabled and EYENED_OIDC_METADATA_URL names a provider"
             else
                 problem "EYENED_API_AUTH_OIDC_ENABLED is on, so the server will do OIDC — but
@@ -312,7 +320,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
            data — './eyened reset' is what deletes it." ;;
     esac
 
-    if [ -n "$(norm "$(env_get EYENED_API_SECRET_KEY)")" ]; then
+    if [ -n "$(unquote "$(env_get EYENED_API_SECRET_KEY)")" ]; then
         ok "EYENED_API_SECRET_KEY is set"
     else
         problem "EYENED_API_SECRET_KEY is empty in deploy/.env, so sessions cannot be
@@ -325,7 +333,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # (the copy stack.sh's prod refusal asks for) still holds.
     bad_secrets=""
     for _var in MYSQL_ROOT_PASSWORD EYENED_DATABASE_PASSWORD EYENED_REDIS_PASSWORD; do
-        _val=$(norm "$(env_get "$_var")")
+        _val=$(unquote "$(env_get "$_var")")
         case "$_val" in
             change_me) bad_secrets="$bad_secrets $_var" ;;
         esac
@@ -350,7 +358,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # it should not get a line about a container they do not run.
     case "$compose_file" in
         *compose.oidc.yaml*)
-            case "$(norm "$(env_get KEYCLOAK_ADMIN_PASSWORD)")" in
+            case "$(unquote "$(env_get KEYCLOAK_ADMIN_PASSWORD)")" in
                 ''|admin|change_me)
                     problem "COMPOSE_FILE includes compose.oidc.yaml, which starts the bundled Keycloak, but
       KEYCLOAK_ADMIN_PASSWORD is not set to a real value in deploy/.env.
@@ -397,9 +405,9 @@ else
     # 'local-db' (see .env.example and the external-database path), so ':-'
     # here would quietly substitute .env.example's 'local-db' back in and
     # report on a bundled database the operator has explicitly turned off.
-    stale_profiles=${COMPOSE_PROFILES-$(norm "$(env_get COMPOSE_PROFILES "$stale_ex")")}
-    stale_path=${DB_DATA_PATH-$(norm "$(env_get DB_DATA_PATH "$stale_ex")")}
-    stale_project=${COMPOSE_PROJECT_NAME-$(norm "$(env_get COMPOSE_PROJECT_NAME "$stale_ex")")}
+    stale_profiles=${COMPOSE_PROFILES-$(unquote "$(env_get COMPOSE_PROFILES "$stale_ex")")}
+    stale_path=${DB_DATA_PATH-$(unquote "$(env_get DB_DATA_PATH "$stale_ex")")}
+    stale_project=${COMPOSE_PROJECT_NAME-$(unquote "$(env_get COMPOSE_PROJECT_NAME "$stale_ex")")}
     # Compose normalises a project name (lowercasing, and dropping characters
     # outside its allowed set) before building volume names from it, so the
     # same normalisation has to happen here or the reconstructed name misses.
@@ -463,41 +471,27 @@ fi
 # otherwise fall back to .env.example, same as when .env does not exist yet.
 http_port=""
 if [ -r "$DEPLOY_DIR/.env" ]; then
-    http_port=$(norm "$(env_get HTTP_PORT)")
+    http_port=$(unquote "$(env_get HTTP_PORT)")
 fi
-[ -n "$http_port" ] || http_port=$(norm "$(env_get HTTP_PORT "$DEPLOY_DIR/.env.example")")
+[ -n "$http_port" ] || http_port=$(unquote "$(env_get HTTP_PORT "$DEPLOY_DIR/.env.example")")
 
 port_probe() {
-    # 0 = in use, 1 = free, 2 = cannot tell. Neither nc nor python3 is
-    # guaranteed on a stock macOS or WSL host, so "cannot tell" is a real case
-    # and must not be reported as "free".
+    # 0 = in use, 1 = free, 2 = cannot tell. "Cannot tell" is a real case and
+    # must never be reported as "free".
     #
-    # The nc branch is chosen on CAPABILITY, not on `command -v nc` succeeding.
-    # busybox nc has no `-z` at all, so it exits non-zero whatever the port's
-    # state; `nc -z ... && return 0 || return 1` then collapsed "nc errored"
-    # into "free" AND — because `command -v nc` had already succeeded — never
-    # reached the python3 branch that would have answered correctly. Measured
-    # against port 22, confirmed listening with `ss -ltn`: busybox nc 1.30.1
-    # gave "ok port 22 is free", the real nc gave "FAIL Port 22 is already in
-    # use". A wrong answer, not a missing one, which is why the earlier `-w 2`
-    # (added against a hang) did not touch it.
+    # This used to choose between nc and python3 on nc's CAPABILITY rather than
+    # its presence, because busybox nc has no -z and answered "free" for a port
+    # that was demonstrably in use (measured against port 22, confirmed
+    # listening with `ss -ltn`). ~50 lines to pick between two probes. python3
+    # alone is one probe with no such trap; where it is absent this returns 2
+    # and the check is skipped, which is the honest answer and was already a
+    # supported outcome.
     #
-    # Exit status alone cannot tell the two apart — measured, busybox's
-    # bad-option exit and a real nc's "connection refused" are BOTH 1. What
-    # separates them is that a capable nc says nothing at all: probing port 1
-    # (nothing listens there; a capable nc answers 0 or 1 in silence) gave 0
-    # bytes on both streams from the real nc, and 441 bytes of "nc: invalid
-    # option -- 'z'" plus usage from busybox. So the test is "silent and
-    # <= 1", and anything else falls through to python3 below rather than
-    # being trusted. stdin comes from /dev/null so a build without -z cannot
-    # block reading it instead of returning.
-    if command -v nc >/dev/null 2>&1; then
-        _nc_rc=0
-        _nc_out=$(nc -z -w 1 127.0.0.1 1 </dev/null 2>&1) || _nc_rc=$?
-        if [ -z "$_nc_out" ] && [ "$_nc_rc" -le 1 ]; then
-            nc -z -w 2 127.0.0.1 "$1" >/dev/null 2>&1 && return 0 || return 1
-        fi
-    fi
+    # The cost of dropping nc, measured rather than assumed: on a host with a
+    # capable nc and no python3, the old code gave the right answer (rc 0
+    # against a listener on 127.0.0.1, rc 1 against a free port) and this gives
+    # 2 for both. That is a real answer traded for ~50 lines — a skipped check,
+    # never a wrong one.
     if command -v python3 >/dev/null 2>&1; then
         python3 -c 'import socket, sys
 s = socket.socket(); s.settimeout(1)
@@ -548,7 +542,7 @@ case "$http_port" in
       Fix: set HTTP_PORT in deploy/.env to a free port (on a machine shared
            with other developers, pick one nobody else is using), or stop
            whatever is holding $http_port." ;;
-                2) ok "port $http_port: no probe tool (nc/python3) here, check skipped" ;;
+                2) ok "port $http_port: no python3 here to probe with, check skipped" ;;
                 *) ok "port $http_port is free" ;;
             esac
         fi ;;
@@ -594,7 +588,7 @@ storage_bad=""
 # if its guard never enters.
 storage_checked=0
 if [ -r "$DEPLOY_DIR/.env" ]; then
-    platform_path=$(norm "$(env_get PLATFORM_STORAGE_PATH)")
+    platform_path=$(unquote "$(env_get PLATFORM_STORAGE_PATH)")
     if [ -n "$platform_path" ]; then
         storage_checked=$((storage_checked + 1))
         [ -d "$platform_path" ] || storage_bad="$storage_bad

@@ -57,29 +57,30 @@ compose() {
     ( cd "$DEPLOY_DIR" && $COMPOSE_BIN "$@" )
 }
 
-# A signing key must never be copied from a template — that would give every
-# deployment the same JWT key. Two sources, and a hard failure if neither is
-# present: an empty signing key is far worse than a refusal to start.
-gen_secret() {
-    if command -v openssl >/dev/null 2>&1; then
-        openssl rand -hex 32
-    elif command -v python3 >/dev/null 2>&1; then
-        python3 -c 'import secrets; print(secrets.token_hex(32))'
-    else
-        die "error: need 'openssl' or 'python3' to generate a signing key, and
-      neither is installed. Install either one and re-run."
-    fi
-}
-
-gen_password() {
-    if command -v openssl >/dev/null 2>&1; then
-        openssl rand -hex 12
-    elif command -v python3 >/dev/null 2>&1; then
-        python3 -c 'import secrets; print(secrets.token_hex(12))'
-    else
-        die "error: need 'openssl' or 'python3' to generate a password, and
-      neither is installed. Install either one and re-run."
-    fi
+# One generator, no host dependency beyond a POSIX userland. This replaced an
+# openssl-OR-python3 pair that died when a host had neither — a real state on a
+# minimal Linux image, and the reason the deploy prerequisites list used to
+# name two things it did not actually need.
+#
+# Every value it produces is still GENERATED, never copied from .env.example:
+# a signing key taken from a template would give every deployment the same JWT
+# key, and .env.example ships none of these five keys at all.
+#
+# An empty or short secret is far worse than a refusal to start, and a silently
+# truncated one is worse still, so the LENGTH is checked rather than trusted:
+# `od` failing mid-read, or /dev/urandom being absent in a chroot, both produce
+# a short string with a zero exit status somewhere in the pipeline (POSIX sh
+# has no pipefail). ${#var} is POSIX. Verified under dash, bash and busybox sh.
+gen_hex() {
+    _n=$1
+    _hex=$(od -An -N"$_n" -tx1 /dev/urandom | tr -d ' \n') ||
+        die "error: could not read $_n random bytes from /dev/urandom."
+    [ "${#_hex}" -eq $((_n * 2)) ] ||
+        die "error: /dev/urandom produced ${#_hex} hex characters where $((_n * 2)) were
+      expected, so the generated secret would be short or empty.
+      Fix: check that /dev/urandom is readable here (a chroot or a container
+           without /dev mounted is the usual cause)."
+    printf '%s\n' "$_hex"
 }
 
 # Read a value from an env file. Last assignment wins; values are taken
@@ -223,10 +224,10 @@ write_env() {
     # is checked. Inside a command substitution in the heredoc below, a
     # generator's `die` would exit only that subshell: the key would be written
     # EMPTY and the run would carry on with status 0.
-    _secret=$(gen_secret)    || die "error: could not generate a signing key; see above."
-    _redis_pw=$(gen_secret)  || die "error: could not generate a Redis password; see above."
-    _root_pw=$(gen_password) || die "error: could not generate a database root password; see above."
-    _db_pw=$(gen_password)   || die "error: could not generate a database password; see above."
+    _secret=$(gen_hex 32)   || die "error: could not generate a signing key; see above."
+    _redis_pw=$(gen_hex 32) || die "error: could not generate a Redis password; see above."
+    _root_pw=$(gen_hex 12)  || die "error: could not generate a database root password; see above."
+    _db_pw=$(gen_hex 12)    || die "error: could not generate a database password; see above."
     # The bundled Keycloak's bootstrap admin. Generated even when
     # compose.oidc.yaml is not in play — it costs nothing, and it means
     # appending that layer later needs no second trip through this function,
@@ -235,7 +236,7 @@ write_env() {
     # :-admin}, so absent means 'admin' rather than a refusal (measured, exit
     # 0). That is why doctor keeps its own check of this one and not of the
     # four above.
-    _kc_pw=$(gen_password)   || die "error: could not generate a Keycloak admin password; see above."
+    _kc_pw=$(gen_hex 12)    || die "error: could not generate a Keycloak admin password; see above."
 
     # Shape, not just status: a generator can exit 0 and still hand back
     # something that cannot be written as one `KEY=value` line. See
@@ -274,13 +275,12 @@ write_env() {
         # UNQUOTED <<EOF, deliberately: $_secret, $_redis_pw, $_root_pw,
         # $_db_pw, $_kc_pw and $_layers must be expanded here, or the block
         # below would write out the literal variable names instead of their
-        # values. That is safe today only because gen_secret/gen_password
-        # emit plain hex and the two $_layers lists are constants — none of
-        # them can contain a $, backtick or backslash for the shell to
-        # re-expand. Whoever changes what those five generators or the layer
-        # lists produce must keep that property, or re-quote this heredoc (and
-        # switch every $var below to `printf` instead, since a quoted heredoc
-        # does not expand them at all).
+        # values. That is safe today only because gen_hex emits plain hex and
+        # the two $_layers lists are constants — none of them can contain a $,
+        # backtick or backslash for the shell to re-expand. Whoever changes
+        # what gen_hex or the layer lists produce must keep that property, or
+        # re-quote this heredoc (and switch every $var below to `printf`
+        # instead, since a quoted heredoc does not expand them at all).
         #
         # That is the only property left to keep by hand. The other one this
         # block needs — that each value is a single LINE — is enforced above by
