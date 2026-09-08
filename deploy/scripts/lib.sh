@@ -74,7 +74,9 @@ compose() {
 gen_hex() {
     _n=$1
     _hex=$(od -An -N"$_n" -tx1 /dev/urandom | tr -d ' \n') ||
-        die "error: could not read $_n random bytes from /dev/urandom."
+        die "error: could not read $_n random bytes from /dev/urandom.
+      Fix: check that /dev/urandom exists and is readable here (a chroot or
+           a container without /dev mounted is the usual cause)."
     [ "${#_hex}" -eq $((_n * 2)) ] ||
         die "error: /dev/urandom produced ${#_hex} hex characters where $((_n * 2)) were
       expected, so the generated secret would be short or empty.

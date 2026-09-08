@@ -27,7 +27,7 @@ ok()      { printf 'ok    %s\n' "$1"; }
 problem() { printf 'FAIL  %s\n' "$1"; failed=1; }
 
 # Trim surrounding whitespace and unwrap one layer of matching quotes, because
-# compose's own dotenv parser does BOTH and env_get (lib.sh:90) does neither.
+# compose's own dotenv parser does BOTH and env_get() in lib.sh does neither.
 # Measured on this host against both compose binaries (standalone v2.15.1 and
 # the v5.4.0 plugin): `PW="change_me"` and `PW=change_me   ` each reach the
 # container as exactly `change_me`. Every comparison below is an exact-match
@@ -125,12 +125,10 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # What this is NOT: compose does not choke on a CRLF .env. Measured here
     # against both binaries (standalone v2.15.1 and the v5.4.0 plugin) —
     # `HTTP_PORT=8080\r` renders `published: "8080"`, and every value comes
-    # back with the CR already stripped. Any claim that a port "becomes
-    # 8080\r" for compose is simply wrong, and saying so here would send the
-    # operator hunting the wrong thing.
+    # back with the CR already stripped.
     #
-    # What it IS: the CR reaches the operator through OUR OWN reads. env_get
-    # (lib.sh:90) returns values verbatim, and lib.sh's print_day2 uses it raw
+    # What it IS: the CR reaches the operator through OUR OWN reads. env_get()
+    # in lib.sh returns values verbatim, and lib.sh's print_day2 uses it raw
     # for PUBLIC_HOST and HTTP_PORT — so the one line the whole install exists
     # to print comes out as `http://host\r:8080\r/`, which a terminal renders
     # by returning the cursor to column 0 mid-URL (measured). The checks below
@@ -139,17 +137,24 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     # that, and an unreported CRLF .env means the same hand-edit is sitting in
     # storage-mounts.conf, which gen-storage.sh refuses outright. Naming it
     # here brings .env into line with the position that file has always taken.
-    if command grep -q "$(printf '\r')" "$DEPLOY_DIR/.env" 2>/dev/null; then
-        problem "deploy/.env has Windows (CRLF) line endings. Compose itself copes with
+    set +e
+    grep -q "$(printf '\r')" "$DEPLOY_DIR/.env" 2>/dev/null
+    crlf_rc=$?
+    set -e
+    case "$crlf_rc" in
+        0) problem "deploy/.env has Windows (CRLF) line endings. Compose itself copes with
       that, but the scripts here read the file directly and keep the carriage
       return: the 'Open:' URL printed at the end of an install comes out as
       'http://host\\r:8080\\r/', which a terminal draws over itself. A
       storage-mounts.conf saved by the same editor is refused outright.
       Fix: convert it to Unix line endings —
-             sed -i 's/\\r\$//' deploy/.env"
-    else
-        ok "deploy/.env has Unix line endings"
-    fi
+             sed -i 's/\\r\$//' deploy/.env" ;;
+        1) ok "deploy/.env has Unix line endings" ;;
+        *) problem "could not check deploy/.env for Windows (CRLF) line endings — grep
+      exited $crlf_rc rather than 0 or 1, so this could not be reported as
+      clean.
+      Fix: make sure grep is installed and on PATH, then re-run doctor." ;;
+    esac
 
     compose_file=$(unquote "$(env_get COMPOSE_FILE)")
 
