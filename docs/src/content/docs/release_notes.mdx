@@ -10,7 +10,8 @@ description: EyeNED Platform v2026.07.0 release notes
 - **Upgrading an existing stack: rebuild once.** Routine `docker compose up -d` reuses the
   images you already built, and the dev client's entrypoint is baked into its image rather
   than mounted. Anyone who had a stack running before this release must run
-  `docker compose up -d --build` (or re-run `./eyened install`, which does it) one time.
+  `docker compose up -d --build` (or re-run `./eyened install` — `./eyened up` on a developer
+  stack — which do it) one time.
   Without it the new dependency handling never engages and a stale `node_modules` volume keeps
   serving old packages, with nothing reporting a problem. Plain `up -d` is correct again
   afterwards.
@@ -60,14 +61,17 @@ description: EyeNED Platform v2026.07.0 release notes
   the server container receives `EYENED_STORAGE_MOUNTS`, so Python-side pixel reads (thumbnail
   regeneration, inference, reports) use local files instead of failing in the API adapter.
 - **Breaking: `make` and `./install.sh` are gone.** Both were replaced by one script,
-  `./eyened`, which absorbs every `make` target and everything `./install.sh` did — `make` is
-  no longer a prerequisite, and there is no Makefile. An operator upgrading through this whole
+  `./eyened`, which absorbs every `make` target except `gen-openapi`, `gen-types`, and
+  `gen-client-types` — those three move to `npm run gen:types` in `client/`. `make` is no
+  longer a prerequisite, and there is no Makefile. An operator upgrading through this whole
   cycle meets every item below at once.
 - **`oidc` is a compose layer, not a profile.** Append `:compose.oidc.yaml` to `COMPOSE_FILE`
   in `deploy/.env` instead of adding `oidc` to `COMPOSE_PROFILES` — see the Keycloak bullet
   above, which described the profile-based form this replaces.
-- **The `tools` profile and Adminer are gone.** Use `./eyened db-shell` for a MySQL shell, or
-  `docker run --rm -p 8081:8080 adminer` for the GUI.
+- **The `tools` profile and Adminer are gone.** Use `./eyened db-shell` for a MySQL shell. For
+  a GUI, append `:compose.host-ports.yaml` to `COMPOSE_FILE` in `deploy/.env` to publish MySQL
+  on a loopback host port, then point a locally installed client (DBeaver, TablePlus, etc.) at
+  it — see `deploy/README.md`'s **Sharing a machine** section.
 - **`make db-snapshot` / `db-restore` are gone.** `./eyened backup` and `./eyened restore`
   replace them and are not a rename: the new pair is xtrabackup-based, takes a path rather
   than `NAME=`, and never stops the database to take a backup — only `restore` does. See
@@ -78,8 +82,9 @@ description: EyeNED Platform v2026.07.0 release notes
 - **`deploy/.env.example` no longer ships placeholder secrets.** A hand-copied `.env` now fails
   at `docker compose up` until real values are set — that is deliberate, not a regression.
 - **An existing `deploy/.env` keeps working.** Nothing rewrites it, so a `COMPOSE_PROFILES`
-  still naming `oidc` or `tools` is inert rather than an error — it is simply ignored. Add the
-  corresponding layer above to get the same behavior back.
+  still naming `oidc` or `tools` is inert rather than an error — it is simply ignored. For
+  `oidc`, add `:compose.oidc.yaml` to `COMPOSE_FILE` above to get the same behavior back. There
+  is no replacement layer for `tools` — use `./eyened db-shell` instead, per the bullet above.
 
 ## v2026.07.0
 
