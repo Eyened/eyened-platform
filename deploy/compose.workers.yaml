@@ -12,7 +12,7 @@
 #   this box's platform storage, put compose.workers.yaml into COMPOSE_FILE,
 #   fill in storage-mounts.conf and run deploy/scripts/gen-storage.sh, then
 #     docker compose -f deploy/compose.workers.yaml -f deploy/compose.storage.yaml \
-#       --profile gpu-inference up -d --build
+#       up -d --build
 #   Compose reads .env from the COMPOSE FILE'S OWN directory, not the CWD
 #   (measured), so deploy/.env is picked up from anywhere and there is no
 #   second env file to keep in sync. compose.storage.yaml is where the image
