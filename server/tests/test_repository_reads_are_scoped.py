@@ -116,7 +116,12 @@ _WRITE_PREFIXES = ("add", "save", "delete", "upsert", "remove", "replace", "clai
 # The most recent moves: 37 -> 38 for TaskRepository.declared_projects, which
 # scopes itself through apply_scope like its neighbours (counted, not exempted),
 # and 38 -> 39 for the subtask-assignee read development added.
-_EXPECTED_SCANNED_READS = 39
+# 39 -> 42 for ProjectRepository's three reads (get_by_name, all_ids,
+# names_for), each scoped through apply_scope like its neighbours --
+# counted, not exempted. Project is in none of scoping.py's registries, so
+# apply_scope fails closed for a non-admin scope rather than filtering
+# nothing.
+_EXPECTED_SCANNED_READS = 42
 
 # Read methods allowed to scope themselves by consuming ``self._scope`` instead
 # of calling ``apply_scope``/``scoped_one``. Set equality, like every other
