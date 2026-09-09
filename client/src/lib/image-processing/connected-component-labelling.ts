@@ -32,7 +32,8 @@ export function BlobExtraction(
             visited[index] = 1;
 
             if (data[index]) {
-                label[index] = i;
+                // Uint8Array wraps 256 to 0 (background). Keep labels in 1–255.
+                label[index] = ((i - 1) % 255) + 1;
                 const x = index % w;
                 const y = Math.floor(index / w);
                 for (const [dx, dy] of directions) {

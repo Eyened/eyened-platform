@@ -6,7 +6,7 @@ precision highp int;
 uniform usampler2D u_annotation;
 
 uniform float u_alpha;
-uniform vec3[256] u_colors;
+uniform vec3[32] u_colors;
 
 uniform usampler2D u_mask;
 uniform uint u_mask_bitmask;
@@ -30,7 +30,7 @@ void main() {
     if(i == 0u) {
         discard;
     }
-    vec3 color = u_colors[(i - 1u) % 256u];
+    vec3 color = u_colors[(i - 1u) % uint(u_colors.length())];
     color_out = vec4(color, u_alpha);    
 
 }
