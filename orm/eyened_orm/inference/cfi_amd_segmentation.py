@@ -108,6 +108,7 @@ class CFI_AMD(BaseInferencePipeline):
         batch_size: int = 8,
         save_only_above_threshold: bool = True,
         undo_transform: bool = True,
+        overwrite: bool = False,
     ):
         from eyened_orm.inference.utils import auto_device
 
@@ -117,6 +118,7 @@ class CFI_AMD(BaseInferencePipeline):
         self.device = device if device is not None else auto_device()
         self.save_only_above_threshold = save_only_above_threshold
         self.undo_transform = undo_transform
+        self.overwrite = overwrite
         self._models_loaded = False
         self.features: Dict[str, Feature] | None = None
         self.models: Dict[str, SegmentationModel] | None = None
@@ -176,7 +178,7 @@ class CFI_AMD(BaseInferencePipeline):
                 "ImageInstanceID": instance_id,
                 "ModelID": model.ModelID,
             },
-            update_values={
+            create_kwargs={
                 "Depth": 1,
                 "Width": w,
                 "Height": h,
@@ -211,7 +213,19 @@ class CFI_AMD(BaseInferencePipeline):
             model_id: Model ID for this segmentation
             segmentation_array: Segmentation array (h, w) with values in [0, 1]
         """
+        existing = ModelSegmentation.by_column(
+            self.session,
+            ImageInstanceID=image_id,
+            ModelID=model.ModelID,
+        )
+        if existing is not None and not self.overwrite:
+            return
+
         h, w = segmentation_array.shape
+        if existing is not None and (existing.Height, existing.Width) != (h, w):
+            attr = "Height" if existing.Height != h else "Width"
+            raise ValueError(f"Cannot modify {attr} of a Segmentation once created.")
+
         image_projection_matrix = None
         if not self.undo_transform:
             image = ImageInstance.by_id(self.session, image_id)
@@ -375,6 +389,7 @@ def run_for_image_ids(
         n_workers=n_workers,
         batch_size=batch_size,
         undo_transform=upscale,
+        overwrite=overwrite,
     )
     total_processed = 0
     chunks = list(iter_image_id_chunks(image_ids))
