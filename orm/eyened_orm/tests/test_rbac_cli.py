@@ -19,7 +19,6 @@ from click.testing import CliRunner
 from sqlalchemy import select
 
 from eyened_orm import AuditLog, Creator, ProjectMember, TaskProject
-from eyened_orm.authz.administration import grant
 from eyened_orm.authz.bootstrap import ensure_admin
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.commands import rbac as rbac_module
@@ -254,8 +253,11 @@ def test_the_round_trip_persists_and_reports_each_outcome(session, stub_database
 
 @pytest.mark.parametrize("command", (deactivate_cmd, reactivate_cmd))
 def test_an_unknown_user_is_a_clean_error_not_a_traceback(session, stub_database, command):
-    """ClickException exits 1 with its message on the stream; an unhandled
-    LookupError exits 1 too, so the message is what separates them."""
+    """ClickException exits 1 with its message on the stream and no traceback;
+    AdminEntityNotFound is deliberately not a LookupError, so a stray KeyError
+    or IndexError inside the call would surface as an unhandled exception with
+    a traceback instead of this clean exit -- the traceback check is what
+    separates them."""
     result = CliRunner().invoke(command, ["--user", "nosuchuser"])
     assert result.exit_code == 1
     assert "nosuchuser" in result.output
@@ -402,11 +404,15 @@ def test_set_admin_round_trip_persists_and_reports_each_outcome(
 def test_set_admin_on_an_unknown_user_is_a_clean_error_not_a_traceback(
     session, stub_database
 ):
-    """ClickException exits 1 with its message on the stream; an unhandled
-    LookupError exits 1 too, so the message is what separates them."""
+    """ClickException exits 1 with its message on the stream and no traceback;
+    AdminEntityNotFound is deliberately not a LookupError, so a stray KeyError
+    or IndexError inside the call would surface as an unhandled exception with
+    a traceback instead of this clean exit -- the traceback check is what
+    separates them."""
     result = CliRunner().invoke(set_admin_cmd, ["--user", "nosuchuser", "--off"])
     assert result.exit_code == 1
     assert "nosuchuser" in result.output
+    assert "Traceback" not in result.output
 
 
 def test_revoke_removes_the_single_membership_and_echoes_it(
@@ -425,10 +431,11 @@ def test_revoke_removes_the_single_membership_and_echoes_it(
     "alice: revoked from A" would still satisfy the assertions below -- so a
     second, untouched membership is required to make that fallthrough loud.
     Do not shrink this back to a single project."""
-    make_project(session, "A")
+    project_a = make_project(session, "A")
     project_b = make_project(session, "B")
-    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
-    grant(session, username="alice", project_name="B", role=ProjectRole.read_only)
+    members = ProjectMemberRepository(session)
+    members.upsert(alice.CreatorID, project_a.ProjectID, ProjectRole.grader)
+    members.upsert(alice.CreatorID, project_b.ProjectID, ProjectRole.read_only)
     session.commit()
 
     result = CliRunner().invoke(
@@ -447,10 +454,11 @@ def test_revoke_all_removes_every_membership_and_names_each(
     """The reset step of the developer loop. Naming each removal is the only
     read-back this phase ships, so the echo is part of the contract, not
     decoration."""
-    make_project(session, "A")
-    make_project(session, "B")
-    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
-    grant(session, username="alice", project_name="B", role=ProjectRole.read_only)
+    project_a = make_project(session, "A")
+    project_b = make_project(session, "B")
+    members = ProjectMemberRepository(session)
+    members.upsert(alice.CreatorID, project_a.ProjectID, ProjectRole.grader)
+    members.upsert(alice.CreatorID, project_b.ProjectID, ProjectRole.read_only)
     session.commit()
 
     result = CliRunner().invoke(revoke_cmd, ["--user", "alice", "--all", "--yes"])
@@ -547,3 +555,35 @@ def test_set_password_refuses_an_empty_password(session, stub_database):
         select(Creator).where(Creator.CreatorName == "alice")
     ).one()
     assert verify_password("old-pw", stored.PasswordHash) is True
+
+
+def test_the_deleted_administration_module_is_gone(session):
+    """The whole point of the cutover: no importable path back to the
+    Session-taking functions, so nothing can quietly keep using them."""
+    import pytest as _pytest
+
+    with _pytest.raises(ModuleNotFoundError):
+        import eyened_orm.authz.administration  # noqa: F401
+
+
+def test_revoke_all_rows_name_the_command_that_ran(session, stub_database, alice):
+    """Behavior change 2. `apply_revoke_all` delegates to `revoke`, and the
+    instance was built for `revoke`, so every row says `eorm revoke` rather
+    than naming the inner call. The same property makes `grant-for-task` rows
+    say `eorm grant-for-task` where they used to say `eorm grant`."""
+    make_project(session, "A")
+    make_project(session, "B")
+    session.commit()
+
+    for name in ("A", "B"):
+        CliRunner().invoke(
+            grant_cmd, ["--user", "alice", "--project", name, "--role", "grader"]
+        )
+    result = CliRunner().invoke(revoke_cmd, ["--user", "alice", "--all", "--yes"])
+    assert result.exit_code == 0
+
+    rows = session.scalars(
+        select(AuditLog).where(AuditLog.Action == "DELETE")
+    ).all()
+    assert len(rows) == 2
+    assert {r.TrustedPath for r in rows} == {"eorm revoke"}

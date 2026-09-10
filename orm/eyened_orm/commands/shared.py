@@ -5,6 +5,7 @@ import string
 
 import click
 from eyened_orm import Database
+from eyened_orm.authz.scope import AccessScope
 
 
 def get_database(*, confirmation: bool = False) -> Database:
@@ -31,3 +32,23 @@ def get_database(*, confirmation: bool = False) -> Database:
             )
 
     return database
+
+
+def admin_scope_for_cli() -> AccessScope:
+    """The unbounded scope the ``eorm`` repositories run under.
+
+    v0.3 places the CLI outside RBAC enforcement as a trusted path, so this
+    grants it nothing it did not already have: ``get_database()`` above
+    authenticates nobody, and whoever runs the binary already opens a
+    ``Database()`` straight from config.
+
+    Confined to this one function on purpose. ``AccessScope.trusted`` is pinned
+    by an exact-set allow-list in ``server/tests/test_escalation_paths.py``, and
+    building the scope at each command would grow that list by every module that
+    administers anything. One entry is reviewable; ten is a list nobody reads.
+
+    ``AccessScope.trusted()``, not ``utils/factories.admin_scope()``: the
+    factory is test support, and importing it into a production path would put
+    test scaffolding in the CLI's import graph.
+    """
+    return AccessScope.trusted(username="eorm")

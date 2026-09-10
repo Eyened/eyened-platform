@@ -10,26 +10,22 @@ an already-inactive user) and read-only reports such as ``check-declarations``.
 from __future__ import annotations
 
 import click
+from sqlalchemy.orm import Session
 
-from ..authz.administration import (
-    apply_grant_plan,
-    apply_revoke_all,
-    audit_trusted,
-    deactivate,
-    grant,
-    grant_all,
-    memberships_of,
-    parse_role,
-    plan_grant_for_tasks,
-    reactivate,
-    revoke,
-    set_admin,
-    set_password,
-    unused_declarations,
-)
+from ..audit_writer import AuditWriter
+from ..authz.account_admin import AccountAdministration
+from ..authz.actor import TrustedPath
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
-from ..authz.roles import ProjectRole
-from .shared import get_database
+from ..authz.errors import AdminEntityNotFound
+from ..authz.membership_admin import MembershipAdministration
+from ..authz.roles import ProjectRole, parse_role
+from ..repositories import (
+    CreatorRepository,
+    ProjectMemberRepository,
+    ProjectRepository,
+    TaskRepository,
+)
+from .shared import admin_scope_for_cli, get_database
 
 
 @click.command("init-admin")
@@ -92,9 +88,8 @@ def init_admin(username: str, password: str) -> None:
             case _:
                 raise ValueError(f"unhandled BootstrapOutcome: {outcome!r}")
         if action is not None:
-            audit_trusted(
-                session,
-                command="init-admin",
+            AuditWriter(session).write(
+                actor=TrustedPath("eorm init-admin"),
                 action=action,
                 entity="Creator",
                 entity_id=creator.CreatorID,
@@ -114,6 +109,35 @@ def _parse_role_or_fail(value: str) -> ProjectRole:
         raise click.BadParameter(str(exc)) from exc
 
 
+def _membership(session: Session, actor: TrustedPath) -> MembershipAdministration:
+    """Build the membership administration this command is attributed to.
+
+    ``actor`` is passed in rather than derived from a command name string so the
+    ``TrustedPath("eorm grant")`` literal sits beside the ``@click.command("grant")``
+    that names it. ``test_click_command_names_match_their_trusted_paths`` pins
+    the pair; a helper that took the bare name would put the literal here, out of
+    the guard's reach.
+    """
+    scope = admin_scope_for_cli()
+    return MembershipAdministration(
+        CreatorRepository(session, scope=scope),
+        ProjectRepository(session, scope=scope),
+        ProjectMemberRepository(session),
+        TaskRepository(session, scope=scope),
+        audit=AuditWriter(session),
+        actor=actor,
+    )
+
+
+def _account(session: Session, actor: TrustedPath) -> AccountAdministration:
+    """Build the account administration this command is attributed to."""
+    return AccountAdministration(
+        CreatorRepository(session, scope=admin_scope_for_cli()),
+        audit=AuditWriter(session),
+        actor=actor,
+    )
+
+
 @click.command("grant")
 @click.option("--user", "username", required=True)
 @click.option("--project", "project_name", required=True)
@@ -124,10 +148,10 @@ def grant_cmd(username: str, project_name: str, role: str):
     database = get_database()
     with database.get_session() as session:
         try:
-            result = grant(
-                session, username=username, project_name=project_name, role=parsed
+            result = _membership(session, TrustedPath("eorm grant")).grant(
+                username=username, project_name=project_name, role=parsed
             )
-        except LookupError as exc:
+        except AdminEntityNotFound as exc:
             raise click.ClickException(str(exc)) from exc
         session.commit()
     if result.changed:
@@ -160,12 +184,11 @@ def revoke_cmd(
 
     database = get_database()
     with database.get_session() as session:
+        admin = _membership(session, TrustedPath("eorm revoke"))
         if not all_projects:
             try:
-                removed = revoke(
-                    session, username=username, project_name=project_name
-                )
-            except LookupError as exc:
+                removed = admin.revoke(username=username, project_name=project_name)
+            except AdminEntityNotFound as exc:
                 raise click.ClickException(str(exc)) from exc
             session.commit()
             click.echo(
@@ -176,8 +199,8 @@ def revoke_cmd(
             return
 
         try:
-            held = memberships_of(session, username=username)
-        except LookupError as exc:
+            held = admin.memberships_of(username=username)
+        except AdminEntityNotFound as exc:
             raise click.ClickException(str(exc)) from exc
         if not held:
             click.echo(f"{username}: holds no memberships; nothing to do")
@@ -188,7 +211,7 @@ def revoke_cmd(
             click.confirm(
                 f"Remove all {len(held)} membership(s) from {username}?", abort=True
             )
-        apply_revoke_all(session, username=username, held=held)
+        admin.apply_revoke_all(username=username, held=held)
         session.commit()
     click.echo(f"{username}: revoked from {len(held)} project(s)")
 
@@ -208,11 +231,12 @@ def grant_for_task_cmd(
     parsed = _parse_role_or_fail(role)
     database = get_database()
     with database.get_session() as session:
+        admin = _membership(session, TrustedPath("eorm grant-for-task"))
         try:
-            plan = plan_grant_for_tasks(
-                session, username=username, task_ids=task_ids, role=parsed
+            plan = admin.plan_grant_for_tasks(
+                username=username, task_ids=task_ids, role=parsed
             )
-        except LookupError as exc:
+        except AdminEntityNotFound as exc:
             raise click.ClickException(str(exc)) from exc
 
         if not plan.to_grant and not plan.already_held:
@@ -237,7 +261,7 @@ def grant_for_task_cmd(
                 f"Grant {username} {roles} in {len(plan.to_grant)} project(s)?",
                 abort=True,
             )
-        apply_grant_plan(session, plan=plan)
+        admin.apply_grant_plan(plan=plan)
         session.commit()
     click.echo(f"{username}: granted in {len(plan.to_grant)} project(s)")
 
@@ -254,7 +278,9 @@ def grant_all_cmd(yes: bool):
                 "authenticate? RBAC then permits everything until pruning.",
                 abort=True,
             )
-        creators, projects, written = grant_all(session)
+        creators, projects, written = _membership(
+            session, TrustedPath("eorm grant-all")
+        ).grant_all()
         session.commit()
     click.echo(
         f"{written} membership(s) written for {creators} creator(s) "
@@ -273,8 +299,10 @@ def deactivate_cmd(username: str):
     database = get_database()
     with database.get_session() as session:
         try:
-            changed = deactivate(session, username=username)
-        except LookupError as exc:
+            changed = _account(session, TrustedPath("eorm deactivate")).deactivate(
+                username=username
+            )
+        except AdminEntityNotFound as exc:
             raise click.ClickException(str(exc)) from exc
         session.commit()
     click.echo(f"{username}: {'deactivated' if changed else 'already inactive'}")
@@ -287,8 +315,10 @@ def reactivate_cmd(username: str):
     database = get_database()
     with database.get_session() as session:
         try:
-            changed = reactivate(session, username=username)
-        except LookupError as exc:
+            changed = _account(session, TrustedPath("eorm reactivate")).reactivate(
+                username=username
+            )
+        except AdminEntityNotFound as exc:
             raise click.ClickException(str(exc)) from exc
         session.commit()
     click.echo(f"{username}: {'reactivated' if changed else 'already active'}")
@@ -311,8 +341,10 @@ def set_admin_cmd(username: str, is_admin: bool):
     database = get_database()
     with database.get_session() as session:
         try:
-            changed = set_admin(session, username=username, is_admin=is_admin)
-        except LookupError as exc:
+            changed = _account(session, TrustedPath("eorm set-admin")).set_admin(
+                username=username, is_admin=is_admin
+            )
+        except AdminEntityNotFound as exc:
             raise click.ClickException(str(exc)) from exc
         session.commit()
     if changed:
@@ -353,8 +385,10 @@ def set_password_cmd(username: str, password: str):
     database = get_database()
     with database.get_session() as session:
         try:
-            set_password(session, username=username, password=password)
-        except LookupError as exc:
+            _account(session, TrustedPath("eorm set-password")).set_password(
+                username=username, password=password
+            )
+        except AdminEntityNotFound as exc:
             raise click.ClickException(str(exc)) from exc
         session.commit()
     click.echo(f"{username}: password set")
@@ -371,7 +405,9 @@ def check_declarations() -> None:
     """
     database = get_database()
     with database.get_session() as session:
-        rows = unused_declarations(session)
+        rows = TaskRepository(
+            session, scope=admin_scope_for_cli()
+        ).unused_declarations()
     if not rows:
         click.echo("No unused declarations.")
         return

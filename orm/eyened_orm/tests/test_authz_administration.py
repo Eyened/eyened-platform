@@ -5,9 +5,9 @@ import pytest
 from sqlalchemy import select
 
 from eyened_orm import AuditLog, Project
-from eyened_orm.authz.administration import deactivate, grant, parse_role, reactivate, revoke
-from eyened_orm.authz.roles import ProjectRole
-from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
+from eyened_orm.authz.errors import AdminEntityNotFound
+from eyened_orm.authz.roles import ProjectRole, parse_role
+from eyened_orm.repositories import ProjectMemberRepository
 from eyened_orm.utils.factories import make_creator, make_project
 
 
@@ -38,12 +38,14 @@ def test_parse_role_names_the_valid_roles_on_a_bad_value():
         assert name in str(exc.value)
 
 
-def test_grant_creates_a_membership_and_audits_it(session):
+def test_grant_creates_a_membership_and_audits_it(session, membership):
     make_creator(session, "alice")
     make_project(session, "A")
     session.commit()
 
-    result = grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    result = membership("grant").grant(
+        username="alice", project_name="A", role=ProjectRole.grader
+    )
     session.commit()
 
     assert result.changed is True and result.previous is None
@@ -60,26 +62,32 @@ def test_grant_creates_a_membership_and_audits_it(session):
     assert rows[0].Changes["role"] == "grader"
 
 
-def test_an_unchanged_grant_writes_no_audit_row(session):
+def test_an_unchanged_grant_writes_no_audit_row(session, membership):
     make_creator(session, "alice")
     make_project(session, "A")
-    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    membership("grant").grant(username="alice", project_name="A", role=ProjectRole.grader)
     session.commit()
 
-    result = grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    result = membership("grant").grant(
+        username="alice", project_name="A", role=ProjectRole.grader
+    )
     session.commit()
 
     assert result.changed is False
     assert len(session.scalars(select(AuditLog)).all()) == 1
 
 
-def test_changing_a_role_records_old_and_new(session):
+def test_changing_a_role_records_old_and_new(session, membership):
     make_creator(session, "alice")
     make_project(session, "A")
-    grant(session, username="alice", project_name="A", role=ProjectRole.read_only)
+    membership("grant").grant(
+        username="alice", project_name="A", role=ProjectRole.read_only
+    )
     session.commit()
 
-    result = grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    result = membership("grant").grant(
+        username="alice", project_name="A", role=ProjectRole.grader
+    )
     session.commit()
 
     assert result.previous is ProjectRole.read_only
@@ -88,15 +96,17 @@ def test_changing_a_role_records_old_and_new(session):
     assert latest.Changes["role"] == {"old": "read_only", "new": "grader"}
 
 
-def test_revoke_removes_the_membership_and_audits_it(session):
+def test_revoke_removes_the_membership_and_audits_it(session, membership):
     alice = make_creator(session, "alice")
-    make_project(session, "A")
-    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    project = make_project(session, "A")
+    membership("grant").grant(username="alice", project_name="A", role=ProjectRole.grader)
     session.commit()
+    project_id = project.ProjectID  # captured before expiry
 
-    assert revoke(session, username="alice", project_name="A") is True
+    assert membership("revoke").revoke(username="alice", project_name="A") is True
     session.commit()
     assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
+    session.expunge_all()
 
     removal = session.scalars(select(AuditLog).where(AuditLog.Action == "DELETE")).all()
     assert len(removal) == 1
@@ -105,77 +115,145 @@ def test_revoke_removes_the_membership_and_audits_it(session):
     assert removal[0].ActorID is None
     assert removal[0].EntityID is None
     assert removal[0].Changes["role"] == "grader"
+    # Behavior change 1, revoke's half of it: `revoke` now
+    # passes `project_id=project.ProjectID` through to `audit.write`, same as
+    # `grant`. Read after commit() + expunge_all() with the id captured
+    # earlier, for the same reason as `test_a_grant_row_now_carries_the_project_it_named`:
+    # reading `removal[0].ProjectID` off the live identity-mapped object would
+    # pass whether or not the column was actually persisted.
+    assert removal[0].ProjectID == project_id
 
 
-def test_revoking_a_membership_that_does_not_exist_is_a_no_op(session):
+def test_revoking_a_membership_that_does_not_exist_is_a_no_op(session, membership):
     make_creator(session, "alice")
     make_project(session, "A")
     session.commit()
-    assert revoke(session, username="alice", project_name="A") is False
+    assert membership("revoke").revoke(username="alice", project_name="A") is False
 
 
-def test_an_unknown_username_names_itself(session):
+def test_an_unknown_username_names_itself(session, membership):
     make_project(session, "A")
     session.commit()
-    with pytest.raises(LookupError, match="nosuchuser"):
-        grant(session, username="nosuchuser", project_name="A", role=ProjectRole.grader)
+    with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
+        membership("grant").grant(
+            username="nosuchuser", project_name="A", role=ProjectRole.grader
+        )
 
 
-def test_an_unknown_project_names_itself(session):
-    """resolve_project's message is unpinned otherwise; only the creator's was."""
+def test_an_unknown_project_names_itself(session, membership):
+    """`_project`'s message is unpinned otherwise; only the creator's was."""
     make_creator(session, "alice")
     session.commit()
-    with pytest.raises(LookupError, match="nosuchproject"):
-        grant(session, username="alice", project_name="nosuchproject", role=ProjectRole.grader)
+    with pytest.raises(AdminEntityNotFound, match="nosuchproject"):
+        membership("grant").grant(
+            username="alice", project_name="nosuchproject", role=ProjectRole.grader
+        )
 
 
-def test_a_plan_lists_what_will_be_granted_and_what_is_already_held(session, spanning):
+def test_memberships_of_lists_every_membership_ordered_by_project_name(
+    session, membership
+):
+    """The only re-implemented method (the other six were copied verbatim), so
+    its shape is asserted directly rather than inferred from a caller: a list
+    of (project_id, project_name, role), sorted by project name -- not by
+    insertion order or ProjectID. "Zebra" is granted first and holds the lower
+    ProjectID, so a sort that silently degraded to `list_for_creator`'s
+    ProjectID order would still put it first; only a real name sort puts
+    "Apple" there instead."""
+    alice = make_creator(session, "alice")
+    zebra = make_project(session, "Zebra")
+    apple = make_project(session, "Apple")
+    session.commit()
+
+    admin = membership("list")
+    admin.grant(username="alice", project_name="Zebra", role=ProjectRole.grader)
+    admin.grant(username="alice", project_name="Apple", role=ProjectRole.project_admin)
+    session.commit()
+
+    assert admin.memberships_of(username="alice") == [
+        (apple.ProjectID, "Apple", ProjectRole.project_admin),
+        (zebra.ProjectID, "Zebra", ProjectRole.grader),
+    ]
+    assert alice.CreatorID is not None  # sanity: the fixture built a real row
+
+
+def test_apply_revoke_all_removes_every_membership_and_audits_each(session, membership):
+    """Loops over `revoke`, so it inherits one DELETE audit row per membership
+    -- not the single-summary-row shape `grant_all` uses at 1,408-row scale.
+    Two memberships held, so exactly two DELETE rows, one per project."""
+    alice = make_creator(session, "alice")
+    make_project(session, "A")
+    make_project(session, "B")
+    session.commit()
+
+    admin = membership("revoke")
+    admin.grant(username="alice", project_name="A", role=ProjectRole.grader)
+    admin.grant(username="alice", project_name="B", role=ProjectRole.read_only)
+    session.commit()
+
+    held = admin.memberships_of(username="alice")
+    assert len(held) == 2  # both memberships actually held, per the fixture setup
+
+    admin.apply_revoke_all(username="alice", held=held)
+    session.commit()
+
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
+    removals = session.scalars(
+        select(AuditLog).where(AuditLog.Action == "DELETE")
+    ).all()
+    assert len(removals) == 2
+    assert {r.Changes["project_name"] for r in removals} == {"A", "B"}
+    assert {r.Entity for r in removals} == {"ProjectMember"}
+
+
+def test_a_plan_lists_what_will_be_granted_and_what_is_already_held(
+    session, spanning, membership
+):
     """Review before apply. "Grant Alice access to task 70" may resolve to eight
     projects, each handing over every patient, image and task in it --
     permanently, until revoked. An administrator who reads the command name and
     not the effect will over-grant."""
-    from eyened_orm.authz.administration import plan_grant_for_tasks
-
     make_creator(session, "alice")
-    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    membership("grant").grant(username="alice", project_name="A", role=ProjectRole.grader)
     session.commit()
 
-    plan = plan_grant_for_tasks(
-        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    plan = membership("grant-for-task").plan_grant_for_tasks(
+        username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     assert [name for _, name, _ in plan.to_grant] == ["B"]
     assert [name for _, name, _ in plan.already_held] == ["A"]
 
 
-def test_a_plan_writes_nothing(session, spanning):
-    from eyened_orm.authz.administration import plan_grant_for_tasks
+def test_a_plan_writes_nothing(session, spanning, membership):
     from eyened_orm.repositories.project_member_repository import (
         ProjectMemberRepository,
     )
 
     alice = make_creator(session, "alice")
     session.commit()
-    plan_grant_for_tasks(
-        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    membership("grant-for-task").plan_grant_for_tasks(
+        username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
 
 
-def test_applying_a_plan_never_lowers_an_existing_role(session, spanning):
+def test_applying_a_plan_never_lowers_an_existing_role(session, spanning, membership):
     """A user who is already project_admin in one of the task's projects keeps it."""
-    from eyened_orm.authz.administration import apply_grant_plan, plan_grant_for_tasks
     from eyened_orm.repositories.project_member_repository import (
         ProjectMemberRepository,
     )
 
     alice = make_creator(session, "alice")
-    grant(session, username="alice", project_name="A", role=ProjectRole.project_admin)
+    membership("grant").grant(
+        username="alice", project_name="A", role=ProjectRole.project_admin
+    )
     session.commit()
 
-    plan = plan_grant_for_tasks(
-        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    admin = membership("grant-for-task")
+    plan = admin.plan_grant_for_tasks(
+        username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
-    apply_grant_plan(session, plan=plan)
+    admin.apply_grant_plan(plan=plan)
     session.commit()
 
     roles = ProjectMemberRepository(session).roles_for(alice.CreatorID)
@@ -184,39 +262,37 @@ def test_applying_a_plan_never_lowers_an_existing_role(session, spanning):
 
 
 def test_a_lower_existing_role_is_upgraded_not_reported_as_already_held(
-    session, spanning
+    session, spanning, membership
 ):
     """`>= role` is the whole comparison: dropping the level check and keeping
     only 'has a membership' silently refuses the upgrade, and the administrator
     reads 'already holds read_only in A' as success."""
-    from eyened_orm.authz.administration import plan_grant_for_tasks
-
     make_creator(session, "alice")
-    grant(session, username="alice", project_name="A", role=ProjectRole.read_only)
+    membership("grant").grant(
+        username="alice", project_name="A", role=ProjectRole.read_only
+    )
     session.commit()
 
-    plan = plan_grant_for_tasks(
-        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    plan = membership("grant-for-task").plan_grant_for_tasks(
+        username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     assert [name for _, name, _ in plan.to_grant] == ["A", "B"]
     assert plan.already_held == ()
 
 
-def test_a_task_touching_no_projects_grants_nothing(session, spanning):
+def test_a_task_touching_no_projects_grants_nothing(session, spanning, membership):
     """Rather than reporting success for a no-op that, under vacuity, is a task
     everyone can already see."""
-    from eyened_orm.authz.administration import plan_grant_for_tasks
-
     make_creator(session, "alice")
     session.commit()
-    plan = plan_grant_for_tasks(
-        session, username="alice", task_ids=[spanning["empty"]], role=ProjectRole.grader
+    plan = membership("grant-for-task").plan_grant_for_tasks(
+        username="alice", task_ids=[spanning["empty"]], role=ProjectRole.grader
     )
     assert plan.to_grant == () and plan.already_held == ()
 
 
 def test_an_unknown_task_id_among_valid_ones_is_an_error_not_a_silent_drop(
-    session, spanning
+    session, spanning, membership
 ):
     """The MIXED case, deliberately, rather than an all-unknown one: a weaker
     guard written `if not found:` passes an all-unknown test while still
@@ -224,13 +300,10 @@ def test_an_unknown_task_id_among_valid_ones_is_an_error_not_a_silent_drop(
     work every task they typed when she can only work some of them. Only a bad
     id *among good ones* distinguishes the two guards. The message names only
     what the operator got wrong."""
-    from eyened_orm.authz.administration import plan_grant_for_tasks
-
     make_creator(session, "alice")
     session.commit()
-    with pytest.raises(LookupError) as excinfo:
-        plan_grant_for_tasks(
-            session,
+    with pytest.raises(AdminEntityNotFound) as excinfo:
+        membership("grant-for-task").plan_grant_for_tasks(
             username="alice",
             task_ids=[spanning["task"], 999999],
             role=ProjectRole.grader,
@@ -238,49 +311,47 @@ def test_an_unknown_task_id_among_valid_ones_is_an_error_not_a_silent_drop(
     assert str(excinfo.value) == "no task with id 999999"
 
 
-def test_the_plan_uses_the_same_definition_enforcement_uses(session, spanning):
+def test_the_plan_uses_the_same_definition_enforcement_uses(session, spanning, membership):
     """Two implementations of "which projects does this task touch" will drift,
     and the failure mode is an administrator granting a set that does not match
     what the API requires."""
     from eyened_orm import Task
-    from eyened_orm.authz.administration import plan_grant_for_tasks
     from eyened_orm.authz.scoping import projects_of
 
     make_creator(session, "alice")
     session.commit()
-    plan = plan_grant_for_tasks(
-        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    plan = membership("grant-for-task").plan_grant_for_tasks(
+        username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     assert {pid for pid, _, _ in plan.to_grant} == projects_of(
         session, Task, spanning["task"]
     )
 
 
-def test_applying_a_plan_audits_every_grant(session, spanning):
+def test_applying_a_plan_audits_every_grant(session, spanning, membership):
     """apply_grant_plan goes through `grant`, so each membership carries the
-    trusted-path attribution. A loop that upserts directly would write the same
-    rows with no audit trail at all."""
-    from eyened_orm.authz.administration import apply_grant_plan, plan_grant_for_tasks
-
+    trusted-path attribution -- naming `grant-for-task`, the command the
+    operator actually ran, rather than the `grant` it delegates to. A loop that
+    upserted directly would write the same rows with no audit trail at all."""
     make_creator(session, "alice")
     session.commit()
-    plan = plan_grant_for_tasks(
-        session, username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    admin = membership("grant-for-task")
+    plan = admin.plan_grant_for_tasks(
+        username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
-    apply_grant_plan(session, plan=plan)
+    admin.apply_grant_plan(plan=plan)
     session.commit()
 
     rows = session.scalars(
         select(AuditLog).where(AuditLog.Entity == "ProjectMember")
     ).all()
     assert {r.Changes["project_name"] for r in rows} == {"A", "B"}
-    assert {(r.ActorID, r.TrustedPath) for r in rows} == {(None, "eorm grant")}
+    assert {(r.ActorID, r.TrustedPath) for r in rows} == {(None, "eorm grant-for-task")}
 
 
-def test_grant_all_skips_creators_that_cannot_authenticate(session):
+def test_grant_all_skips_creators_that_cannot_authenticate(session, membership):
     """AI models and attribution-only rows would get memberships that can never
     be used, inflating the list somebody later has to prune."""
-    from eyened_orm.authz.administration import grant_all
     from eyened_orm.repositories.project_member_repository import (
         ProjectMemberRepository,
     )
@@ -293,7 +364,7 @@ def test_grant_all_skips_creators_that_cannot_authenticate(session):
     make_project(session, "B")
     session.commit()
 
-    creators, projects, written = grant_all(session)
+    creators, projects, written = membership("grant-all").grant_all()
     session.commit()
 
     assert (creators, projects, written) == (1, 2, 2)
@@ -303,8 +374,7 @@ def test_grant_all_skips_creators_that_cannot_authenticate(session):
     assert repo.roles_for(attribution_only.CreatorID) == {}
 
 
-def test_grant_all_writes_one_summary_audit_row(session):
-    from eyened_orm.authz.administration import grant_all
+def test_grant_all_writes_one_summary_audit_row(session, membership):
     from eyened_orm.utils.db_users import create_user
 
     create_user(session, "alice", "pw")
@@ -312,7 +382,7 @@ def test_grant_all_writes_one_summary_audit_row(session):
     make_project(session, "B")
     session.commit()
 
-    grant_all(session)
+    membership("grant-all").grant_all()
     session.commit()
 
     rows = session.scalars(
@@ -330,24 +400,22 @@ def test_grant_all_writes_one_summary_audit_row(session):
     }
 
 
-def test_grant_all_is_idempotent(session):
-    from eyened_orm.authz.administration import grant_all
+def test_grant_all_is_idempotent(session, membership):
     from eyened_orm.utils.db_users import create_user
 
     create_user(session, "alice", "pw")
     make_project(session, "A")
     session.commit()
 
-    grant_all(session)
+    membership("grant-all").grant_all()
     session.commit()
-    _, _, written = grant_all(session)
+    _, _, written = membership("grant-all").grant_all()
     assert written == 0
 
 
-def test_grant_all_skips_a_model_that_has_a_password_hash(session):
+def test_grant_all_skips_a_model_that_has_a_password_hash(session, membership):
     """The plan's own test cannot see the IsHuman filter: its model has a NULL
     PasswordHash too, so the password filter alone still passes it."""
-    from eyened_orm.authz.administration import grant_all
     from eyened_orm.repositories.project_member_repository import (
         ProjectMemberRepository,
     )
@@ -357,16 +425,15 @@ def test_grant_all_skips_a_model_that_has_a_password_hash(session):
     make_project(session, "A")
     session.commit()
 
-    creators, _, written = grant_all(session)
+    creators, _, written = membership("grant-all").grant_all()
     session.commit()
 
     assert (creators, written) == (0, 0)
     assert ProjectMemberRepository(session).roles_for(model.CreatorID) == {}
 
 
-def test_grant_all_skips_a_deactivated_creator(session):
+def test_grant_all_skips_a_deactivated_creator(session, membership):
     """Otherwise the cutover re-grants everyone an administrator deactivated."""
-    from eyened_orm.authz.administration import grant_all
     from eyened_orm.repositories.project_member_repository import (
         ProjectMemberRepository,
     )
@@ -377,16 +444,15 @@ def test_grant_all_skips_a_deactivated_creator(session):
     make_project(session, "A")
     session.commit()
 
-    creators, _, written = grant_all(session)
+    creators, _, written = membership("grant-all").grant_all()
     session.commit()
 
     assert (creators, written) == (0, 0)
     assert ProjectMemberRepository(session).roles_for(bob.CreatorID) == {}
 
 
-def test_grant_all_honours_the_role_it_is_given(session):
+def test_grant_all_honours_the_role_it_is_given(session, membership):
     """`role` is a parameter, not decoration: nothing else pins it."""
-    from eyened_orm.authz.administration import grant_all
     from eyened_orm.repositories.project_member_repository import (
         ProjectMemberRepository,
     )
@@ -396,18 +462,17 @@ def test_grant_all_honours_the_role_it_is_given(session):
     make_project(session, "A")
     session.commit()
 
-    grant_all(session, role=ProjectRole.project_admin)
+    membership("grant-all").grant_all(role=ProjectRole.project_admin)
     session.commit()
 
     roles = ProjectMemberRepository(session).roles_for(alice.CreatorID)
     assert set(roles.values()) == {ProjectRole.project_admin}
 
 
-def test_grant_all_never_changes_a_role_already_held(session):
+def test_grant_all_never_changes_a_role_already_held(session, membership):
     """A cutover re-run must not quietly lower a project_admin to grader --
     and `written == 0` is not evidence of that: a mutation that re-upserts
     without counting reports 0 while rewriting every role it touches."""
-    from eyened_orm.authz.administration import grant_all
     from eyened_orm.repositories.project_member_repository import (
         ProjectMemberRepository,
     )
@@ -417,11 +482,15 @@ def test_grant_all_never_changes_a_role_already_held(session):
     for name in ("A", "B", "C"):
         make_project(session, name)
     session.commit()
-    grant(session, username="alice", project_name="A", role=ProjectRole.project_admin)
-    grant(session, username="alice", project_name="B", role=ProjectRole.read_only)
+    membership("grant").grant(
+        username="alice", project_name="A", role=ProjectRole.project_admin
+    )
+    membership("grant").grant(
+        username="alice", project_name="B", role=ProjectRole.read_only
+    )
     session.commit()
 
-    _, _, written = grant_all(session)
+    _, _, written = membership("grant-all").grant_all()
     session.commit()
 
     roles = ProjectMemberRepository(session).roles_for(alice.CreatorID)
@@ -433,16 +502,18 @@ def test_grant_all_never_changes_a_role_already_held(session):
     assert written == 1
 
 
-def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(session):
+def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(
+    session, membership, account
+):
     """Reactivation should restore the state that existed rather than require
     it to be rebuilt from memory."""
     alice = make_creator(session, "alice")
     make_project(session, "A")
-    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
+    membership("grant").grant(username="alice", project_name="A", role=ProjectRole.grader)
     session.commit()
     creator_id = alice.CreatorID
 
-    assert deactivate(session, username="alice") is True
+    assert account("deactivate").deactivate(username="alice") is True
     session.commit()
     assert alice.Inactive is True
     assert len(ProjectMemberRepository(session).roles_for(alice.CreatorID)) == 1
@@ -459,7 +530,7 @@ def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(session):
     }
 
 
-def test_deactivating_the_only_administrator_is_allowed(session):
+def test_deactivating_the_only_administrator_is_allowed(session, account):
     """No last-admin guard in this pass: the operator running `eorm` already has
     the database access that recovery needs."""
     from eyened_orm.authz.bootstrap import count_admins, ensure_admin
@@ -467,20 +538,20 @@ def test_deactivating_the_only_administrator_is_allowed(session):
     root, _ = ensure_admin(session, "root", None)
     session.commit()
 
-    assert deactivate(session, username="root") is True
+    assert account("deactivate").deactivate(username="root") is True
     session.commit()
     assert root.Inactive is True
     assert count_admins(session) == 0
 
 
-def test_reactivate_clears_the_flag_and_audits(session):
+def test_reactivate_clears_the_flag_and_audits(session, account):
     alice = make_creator(session, "alice")
     session.commit()
     creator_id = alice.CreatorID
-    deactivate(session, username="alice")
+    account("deactivate").deactivate(username="alice")
     session.commit()
 
-    assert reactivate(session, username="alice") is True
+    assert account("reactivate").reactivate(username="alice") is True
     session.commit()
     assert alice.Inactive is False
 
@@ -496,40 +567,264 @@ def test_reactivate_clears_the_flag_and_audits(session):
     }
 
 
-def test_deactivating_an_already_inactive_user_is_a_no_op(session):
+def test_deactivating_an_already_inactive_user_is_a_no_op(session, account):
     make_creator(session, "alice")
     session.commit()
-    deactivate(session, username="alice")
+    account("deactivate").deactivate(username="alice")
     session.commit()
-    assert deactivate(session, username="alice") is False
+    assert account("deactivate").deactivate(username="alice") is False
     assert len(_audit(session, "deactivate")) == 1
 
 
-def test_reactivating_an_already_active_user_is_a_no_op(session):
+def test_reactivating_an_already_active_user_is_a_no_op(session, account):
     """The symmetric guard: the plan tests it for `deactivate` only."""
     make_creator(session, "alice")
     session.commit()
-    assert reactivate(session, username="alice") is False
+    assert account("reactivate").reactivate(username="alice") is False
     assert _audit(session, "reactivate") == []
 
 
-@pytest.mark.parametrize("command", (deactivate, reactivate))
-def test_an_unknown_username_names_itself_for_deactivate_and_reactivate(session, command):
-    with pytest.raises(LookupError, match="nosuchuser"):
-        command(session, username="nosuchuser")
+@pytest.mark.parametrize("command", ("deactivate", "reactivate"))
+def test_an_unknown_username_names_itself_for_deactivate_and_reactivate(
+    session, account, command
+):
+    from eyened_orm.authz.errors import AdminEntityNotFound
+
+    with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
+        getattr(account(command), command)(username="nosuchuser")
+
+
+def test_set_admin_round_trip_persists_and_audits_each_change(session, account):
+    """`set_admin` is otherwise exercised only through the CLI shell. Mirrors
+    `test_set_admin_round_trip_persists_and_reports_each_outcome` in
+    test_rbac_cli.py, at the AccountAdministration level: idempotence on
+    the unchanged call is the same rule `grant` follows."""
+    alice = make_creator(session, "alice")
+    session.commit()
+    creator_id = alice.CreatorID
+
+    assert account("set-admin").set_admin(username="alice", is_admin=True) is True
+    session.commit()
+    assert alice.IsAdmin is True
+
+    again = account("set-admin").set_admin(username="alice", is_admin=True)
+    assert again is False
+
+    assert account("set-admin").set_admin(username="alice", is_admin=False) is True
+    session.commit()
+    assert alice.IsAdmin is False
+
+    rows = _audit(session, "set-admin")
+    assert len(rows) == 2  # the unchanged call wrote nothing
+    assert rows[0].ActorID is None
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Entity == "Creator"
+    assert rows[0].EntityID == str(creator_id)
+    assert rows[0].Changes == {
+        "username": "alice",
+        "is_admin": {"old": False, "new": True},
+    }
+    assert rows[1].Changes == {
+        "username": "alice",
+        "is_admin": {"old": True, "new": False},
+    }
+
+
+def test_set_password_replaces_the_hash_and_clears_the_legacy_column(session, account):
+    """`set_password` is otherwise exercised only through the CLI shell.
+    Mirrors the two `test_set_password_*` cases in test_rbac_cli.py: both
+    halves of the replacement matter (old stops verifying, new starts), and
+    the legacy `Password` column -- `check_login`'s fallback -- must be
+    cleared or a reset away from a password would not actually revoke it."""
+    from eyened_orm import Creator
+    from eyened_orm.utils.db_users import verify_password
+
+    creator = make_creator(session, "alice")
+    creator.PasswordHash = "existing-hash"
+    creator.Password = b"\x00" * 32  # legacy pbkdf2 hash, still live
+    session.commit()
+    creator_id = creator.CreatorID
+
+    account("set-password").set_password(username="alice", password="new-pw")
+    session.commit()
+
+    stored = session.scalars(
+        select(Creator).where(Creator.CreatorName == "alice")
+    ).one()
+    assert verify_password("new-pw", stored.PasswordHash) is True
+    assert stored.Password is None
+
+    rows = _audit(session, "set-password")
+    assert len(rows) == 1
+    assert rows[0].ActorID is None
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Entity == "Creator"
+    assert rows[0].EntityID == str(creator_id)
+    # Never the password and never the hash -- only that a reset occurred.
+    assert rows[0].Changes == {"username": "alice", "password_changed": True}
+
+
+def test_an_unknown_username_names_itself_for_set_admin_and_set_password(
+    session, account
+):
+    with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
+        account("set-admin").set_admin(username="nosuchuser", is_admin=True)
+    with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
+        account("set-password").set_password(username="nosuchuser", password="pw")
 
 
 def test_unused_declarations_reports_a_project_no_link_uses(session, spanning):
     """A declared project no link uses -- fail-safe, but worth surfacing."""
     from eyened_orm import TaskProject
-    from eyened_orm.authz.administration import unused_declarations
+    from eyened_orm.repositories import TaskRepository
+    from eyened_orm.utils.factories import admin_scope
 
     session.add(
         TaskProject(TaskID=spanning["a_only"], ProjectID=spanning["projects"]["B"])
     )
     session.commit()
 
-    found = unused_declarations(session)
+    found = TaskRepository(session, scope=admin_scope()).unused_declarations()
     assert (spanning["a_only"], spanning["projects"]["B"]) in found
     # ...and it does not report the ones that ARE used, or the report is noise.
     assert (spanning["a_only"], spanning["projects"]["A"]) not in found
+
+
+def test_admin_entity_not_found_is_not_a_lookup_error():
+    """LookupError is the base class of KeyError and IndexError, so catching it
+    to build a 404 -- or a clean ClickException -- turns any dict or list miss
+    inside the call into "not found". The dedicated type catches only what was
+    raised on purpose."""
+    assert not issubclass(AdminEntityNotFound, LookupError)
+
+
+def test_admin_entity_not_found_names_which_lookup_failed():
+    """The 404 it becomes in step 2 carries no body, so the entity has to ride
+    on the exception -- the same argument errors.py already makes for
+    AuthorizationError. The message stays the operator-facing string."""
+    exc = AdminEntityNotFound("no creator named 'bob'", entity="Creator")
+    assert exc.entity == "Creator"
+    assert str(exc) == "no creator named 'bob'"
+
+
+def test_list_authenticatable_includes_an_account_whose_password_is_disabled(session):
+    """`disable_password` writes '!' -- a valid hash that verifies nothing --
+    and OIDC-provisioned accounts get exactly that. They can authenticate, just
+    not by password, so they belong in the cutover grant. Only rows with no
+    PasswordHash at all are skipped."""
+    from eyened_orm.repositories import CreatorRepository
+    from eyened_orm.utils.db_users import create_user
+    from eyened_orm.utils.factories import admin_scope
+
+    create_user(session, "oidc-user", None)
+    model = create_user(session, "a-model", None)
+    model.IsHuman = False
+    inactive = create_user(session, "gone", "pw")
+    inactive.Inactive = True
+    session.commit()
+
+    names = {
+        c.CreatorName
+        for c in CreatorRepository(session, scope=admin_scope()).list_authenticatable()
+    }
+    assert "oidc-user" in names
+    assert "a-model" not in names
+    assert "gone" not in names
+
+
+@pytest.fixture()
+def membership(session):
+    """Build a MembershipAdministration attributed to the named `eorm` command.
+
+    A factory rather than a plain fixture because `actor` is constructor state:
+    a `grant` and a `revoke` are two different instances, which is exactly what
+    makes each row stamp the command that actually ran.
+    """
+    from eyened_orm.audit_writer import AuditWriter
+    from eyened_orm.authz.actor import TrustedPath
+    from eyened_orm.authz.membership_admin import MembershipAdministration
+    from eyened_orm.repositories import (
+        CreatorRepository,
+        ProjectMemberRepository,
+        ProjectRepository,
+        TaskRepository,
+    )
+    from eyened_orm.utils.factories import admin_scope
+
+    def _build(command: str) -> MembershipAdministration:
+        scope = admin_scope()
+        return MembershipAdministration(
+            CreatorRepository(session, scope=scope),
+            ProjectRepository(session, scope=scope),
+            ProjectMemberRepository(session),
+            TaskRepository(session, scope=scope),
+            audit=AuditWriter(session),
+            actor=TrustedPath(f"eorm {command}"),
+        )
+
+    return _build
+
+
+def test_a_grant_row_now_carries_the_project_it_named(session, membership):
+    """Behavior change 1. `audit_trusted` dropped ProjectID -- including in
+    `grant`, which had resolved the project two lines earlier and buried the id
+    in Changes.
+
+    Asserted after commit() + expunge_all(), not on the live object: reading
+    row.ProjectID straight after the write consults the identity map, not the
+    database, so the assertion would pass whether or not the column was
+    populated. For a change whose entire point is "ProjectID is now populated",
+    that is the assertion most likely to pass for the wrong reason.
+    """
+    make_creator(session, "alice")
+    project = make_project(session, "A")
+    session.commit()
+    project_id = project.ProjectID  # captured before expiry
+
+    membership("grant").grant(
+        username="alice", project_name="A", role=ProjectRole.grader
+    )
+    session.commit()
+    session.expunge_all()
+
+    row = session.scalars(
+        select(AuditLog).where(AuditLog.Entity == "ProjectMember")
+    ).one()
+    assert row.ProjectID == project_id
+
+
+@pytest.fixture()
+def account(session):
+    """Build an AccountAdministration attributed to the named `eorm` command."""
+    from eyened_orm.audit_writer import AuditWriter
+    from eyened_orm.authz.account_admin import AccountAdministration
+    from eyened_orm.authz.actor import TrustedPath
+    from eyened_orm.repositories import CreatorRepository
+    from eyened_orm.utils.factories import admin_scope
+
+    def _build(command: str) -> AccountAdministration:
+        return AccountAdministration(
+            CreatorRepository(session, scope=admin_scope()),
+            audit=AuditWriter(session),
+            actor=TrustedPath(f"eorm {command}"),
+        )
+
+    return _build
+
+
+def test_the_audit_sink_is_required_rather_than_defaulting_to_none(session):
+    """The seven server services declare `audit: AuditService | None = None`.
+    Here attribution is the entire job, so a sink that defaults to None would
+    be fail-open on precisely the property this class exists to protect."""
+    import pytest as _pytest
+
+    from eyened_orm.authz.account_admin import AccountAdministration
+    from eyened_orm.authz.actor import TrustedPath
+    from eyened_orm.repositories import CreatorRepository
+    from eyened_orm.utils.factories import admin_scope
+
+    with _pytest.raises(TypeError):
+        AccountAdministration(
+            CreatorRepository(session, scope=admin_scope()),
+            actor=TrustedPath("eorm set-admin"),
+        )

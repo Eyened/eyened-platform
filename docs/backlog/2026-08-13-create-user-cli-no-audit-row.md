@@ -1,3 +1,13 @@
+> **CLOSED 2026-09-08** by RBAC admin P0. `eorm create-user` now writes
+> `TrustedPath("eorm create-user")` with the same `changes` shape as
+> `auth:register`. Pinned by
+> `orm/eyened_orm/tests/test_cli_create_user.py::test_creating_a_user_writes_an_audit_row`.
+>
+> Its sibling `2026-08-13-create-user-cli-is-human-flag.md` stays **open**: the
+> flag is genuinely broken (`is_flag=True, default=True` cannot be cleared, so
+> no non-human creator can be made from the CLI), but fixing it changes the
+> CLI's option surface, which P0 deliberately did not touch.
+
 # `eorm create-user` writes no `AuditLog` row
 
 **Status:** open
@@ -23,7 +33,7 @@ the other place a `Creator` gets created, does audit it.
 Creating a principal is the one unattributed action in an otherwise fully
 attributed CLI workflow: every state change made *to* an account is on the
 audit trail, but the account's own creation is not. Low urgency -- the command
-is a trusted path already (see `authz/administration.py`'s module docstring),
+is a trusted path already (see `authz/actor.py`'s module docstring),
 and this is a gap in coverage, not a new escalation.
 
 ## Related

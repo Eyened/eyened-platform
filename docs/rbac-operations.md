@@ -207,9 +207,10 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
 ## Accepted risks
 
 - **The CLI does not authenticate its operator.** Every command above is a
-  trusted path (see the module docstrings on `authz/administration.py` and
-  `commands/rbac.py`): anyone with shell access can run `eorm set-admin --user
-  U --on` and self-promote, and the audit row that records it names no actor
+  trusted path (see `admin_scope_for_cli()` in `commands/shared.py`, and the
+  module docstring on `commands/rbac.py`): anyone with shell access can run
+  `eorm set-admin --user U --on` and self-promote, and the audit row that
+  records it names no actor
   -- `ActorID` is NULL by design on this path, the same as every other command
   here.
 - **`grant-all` grants every project to self-registered accounts.**

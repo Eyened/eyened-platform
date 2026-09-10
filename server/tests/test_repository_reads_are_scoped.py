@@ -77,6 +77,13 @@ _UNSCOPED_METHODS = {
     # would delete exactly the projects the check exists to catch and make
     # every floor built on it pass vacuously.
     "TaskRepository.project_ids": "resolves the projects a write is judged on",
+    # Not project resolution like its neighbours above -- this answers "which
+    # of these ids exist" for a CLI operator who named them, and Task is in
+    # SET_VALUED_ENTITIES, so scoping it would really filter and report a task
+    # that genuinely exists as missing.
+    "TaskRepository.existing_ids": "answers which of these ids exist for a CLI "
+    "operator who named them; Task is in SET_VALUED_ENTITIES, so scoping it "
+    "would report a task that genuinely exists as missing",
     "SubTaskRepository.project_ids": "resolves the projects a write is judged on",
     "SegmentationRepository.project_ids": "resolves the projects a write is judged on",
     "ModelSegmentationRepository.project_ids": "resolves the projects a write is "
@@ -116,7 +123,18 @@ _WRITE_PREFIXES = ("add", "save", "delete", "upsert", "remove", "replace", "clai
 # The most recent moves: 37 -> 38 for TaskRepository.declared_projects, which
 # scopes itself through apply_scope like its neighbours (counted, not exempted),
 # and 38 -> 39 for the subtask-assignee read development added.
-_EXPECTED_SCANNED_READS = 39
+# 39 -> 42 for ProjectRepository's three reads (get_by_name, all_ids,
+# names_for), each scoped through apply_scope like its neighbours --
+# counted, not exempted. Project is in none of scoping.py's registries, so
+# apply_scope fails closed for a non-admin scope rather than filtering
+# nothing.
+# 42 -> 43 for TaskRepository.unused_declarations, scoped through
+# apply_scope on TaskProject like ProjectRepository's three reads above
+# (counted, not exempted) -- TaskProject is likewise in none of scoping.py's
+# registries, so apply_scope is a no-op for an admin scope and fails closed
+# otherwise. Its sibling TaskRepository.existing_ids joined
+# _UNSCOPED_METHODS instead and so is not counted here.
+_EXPECTED_SCANNED_READS = 43
 
 # Read methods allowed to scope themselves by consuming ``self._scope`` instead
 # of calling ``apply_scope``/``scoped_one``. Set equality, like every other
