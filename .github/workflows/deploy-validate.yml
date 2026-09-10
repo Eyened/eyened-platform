@@ -356,8 +356,11 @@ jobs:
           # image where /bin/sh is bash — shows up as a clear failure rather
           # than as this step quietly pinning nothing. Step 6's `/bin/sh -c`,
           # whose whole point is that bash would RUN the bashisms dash rejects,
-          # rests on the same property and is covered by these lines too; it is
-          # asserted once, here, rather than in both steps.
+          # rests on a DIFFERENT dash property — rejecting bash-only syntax,
+          # not aborting on a redirection error against `:` — so this control
+          # does not strictly prove it. Both held together on this runner
+          # (the mutation matrix confirmed it), which is why step 6's coverage
+          # is inferred from this control rather than asserted a second time.
           if /bin/sh -c ': > /nonexistent-dir-xyz/f || echo REACHED' 2>/dev/null | command grep -q REACHED; then
             echo "::error::/bin/sh on this runner does not abort on a redirection error against the ':' special built-in (it is bash, or a shell that behaves like it), so this step cannot tell 'true >' from ': >' and pins nothing"; exit 1
           fi

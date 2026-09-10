@@ -191,10 +191,10 @@ _one_line_or_die() {
 #     Give anything new a ${VAR:-default} in compose.yaml.
 #
 # The file is .env.example plus ONE appended block. Not a second copy of the
-# template as a heredoc: that would be a second source of truth for 176 lines
-# of documented settings, and it would drift. Compose's dotenv parser takes the
-# LAST assignment (measured), as does env_get above, so the appended block wins
-# over the template's own COMPOSE_FILE line.
+# template as a heredoc: that would be a second source of truth for the
+# settings documented in .env.example, and it would drift. Compose's dotenv
+# parser takes the LAST assignment (measured), as does env_get above, so the
+# appended block wins over the template's own COMPOSE_FILE line.
 
 write_env() {
     _mode=$1

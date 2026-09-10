@@ -255,8 +255,8 @@ cfi-quality`, so running it beside the slim one double-consumes two queues.
 Set `EYENED_RQ_QUEUES_INFERENCE` in `deploy/.env` to drop them if you want each
 job handled once.
 
-**Remote** — the workers on a separate GPU box. Copy the repo there. This box
-never runs `./eyened` (see below), so nothing writes `deploy/.env` for you —
+**Remote** — the workers on a separate GPU box. Copy the repo there. Do not
+run `./eyened` on this box (see below): nothing writes `deploy/.env` for you —
 start it as a plain copy of the template:
 
 ```bash
@@ -395,8 +395,9 @@ stopped and tells you to re-run.
 via `mysqlsh`, with a `--legacy-sql` mysqldump fallback — and the tool for a
 database this stack does not own. They run on the HOST, not in a container:
 `Dockerfile.server` carries no MySQL client at all, so neither mode works
-inside the stack. **`mysqlsh` is a host prerequisite for this path** and is not
-installed by anything here.
+inside the stack. **`mysqlsh` is a host prerequisite for the default path**
+(`--legacy-sql` needs `mysqldump` instead) and is not installed by anything
+here.
 
 For the application itself: check out the commit-ish you moved *from* and
 re-run `./eyened install`. **Images are built from source, so the checkout is
@@ -458,8 +459,10 @@ alongside `deploy/.env` (both are already covered by `deploy/.env.*` in
 
 ## Command reference
 
-Every command `./eyened` accepts. Run them from anywhere: `./eyened` resolves
-its own location, and so does every script it calls.
+Every command `./eyened` accepts. The scripts work from anywhere: `./eyened`
+resolves its own location, and so does every script it calls — but the
+literal `./eyened` spelling only resolves relative to the current directory;
+from elsewhere, use an absolute path or `cd` to the repository root first.
 
 | Command | Implemented in | What it does |
 |---|---|---|
@@ -485,7 +488,7 @@ four thin scripts that used to sit beside it are now subcommands of it.
 `./eyened down` and `./eyened logs` hold no machinery: they are `docker
 compose` (or `docker-compose`) run from `deploy/`, so `cd deploy && docker
 compose down` is equally correct — see [The compose
-binary](#the-compose-binary). The three delegated scripts are ordinary
+binary](#the-compose-binary). The five delegated scripts are ordinary
 `#!/bin/sh` files and can still be invoked directly; `./eyened <command>` is
 the supported spelling.
 

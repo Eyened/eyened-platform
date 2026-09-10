@@ -7,10 +7,11 @@
 #   at all. Add a GPU profile to COMPOSE_PROFILES for the model workers.
 #
 # REMOTE — workers on a separate GPU box:
-#   copy the repo there, set EYENED_REDIS_HOST / EYENED_DATABASE_HOST and
-#   PLATFORM_STORAGE_PATH in deploy/.env to point at the platform host and at
-#   this box's platform storage, put compose.workers.yaml into COMPOSE_FILE,
-#   fill in storage-mounts.conf and run deploy/scripts/gen-storage.sh, then
+#   copy the repo there, set EYENED_REDIS_HOST / EYENED_REDIS_PASSWORD,
+#   EYENED_DATABASE_HOST / EYENED_DATABASE_PASSWORD, and PLATFORM_STORAGE_PATH
+#   in deploy/.env to point at the platform host and at this box's platform
+#   storage, put compose.workers.yaml into COMPOSE_FILE, fill in
+#   storage-mounts.conf and run deploy/scripts/gen-storage.sh, then
 #     docker compose -f deploy/compose.workers.yaml -f deploy/compose.storage.yaml \
 #       up -d --build
 #   Compose reads .env from the COMPOSE FILE'S OWN directory, not the CWD
