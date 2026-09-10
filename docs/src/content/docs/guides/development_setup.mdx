@@ -31,8 +31,9 @@ account whose password it prints once.
 
 ### On a machine shared with other developers
 
-Before the first `./eyened up`, or any time afterwards, set these in `deploy/.env` to values
-nobody else is using:
+`deploy/.env` does not exist on a clean clone, so these cannot be set before the first
+`./eyened up`. Run it once — that creates `deploy/.env` — then set these to values nobody
+else is using and run `./eyened up` again, before your stack collides with someone else's:
 
 | Variable | Purpose |
 | --- | --- |
@@ -47,7 +48,7 @@ you need a host port instead — DBeaver, or a host-side alembic — append
 ## Daily use
 
 ```bash
-./eyened up          # start (also rebuilds; bootstrap only acts on an empty database; safe to repeat)
+./eyened up          # start (also rebuilds; bootstrap never migrates or re-seeds an existing database; safe to repeat)
 ./eyened logs        # follow logs
 ./eyened down        # stop
 ./eyened doctor      # preflight checks on their own

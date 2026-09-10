@@ -25,7 +25,7 @@ These run from `deploy/compose.yaml`:
 
 The server also needs `EYENED_API_SECRET_KEY` and the `EYENED_DATABASE_*` variables (see below).
 
-**Worker** is deployed separately (`python -m server.rq_worker` or a worker Docker compose file). It uses the same `EYENED_REDIS_*`, `EYENED_DATABASE_*`, and storage env as the server. Set `EYENED_RQ_WORKER_QUEUES` to the queues it should consume (include `default` for thumbnail jobs). Without a worker, synchronous CLI paths still work; async API endpoints will queue jobs that never run.
+**Worker** is deployed separately (`python -m server.rq_worker`, or the Docker workers in `deploy/compose.workers.yaml`). It uses the same `EYENED_REDIS_*`, `EYENED_DATABASE_*`, and storage env as the server. For the bare process, set `EYENED_RQ_WORKER_QUEUES` to the queues it should consume (include `default` for thumbnail jobs); the Docker workers ignore that variable and set their queues per service instead (`EYENED_RQ_QUEUES_CFI_ROI`, `EYENED_RQ_QUEUES_INFERENCE`, or a queue fixed in the compose file) — see [Thumbnails](/eyened-platform/thumbnails#worker). Without a worker, synchronous CLI paths still work; async API endpoints will queue jobs that never run.
 
 ## Database
 
