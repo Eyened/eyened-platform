@@ -46,3 +46,4 @@ deploy/storage-mounts.conf
 deploy/compose.storage.yaml
 deploy/nginx/storage.d/*.conf
 deploy/backups
+deploy/snapshots/
