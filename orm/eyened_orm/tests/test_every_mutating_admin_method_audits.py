@@ -13,6 +13,8 @@ is how the author is made to think about it.
 """
 from __future__ import annotations
 
+import inspect
+
 import pytest
 from sqlalchemy import func, select
 
@@ -115,6 +117,36 @@ _MUTATING = [
 
 def _audit_count(session) -> int:
     return session.scalar(select(func.count()).select_from(AuditLog))
+
+
+def _public_method_names(cls: type) -> set[str]:
+    """Methods defined directly on the class body, dunder and `_`-prefixed
+    helpers excluded. `vars()`, not `dir()`/`inspect.getmembers`: those walk
+    the MRO and would also report `object`'s methods on a class with none of
+    its own."""
+    return {
+        name
+        for name, value in vars(cls).items()
+        if not name.startswith("_") and inspect.isfunction(value)
+    }
+
+
+def test_the_administration_classes_have_no_unclassified_public_method():
+    """`_MUTATING` above is a hardcoded list; nothing before this test checked
+    that it was exhaustive. A public method added to either class and left off
+    both this file's read-only tests and the `_MUTATING` table -- audited or
+    not -- fails here instead of shipping unclassified, which is what makes
+    this module's docstring claim ("a tenth mutating method ... must fail
+    here") actually true.
+    """
+    assert _public_method_names(MembershipAdministration) == {
+        *(label for label, which, _, _ in _MUTATING if which == "membership"),
+        "memberships_of",
+        "plan_grant_for_tasks",
+    }
+    assert _public_method_names(AccountAdministration) == {
+        label for label, which, _, _ in _MUTATING if which == "account"
+    }
 
 
 @pytest.mark.parametrize(

@@ -47,15 +47,22 @@ def _command_name(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
     (an explicit name, returned as-is), ``@eorm.command()`` (a bare call with
     no name, so Click derives one -- see ``_click_derived_name``), and a bare
     ``@click.command`` with no parentheses at all (Click permits applying the
-    decorator unapplied; the same derivation applies).
+    decorator unapplied; the same derivation applies). None of the current
+    commands pass the name as a keyword, but Click's signature is
+    ``command(name=None, cls=None, **attrs)``, so ``@click.command(name="rm")``
+    is legal and would otherwise register under ``rm`` while this function
+    kept returning the derived name -- checked below so a future command
+    written that way is not silently mismatched.
     """
     for decorator in node.decorator_list:
         if isinstance(decorator, ast.Call):
             func = decorator.func
             args = decorator.args
+            keywords = decorator.keywords
         elif isinstance(decorator, ast.Attribute):
             func = decorator
             args = ()
+            keywords = ()
         else:
             continue
         if not (isinstance(func, ast.Attribute) and func.attr == "command"):
@@ -63,6 +70,13 @@ def _command_name(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
         for arg in args:
             if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
                 return arg.value
+        for kw in keywords:
+            if (
+                kw.arg == "name"
+                and isinstance(kw.value, ast.Constant)
+                and isinstance(kw.value.value, str)
+            ):
+                return kw.value.value
         return _click_derived_name(node.name)
     return None
 

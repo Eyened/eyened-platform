@@ -4,6 +4,26 @@ Changes merged since v2026.09.0. This section is renamed to the version heading 
 the next release is cut. Add an entry here in the same pull request that changes
 behaviour — reconstructing it at release time is how things get missed.
 
+## Changed behaviour
+
+**CLI**
+
+- **`grant` and `revoke` audit rows now carry `ProjectID`**, and so do the paths that
+  funnel through them: `grant-for-task` (via `apply_grant_plan`) and `revoke --all`
+  (via `apply_revoke_all`). The previous writer dropped the column; the project id
+  was only in `Changes`. Existing rows are **not backfilled** — their project id is
+  still readable from `Changes["project_id"]`. `grant-all` is unaffected: it still
+  writes one summary row per invocation with no `ProjectID`, since it names no single
+  project.
+- **`grant-for-task` audit rows now say `eorm grant-for-task`, not `eorm grant`.**
+  Each CLI invocation now stamps every row it writes with the command actually run,
+  instead of the shared write path hardcoding `"grant"`. `revoke --all` did **not**
+  change — it already wrote `eorm revoke` for every row it removed.
+- **`AuditWriter` stamps `Timestamp` itself** instead of leaving it to the column
+  default, so the row handed back to the caller already carries the value any mirror
+  built from it (e.g. CLI stdout) would report.
+- **`eorm create-user` writes an audit row.** It previously wrote none.
+
 ---
 
 # EyeNED Platform v2026.09.0

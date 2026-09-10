@@ -5,7 +5,7 @@ import enum
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from eyened_orm import AuditLog
 from eyened_orm.audit_writer import AuditWriter

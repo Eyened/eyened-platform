@@ -115,7 +115,7 @@ def test_revoke_removes_the_membership_and_audits_it(session, membership):
     assert removal[0].ActorID is None
     assert removal[0].EntityID is None
     assert removal[0].Changes["role"] == "grader"
-    # Behavior change 4 (the revoke counterpart of change 1): `revoke` now
+    # Behavior change 1, revoke's half of it: `revoke` now
     # passes `project_id=project.ProjectID` through to `audit.write`, same as
     # `grant`. Read after commit() + expunge_all() with the id captured
     # earlier, for the same reason as `test_a_grant_row_now_carries_the_project_it_named`:
@@ -141,7 +141,7 @@ def test_an_unknown_username_names_itself(session, membership):
 
 
 def test_an_unknown_project_names_itself(session, membership):
-    """resolve_project's message is unpinned otherwise; only the creator's was."""
+    """`_project`'s message is unpinned otherwise; only the creator's was."""
     make_creator(session, "alice")
     session.commit()
     with pytest.raises(AdminEntityNotFound, match="nosuchproject"):
@@ -595,11 +595,9 @@ def test_an_unknown_username_names_itself_for_deactivate_and_reactivate(
 
 
 def test_set_admin_round_trip_persists_and_audits_each_change(session, account):
-    """Not covered by the brief's migration table (it only listed call sites
-    that already had tests) -- `set_admin` is otherwise exercised only through
-    the CLI shell, which still calls the old `administration.py` function
-    until Task 8. Mirrors `test_set_admin_round_trip_persists_and_reports_each_outcome`
-    in test_rbac_cli.py, at the AccountAdministration level: idempotence on
+    """`set_admin` is otherwise exercised only through the CLI shell. Mirrors
+    `test_set_admin_round_trip_persists_and_reports_each_outcome` in
+    test_rbac_cli.py, at the AccountAdministration level: idempotence on
     the unchanged call is the same rule `grant` follows."""
     alice = make_creator(session, "alice")
     session.commit()
@@ -633,11 +631,10 @@ def test_set_admin_round_trip_persists_and_audits_each_change(session, account):
 
 
 def test_set_password_replaces_the_hash_and_clears_the_legacy_column(session, account):
-    """Not covered by the brief's migration table -- `set_password` is otherwise
-    exercised only through the CLI shell against the old `administration.py`
-    function. Mirrors the two `test_set_password_*` cases in test_rbac_cli.py:
-    both halves of the replacement matter (old stops verifying, new starts),
-    and the legacy `Password` column -- `check_login`'s fallback -- must be
+    """`set_password` is otherwise exercised only through the CLI shell.
+    Mirrors the two `test_set_password_*` cases in test_rbac_cli.py: both
+    halves of the replacement matter (old stops verifying, new starts), and
+    the legacy `Password` column -- `check_login`'s fallback -- must be
     cleared or a reset away from a password would not actually revoke it."""
     from eyened_orm import Creator
     from eyened_orm.utils.db_users import verify_password
