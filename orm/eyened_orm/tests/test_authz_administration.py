@@ -8,7 +8,7 @@ from eyened_orm import AuditLog, Project
 from eyened_orm.authz.administration import deactivate, reactivate
 from eyened_orm.authz.errors import AdminEntityNotFound
 from eyened_orm.authz.roles import ProjectRole, parse_role
-from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
+from eyened_orm.repositories import ProjectMemberRepository
 from eyened_orm.utils.factories import make_creator, make_project
 
 
@@ -99,13 +99,15 @@ def test_changing_a_role_records_old_and_new(session, membership):
 
 def test_revoke_removes_the_membership_and_audits_it(session, membership):
     alice = make_creator(session, "alice")
-    make_project(session, "A")
+    project = make_project(session, "A")
     membership("grant").grant(username="alice", project_name="A", role=ProjectRole.grader)
     session.commit()
+    project_id = project.ProjectID  # captured before expiry
 
     assert membership("revoke").revoke(username="alice", project_name="A") is True
     session.commit()
     assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
+    session.expunge_all()
 
     removal = session.scalars(select(AuditLog).where(AuditLog.Action == "DELETE")).all()
     assert len(removal) == 1
@@ -114,6 +116,13 @@ def test_revoke_removes_the_membership_and_audits_it(session, membership):
     assert removal[0].ActorID is None
     assert removal[0].EntityID is None
     assert removal[0].Changes["role"] == "grader"
+    # Behavior change 4 (the revoke counterpart of change 1): `revoke` now
+    # passes `project_id=project.ProjectID` through to `audit.write`, same as
+    # `grant`. Read after commit() + expunge_all() with the id captured
+    # earlier, for the same reason as `test_a_grant_row_now_carries_the_project_it_named`:
+    # reading `removal[0].ProjectID` off the live identity-mapped object would
+    # pass whether or not the column was actually persisted.
+    assert removal[0].ProjectID == project_id
 
 
 def test_revoking_a_membership_that_does_not_exist_is_a_no_op(session, membership):
@@ -140,6 +149,62 @@ def test_an_unknown_project_names_itself(session, membership):
         membership("grant").grant(
             username="alice", project_name="nosuchproject", role=ProjectRole.grader
         )
+
+
+def test_memberships_of_lists_every_membership_ordered_by_project_name(
+    session, membership
+):
+    """The only re-implemented method (the other six were copied verbatim), so
+    its shape is asserted directly rather than inferred from a caller: a list
+    of (project_id, project_name, role), sorted by project name -- not by
+    insertion order or ProjectID. "Zebra" is granted first and holds the lower
+    ProjectID, so a sort that silently degraded to `list_for_creator`'s
+    ProjectID order would still put it first; only a real name sort puts
+    "Apple" there instead."""
+    alice = make_creator(session, "alice")
+    zebra = make_project(session, "Zebra")
+    apple = make_project(session, "Apple")
+    session.commit()
+
+    admin = membership("list")
+    admin.grant(username="alice", project_name="Zebra", role=ProjectRole.grader)
+    admin.grant(username="alice", project_name="Apple", role=ProjectRole.project_admin)
+    session.commit()
+
+    assert admin.memberships_of(username="alice") == [
+        (apple.ProjectID, "Apple", ProjectRole.project_admin),
+        (zebra.ProjectID, "Zebra", ProjectRole.grader),
+    ]
+    assert alice.CreatorID is not None  # sanity: the fixture built a real row
+
+
+def test_apply_revoke_all_removes_every_membership_and_audits_each(session, membership):
+    """Loops over `revoke`, so it inherits one DELETE audit row per membership
+    -- not the single-summary-row shape `grant_all` uses at 1,408-row scale.
+    Two memberships held, so exactly two DELETE rows, one per project."""
+    alice = make_creator(session, "alice")
+    make_project(session, "A")
+    make_project(session, "B")
+    session.commit()
+
+    admin = membership("revoke")
+    admin.grant(username="alice", project_name="A", role=ProjectRole.grader)
+    admin.grant(username="alice", project_name="B", role=ProjectRole.read_only)
+    session.commit()
+
+    held = admin.memberships_of(username="alice")
+    assert len(held) == 2  # both memberships actually held, per the fixture setup
+
+    admin.apply_revoke_all(username="alice", held=held)
+    session.commit()
+
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
+    removals = session.scalars(
+        select(AuditLog).where(AuditLog.Action == "DELETE")
+    ).all()
+    assert len(removals) == 2
+    assert {r.Changes["project_name"] for r in removals} == {"A", "B"}
+    assert {r.Entity for r in removals} == {"ProjectMember"}
 
 
 def test_a_plan_lists_what_will_be_granted_and_what_is_already_held(
@@ -593,10 +658,7 @@ def membership(session):
     """
     from eyened_orm.audit_writer import AuditWriter
     from eyened_orm.authz.actor import TrustedPath
-    from eyened_orm.authz.membership_admin import (
-    MembershipAdministration,
-    TaskGrantPlan,
-)
+    from eyened_orm.authz.membership_admin import MembershipAdministration
     from eyened_orm.repositories import (
         CreatorRepository,
         ProjectMemberRepository,

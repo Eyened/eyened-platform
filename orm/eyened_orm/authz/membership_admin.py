@@ -10,6 +10,8 @@ writes an ``AuditLog`` row naming the ``Actor`` this instance was constructed
 with. What changes nothing writes nothing -- an idempotent grant, an
 already-revoked membership -- and the read-only methods
 (``memberships_of``, ``plan_grant_for_tasks``) write no row at all.
+``grant_all`` is the one exception: it always writes a single summary row,
+even when zero memberships were written -- see its docstring.
 
 Split from account lifecycle (``account_admin.py``) along the dependency seam:
 these seven methods use four repositories between them, the lifecycle methods
