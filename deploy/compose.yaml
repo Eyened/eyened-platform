@@ -36,6 +36,11 @@ services:
       MYSQL_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
       MYSQL_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
       MYSQL_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
+    # MySQL's own default (128M) is far too small for this database's real
+    # size; EYENED_DATABASE_BUFFER_POOL_SIZE in deploy/.env.example carries
+    # the measurement behind 2G and the advice to size it to the host.
+    command:
+      - --innodb-buffer-pool-size=${EYENED_DATABASE_BUFFER_POOL_SIZE:-2G}
     volumes:
       # Unset -> the named volume db_data (this stack's own disk). Set to an
       # absolute host path -> a bind mount, which is what puts MySQL on storage
@@ -110,6 +115,12 @@ services:
       EYENED_API_SECRET_KEY: ${EYENED_API_SECRET_KEY:?generated on first run; see deploy/.env}
       EYENED_API_PUBLIC_AUTH_DISABLED: ${EYENED_API_PUBLIC_AUTH_DISABLED:-false}
       EYENED_API_DEBUG: ${EYENED_API_DEBUG:-false}
+      # Read directly by the image's CMD (deploy/Dockerfile.server), not by
+      # the app — this service has no env_file, so without this line WORKERS
+      # in deploy/.env reaches no container and the image's own ${WORKERS:-4}
+      # silently wins instead. Restated as :-4, not :-, for the same reason as
+      # EYENED_API_AUTH_PASSWORD_ENABLED below.
+      WORKERS: ${WORKERS:-4}
       # Whether the login page offers username/password at all. Documented as
       # the thing you turn off once OIDC works, so it has to reach a container:
       # `server` has no env_file, and compose reads .env for INTERPOLATION
