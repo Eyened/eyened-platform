@@ -174,12 +174,14 @@ def seed_form_schemas_cmd(update: bool):
 def create_user(username: str, password: str, is_human: bool, description: str | None):
     """Create a new user with the given credentials."""
 
+    from eyened_orm.audit_writer import AuditWriter
+    from eyened_orm.authz.actor import TrustedPath
     from eyened_orm.utils.db_users import create_user
 
     database = get_database()
     with database.get_session() as session:
         try:
-            create_user(
+            created = create_user(
                 session,
                 username,
                 password,
@@ -188,6 +190,15 @@ def create_user(username: str, password: str, is_human: bool, description: str |
             )
         except ValueError as e:
             raise click.ClickException(str(e)) from e
+        # After the create, not before: a rejected duplicate created nothing, so
+        # a row claiming it did would be worse than the missing row this fixes.
+        AuditWriter(session).write(
+            actor=TrustedPath("eorm create-user"),
+            action="INSERT",
+            entity="Creator",
+            entity_id=created.CreatorID,
+            changes={"username": username, "is_human": created.IsHuman},
+        )
         session.commit()
     click.echo("User created successfully")
 

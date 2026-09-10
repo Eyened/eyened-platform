@@ -45,3 +45,39 @@ def test_a_duplicate_username_exits_non_zero(session, stub_cli_database):
     assert result.exit_code == 1
     assert "Username already exists" in result.output
     assert "Traceback" not in result.output
+
+
+def test_creating_a_user_writes_an_audit_row(session, stub_cli_database):
+    """It used to write none -- the only account-creating path with no
+    attribution at all, in a command set whose stated contract is that every
+    state change is attributed. `auth:register` already writes the equivalent
+    row for the HTTP path."""
+    from sqlalchemy import select
+
+    from eyened_orm import AuditLog
+
+    result = CliRunner().invoke(
+        create_user_cmd, ["--username", "bob", "--password", "pw"]
+    )
+    assert result.exit_code == 0
+
+    row = session.scalars(select(AuditLog)).one()
+    assert row.TrustedPath == "eorm create-user"
+    assert row.ActorID is None
+    assert row.Action == "INSERT"
+    assert row.Entity == "Creator"
+    assert row.Changes["username"] == "bob"
+
+
+def test_a_rejected_duplicate_writes_no_audit_row(session, stub_cli_database):
+    """The row records a creation, so a command that created nothing must not
+    write one."""
+    from sqlalchemy import select
+
+    from eyened_orm import AuditLog
+
+    create_user(session, "alice", "pw")
+    session.commit()
+
+    CliRunner().invoke(create_user_cmd, ["--username", "alice", "--password", "pw"])
+    assert session.scalars(select(AuditLog)).all() == []
