@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from eyened_orm import (
     AttributeDataType,
@@ -146,3 +147,28 @@ def test_process_same_shape_mask_without_projection(session, monkeypatch):
     assert av is not None
     assert av.ValueJSON
     assert av.ValueJSON.get("total_area", 0) > 0
+
+
+def test_process_raises_when_warped_mask_shape_mismatches(session, monkeypatch):
+    image = _prepare_image(session)
+    ms = _seed_model_seg(session, image, height=8, width=8)
+    monkeypatch.setattr(
+        ms, "read_data", lambda *a, **k: np.full((1, 8, 8), 255, dtype=np.uint8)
+    )
+    monkeypatch.setattr(
+        ms, "warp_to_image", lambda *a, **k: np.ones((3, 3), dtype=np.uint8)
+    )
+    keypoints = _seed_keypoints(session, image.ImageInstanceID)
+    odfd = _seed_odfd(session, image.ImageInstanceID)
+    session.commit()
+
+    with pytest.raises(ValueError, match="Shape mismatch"):
+        ETDRSModelProcessor(session).process(ms, keypoints, odfd)
+
+
+def test_process_returns_none_when_segmentation_has_no_data(session, monkeypatch):
+    image = _prepare_image(session)
+    ms = _seed_model_seg(session, image, height=8, width=8)
+    av = _process(session, monkeypatch, ms, image, None)
+
+    assert av is None
