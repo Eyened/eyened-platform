@@ -22,23 +22,48 @@ _ORM = pathlib.Path(__file__).resolve().parents[1]
 _FILES = (_ORM / "commands" / "rbac.py", _ORM / "cli.py")
 
 
-def _command_name(node: ast.FunctionDef) -> str | None:
+def _click_derived_name(func_name: str) -> str:
+    """Reproduce Click's bare-decorator name derivation (click/decorators.py).
+
+    Confirmed empirically against the installed click (``orm/setup.py`` pins
+    ``click==8.*``; 8.4.2 is what's installed) and against its source: Click
+    lowercases the function name, turns underscores into dashes, then -- as
+    of click 8.2 -- strips one trailing ``-command``, ``-cmd``, ``-group``, or
+    ``-grp`` segment. So ``grant_for_task_cmd`` becomes ``grant-for-task``,
+    not ``grant-for-task-cmd``; the suffix must be the trailing segment, so
+    ``cmd_foo`` is unaffected and becomes ``cmd-foo``, not ``foo``.
+    """
+    cmd_name = func_name.lower().replace("_", "-")
+    cmd_left, sep, suffix = cmd_name.rpartition("-")
+    if sep and suffix in {"command", "cmd", "group", "grp"}:
+        cmd_name = cmd_left
+    return cmd_name
+
+
+def _command_name(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
     """The Click command name this function is registered under, or None.
 
-    Both decorator shapes in this repo are handled: ``@click.command("grant")``
-    and ``@eorm.command()``, which Click names from the function itself with
-    underscores turned into dashes.
+    Three decorator shapes appear in this repo: ``@click.command("grant")``
+    (an explicit name, returned as-is), ``@eorm.command()`` (a bare call with
+    no name, so Click derives one -- see ``_click_derived_name``), and a bare
+    ``@click.command`` with no parentheses at all (Click permits applying the
+    decorator unapplied; the same derivation applies).
     """
     for decorator in node.decorator_list:
-        if not isinstance(decorator, ast.Call):
+        if isinstance(decorator, ast.Call):
+            func = decorator.func
+            args = decorator.args
+        elif isinstance(decorator, ast.Attribute):
+            func = decorator
+            args = ()
+        else:
             continue
-        func = decorator.func
         if not (isinstance(func, ast.Attribute) and func.attr == "command"):
             continue
-        for arg in decorator.args:
+        for arg in args:
             if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
                 return arg.value
-        return node.name.replace("_", "-")
+        return _click_derived_name(node.name)
     return None
 
 
@@ -74,6 +99,11 @@ def _mismatches() -> list[str]:
                     )
     # Positive control: the walk must actually have found literals to compare.
     # Without this the guard passes on a refactor that stopped writing them.
+    #
+    # 10 = 9 in rbac.py (one per command, all ten except the read-only
+    # check-declarations) + 1 in cli.py (create-user). Legitimately retiring
+    # a command means lowering this floor deliberately, not letting a lower
+    # count pass silently.
     assert checked >= 10, f"only {checked} TrustedPath literals found in the CLI"
     return bad
 
