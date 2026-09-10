@@ -7,10 +7,18 @@ request transaction.
 Two guards live here:
 
 1. Signature guard (test_no_service_holds_a_session,
-   test_no_route_handler_holds_a_session): no function under server/services
-   or server/routes takes/annotates a parameter as a Session, except a small
-   declared exception set (_SIGNATURE_ALLOWED below) plus the get_*_service
+   test_no_route_handler_holds_a_session,
+   test_no_authz_administration_function_holds_a_session): no function under
+   server/services, server/routes or orm/eyened_orm/authz takes/annotates a
+   parameter as a Session, except a small declared exception set
+   (_SIGNATURE_ALLOWED, _AUTHZ_SIGNATURE_ALLOWED) plus the get_*_service
    composition-root factories (_is_di_factory).
+
+   The orm/eyened_orm/authz root was added with RBAC admin P0, whose headline
+   change is that MembershipAdministration and AccountAdministration take
+   repositories rather than a Session. Without it that property was unpoliced.
+   Not extended further into orm/: the repositories own the Session by design,
+   and every one of them would be an exemption.
 
 2. Direct-DB-access guard (test_no_direct_db_access_in_service_or_route_functions):
    a stronger, independent check. The exceptions below weaken guard 1 (several
@@ -73,6 +81,23 @@ import pathlib
 _ROOT = pathlib.Path(__file__).resolve().parents[1]  # server/
 _SERVICES = _ROOT / "services"
 _ROUTES = _ROOT / "routes"
+_ORM_ROOT = _ROOT.parent / "orm"                 # the eyened_orm distribution root
+_AUTHZ = _ORM_ROOT / "eyened_orm" / "authz"
+
+# The ORM's own exemptions, keyed relative to _ORM_ROOT. Each is a function that
+# runs before, or outside, the repository layer that owns the Session.
+_AUTHZ_SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
+    ("eyened_orm/authz/bootstrap.py", "count_admins"): "reads Creator before any scope exists",
+    ("eyened_orm/authz/bootstrap.py", "ensure_admin"): "the bootstrap -- create-or-promote, runs before an admin exists",
+    ("eyened_orm/authz/denormalization.py", "_project_of"): "one-off ProjectID backfill helper, driven by a migration",
+    ("eyened_orm/authz/denormalization.py", "populate_project_ids"): "one-off ProjectID backfill, driven by a migration",
+    ("eyened_orm/authz/denormalization.py", "_populate_link"): "one-off ProjectID backfill helper, driven by a migration",
+    ("eyened_orm/authz/scoping.py", "projects_of"): (
+        "the shared project-route function the repositories themselves call; it "
+        "is the definition enforcement and the CLI share, and it executes a "
+        "selectable rather than owning a unit of work"
+    ),
+}
 
 
 def _is_di_factory(name: str) -> bool:
@@ -119,7 +144,20 @@ _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
 }
 
 
-def _offenders(root: pathlib.Path) -> list[str]:
+def _offenders(
+    root: pathlib.Path,
+    *,
+    root_key: pathlib.Path = _ROOT,
+    allowed: dict[tuple[str, str], str] | None = None,
+) -> list[str]:
+    """Functions under ``root`` that take or annotate a Session.
+
+    ``root_key`` is the base the exemption keys are relative to -- ``server/``
+    for the two server roots, ``orm/`` for the ORM one -- so a
+    ``services/auth.py`` and an ``eyened_orm/authz/auth.py`` cannot ever collide
+    in one another's allow-list.
+    """
+    allowed = _SIGNATURE_ALLOWED if allowed is None else allowed
     # A moved/renamed test file (_SERVICES/_ROUTES derive from __file__) would
     # otherwise make rglob() silently yield nothing, and `assert [] == []`
     # would pass vacuously -- fail loudly instead.
@@ -128,12 +166,12 @@ def _offenders(root: pathlib.Path) -> list[str]:
     for path in root.rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
-        key_path = path.relative_to(_ROOT).as_posix()
+        key_path = path.relative_to(root_key).as_posix()
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            if (key_path, node.name) in _SIGNATURE_ALLOWED or _is_di_factory(node.name):
+            if (key_path, node.name) in allowed or _is_di_factory(node.name):
                 continue
             # posonlyargs covers `def f(session: Session, /)`; kwonlyargs covers
             # `def f(*, session: Session)`; args covers the common case. A bare
@@ -143,7 +181,7 @@ def _offenders(root: pathlib.Path) -> list[str]:
                 ann = getattr(arg, "annotation", None)
                 text = ast.unparse(ann) if ann is not None else ""
                 if arg.arg in {"session", "db"} or text.endswith("Session"):
-                    bad.append(f"{path.relative_to(_ROOT.parent)}::{node.name}({arg.arg})")
+                    bad.append(f"{path.relative_to(root_key.parent)}::{node.name}({arg.arg})")
     return bad
 
 
@@ -155,6 +193,17 @@ def test_no_service_holds_a_session():
 def test_no_route_handler_holds_a_session():
     """No function under server/routes takes a Session, except the declared exceptions."""
     assert _offenders(_ROUTES) == []
+
+
+def test_no_authz_administration_function_holds_a_session():
+    """P0's headline property, policed.
+
+    The administration classes take repositories; the six exemptions below are
+    the pre-scope bootstrap, the one-off denormalization backfill and the shared
+    ``projects_of`` route the repositories themselves call. A seventh entry is
+    the signal this guard exists to raise.
+    """
+    assert _offenders(_AUTHZ, root_key=_ORM_ROOT, allowed=_AUTHZ_SIGNATURE_ALLOWED) == []
 
 
 # --- Guard 2: direct DB-access AST scan -------------------------------------
