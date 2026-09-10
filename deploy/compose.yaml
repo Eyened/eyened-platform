@@ -118,8 +118,12 @@ services:
       # Read directly by the image's CMD (deploy/Dockerfile.server), not by
       # the app — this service has no env_file, so without this line WORKERS
       # in deploy/.env reaches no container and the image's own ${WORKERS:-4}
-      # silently wins instead. Restated as :-4, not :-, for the same reason as
-      # EYENED_API_AUTH_PASSWORD_ENABLED below.
+      # silently wins instead. The `:-4` restates the Dockerfile's own default
+      # to keep it visible here and in step with it. That is NOT the ${X:-}
+      # trap EYENED_API_AUTH_PASSWORD_ENABLED below documents: that one bites
+      # because pydantic accepts the empty string in place of its own default,
+      # whereas this value lands in a shell expansion, where `:-` substitutes
+      # for empty as well as unset (measured: unset and empty both yield 4).
       WORKERS: ${WORKERS:-4}
       # Whether the login page offers username/password at all. Documented as
       # the thing you turn off once OIDC works, so it has to reach a container:
