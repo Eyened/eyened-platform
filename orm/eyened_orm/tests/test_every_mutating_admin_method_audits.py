@@ -6,9 +6,10 @@ covers this: a method can accept a perfectly good actor and simply forget to
 write the row. That is invisible to any signature check and is exactly the
 failure this whole change exists to prevent, so it is checked behaviorally.
 
-Parametrized over all eleven methods rather than a sample. A tenth mutating
-method added without a row must fail here, and adding it to the table is how the
-author is made to think about it.
+Parametrized over the nine mutating methods, not a sample of them; the two
+read-only methods each get their own dedicated test below instead. A tenth
+mutating method added without a row must fail here, and adding it to the table
+is how the author is made to think about it.
 """
 from __future__ import annotations
 
@@ -145,10 +146,49 @@ def test_the_read_only_methods_write_nothing(session, seeded):
     the audit trail with events that never happened, and only this catches it.
 
     `plan_grant_for_tasks` is the other read-only method; it needs the
-    `spanning` task fixture, and `test_a_plan_writes_nothing` in
-    test_authz_administration.py already pins it.
+    `spanning` task fixture, which builds its own project "A" and collides
+    with this fixture's, so it is covered separately by
+    `test_plan_grant_for_tasks_writes_nothing` below instead of here.
     """
     before = _audit_count(session)
     seeded["membership"].memberships_of(username="alice")
     session.flush()
+    assert _audit_count(session) == before
+
+
+def test_plan_grant_for_tasks_writes_nothing(session, spanning):
+    """The other read-only method. It cannot share `seeded`: `spanning`
+    creates its own project "A" (ProjectName is unique), so this gets its own
+    arrange instead of reusing that fixture.
+
+    The call must land on the real success path, not just raise past
+    `AdminEntityNotFound` -- a call that errors before reaching any point
+    where a write could occur would prove nothing about whether one happens.
+    `spanning`'s task touches two projects that alice holds no membership in,
+    so a correct call returns a plan with both in `to_grant`; asserting that
+    is what shows the resolution work actually ran before the audit count is
+    checked.
+    """
+    make_creator(session, "alice")
+    session.commit()
+
+    scope = admin_scope()
+    admin = MembershipAdministration(
+        CreatorRepository(session, scope=scope),
+        ProjectRepository(session, scope=scope),
+        ProjectMemberRepository(session),
+        TaskRepository(session, scope=scope),
+        audit=AuditWriter(session),
+        actor=TrustedPath("eorm test"),
+    )
+
+    before = _audit_count(session)
+    plan = admin.plan_grant_for_tasks(
+        username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
+    )
+    session.flush()
+
+    assert {name for _, name, _ in plan.to_grant} == {"A", "B"}, (
+        "plan resolved no projects -- success path not reached"
+    )
     assert _audit_count(session) == before
