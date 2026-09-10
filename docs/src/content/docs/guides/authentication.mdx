@@ -149,7 +149,7 @@ Only the value in the `creator.EmployeeIdentifier` field matters for OIDC authen
 
 Two limits are worth knowing:
 
-- **It is not instantaneous for `GET /api/auth/me`.** That route resolves the token without re-reading the account's status, so an unexpired access token the user already holds still returns their own account details until it expires on its own schedule. Nothing else answers.
+- **It is not instantaneous for `GET /api/auth/me`.** That route resolves the token without re-reading the account's status, so an unexpired access token the user already holds still returns their own account details until it expires on its own schedule. One other authenticated route answers the same way — `GET /api/import/status/{task_id}`, which reports a queued job's bare status and carries no project data. Everything that reads or writes project data resolves the scope fresh and closes.
 - **It is not absolute against OIDC.** A deactivated password-only account has `EmployeeIdentifier = NULL`, which the OIDC existing-account lookup matches on, so with `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` the same person can sign in through the provider under a different username and receive a **new** account. That new account holds no memberships, so it reaches no project data until someone grants it; an exact username match is refused with 409 rather than linked.
 
 To force re-authentication across the board, set a new `EYENED_API_SECRET_KEY` — this invalidates every outstanding token, including refresh tokens (default lifetime: 7 days).

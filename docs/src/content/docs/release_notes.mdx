@@ -227,15 +227,16 @@ This release focuses on viewer persistence and enface overlays, a service-layer 
 
 - **Viewer bookmarks:** open viewers and B-scan indices persist in the URL (`v=`) and localStorage (#198).
 - **Enface on registered images:** overlays follow GPU registration hops; photolocator hit testing covers raster, radial, and circular locators (#177, #194).
-- **Server service layer:** FastAPI routes go through repositories and services; mutations write an append-only `AuditLog`. This is preparation for RBAC, not a permission-model change for operators (#171 and related PRs).
+- **Server service layer:** FastAPI routes go through repositories and services; mutations write an append-only `AuditLog`. This is preparation for RBAC, not a permission-model change for operators (#134, #139, #145, #165, #171).
 - **CFI inference:** `eorm run-cfi-models` replaces the previous CFI writers, with model versions, input specs, and more robust batching (#158).
 - **CI:** client and server test/lint gates on `development` and `main`.
+- **CODEOWNERS:** repository-wide review by `@Eyened/platform-core`.
 
 ### Bug fixes
 
 **Viewer**
 
-- Large DICOM volumes and IR/OCT stretch (#196).
+- Large DICOM volumes and IR/OCT stretch (#196, #173).
 - Patient registration on task viewer (#144).
 - CirclePhotoLocator crash (#157).
 - Multiclass erode/dilate (#131).
@@ -246,6 +247,7 @@ This release focuses on viewer persistence and enface overlays, a service-layer 
 - PNG series path resolution (#191).
 - CFI inference filtering, thumbnails, lock/deadlock replay (#158).
 - Removed unused `mysql-connector-python` (#199).
+- Registration processing exception handling (#147).
 
 ### Upgrade notes
 
@@ -253,6 +255,14 @@ This release focuses on viewer persistence and enface overlays, a service-layer 
 2. Reinstall `eyened_orm` after pulling.
 3. Use `eorm run-cfi-models` instead of the removed legacy CFI writers.
 4. Do not depend on `mysql-connector-python`.
+5. Authentication (password + optional OIDC) is unchanged from v2026.07.0.
+
+### Documentation
+
+- [Release notes](/eyened-platform/release_notes/)
+- [Getting started](/eyened-platform/getting_started/)
+- [CFI / inference](/eyened-platform/orm/inference/)
+- [Attributes](/eyened-platform/orm/data_model/attributes/)
 
 ## v2026.07.0
 

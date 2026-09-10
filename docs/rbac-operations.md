@@ -120,13 +120,18 @@ do nothing. There is no feature flag: a flag means two code paths where the
 | **Delete another user's annotation** | yes | **no** -- project admin |
 | **Delete a populated task** | yes | **no** -- project admin |
 
-The first is the requirement doing its job. The other two are collateral from
-`grader` not reaching `project_admin`. **Only the delete has a recovery path**:
-`require_owner_or_project_admin` lets a `project_admin` -- and an administrator --
-through. The modify does not. `require_owner` is author-only with no admin
-clause ("403 for everyone else, administrators included"), so no role or flag
-permits editing someone else's annotation, and a row whose author is NULL is
-permanently unmodifiable.
+The first is the requirement doing its job, and it is the one with **no** recovery
+path at all: `require_owner` is author-only with no admin clause ("403 for
+everyone else, administrators included"), so no role and no flag permits editing
+someone else's annotation, and a row whose author is NULL is permanently
+unmodifiable.
+
+The other two are collateral from `grader` not reaching `project_admin`, and both
+have a working recovery path: administrators are data superusers *for these two*
+and can perform them immediately -- the annotation delete through
+`require_owner_or_project_admin`, the task delete through the `project_admin`
+floor on `DELETE /task/{id}`. Both reach the administrator by the same route,
+`AccessScope.effective_role` returning `project_admin` for every project.
 
 ## RBAC ships inert
 

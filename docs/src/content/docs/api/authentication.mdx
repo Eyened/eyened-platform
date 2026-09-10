@@ -71,7 +71,7 @@ Two endpoints back the browser redirect flow. Configuration is in **[Guides — 
 
 **Query:** `next` — where to return the user after login.
 
-A CSRF token and a nonce are generated per call: the **hashes** travel to the provider (in `state` and `nonce`), and the originals come back to the client as cookies. Both are validated on the next call.
+A CSRF token and a nonce are generated per call, and they travel in opposite directions. The CSRF **hash** goes to the provider in `state` while the raw token comes back to the client in the `oidc_csrf_token` cookie; the **raw** nonce goes to the provider and its hash comes back in the `oidc_nonce` cookie. Both are validated on the next call.
 
 ### POST /api/auth/oidc/authenticate
 
@@ -80,7 +80,7 @@ A CSRF token and a nonce are generated per call: the **hashes** travel to the pr
 **Request body:** `{ "code": "string", "state": "string" }`
 **Cookies:** `oidc_csrf_token`, `oidc_nonce` — set by `/authorize`.
 
-Validates the CSRF token against the hash in `state` and the nonce against the ID token, then returns the user and sets JWT cookies exactly as `POST /api/auth/login` does. Returns **400** on any state, CSRF, or nonce mismatch.
+Validates the CSRF token against the hash in `state` and the nonce against the ID token, then returns the user and sets JWT cookies exactly as `POST /api/auth/login` does. Returns **400** on an unparseable `state`, a missing or mismatched CSRF token, or a missing nonce, and **401** when the nonce in the ID token does not match the cookie.
 
 Whether an unknown OIDC identity is provisioned an account is controlled by `EYENED_OIDC_CREATE_NEW_ACCOUNTS`. Newly provisioned accounts hold no memberships — see **[Access control](/eyened-platform/guides/access_control)**.
 

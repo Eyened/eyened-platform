@@ -54,7 +54,7 @@ An object is reachable only if the actor holds **every** project it touches. Thi
 There are no partial views. A task spanning projects A and B is invisible to someone who holds only A — it does not appear with fewer subtasks, it does not appear at all.
 
 :::note
-Objects that touch **no** project are unrestricted for reads: any authenticated user can see them. Writes fail closed instead. An empty task between creation and its first image is the common case.
+Objects that touch **no** project are unrestricted for reads: any authenticated user can see them. Writes fail closed instead. This is not reachable through the API — `POST /api/task` requires a non-empty declaration — but it exists in migrated data: the backfill derived each task's declaration from the projects of its linked images, so a task that had no images at that moment carries no `TaskProject` rows and is visible to everyone.
 :::
 
 ### Tasks declare their projects

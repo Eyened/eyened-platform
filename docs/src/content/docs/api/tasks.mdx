@@ -37,6 +37,12 @@ Get one subtask by **0-based index** within the task.
 
 **Query parameters:** `with_images` (bool), `with_next` (bool).
 
+### GET /api/task/\{task_id\}/subtask-assignees
+
+The distinct creators who hold at least one subtask of this task, ordered by name. A subtask with no assignee contributes nothing.
+
+**Response:** `[{ "id": 1, "name": "alice" }]`
+
 ## Subtasks
 
 ### GET /api/subtasks/\{subtask_id\}
