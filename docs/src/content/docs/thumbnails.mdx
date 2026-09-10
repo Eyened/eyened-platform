@@ -20,8 +20,8 @@ All paths below call the same ORM core: `update_thumbnails` → `save_thumbnails
 Scan the database for images missing thumbnails and generate them in-process:
 
 ```bash
-eorm update-thumbnails --env prod
-eorm update-thumbnails --failed --print-errors --env prod
+eorm --env-file /path/to/prod.env update-thumbnails
+eorm --env-file /path/to/prod.env update-thumbnails --failed --print-errors
 ```
 
 - Default: `ThumbnailPath IS NULL`
@@ -160,14 +160,14 @@ The API only **enqueues** jobs. Execution happens in an RQ worker that shares:
 Thumbnail jobs are placed on the **`default`** queue. The worker must listen to it:
 
 ```bash
-# set in the environment, or in deploy/.env for the Docker workers
-EYENED_RQ_WORKER_QUEUES=default,cfi-roi,...   # must include default for thumbnails
+# bare process — read from this shell's environment
+export EYENED_RQ_WORKER_QUEUES=default,cfi-roi,...   # must include default for thumbnails
 
 # from repo root
 PYTHONPATH=. python -m server.rq_worker
 ```
 
-Docker example: [`deploy/compose.workers.yaml`](https://github.com/Eyened/eyened-platform/blob/main/deploy/compose.workers.yaml) — see [`worker/README.md`](https://github.com/Eyened/eyened-platform/blob/main/worker/README.md) for how to run and rebuild each image.
+Docker example: [`deploy/compose.workers.yaml`](https://github.com/Eyened/eyened-platform/blob/main/deploy/compose.workers.yaml) — see [`worker/README.md`](https://github.com/Eyened/eyened-platform/blob/main/worker/README.md) for how to run and rebuild each image. The Docker workers do **not** read `EYENED_RQ_WORKER_QUEUES` from `deploy/.env` — each service sets it internally, and the container's value always wins. To change which queues a Docker worker listens to, set `EYENED_RQ_QUEUES_CFI_ROI` (for `worker-cfi-roi`) or `EYENED_RQ_QUEUES_INFERENCE` (for `worker-inference`) in `deploy/.env`; `worker-cfi-amd` and `worker-layersegmentation` listen on a queue **fixed in `compose.workers.yaml`** and cannot be re-pointed from `.env` at all.
 
 If you split workers (e.g. slim ROI-only container), ensure **at least one** worker lists `default` and has storage access — otherwise thumbnail jobs stay queued forever.
 
