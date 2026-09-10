@@ -77,8 +77,8 @@ description: EyeNED Platform v2026.07.0 release notes
   than `NAME=`, and never stops the database to take a backup — only `restore` does. See
   `deploy/README.md`'s **Backup and rollback** section. Anyone with existing archives under the
   old default path, `deploy/snapshots/`, should move or delete them — `.gitignore` covers that
-  path again, but they are not moved automatically and `./eyened backup`'s new default is
-  `deploy/backups/`.
+  path again, but they are not moved automatically, and `./eyened backup` has no default
+  destination: `deploy/backups/` is merely the suggested one (`<dir>` is a required argument).
 - **`worker/`'s compose files and `.env` are gone.** The four `worker/docker-compose.*.yml`
   files and `worker/.env*` are replaced by `deploy/compose.workers.yaml`, which reads
   `deploy/.env` — there is no separate worker env file any more. See `worker/README.md`.
