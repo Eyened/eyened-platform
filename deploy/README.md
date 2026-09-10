@@ -392,7 +392,7 @@ it again. There is no undo. An interrupt is safe: it leaves the database
 stopped and tells you to re-run.
 
 `eorm save-dump` / `eorm load-dump` are a different mechanism — a logical dump
-via `mysqlsh`, with a `--legacy-sql` mysqldump fallback — and the tool for a
+via `mysqlsh`, with a `--legacy-sql` fallback — and the tool for a
 database this stack does not own. They run on the HOST, not in a container:
 `Dockerfile.server` carries no MySQL client at all, so neither mode works
 inside the stack. **`mysqlsh` is a host prerequisite for the default path**
