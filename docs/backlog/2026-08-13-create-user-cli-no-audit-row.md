@@ -1,3 +1,13 @@
+> **CLOSED 2026-09-08** by RBAC admin P0. `eorm create-user` now writes
+> `TrustedPath("eorm create-user")` with the same `changes` shape as
+> `auth:register`. Pinned by
+> `orm/eyened_orm/tests/test_cli_create_user.py::test_creating_a_user_writes_an_audit_row`.
+>
+> Its sibling `2026-08-13-create-user-cli-is-human-flag.md` stays **open**: the
+> flag is genuinely broken (`is_flag=True, default=True` cannot be cleared, so
+> no non-human creator can be made from the CLI), but fixing it changes the
+> CLI's option surface, which P0 deliberately did not touch.
+
 # `eorm create-user` writes no `AuditLog` row
 
 **Status:** open
