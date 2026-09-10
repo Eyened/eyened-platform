@@ -260,6 +260,16 @@ jobs:
       # the dev stack) passed this step green. The client layer list differs
       # from the template's dev one, which is what makes the assertion below
       # able to fail at all.
+      #
+      # Run through /bin/sh — dash on the runner — and not the step's own bash.
+      # The `sh -n` step above proves write_env PARSES as POSIX sh; it does not
+      # prove it RUNS as POSIX sh, and those are not the same check: measured
+      # here, `dash -n` accepts `[[ ]]`, `local` and `${x^^}` without a word
+      # (it rejects an array literal, which is how that gap goes unnoticed),
+      # and a bash subshell here would not mind any of the three either
+      # — it would RUN them. `./eyened help` above is the one step that
+      # does source lib.sh under a `#!/bin/sh` shebang, and it only ever
+      # reaches the file's TOP LEVEL — never a line inside this function.
       - name: write_env's last-assignment-wins is real, not assumed
         run: |
           set -e
@@ -277,9 +287,17 @@ jobs:
           # can never fire here and turn this into a check of nothing.
           rm -f "$scratch/deploy/.env"
 
-          ( REPO_ROOT="$scratch"; . "$scratch/deploy/scripts/lib.sh"; write_env client )
+          /bin/sh -c 'REPO_ROOT=$1; . "$1/deploy/scripts/lib.sh"; write_env client' sh "$scratch" \
+            || { echo "::error::'write_env client' failed under /bin/sh — its own output is above"; exit 1; }
           env="$scratch/deploy/.env"
           [ -f "$env" ] || { echo "::error::write_env did not create $env"; exit 1; }
+
+          # 600, because this file holds five secrets. write_env restricts the
+          # temp file BEFORE anything goes into it and lets `mv` carry the mode
+          # onto the target, so a regression here is silent: the .env is
+          # correct in every other respect and readable by everyone on the box.
+          mode=$(stat -c '%a' "$env")
+          [ "$mode" = "600" ] || { echo "::error::$env is mode $mode, want 600 — the file holding this deployment's five generated secrets is readable beyond its owner"; exit 1; }
 
           n=$(command grep -c '^COMPOSE_FILE=' "$env" || true)
           [ "$n" = "2" ] || { echo "::error::$env has $n '^COMPOSE_FILE=' line(s), want 2 (the template's and write_env's appended one) — write_env no longer produces the two-assignment file the whole mechanism depends on"; exit 1; }
@@ -310,6 +328,118 @@ jobs:
           n=$(printf '%s\n' "$rendered" | command grep -c 'published: "13306"' || true)
           [ "$n" = "1" ] || { echo "::error::deploy/.env with compose.host-ports.yaml appended to the LAST COMPOSE_FILE line rendered 'published: \"13306\"' $n time(s), want 1 — compose is not reading the last assignment, or write_env's appended block is not actually the last COMPOSE_FILE line"; exit 1; }
           echo "ok: write_env's appended COMPOSE_FILE line is the one compose reads (last-assignment-wins, on the real generated file)"
+
+      # `true >`, not `: >`, in write_env (deploy/scripts/lib.sh). The two look
+      # interchangeable and are not: `:` is a POSIX SPECIAL built-in, and a
+      # redirection error on one of those exits a non-interactive shell
+      # outright — so the `|| die` written after it never runs and the operator
+      # is left with a bare "cannot create ...: Permission denied" naming no
+      # fix. bash catches BOTH forms, which is precisely why this cannot be
+      # checked from a step running under GitHub's default `bash -e {0}`:
+      # measured on the ': >' spelling, `bash -c` gave rc 1 and the die's own
+      # message — indistinguishable from correct — while `/bin/sh -c` gave
+      # rc 2 and no die at all.
+      #
+      # Its own step rather than another assertion in the one above: this one
+      # needs deploy/ at mode 555, and a scratch tree in that state is not
+      # something to leave lying around a step that has other work to do.
+      - name: write_env names the fix when deploy/ is not writable
+        run: |
+          set -e
+          scratch=$(mktemp -d)
+          # chmod before rm: this step leaves deploy/ at mode 555, and rm -rf
+          # cannot recurse into a directory it may not write.
+          trap 'chmod -R u+rwX "$scratch" 2>/dev/null || true; rm -rf "$scratch"' EXIT
+          cp -a deploy "$scratch/deploy"
+          # write_env returns early — and SUCCESSFULLY — when .env is already
+          # there, which would make this a check of nothing.
+          rm -f "$scratch/deploy/.env"
+          chmod 555 "$scratch/deploy"
+
+          set +e
+          out=$(/bin/sh -c 'REPO_ROOT=$1; . "$1/deploy/scripts/lib.sh"; write_env client' sh "$scratch" 2>&1)
+          rc=$?
+          set -e
+          chmod u+w "$scratch/deploy"
+          printf '%s\n' "$out"
+
+          # WHICH failure, not merely that it failed: 1 is die's status, and a
+          # shell aborting on the redirection itself gives 2. Both are
+          # non-zero, so "it failed" would not tell the fixed and broken
+          # spellings apart.
+          [ "$rc" = "1" ] || { echo "::error::write_env against an unwritable deploy/ exited $rc, want 1 (die's own status). With ': >' in place of 'true >' the shell aborts on the redirection itself and the '|| die' after it never runs — dash exits 2. A job running as root would land here too, since root ignores the directory mode"; exit 1; }
+          case "$out" in
+            *"could not create"*) ;;
+            *) echo "::error::write_env against an unwritable deploy/ never printed its own 'could not create ...' message, so the shell aborted on the redirection instead and the operator gets a bare 'cannot create ...: Permission denied' with no fix in it"; exit 1 ;;
+          esac
+          echo "ok: write_env reaches its own die under /bin/sh when deploy/ is unwritable"
+
+      # doctor.sh had no executable coverage of any kind: it appears in the
+      # shell-syntax loop above and nowhere else, so CI proved it PARSES and
+      # nothing proved that a single check inside it can fail. D7 is what makes
+      # that expensive. .env.example no longer ASSIGNS 'change_me' to anything,
+      # so compose.yaml's ${...:?} — which rejects a variable that is ABSENT or
+      # EMPTY, never one that is SET to the published default — can no longer
+      # catch a deploy/.env hand-copied from a PRE-D7 template, and doctor's
+      # sweep is the only thing left between that file and a stack booting on a
+      # database root password published in this repository's history.
+      #
+      # Both directions, against ONE .env that differs by exactly one line. The
+      # pass is not decoration: without it "doctor exited 1" below would be
+      # satisfied by a doctor that fails for any reason at all, and several of
+      # its checks answer for the RUNNER rather than for the .env — the docker
+      # daemon, the compose floor, a free HTTP_PORT, 10 GiB of free disk.
+      #
+      # The default is QUOTED — MYSQL_ROOT_PASSWORD="change_me" — because
+      # compose's dotenv parser unwraps quotes and lib.sh's env_get does not.
+      # doctor's own unquote() is the only thing closing that gap, and every
+      # comparison in the sweep is an exact-match `case`, so an unquote that
+      # stops unwrapping reads a DIFFERENT string, reports the passwords fine
+      # and exits 0.
+      - name: doctor refuses a .env on the published default password
+        run: |
+          set -e
+          scratch=$(mktemp -d)
+          # On EXIT, not at the end: the assertions below exit non-zero on
+          # failure, and the .env generated here holds five real secrets.
+          trap 'rm -rf "$scratch"' EXIT
+          cp -a deploy "$scratch/deploy"
+          # The fixture .env an earlier step wrote is copied straight in by the
+          # line above. Remove it so write_env's "exists, left alone" path
+          # cannot fire and hand doctor a file this step did not produce.
+          rm -f "$scratch/deploy/.env"
+          /bin/sh -c 'REPO_ROOT=$1; . "$1/deploy/scripts/lib.sh"; write_env dev' sh "$scratch" \
+            || { echo "::error::'write_env dev' failed under /bin/sh — its own output is above"; exit 1; }
+          env="$scratch/deploy/.env"
+          # Without this the whole step could pass having read nothing: a
+          # write_env that created no file leaves doctor on its "no deploy/.env
+          # yet" branch, which exits 0, and the append below would then create
+          # the file from scratch and still trip the sweep.
+          [ -f "$env" ] || { echo "::error::write_env did not create $env, so neither run below would be reading a generated .env at all"; exit 1; }
+
+          set +e
+          out=$("$scratch/deploy/scripts/doctor.sh" dev 2>&1); rc=$?
+          set -e
+          printf '%s\n' "$out"
+          [ "$rc" = "0" ] || { echo "::error::doctor.sh dev exited $rc against a .env freshly written by write_env — the report above names the check that failed"; exit 1; }
+
+          # ONE appended line onto the file that just passed. Compose's dotenv
+          # parser and env_get both take the LAST assignment, so this is
+          # exactly the shape of the pre-D7 hand copy.
+          printf '%s\n' 'MYSQL_ROOT_PASSWORD="change_me"' >> "$env"
+          set +e
+          out=$("$scratch/deploy/scripts/doctor.sh" dev 2>&1); rc=$?
+          set -e
+          printf '%s\n' "$out"
+          [ "$rc" = "1" ] || { echo "::error::doctor.sh dev exited $rc on a deploy/.env whose MYSQL_ROOT_PASSWORD is the published default 'change_me', want 1 — with .env.example no longer shipping that value, nothing else stops such a stack from booting"; exit 1; }
+          # Named, not merely reported: doctor failing for one of its dozen
+          # other reasons would satisfy the status check above while leaving
+          # the published-default sweep exactly as unproven as it was.
+          case "$out" in
+            *"MYSQL_ROOT_PASSWORD"*) ;;
+            *) echo "::error::doctor.sh dev did fail on the published-default .env, but never named MYSQL_ROOT_PASSWORD — so it failed for some other reason and the published-default sweep is still unproven"; exit 1 ;;
+          esac
+          echo "ok: doctor passes a write_env-generated .env and refuses the same file with a quoted 'change_me' root password"
 
       # Pre-flight: the layer combinations below merge compose.workers.yaml
       # against the storage overlay generated ABOVE, which has no worker
