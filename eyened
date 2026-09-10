@@ -340,7 +340,13 @@ case "$cmd" in
         resolve_compose
         compose exec -it database sh -c 'exec mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' ;;
     check-storage)  cmd_check_storage ;;
-    backup)         "$DEPLOY_DIR/scripts/db-backup.sh" "$@" ;;
+    # EYENED_INVOKED_AS tells db-backup.sh the command actually typed, so its
+    # own usage/error messages can name it instead of 'db-backup.sh' or a bare
+    # argument fragment. A plain VAR=value prefix on this line scopes it to
+    # this one exec — no `export` and no persisted state — and is POSIX, not
+    # a bashism; db-backup.sh falls back to its own name when unset (direct
+    # invocation).
+    backup)         EYENED_INVOKED_AS="./eyened backup" "$DEPLOY_DIR/scripts/db-backup.sh" "$@" ;;
     restore)        "$DEPLOY_DIR/scripts/db-restore.sh" "$@" ;;
     reset)          cmd_reset ;;
     help|-h|--help) usage ;;

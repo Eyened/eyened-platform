@@ -31,7 +31,13 @@ resolve_compose
 ENV_FILE="$DEPLOY_DIR/.env"
 TAR=no
 
-USAGE="usage: db-backup.sh [-e envfile] [-t] <output-dir>
+# EYENED_INVOKED_AS: set by ./eyened (only on the 'backup' dispatch) to the
+# command the operator actually typed, so these messages never name a command
+# they didn't run. ${VAR:-default} is safe under this script's own `set -eu`
+# even when the caller never set it (direct 'db-backup.sh' invocation) —
+# that is what the :- form is for, not a bashism. Falls back to this script's
+# own name, which is still correct and runnable for that entry point.
+USAGE="usage: ${EYENED_INVOKED_AS:-db-backup.sh} [-e envfile] [-t] <output-dir>
       <output-dir>  an absolute path, or a path under deploy/ (e.g. backups)
       -e envfile    read credentials from this file instead of deploy/.env
       -t            also write <output-dir>.tgz"
@@ -61,7 +67,7 @@ DEST=${1:-}
 shift
 [ $# -eq 0 ] || die "error: unexpected extra argument(s) after <output-dir>: $*
       Fix: options come before the output directory, e.g.
-           [-e envfile] [-t] <output-dir>."
+           ${EYENED_INVOKED_AS:-db-backup.sh} [-e envfile] [-t] <output-dir>."
 
 # Bind mounts need an absolute host path; resolve relative paths against deploy/.
 case "$ENV_FILE" in /*) ;; *) ENV_FILE="$DEPLOY_DIR/${ENV_FILE#./}" ;; esac
