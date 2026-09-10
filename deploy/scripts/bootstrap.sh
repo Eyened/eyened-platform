@@ -180,9 +180,11 @@ schema_ok=0
 
 if [ "$tables" = "0" ]; then
     echo "bootstrap: the database is empty — creating the schema and seeding form schemas."
-    # The supported fresh-install path: create_all + stamp alembic at head, so
-    # later upgrades apply only new migrations. NOT `alembic upgrade head`:
-    # replaying the whole chain from zero is not a path this repo maintains.
+    # The supported fresh-install path. `initialize-database` runs the alembic
+    # trail to head; since the squash there is no separate table-creation step,
+    # because orm_baseline — the root migration — creates the whole schema
+    # itself. So this is not "replaying years of history from zero"; it is one
+    # migration plus whatever has landed after it.
     # A failure here aborts the script under `set -e` before schema_ok is set,
     # so a partial failure this run never falls through to admin creation.
     compose exec -T server eorm initialize-database --seed-form-schemas
@@ -192,16 +194,23 @@ else
     current=$(alembic_current)
     head=$(alembic_head heads)
     if [ -z "$current" ]; then
-        # Tables exist but alembic was never stamped: create_all succeeded
-        # and something after it (stamping, or --seed-form-schemas) did not.
-        # This is a broken initialisation, not drift, and applying migrations
-        # cannot repair a schema that was never fully created — telling the
-        # operator to run them would misdiagnose the problem.
+        # Tables exist but no alembic_version row. initialize-database runs the
+        # migration trail, and alembic writes that row as it applies, so this is
+        # no longer "create_all succeeded and stamping did not" — that sequence
+        # no longer exists. What remains are a schema restored from a logical
+        # dump that did not carry its alembic_version table, a schema created by
+        # a release older than the migration squash, or a run that died partway
+        # (MySQL DDL is not transactional, so a half-applied migration leaves
+        # tables behind). Which revision such a schema should be stamped at
+        # depends on what it actually contains, so bootstrap reports and stops
+        # rather than guessing — applying migrations blind would misdiagnose all
+        # three.
         echo "bootstrap: WARNING — this database has tables but no alembic_version row."
-        echo "bootstrap: A previous initialisation likely did not finish (schema creation"
-        echo "bootstrap: succeeded; stamping or form-schema seeding did not). This is not"
-        echo "bootstrap: something bootstrap can repair automatically — inspect the"
-        echo "bootstrap: database directly before proceeding."
+        echo "bootstrap: That is usually a schema restored from a logical dump that did not"
+        echo "bootstrap: include the alembic_version table, or one created by a release older"
+        echo "bootstrap: than the migration squash. Which revision it should be stamped at"
+        echo "bootstrap: depends on what the schema actually is, so bootstrap will not guess —"
+        echo "bootstrap: inspect the database directly before proceeding."
     elif [ "${current%% *}" = "${head%% *}" ]; then
         echo "bootstrap: schema is at head ($head). Nothing to do."
         schema_ok=1

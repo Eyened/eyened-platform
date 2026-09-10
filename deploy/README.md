@@ -362,10 +362,11 @@ interactive on purpose — alembic's own confirmation prompt is what still
 guards a populated database against the wrong migration being applied.
 
 **Fresh installs never run this.** `./eyened install` and `./eyened up` initialize a
-brand-new database with `eorm initialize-database`, not by replaying the
-whole alembic chain from an empty schema — that is not a path this repo
-maintains. `./eyened migrate` is for applying new migrations to a database that
-already has a schema.
+brand-new database with `eorm initialize-database`, which runs the alembic
+trail to head against the empty schema — `orm_baseline`, the root migration,
+creates the whole schema itself, so there is no separate table-creation step.
+`./eyened migrate` is for applying new migrations to a database that already
+has a schema.
 
 ## Backup and rollback
 
