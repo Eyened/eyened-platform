@@ -38,15 +38,15 @@ _ROOT = pathlib.Path(__file__).resolve().parents[2]
 # Creator(**data) both slip past it, so this bounds the obvious writes rather
 # than proving there are no others.
 _ISADMIN_WRITERS = {
-    "orm/eyened_orm/authz/bootstrap.py",       # ensure_admin
-    "orm/eyened_orm/authz/administration.py",  # set_admin (deleted in the cutover)
-    "orm/eyened_orm/authz/account_admin.py",   # AccountAdministration.set_admin
+    "orm/eyened_orm/authz/bootstrap.py",      # ensure_admin
+    "orm/eyened_orm/authz/account_admin.py",  # AccountAdministration.set_admin
 }
 
 # Files permitted to call AccessScope.trusted(). Every entry is a path v0.3
 # places outside enforcement.
 _TRUSTED_CALLERS = {
-    "server/routes/auth.py",  # pre-authentication token refresh / OIDC
+    "server/routes/auth.py",              # pre-authentication token refresh / OIDC
+    "orm/eyened_orm/commands/shared.py",  # admin_scope_for_cli, for the eorm repositories
 }
 
 # Files permitted to construct an AccessScope whose is_admin is anything but a
@@ -172,11 +172,16 @@ def test_is_admin_is_written_only_by_the_allow_listed_writers():
 
 
 def test_only_the_allow_listed_files_call_access_scope_trusted():
-    """The unbounded-scope escape hatch is reachable from one file only.
+    """The unbounded-scope escape hatch is reachable from two files only.
 
-    ``audit_trusted`` in authz/administration.py and commands/rbac.py is a bare
-    Name call, not an attribute, so it does not match here. Do not "fix" that
-    with a substring search -- it would flag every one of those call sites.
+    ``commands/shared.py`` is the CLI's single construction site: the `eorm`
+    repositories need a scope, and confining it to one helper keeps this list at
+    two entries instead of one per command module. `eorm` authenticates nobody
+    either way -- ``get_database()`` opens a Database() straight from config --
+    so the entry records where the power lives, not a new grant of it.
+
+    The scan matches an *attribute* call, so a bare ``trusted(...)`` name call
+    would not appear here. Do not "fix" that with a substring search.
     """
     offenders = set()
     for path in _python_sources():
