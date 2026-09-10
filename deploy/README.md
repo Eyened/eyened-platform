@@ -372,7 +372,7 @@ already has a schema.
 | Case | Tool |
 |---|---|
 | The bundled database — live, fast, byte-exact | `./eyened backup <dir>` / `./eyened restore <dir>` |
-| Any database including an external one; portable across MySQL versions | `eorm save-dump` / `eorm load-dump` (a HOST tool — needs `mysqlsh` installed) |
+| Any database including an external one; portable across MySQL versions | `eorm save-dump` / `eorm load-dump` (a HOST tool — needs `mysqlsh` for the default path) |
 
 `./eyened backup` runs Percona XtraBackup in a one-shot container under the
 `backup` profile. The database keeps serving throughout. The output is a raw
@@ -489,8 +489,15 @@ four thin scripts that used to sit beside it are now subcommands of it.
 compose` (or `docker-compose`) run from `deploy/`, so `cd deploy && docker
 compose down` is equally correct — see [The compose
 binary](#the-compose-binary). The five delegated scripts are ordinary
-`#!/bin/sh` files and can still be invoked directly; `./eyened <command>` is
-the supported spelling.
+`#!/bin/sh` files. Three of them — `doctor.sh`, `db-backup.sh`,
+`db-restore.sh` — are also `./eyened` subcommands (`doctor`, `backup`,
+`restore`), and `./eyened <command>` is the supported spelling for those.
+The other two, `bootstrap.sh` and `gen-storage.sh`, have no subcommand of
+their own: `./eyened` calls them internally as part of starting a stack, and
+an operator is sometimes told to run one directly instead — `gen-storage.sh`
+on a remote worker box, for example (see [Workers](#workers) above). Both
+remain ordinary scripts anyone can invoke by path when that is what's
+needed.
 
 ## Troubleshooting
 
