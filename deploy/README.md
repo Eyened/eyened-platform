@@ -396,8 +396,8 @@ via `mysqlsh`, with a `--legacy-sql` mysqldump fallback — and the tool for a
 database this stack does not own. They run on the HOST, not in a container:
 `Dockerfile.server` carries no MySQL client at all, so neither mode works
 inside the stack. **`mysqlsh` is a host prerequisite for the default path**
-(`--legacy-sql` needs `mysqldump` instead) and is not installed by anything
-here.
+(`--legacy-sql` needs the ordinary MySQL client tools instead — `mysqldump` to
+save, `mysql` to load) and is not installed by anything here.
 
 For the application itself: check out the commit-ish you moved *from* and
 re-run `./eyened install`. **Images are built from source, so the checkout is
