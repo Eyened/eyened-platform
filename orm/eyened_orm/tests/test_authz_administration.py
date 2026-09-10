@@ -5,7 +5,6 @@ import pytest
 from sqlalchemy import select
 
 from eyened_orm import AuditLog, Project
-from eyened_orm.authz.administration import deactivate, reactivate
 from eyened_orm.authz.errors import AdminEntityNotFound
 from eyened_orm.authz.roles import ProjectRole, parse_role
 from eyened_orm.repositories import ProjectMemberRepository
@@ -503,7 +502,9 @@ def test_grant_all_never_changes_a_role_already_held(session, membership):
     assert written == 1
 
 
-def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(session, membership):
+def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(
+    session, membership, account
+):
     """Reactivation should restore the state that existed rather than require
     it to be rebuilt from memory."""
     alice = make_creator(session, "alice")
@@ -512,7 +513,7 @@ def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(session, membe
     session.commit()
     creator_id = alice.CreatorID
 
-    assert deactivate(session, username="alice") is True
+    assert account("deactivate").deactivate(username="alice") is True
     session.commit()
     assert alice.Inactive is True
     assert len(ProjectMemberRepository(session).roles_for(alice.CreatorID)) == 1
@@ -529,7 +530,7 @@ def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(session, membe
     }
 
 
-def test_deactivating_the_only_administrator_is_allowed(session):
+def test_deactivating_the_only_administrator_is_allowed(session, account):
     """No last-admin guard in this pass: the operator running `eorm` already has
     the database access that recovery needs."""
     from eyened_orm.authz.bootstrap import count_admins, ensure_admin
@@ -537,20 +538,20 @@ def test_deactivating_the_only_administrator_is_allowed(session):
     root, _ = ensure_admin(session, "root", None)
     session.commit()
 
-    assert deactivate(session, username="root") is True
+    assert account("deactivate").deactivate(username="root") is True
     session.commit()
     assert root.Inactive is True
     assert count_admins(session) == 0
 
 
-def test_reactivate_clears_the_flag_and_audits(session):
+def test_reactivate_clears_the_flag_and_audits(session, account):
     alice = make_creator(session, "alice")
     session.commit()
     creator_id = alice.CreatorID
-    deactivate(session, username="alice")
+    account("deactivate").deactivate(username="alice")
     session.commit()
 
-    assert reactivate(session, username="alice") is True
+    assert account("reactivate").reactivate(username="alice") is True
     session.commit()
     assert alice.Inactive is False
 
@@ -566,27 +567,113 @@ def test_reactivate_clears_the_flag_and_audits(session):
     }
 
 
-def test_deactivating_an_already_inactive_user_is_a_no_op(session):
+def test_deactivating_an_already_inactive_user_is_a_no_op(session, account):
     make_creator(session, "alice")
     session.commit()
-    deactivate(session, username="alice")
+    account("deactivate").deactivate(username="alice")
     session.commit()
-    assert deactivate(session, username="alice") is False
+    assert account("deactivate").deactivate(username="alice") is False
     assert len(_audit(session, "deactivate")) == 1
 
 
-def test_reactivating_an_already_active_user_is_a_no_op(session):
+def test_reactivating_an_already_active_user_is_a_no_op(session, account):
     """The symmetric guard: the plan tests it for `deactivate` only."""
     make_creator(session, "alice")
     session.commit()
-    assert reactivate(session, username="alice") is False
+    assert account("reactivate").reactivate(username="alice") is False
     assert _audit(session, "reactivate") == []
 
 
-@pytest.mark.parametrize("command", (deactivate, reactivate))
-def test_an_unknown_username_names_itself_for_deactivate_and_reactivate(session, command):
-    with pytest.raises(LookupError, match="nosuchuser"):
-        command(session, username="nosuchuser")
+@pytest.mark.parametrize("command", ("deactivate", "reactivate"))
+def test_an_unknown_username_names_itself_for_deactivate_and_reactivate(
+    session, account, command
+):
+    from eyened_orm.authz.errors import AdminEntityNotFound
+
+    with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
+        getattr(account(command), command)(username="nosuchuser")
+
+
+def test_set_admin_round_trip_persists_and_audits_each_change(session, account):
+    """Not covered by the brief's migration table (it only listed call sites
+    that already had tests) -- `set_admin` is otherwise exercised only through
+    the CLI shell, which still calls the old `administration.py` function
+    until Task 8. Mirrors `test_set_admin_round_trip_persists_and_reports_each_outcome`
+    in test_rbac_cli.py, at the AccountAdministration level: idempotence on
+    the unchanged call is the same rule `grant` follows."""
+    alice = make_creator(session, "alice")
+    session.commit()
+    creator_id = alice.CreatorID
+
+    assert account("set-admin").set_admin(username="alice", is_admin=True) is True
+    session.commit()
+    assert alice.IsAdmin is True
+
+    again = account("set-admin").set_admin(username="alice", is_admin=True)
+    assert again is False
+
+    assert account("set-admin").set_admin(username="alice", is_admin=False) is True
+    session.commit()
+    assert alice.IsAdmin is False
+
+    rows = _audit(session, "set-admin")
+    assert len(rows) == 2  # the unchanged call wrote nothing
+    assert rows[0].ActorID is None
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Entity == "Creator"
+    assert rows[0].EntityID == str(creator_id)
+    assert rows[0].Changes == {
+        "username": "alice",
+        "is_admin": {"old": False, "new": True},
+    }
+    assert rows[1].Changes == {
+        "username": "alice",
+        "is_admin": {"old": True, "new": False},
+    }
+
+
+def test_set_password_replaces_the_hash_and_clears_the_legacy_column(session, account):
+    """Not covered by the brief's migration table -- `set_password` is otherwise
+    exercised only through the CLI shell against the old `administration.py`
+    function. Mirrors the two `test_set_password_*` cases in test_rbac_cli.py:
+    both halves of the replacement matter (old stops verifying, new starts),
+    and the legacy `Password` column -- `check_login`'s fallback -- must be
+    cleared or a reset away from a password would not actually revoke it."""
+    from eyened_orm import Creator
+    from eyened_orm.utils.db_users import verify_password
+
+    creator = make_creator(session, "alice")
+    creator.PasswordHash = "existing-hash"
+    creator.Password = b"\x00" * 32  # legacy pbkdf2 hash, still live
+    session.commit()
+    creator_id = creator.CreatorID
+
+    account("set-password").set_password(username="alice", password="new-pw")
+    session.commit()
+
+    stored = session.scalars(
+        select(Creator).where(Creator.CreatorName == "alice")
+    ).one()
+    assert verify_password("new-pw", stored.PasswordHash) is True
+    assert stored.Password is None
+
+    rows = _audit(session, "set-password")
+    assert len(rows) == 1
+    assert rows[0].ActorID is None
+    assert rows[0].Action == "UPDATE"
+    assert rows[0].Entity == "Creator"
+    assert rows[0].EntityID == str(creator_id)
+    # Never the password and never the hash -- only that a reset occurred.
+    assert rows[0].Changes == {"username": "alice", "password_changed": True}
+
+
+def test_an_unknown_username_names_itself_for_set_admin_and_set_password(
+    session, account
+):
+    with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
+        account("set-admin").set_admin(username="nosuchuser", is_admin=True)
+    with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
+        account("set-password").set_password(username="nosuchuser", password="pw")
 
 
 def test_unused_declarations_reports_a_project_no_link_uses(session, spanning):
@@ -707,3 +794,40 @@ def test_a_grant_row_now_carries_the_project_it_named(session, membership):
         select(AuditLog).where(AuditLog.Entity == "ProjectMember")
     ).one()
     assert row.ProjectID == project_id
+
+
+@pytest.fixture()
+def account(session):
+    """Build an AccountAdministration attributed to the named `eorm` command."""
+    from eyened_orm.audit_writer import AuditWriter
+    from eyened_orm.authz.account_admin import AccountAdministration
+    from eyened_orm.authz.actor import TrustedPath
+    from eyened_orm.repositories import CreatorRepository
+    from eyened_orm.utils.factories import admin_scope
+
+    def _build(command: str) -> AccountAdministration:
+        return AccountAdministration(
+            CreatorRepository(session, scope=admin_scope()),
+            audit=AuditWriter(session),
+            actor=TrustedPath(f"eorm {command}"),
+        )
+
+    return _build
+
+
+def test_the_audit_sink_is_required_rather_than_defaulting_to_none(session):
+    """The seven server services declare `audit: AuditService | None = None`.
+    Here attribution is the entire job, so a sink that defaults to None would
+    be fail-open on precisely the property this class exists to protect."""
+    import pytest as _pytest
+
+    from eyened_orm.authz.account_admin import AccountAdministration
+    from eyened_orm.authz.actor import TrustedPath
+    from eyened_orm.repositories import CreatorRepository
+    from eyened_orm.utils.factories import admin_scope
+
+    with _pytest.raises(TypeError):
+        AccountAdministration(
+            CreatorRepository(session, scope=admin_scope()),
+            actor=TrustedPath("eorm set-admin"),
+        )

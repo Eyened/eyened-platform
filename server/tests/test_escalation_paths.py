@@ -39,7 +39,8 @@ _ROOT = pathlib.Path(__file__).resolve().parents[2]
 # than proving there are no others.
 _ISADMIN_WRITERS = {
     "orm/eyened_orm/authz/bootstrap.py",       # ensure_admin
-    "orm/eyened_orm/authz/administration.py",  # set_admin
+    "orm/eyened_orm/authz/administration.py",  # set_admin (deleted in the cutover)
+    "orm/eyened_orm/authz/account_admin.py",   # AccountAdministration.set_admin
 }
 
 # Files permitted to call AccessScope.trusted(). Every entry is a path v0.3
