@@ -6,7 +6,13 @@ image is never pulled — until you ask for it.
 
 ## Start
 
-In `deploy/.env`, **before starting the stack**:
+`deploy/.env` does not exist on a clean clone. Create it first by running the stack once:
+
+```bash
+./eyened up
+```
+
+Then, in `deploy/.env`:
 
 - append `:compose.oidc.yaml` to `COMPOSE_FILE`
 - set `PUBLIC_HOST` to the hostname or LAN IP you type in the browser — **not `localhost`**,
@@ -27,10 +33,10 @@ In `deploy/.env`, **before starting the stack**:
   provider are configured identically, by hand, and all three must move
   together — see `deploy/compose.yaml` and `deploy/compose.oidc.yaml`.
 
-`KEYCLOAK_ADMIN_PASSWORD` is **not** in that list: `./eyened install` generates it into
-`deploy/.env` on first run, alongside the database passwords and the API signing key. Read
-it out of that file when you need the admin console. It is on the list only if you wrote
-`deploy/.env` by hand or your copy predates that behaviour — see below.
+`KEYCLOAK_ADMIN_PASSWORD` is **not** in that list: `./eyened install` or `./eyened up`
+generates it into `deploy/.env` on first run, alongside the database passwords and the API
+signing key. Read it out of that file when you need the admin console. It is on the list
+only if you wrote `deploy/.env` by hand or your copy predates that behaviour — see below.
 
 The `EYENED_OIDC_CLIENT_*` lines ship **commented out** in `deploy/.env.example`, and
 `server/config.py` defaults both to the empty string with no validation error. Leave them
@@ -54,10 +60,10 @@ for exactly that reason. The port being reachable is the point, which is why the
 is what has to carry the weight: that console administers the realm the platform trusts for
 logins.
 
-So `./eyened install` generates the password rather than shipping one, and `doctor.sh`
-refuses to build with `compose.oidc.yaml` in `COMPOSE_FILE` while it is absent, empty,
-`admin` or `change_me` — the backstop for a hand-written `deploy/.env`, or one created
-before generation existed.
+So `./eyened install` or `./eyened up` generates the password rather than shipping one, and
+`doctor.sh` refuses to build with `compose.oidc.yaml` in `COMPOSE_FILE` while it is absent,
+empty, `admin` or `change_me` — the backstop for a hand-written `deploy/.env`, or one
+created before generation existed.
 
 ## It is a development provider, and its state is disposable
 
@@ -84,11 +90,8 @@ One setting is genuinely optional:
   `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS` in `deploy/.env` to match — nothing derives
   them from it any more.
 
-Then:
-
-```bash
-./eyened up
-```
+With `deploy/.env` edited, re-run `./eyened up` — the same command that created it — to
+pick up your changes.
 
 Open `http://<PUBLIC_HOST>:<HTTP_PORT>/users/login` and sign in with **`testuser` / `testuser`**.
 

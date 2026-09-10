@@ -87,8 +87,9 @@ services:
     # an operator reading the admin console) each need a different reachable
     # address, and a loopback default silently breaks the dev layer for one of
     # them. The compensating control is KEYCLOAK_ADMIN_PASSWORD, which
-    # ./eyened install generates on first run, and doctor.sh refuses to
-    # proceed with this layer enabled while it is still a published default.
+    # ./eyened install or ./eyened up generates on first run, and doctor.sh
+    # refuses to proceed with this layer enabled while it is still a
+    # published default.
     ports:
       - "${KEYCLOAK_BIND:-0.0.0.0}:${KEYCLOAK_PORT:-8180}:8080"
     volumes:

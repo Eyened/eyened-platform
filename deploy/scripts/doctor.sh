@@ -180,7 +180,8 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       not over the compose network, so token exchange will fail while every
       container still reports healthy.
       Fix: leave KEYCLOAK_BIND unset (0.0.0.0) and restrict the console with
-           KEYCLOAK_ADMIN_PASSWORD instead, which ./eyened install generates." ;;
+           KEYCLOAK_ADMIN_PASSWORD instead, which ./eyened install or ./eyened
+           up generates." ;;
                 *) ok "KEYCLOAK_BIND '${kc_bind:-0.0.0.0}' leaves Keycloak reachable from the server" ;;
             esac ;;
     esac
@@ -376,8 +377,9 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       on admin/admin — and that console is the identity provider for every
       account on this platform.
       Fix: set KEYCLOAK_ADMIN_PASSWORD in deploy/.env to a long random value.
-           ./eyened install generates one on a first run; a .env written by
-           hand, or created before that was added, has to be given one." ;;
+           ./eyened install or ./eyened up generates one on a first run; a
+           .env written by hand, or created before that was added, has to be
+           given one." ;;
                 *) ok "KEYCLOAK_ADMIN_PASSWORD is not the published default" ;;
             esac ;;
     esac
