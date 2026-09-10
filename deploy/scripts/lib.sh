@@ -295,13 +295,14 @@ write_env() {
         cat <<EOF
 
 # ============================================================================
-# Written once, by the installer, and never rewritten. Everything below
-# overrides the same key above it: compose reads the LAST assignment.
+# Written once — by './eyened up' or './eyened install', whichever you ran —
+# and never rewritten. Everything below overrides the same key above it:
+# compose reads the LAST assignment.
 #
 # Editing this block is fine — nothing here will overwrite your changes. To
 # start over (a different stack, regenerated secrets), DELETE this whole file
-# and re-run the installer. Deleting it keeps your data; './eyened reset' is
-# what deletes that.
+# and re-run './eyened up' (developer stack) or './eyened install' (client
+# stack). Deleting it keeps your data; './eyened reset' is what deletes that.
 #
 # Appending your own layer to COMPOSE_FILE below is safe and permanent:
 #   :compose.host-ports.yaml   publish MySQL and Redis on the host
