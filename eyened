@@ -32,15 +32,15 @@ Starting a stack
   prod             a site deployment against an EXTERNAL database.
 
 Day to day
-  down             stop this stack.
+  down             stop this stack. Extra arguments go through to compose.
   logs             follow logs. Extra arguments go through to compose.
-  doctor           preflight checks, building nothing.
+  doctor           preflight checks, building nothing:  ./eyened doctor [dev|client]
   migrate          apply pending migrations inside the server container.
   db-shell         a MySQL shell in the bundled database.
   check-storage    report configured mounts with no StorageBackend row, and vice versa.
 
 Data
-  backup           hot backup of the bundled database:  ./eyened backup <dir> [-t]
+  backup           hot backup of the bundled database:  ./eyened backup [-t] <dir>
   restore          restore one:  ./eyened restore <dir|backup.tgz>
   reset            stop this stack and DELETE its volumes. Guarded; asks for confirmation.
 

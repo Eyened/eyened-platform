@@ -61,7 +61,7 @@ DEST=${1:-}
 shift
 [ $# -eq 0 ] || die "error: unexpected extra argument(s) after <output-dir>: $*
       Fix: options come before the output directory, e.g.
-           db-backup.sh [-e envfile] [-t] <output-dir>."
+           [-e envfile] [-t] <output-dir>."
 
 # Bind mounts need an absolute host path; resolve relative paths against deploy/.
 case "$ENV_FILE" in /*) ;; *) ENV_FILE="$DEPLOY_DIR/${ENV_FILE#./}" ;; esac

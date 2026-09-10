@@ -87,9 +87,10 @@ Then work through all four steps, in order.
     ```
 
     This is a hot backup — the database keeps serving throughout — and writes a raw MySQL
-    datadir to `deploy/backups/before-upgrade` (a relative path resolves under `deploy/`; add
-    `-t` to also get a single `.tgz`). `deploy/backups/` is gitignored, so step 2 leaves it in
-    place. See `deploy/README.md`'s **Backup and rollback** section for the full mechanics.
+    datadir to `deploy/backups/before-upgrade` (a relative path resolves under `deploy/`; run
+    `./eyened backup -t backups/before-upgrade` to also get a single `.tgz`).
+    `deploy/backups/` is gitignored, so step 2 leaves it in place. See `deploy/README.md`'s
+    **Backup and rollback** section for the full mechanics.
 
 2. **Move the checkout and rebuild:**
 

@@ -377,8 +377,9 @@ already has a schema.
 `./eyened backup` runs Percona XtraBackup in a one-shot container under the
 `backup` profile. The database keeps serving throughout. The output is a raw
 InnoDB datadir, so the machine you restore onto must run a compatible MySQL
-8.0 — true by construction here, since the stack pins `mysql:8.0.46`. Add
-`-t` for a single `.tgz`; `./eyened restore` accepts either form.
+8.0 — true by construction here, since the stack pins `mysql:8.0.46`.
+`./eyened backup -t <dir>` also writes a single `.tgz`; `./eyened restore`
+accepts either form.
 
 A relative `<dir>` is resolved under `deploy/` — `deploy/backups/` is the
 suggested one and is gitignored. `<dir>` is refused outright if it resolves
@@ -471,7 +472,7 @@ its own location, and so does every script it calls.
 | `./eyened migrate` | `eyened` | `alembic upgrade head` inside the server container, interactively. |
 | `./eyened db-shell` | `eyened` | a MySQL shell in the bundled database. |
 | `./eyened check-storage` | `eyened` | report configured mounts with no `StorageBackend` row, and vice versa. |
-| `./eyened backup <dir> [-t]` | `deploy/scripts/db-backup.sh` | hot backup of the bundled database — see [Backup and rollback](#backup-and-rollback). |
+| `./eyened backup [-t] <dir>` | `deploy/scripts/db-backup.sh` | hot backup of the bundled database — see [Backup and rollback](#backup-and-rollback). |
 | `./eyened restore <dir\|backup.tgz>` | `deploy/scripts/db-restore.sh` | restore one. |
 | `./eyened reset` | `eyened` | stop this stack and delete its volumes. Guarded; asks for confirmation. |
 | `./eyened help` | `eyened` | the list above, at the terminal. |
