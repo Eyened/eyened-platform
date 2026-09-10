@@ -8,7 +8,10 @@ uniform float u_min_thickness;
 uniform float u_max_thickness;
 uniform float u_alpha;
 uniform int u_mode;
+uniform int u_nearest_sample;
 uniform vec3 u_image_size;
+uniform vec2 u_size_primary;
+uniform vec2 u_size_secondary;
 in vec2 v_uv;
 
 layout(location = 0) out vec4 color_out;
@@ -29,19 +32,34 @@ vec3 heatmap(float value) {
     return c4;
 }
 
+/// @insert mapping
+
+float sampleThickness(vec2 mapped) {
+    // Identity `_proj` binary: discrete B-scan rows must not bleed via LINEAR.
+    if(u_nearest_sample != 0) {
+        vec2 sz = u_size_secondary;
+        ivec2 tc = ivec2(clamp(floor(mapped * sz), vec2(0.0), sz - 1.0));
+        return texelFetch(u_thickness, tc, 0).r;
+    }
+    return texture(u_thickness, mapped).r;
+}
+
 void main() {
     color_out = vec4(0.0);
-    float thickness = texture(u_thickness, v_uv).r;
+    vec2 mapped = mapping(v_uv);
+    if(mapped.x < 0.0 || mapped.x > 1.0 || mapped.y < 0.0 || mapped.y > 1.0) {
+        return;
+    }
+
+    float thickness = sampleThickness(mapped);
     if(thickness <= 0.0) {
         return;
     }
 
     if(u_mode == 0) {
-        // Mask: any thickness > 0 renders as a flat feature color.
         vec4 feature_color = vec4(u_color, 1.0);
         color_out = mix(vec4(0.0), feature_color, u_alpha);
     } else {
-        // Heatmap: stretch foreground thickness between min and max.
         float range = max(u_max_thickness - u_min_thickness, 1e-6);
         float normalized = clamp((thickness - u_min_thickness) / range, 0.0, 1.0);
         color_out.rgb = heatmap(normalized);

@@ -27,7 +27,6 @@ setup(
         "tqdm==4.*",
         "alembic==1.13.2",
         "pymysql>=1.1.1",
-        "mysql-connector-python==8.*",
         "pydicom==3.*",
         "pylibjpeg==2.*",
         "pylibjpeg-libjpeg==2.*",
@@ -42,6 +41,8 @@ setup(
         "google_crc32c==1.8.0",
         "simpleitk==2.*",
         "zarr>=2.18.0",
+        "passlib==1.7.4",
+        "argon2-cffi>=25.1.0",
     ],
     python_requires=">=3.10",
 )

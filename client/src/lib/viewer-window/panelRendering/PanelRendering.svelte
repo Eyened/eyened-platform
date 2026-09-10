@@ -1,5 +1,9 @@
 <script lang="ts">
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import {
+        getAvailableRenderModes,
+        type RenderMode,
+    } from "$lib/viewer/viewer-utils";
     import { getContext } from "svelte";
     import WindowLevel from "./WindowLevel.svelte";
     import Stretch from "./Stretch.svelte";
@@ -7,7 +11,7 @@
     let { radio = true } = $props();
     const viewerContext = getContext<ViewerContext>("viewerContext");
 
-    const enface = {
+    const labels: Record<RenderMode, string> = {
         Original: "O<u>r</u>iginal",
         "Contrast enhanced": "Contrast <u>e</u>nhanced",
         "Color balanced": "Color <u>b</u>alanced",
@@ -19,11 +23,17 @@
         Green: "Green",
         Blue: "Blue",
     };
-    const axial = {
-        Original: "O<u>r</u>iginal",
-        CLAHE: "CLA<u>H</u>E",
-    };
-    const options = { enface, axial };
+
+    const availableModes = $derived(
+        getAvailableRenderModes(viewerContext.image.supportsColorRenderModes),
+    );
+
+    // Drop modes that are not available for this image (e.g. after switching)
+    $effect(() => {
+        if (!availableModes.includes(viewerContext.renderMode)) {
+            viewerContext.renderMode = "Original";
+        }
+    });
 </script>
 
 <div class="main">
@@ -34,7 +44,7 @@
     <div>
         {#if radio}
             <ul>
-                {#each Object.entries(options[viewerContext.image.orientation]) as [option, label]}
+                {#each availableModes as option}
                     <li>
                         <label>
                             <input
@@ -43,14 +53,14 @@
                                 value={option}
                             />
                             <!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted, non-user content -->
-                            {@html label}
+                            {@html labels[option]}
                         </label>
                     </li>
                 {/each}
             </ul>
         {:else}
             <select bind:value={viewerContext.renderMode}>
-                {#each Object.entries(options) as [option]}
+                {#each availableModes as option}
                     <option value={option}>
                         {option}
                     </option>

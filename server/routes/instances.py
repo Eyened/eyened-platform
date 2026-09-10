@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_instances import ImageGET
 from ..dtos.dtos_aux import ObjectTagPOST, ObjectTagPATCH, TagMeta
-from ..services.acting_user import ActingUser
 from ..services.image_instance_service import (
     ImageInstanceService,
     get_image_instance_service,
@@ -17,7 +16,7 @@ router = APIRouter()
 
 
 @router.get("/instances/{instance_id}", response_model=ImageGET)
-async def get_instance(
+def get_instance(
     instance_id: int,
     with_segmentations: bool = False,
     with_form_annotations: bool = False,
@@ -43,7 +42,7 @@ async def get_instance(
 
 
 @router.get("/images/{image_id}", response_model=ImageGET)
-async def get_public_image(
+def get_public_image(
     image_id: str,
     with_segmentations: bool = False,
     with_form_annotations: bool = False,
@@ -75,7 +74,7 @@ def build_storage_redirect_response(path: str) -> Response:
 
 
 @router.get("/images/{image_id}/data")
-async def get_public_image_data(
+def get_public_image_data(
     image_id: str,
     index: Optional[int] = None,
     meta: bool = False,
@@ -94,7 +93,7 @@ async def get_public_image_data(
 
 
 @router.get("/images/{image_id}/thumbnail")
-async def get_public_image_thumbnail(
+def get_public_image_thumbnail(
     image_id: str,
     size: int = 144,
     _: bool = Depends(is_authenticated),
@@ -109,29 +108,8 @@ async def get_public_image_thumbnail(
     return build_storage_redirect_response(ref.nginx_path)
 
 
-@router.get("/instances/images/{dataset_identifier:path}")
-async def get_file(
-    dataset_identifier: str,
-    _: bool = Depends(is_authenticated),
-):
-    # Set X-Accel-Redirect header to tell NGINX to serve the file
-    response = Response()
-    response.headers["X-Accel-Redirect"] = "/files/" + dataset_identifier
-    return response
-
-
-@router.get("/instances/thumbnails/{thumbnail_identifier:path}")
-async def get_thumb(
-    thumbnail_identifier: str,
-    _: bool = Depends(is_authenticated),
-):
-    response = Response()
-    response.headers["X-Accel-Redirect"] = "/thumbnails/" + thumbnail_identifier
-    return response
-
-
 @router.post("/instances/{instance_id}/tags", response_model=TagMeta)
-async def tag_instance(
+def tag_instance(
     instance_id: str,
     body: ObjectTagPOST,
     service: ImageInstanceService = Depends(get_image_instance_service),
@@ -142,13 +120,12 @@ async def tag_instance(
         instance_id,
         body.tag_id,
         body.comment,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)
 
 
 @router.patch("/instances/{instance_id}/tags/{tag_id}", response_model=TagMeta)
-async def patch_instance_tag(
+def patch_instance_tag(
     instance_id: str,
     tag_id: int,
     body: ObjectTagPATCH,
@@ -160,13 +137,12 @@ async def patch_instance_tag(
         instance_id,
         tag_id,
         body.comment,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return DTOConverter.link_to_tag_metadata(link)
 
 
 @router.delete("/instances/{instance_id}/tags/{tag_id}", status_code=204)
-async def untag_instance(
+def untag_instance(
     instance_id: str,
     tag_id: int,
     service: ImageInstanceService = Depends(get_image_instance_service),
@@ -176,6 +152,5 @@ async def untag_instance(
     service.untag_instance(
         instance_id,
         tag_id,
-        ActingUser(id=current_user.id, username=current_user.username),
     )
     return Response(status_code=204)

@@ -3,13 +3,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 from enum import Enum
 from pandas import DataFrame, json_normalize
-from sqlalchemy import Column, DateTime, ForeignKey, Index, String, func, Enum as SAEnum
+from sqlalchemy import Column, DateTime, FetchedValue, ForeignKey, Index, String, func, Enum as SAEnum
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .base import Base
 from .image_instance import Laterality
-from .types import OptionalEnum
+from .types import CurrentTimestampOnUpdate, OptionalEnum
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -79,8 +79,13 @@ class FormAnnotation(Base):
     FormAnnotationReferenceID: Mapped[Optional[int]] = mapped_column(ForeignKey("FormAnnotation.FormAnnotationID", ondelete="CASCADE"), index=True)
     Inactive: Mapped[bool] = mapped_column(default=False)
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    DateModified: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        server_default=CurrentTimestampOnUpdate(),
+        server_onupdate=FetchedValue(),
+        onupdate=func.now(),
+    )
 
     FormSchema: Mapped["FormSchema"] = relationship("eyened_orm.form_annotation.FormSchema", back_populates="FormAnnotations")
     Patient: Mapped["Patient"] = relationship("eyened_orm.patient.Patient", back_populates="FormAnnotations")

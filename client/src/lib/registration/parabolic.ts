@@ -34,7 +34,7 @@ export class ParabolicRegistration implements RegistrationItem {
     }
 
     get glslMapping(): string {
-        return `vec2 mapping(vec2 uv) {
+        return `vec2 map_hop(vec2 uv) {
             vec2 coord = uv * u_size_primary.xy;
             float x = coord.x;
             float y = coord.y;

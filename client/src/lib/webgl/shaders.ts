@@ -25,10 +25,10 @@ import fs_enfaceProjectMask from "./glsl/fs_enface_project_mask.frag";
 import fs_enfaceProjectProbability from "./glsl/fs_enface_project_probability.frag";
 import fs_enfaceProjectMultiClass from "./glsl/fs_enface_project_multiclass.frag";
 import fs_enfaceProjectMultiLabel from "./glsl/fs_enface_project_multilabel.frag";
-import fs_renderEnfaceProjection from "$lib/viewer/overlays/fs_render_enface_projection.frag";
 import fs_minmax_reduction from "./glsl/fs_minmax_reduction.frag";
 import fs_normalize from "./glsl/fs_normalize.frag";
 import fs_extract_slice from "./glsl/fs_extract_slice.frag";
+import fs_extract_slice_array from "./glsl/fs_extract_slice_array.frag";
 import type { WebGL } from "./webgl";
 
 /** Inject shared segmentation quad outline helpers before main(). */
@@ -65,10 +65,10 @@ export class Shaders {
     enfaceProjectProbability: PixelShaderProgram;
     enfaceProjectMultiClass: PixelShaderProgram;
     enfaceProjectMultiLabel: PixelShaderProgram;
-    renderEnfaceProjection: TextureShaderProgram;
     minMaxReduction: PixelShaderProgram;
     normalize: PixelShaderProgram;
     extractSlice: PixelShaderProgram;
+    extractSliceArray: PixelShaderProgram;
 
     constructor(webgl: WebGL) {
         this.renderFeatures = new TextureShaderProgram(
@@ -119,16 +119,16 @@ export class Shaders {
             webgl,
             fs_enfaceProjectMultiLabel,
         );
-        this.renderEnfaceProjection = new TextureShaderProgram(
-            webgl,
-            fs_renderEnfaceProjection,
-        );
         this.minMaxReduction = new PixelShaderProgram(
             webgl,
             fs_minmax_reduction,
         );
         this.normalize = new PixelShaderProgram(webgl, fs_normalize);
         this.extractSlice = new PixelShaderProgram(webgl, fs_extract_slice);
+        this.extractSliceArray = new PixelShaderProgram(
+            webgl,
+            fs_extract_slice_array,
+        );
 
         this.import = new PixelShaderProgram(webgl, fs_import);
         this.importProbability = new PixelShaderProgram(

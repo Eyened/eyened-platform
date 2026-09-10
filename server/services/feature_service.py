@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from eyened_orm import Feature
 from eyened_orm.repositories.feature_repository import FeatureRepository
+from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
 from .exceptions import ConflictError, NotFoundError
@@ -17,9 +19,13 @@ class FeatureService:
     def __init__(
         self,
         repository: FeatureRepository,
+        *,
+        scope: AccessScope,
         audit: AuditService | None = None,
     ) -> None:
         self.repository = repository
+        self.scope = scope
+        self._actor = ActingUser.from_scope(scope)
         self.audit = audit
 
     def list_features(self, with_counts: bool) -> tuple[list[Feature], dict[int, int]]:
@@ -40,7 +46,7 @@ class FeatureService:
         return feature
 
     def create_feature(
-        self, name: str, subfeature_ids: list[int] | None, actor: ActingUser
+        self, name: str, subfeature_ids: list[int] | None
     ) -> Feature:
         """Create a feature and set its subfeature links."""
         feature = Feature(FeatureName=name)
@@ -48,7 +54,7 @@ class FeatureService:
         self.repository.replace_subfeatures(feature.FeatureID, subfeature_ids)
         if self.audit is not None:
             self.audit.record(
-                action="INSERT", entity="Feature", actor=actor,
+                action="INSERT", entity="Feature", actor=self._actor,
                 entity_id=feature.FeatureID,
                 changes={"name": feature.FeatureName, "subfeature_ids": subfeature_ids or []},
             )
@@ -56,7 +62,7 @@ class FeatureService:
 
     def update_feature(
         self, feature_id: int, name: str | None,
-        subfeature_ids: list[int] | None, actor: ActingUser,
+        subfeature_ids: list[int] | None,
     ) -> Feature:
         """Update a feature's name and/or subfeature links (each optional).
 
@@ -80,12 +86,12 @@ class FeatureService:
 
         if self.audit is not None:
             self.audit.record(
-                action="UPDATE", entity="Feature", actor=actor,
+                action="UPDATE", entity="Feature", actor=self._actor,
                 entity_id=feature_id, changes=changes if changes else None,
             )
         return feature
 
-    def delete_feature(self, feature_id: int, actor: ActingUser) -> None:
+    def delete_feature(self, feature_id: int) -> None:
         """Delete a feature, unless it is referenced by segmentations or is a child.
 
         Raises:
@@ -97,15 +103,18 @@ class FeatureService:
         if feature is None:
             raise NotFoundError(f"Feature {feature_id} not found")
 
-        seg_count = self.repository.count_segmentations(feature_id)
-        if seg_count > 0:
+        # count_segmentations is database-wide on purpose (it decides whether
+        # the delete is legal, and deletion is global), so the number it
+        # returns may include projects this caller cannot reach. It therefore
+        # decides *whether* to refuse and never appears in the refusal: no
+        # count in the message, and no count in the payload.
+        if self.repository.count_segmentations(feature_id) > 0:
             raise ConflictError({
                 "code": "FEATURE_HAS_SEGMENTATIONS",
                 "message": (
-                    f"Cannot delete feature '{feature.FeatureName}' because it has "
-                    f"{seg_count} linked segmentation(s)."
+                    f"Cannot delete feature '{feature.FeatureName}' because "
+                    "segmentations reference it."
                 ),
-                "segmentation_count": seg_count,
             })
 
         parents = self.repository.parent_names_of_child(feature_id)
@@ -123,12 +132,19 @@ class FeatureService:
         self.repository.delete(feature)
         if self.audit is not None:
             self.audit.record(
-                action="DELETE", entity="Feature", actor=actor,
+                action="DELETE", entity="Feature", actor=self._actor,
                 entity_id=feature_id, changes=deleted_data,
             )
         return None
 
 
-def get_feature_service(db: Session = Depends(get_db)) -> FeatureService:
+def get_feature_service(
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(get_access_scope),
+) -> FeatureService:
     """Default FeatureService wiring for FastAPI ``Depends()``."""
-    return FeatureService(FeatureRepository(db), audit=get_audit_service(db))
+    return FeatureService(
+        FeatureRepository(db, scope=scope),
+        scope=scope,
+        audit=get_audit_service(db),
+    )

@@ -1,6 +1,8 @@
 <script lang="ts">
     import SchemaForm from "./SchemaForm.svelte";
+    import PointField from "./PointField.svelte";
     import { type JSONSchema } from "./schemaType";
+    import { isPointWidget } from "./pointSchema";
     import MainIcon from "$lib/viewer-window/icons/MainIcon.svelte";
     import { Trash } from "$lib/viewer-window/icons/icons";
     import { SchemaValidator } from "./schemaValidator.svelte";
@@ -24,6 +26,8 @@
         canEdit?: boolean;
         collapse?: boolean;
         requiredAbsent?: boolean;
+        entityType?: string | null;
+        fieldPath?: string;
     }
     let {
         schema,
@@ -34,6 +38,8 @@
         collapse = true,
         canEdit = true,
         requiredAbsent = false,
+        entityType = null,
+        fieldPath = "",
     }: Props = $props();
 
     const title = schema.title || "?";
@@ -139,7 +145,15 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="main" class:hidden>
     <div class="content" class:valid={schemaValidator.isValid}>
-        {#if schema.type == "object"}
+        {#if isPointWidget(schema)}
+            <PointField
+                {schema}
+                {value}
+                {onchange}
+                {canEdit}
+                fieldPath={fieldPath || schema.title || "point"}
+            />
+        {:else if schema.type == "object"}
             <header onclick={() => (collapsed = !collapsed)}>
                 {#if collapsed}▶{:else}▼{/if}
                 {title}
@@ -163,6 +177,8 @@
                                 key,
                             )}
                             {canEdit}
+                            {entityType}
+                            fieldPath={fieldPath ? `${fieldPath}.${key}` : key}
                         />
                     </div>
                 {/each}
@@ -180,6 +196,10 @@
                             {vertical}
                             {collapse}
                             {canEdit}
+                            {entityType}
+                            fieldPath={fieldPath
+                                ? `${fieldPath}[${i}]`
+                                : `[${i}]`}
                         />
                         <div class="icon">
                             {#if canEdit}

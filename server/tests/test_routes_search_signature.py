@@ -1,6 +1,6 @@
 import pytest
 
-from eyened_orm.utils.factories import seed_search_dataset
+from eyened_orm.utils.factories import scope_for, seed_search_dataset
 
 
 @pytest.fixture()
@@ -96,3 +96,40 @@ def test_study_signature_advertises_a_field_that_cannot_be_searched(client, data
     )
 
     assert resp.status_code == 422
+
+
+def test_instance_signature_scopes_project_names_to_the_caller(client_scoped, data):
+    """Project Name is DB-derived vocabulary, but it names project rows -- a
+    restricted caller must not enumerate a project they cannot see."""
+    client, set_scope = client_scoped
+    set_scope(scope_for(data.projects["alpha"].ProjectID))
+    fields = _by_name(client.get("/instances/search/signature").json())
+    assert fields["Project Name"]["values"] == ["Alpha"]
+
+
+def test_instance_signature_sees_both_projects_under_a_wider_scope(client_scoped, data):
+    """Pairs the hidden assertion above with a visible one under the wider scope."""
+    client, set_scope = client_scoped
+    set_scope(scope_for(
+        data.projects["alpha"].ProjectID, data.projects["beta"].ProjectID
+    ))
+    fields = _by_name(client.get("/instances/search/signature").json())
+    assert fields["Project Name"]["values"] == ["Alpha", "Beta"]
+
+
+def test_instance_signature_empty_scope_sees_no_project_names(client_scoped, data):
+    """A caller with no memberships gets an empty dropdown, not a free pass."""
+    client, set_scope = client_scoped
+    set_scope(scope_for())
+    fields = _by_name(client.get("/instances/search/signature").json())
+    assert fields["Project Name"]["values"] == []
+
+
+def test_study_signature_scopes_project_names_to_the_caller(client_scoped, data):
+    """study_signature is a separate call site of the same leak; pinned separately.
+    (The empty-scope and wider-scope directions share visible_project_names with the
+    instance route above and are not re-pinned here -- same method, same mechanism.)"""
+    client, set_scope = client_scoped
+    set_scope(scope_for(data.projects["alpha"].ProjectID))
+    fields = _by_name(client.get("/studies/search/signature").json())
+    assert fields["Project Name"]["values"] == ["Alpha"]

@@ -3,6 +3,7 @@ import type {
     ViewerEventListener,
     RenderMode,
 } from "../viewer-utils";
+import { isRenderModeAvailable } from "../viewer-utils";
 
 export class HotKeys implements ViewerEventListener {
     codes: { [key: string]: RenderMode } = {
@@ -27,7 +28,15 @@ export class HotKeys implements ViewerEventListener {
         viewerContext.hideOverlays = hideOverlays;
 
         if (code in this.codes) {
-            viewerContext.renderMode = this.codes[code];
+            const mode = this.codes[code];
+            if (
+                isRenderModeAvailable(
+                    viewerContext.image.supportsColorRenderModes,
+                    mode,
+                )
+            ) {
+                viewerContext.renderMode = mode;
+            }
         }
     }
 

@@ -5,13 +5,16 @@ from sqlalchemy.orm import Session
 
 from eyened_orm import Feature
 from eyened_orm.segmentation import FeatureFeatureLink, Segmentation
+from eyened_orm.authz.scope import AccessScope
+from eyened_orm.authz.scoping import apply_scope
 
 
 class FeatureRepository:
     """Data access for Feature rows and their parent/child (composite) links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
 
     def add(self, feature: Feature) -> None:
         """Stage a new feature and flush so its PK is assigned."""
@@ -44,14 +47,44 @@ class FeatureRepository:
         )
 
     def segmentation_counts(self) -> dict[int, int]:
-        """Return {FeatureID: segmentation count} for features that have any."""
+        """Return {FeatureID: segmentation count} for features the caller reaches.
+
+        A ``Feature`` is vocabulary and carries no project, which is why this
+        whole repository reads unfiltered -- but a ``Segmentation`` is project
+        data (a ``SINGLE_PROJECT_ENTITIES`` member with a route to ``Patient``),
+        and counting it is reading it. Unscoped, this told any authenticated
+        caller, including one with no memberships at all, the per-feature
+        annotation volume of every project in the database.
+        """
         rows = self._session.execute(
-            select(Segmentation.FeatureID, func.count()).group_by(Segmentation.FeatureID)
+            apply_scope(
+                select(Segmentation.FeatureID, func.count())
+                .select_from(Segmentation)
+                .group_by(Segmentation.FeatureID),
+                Segmentation,
+                self._scope,
+            )
         ).all()
         return {fid: cnt for fid, cnt in rows}
 
     def count_segmentations(self, feature_id: int) -> int:
-        """Return how many segmentations reference this feature."""
+        """Return how many segmentations reference this feature, database-wide.
+
+        Deliberately **unscoped**, and the one method here where that is a
+        decision rather than an oversight. This is a referential-integrity
+        guard, not display data: it answers "may this row be deleted", and
+        deletion is global. Filtered by the caller's scope it returns 0 for a
+        feature referenced only from a project they cannot reach, the
+        delete-conflict check passes, and the delete then dies at the flush as
+        an unmapped ``IntegrityError`` (``Segmentation.FeatureID`` is NOT NULL
+        under ``ON DELETE RESTRICT``, so nothing is lost) -- turning a correct
+        409 into an uninformative 500.
+
+        Its sibling ``segmentation_counts`` is the opposite case and stays
+        scoped. What keeps the number from leaking here is that no caller ever
+        sees it: ``FeatureService.delete_feature`` reports that the feature is
+        in use *without* the count.
+        """
         return self._session.execute(
             select(func.count())
             .select_from(Segmentation)

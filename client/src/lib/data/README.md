@@ -707,7 +707,15 @@ await unstarTag(tagId);
 **Task operations:**
 
 ```typescript
-await createTask({ name, description, contact_id, task_definition_id });
+// `projects` is required and must name at least one project: it is the task's
+// declaration, and only images inside it can be linked to its subtasks.
+await createTask({
+    name,
+    description,
+    contact_id,
+    task_definition_id,
+    projects,
+});
 await updateTask(id, {
     name,
     description,

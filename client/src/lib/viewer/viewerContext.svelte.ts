@@ -5,7 +5,7 @@ import { BaseImageRenderer } from "$lib/webgl/imageRenderer";
 import type { Shaders } from "$lib/webgl/shaders";
 import { SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
-import type { Registration } from "../registration/registration";
+import type { Registration } from "../registration/registration.svelte";
 import type { ViewerWindowContext } from "../viewer-window/viewerWindowContext.svelte";
 import { HotKeys } from "./controls/hotkeys";
 import { ScrollOCT } from "./controls/scrollOCT";
@@ -59,6 +59,18 @@ export type cursorStyle =
     | "zoom-in"
     | "zoom-out";
 
+/** Higher wins for the current frame. Equal priority: last claim wins. */
+export const CursorPriority = {
+    Default: 0,
+    Tool: 1,
+    Hover: 2,
+    Drag: 3,
+    Hide: 4,
+    Busy: 5,
+} as const;
+export type CursorPriorityLevel =
+    (typeof CursorPriority)[keyof typeof CursorPriority];
+
 export class ViewerContext {
     // perhaps the typing should be improved here
     // using the same interface for repaint (Overlay) and controls (ViewerEventListener)
@@ -67,9 +79,15 @@ export class ViewerContext {
     hideOverlays: boolean = $state(false);
     renderMode: RenderMode = $state("Original");
     enfaceProjectionMode: EnfaceProjectionMode = $state("off");
+    /** Per-OCT enface overlay mode for non-_proj top-row images. */
+    enfaceProjectionModesByOct: Map<string, EnfaceProjectionMode> = $state(
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
+        new Map(),
+    );
     lockScroll: boolean = $state(false);
     windowLevel: WindowLevel = $state({ min: 0, max: 255 });
     cursorStyle: cursorStyle = $state("default");
+    private cursorClaimPriority = 0;
     active: boolean = $state(false);
     updatePosition: boolean = $state(true);
     axis: 0 | 1 | 2 = $state(0);
@@ -155,21 +173,38 @@ export class ViewerContext {
             ) {
                 this.windowLevel = { min: 30, max: 225 };
             }
-            // aspect ratio for OCT
-            if (image.resolution.z && image.resolution.x > 0) {
+            // B-scan exaggeration only for axial OCT volumes (not enface stacks)
+            if (
+                image.orientation === "axial" &&
+                image.resolution.z &&
+                image.resolution.x > 0
+            ) {
                 this.stretch = (8 * image.resolution.y) / image.resolution.x;
             }
         }
         this.transform = this.getInitTransform();
         this.imageTransform = image.transform;
 
-        if (image.is3D) {
+        if (image.is3D && image.depth > 1) {
             this.addOverlay(new ScrollOCT());
         }
         this.addOverlay(new UpdatePosition());
         this.addOverlay(new ZoomPan());
         this.addOverlay(new CursorOverlay());
         this.addOverlay(new HotKeys());
+
+        if (image.is3D && image.depth > 1) {
+            const pending = this.viewerWindowContext.viewState?.peekIndex(
+                this.image.image_id,
+                image.depth,
+            );
+            // Apply pending on viewer.index only. setIndex() writes the global
+            // registration pointer, which cannot hold per-viewer frames
+            // (known limitation for multiple open volumes).
+            this.index = pending ?? Math.round(image.depth / 2);
+        } else if (image.is3D) {
+            this.index = 0;
+        }
     }
 
     setIndex(i: number) {
@@ -188,6 +223,24 @@ export class ViewerContext {
             index: i,
         });
         this.index = i;
+        if (this.image.is3D && this.image.depth > 1) {
+            this.viewerWindowContext.viewState?.recordIndex(
+                this.image.image_id,
+                i,
+                this.image.depth,
+            );
+        }
+    }
+
+    cycleEnfaceProjectionModeForOct(octPublicId: string): void {
+        const modes: EnfaceProjectionMode[] = ["off", "binary", "heatmap"];
+        const current =
+            this.enfaceProjectionModesByOct.get(octPublicId) ?? "off";
+        const next = modes[(modes.indexOf(current) + 1) % modes.length];
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
+        const map = new Map(this.enfaceProjectionModesByOct);
+        map.set(octPublicId, next);
+        this.enfaceProjectionModesByOct = map;
     }
 
     initTransform() {
@@ -291,6 +344,35 @@ export class ViewerContext {
         return this.imageViewerTransform.apply(pixel);
     }
 
+    /**
+     * Claim the canvas cursor for this paint/event frame.
+     * Highest priority wins; equal priority keeps the latest claim.
+     * Applies immediately so event handlers (pointer/key) don't wait for repaint.
+     *
+     * Cursor is set on both the canvas and its parent (the viewer div). Pointer
+     * capture is on the div, and browsers use the capture target's cursor while
+     * a button is held — canvas-only updates are ignored during pointer drags.
+     */
+    claimCursor(style: cursorStyle, priority: CursorPriorityLevel) {
+        if (priority < this.cursorClaimPriority) return;
+        this.cursorClaimPriority = priority;
+        this.cursorStyle = style;
+        this.applyCursor(style);
+    }
+
+    /** Clear claims (e.g. when a drag ends between repaints). */
+    resetCursor() {
+        this.cursorClaimPriority = CursorPriority.Default;
+        this.cursorStyle = "default";
+        this.applyCursor("default");
+    }
+
+    private applyCursor(style: cursorStyle) {
+        this.canvas2D.style.cursor = style;
+        const parent = this.canvas2D.parentElement;
+        if (parent) parent.style.cursor = style;
+    }
+
     viewerToImageCoordinates(cursor: Position2D): Position2D {
         return this.imageViewerTransform.inverse.apply(cursor);
     }
@@ -332,11 +414,8 @@ export class ViewerContext {
         );
         if (p) {
             this.index = p.index;
-        } else {
-            // this.index = Math.round(this.image.depth / 2);
-            this.index =
-                this.image.depth === 1 ? 0 : Math.round(this.image.depth / 2);
         }
+        // else keep this.index (mid-slice / restored pending / last setIndex)
 
         const renderTarget = { ...renderBounds, framebuffer: null };
 
@@ -349,12 +428,13 @@ export class ViewerContext {
             this.canvas2D.height,
         );
 
+        this.cursorClaimPriority = CursorPriority.Default;
         this.cursorStyle = "default";
         if (!this.hideOverlays) {
             for (const overlay of this.overlays.values()) {
                 overlay.repaint?.(this, renderTarget);
             }
         }
-        this.canvas2D.style.cursor = this.cursorStyle;
+        this.applyCursor(this.cursorStyle);
     }
 }

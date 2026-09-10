@@ -109,7 +109,8 @@ Then work through all four steps, in order.
     ```
 
     Skipping this is the failure this list exists to prevent: new code running against the old
-    schema, with nothing saying so.
+    schema, with nothing saying so. Alembic asks you to confirm the target database before it
+    applies anything, which is why the command stays interactive.
 
 4. **Verify the schema is where the new code expects it.** The two revision ids must match:
 

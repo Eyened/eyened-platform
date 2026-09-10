@@ -7,11 +7,10 @@ Keeps track of the main panels and the top row of images.
 <script lang="ts">
     import { onDestroy, onMount, setContext } from "svelte";
     import MainPanel from "./MainPanel.svelte";
-    import MainViewer from "./MainViewer.svelte";
     import TopRowImages from "./TopRowImages.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
     import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
-    import { formAnnotations, instances, patients } from "$lib/data";
+    import { instances, patients } from "$lib/data";
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
 
@@ -23,20 +22,8 @@ Keeps track of the main panels and the top row of images.
     setContext("viewerWindowContext", viewerWindowContext);
     const registration = viewerWindowContext.registration;
 
-    // open first image
-    const instanceIds = viewerWindowContext.instanceIds;
-    if (instanceIds.length) {
-        const openInstance = instanceIds[0];
-        viewerWindowContext.getImages(openInstance).then((images) => {
-            // images is normally a single image
-            // for OCT it is an array: enface projection + oct image
-            const panel = {
-                component: MainViewer,
-                props: { image: images[images.length - 1] }, // last image (in case of OCT)
-            };
-            viewerWindowContext.setPanel(panel);
-        });
-    }
+    // Main viewers are restored by ViewerWindowContext after images load
+    // (see restoreMainViewersFromViewState) so task grade and /view share one path.
 
     let main: HTMLDivElement | undefined = $state();
     let isResizing = false;
@@ -87,10 +74,7 @@ Keeps track of the main panels and the top row of images.
     }
 </script>
 
-{#each Array.from(formAnnotations.values()) as formAnnotation}
-    <RegistrationItemLoader {registration} {formAnnotation} />
-{/each}
-
+<!-- Patient attrs first, then form pointset/affine (pointset wins on conflict). -->
 <RegistrationItemLoader {registration} {registrationSet} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->

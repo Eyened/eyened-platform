@@ -5,11 +5,13 @@ Used to create the viewerwindow context.
 -->
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { Registration } from "$lib/registration/registration";
+    import { Registration } from "$lib/registration/registration.svelte";
+    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import { Deferred } from "$lib/utils";
     import { WebGL } from "$lib/webgl/webgl";
     import { getContext, onMount } from "svelte";
     import ViewerWindow from "./ViewerWindow.svelte";
+    import { createViewerViewStateController } from "./viewerViewState";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     interface Props {
@@ -27,6 +29,7 @@ Used to create the viewerwindow context.
     }
     const globalContext = getContext<GlobalContext>("globalContext");
     const { user: creator } = globalContext;
+    const taskContext = getContext<TaskContext | undefined>("taskContext");
 
     const { promise, resolve, reject } = new Deferred<ViewerWindowContext>();
     let viewerWindowContext: ViewerWindowContext | null = null;
@@ -78,11 +81,39 @@ Used to create the viewerwindow context.
 
         webgl = new WebGL(mainCanvas);
         const registration = new Registration();
+
+        const scope =
+            taskContext?.subTask?.id != null
+                ? `subtask:${taskContext.subTask.id}`
+                : "view";
+
+        const viewState = createViewerViewStateController({
+            scope,
+            getSearchParams: () => new URLSearchParams(window.location.search),
+            replaceUrl: (params) => {
+                // Avoid `new URL(...)` (svelte/prefer-svelte-reactivity).
+                // Use history.replaceState (not page.url) so we don't fight SvelteKit;
+                // readers must use window.location.search (see BrowserOverlay).
+                const searchRaw = params.toString();
+                const search = searchRaw
+                    ? `?${searchRaw.replaceAll("%2C", ",")}`
+                    : "";
+                history.replaceState(
+                    history.state,
+                    "",
+                    `${window.location.pathname}${search}${window.location.hash}`,
+                );
+            },
+            storage: localStorage,
+        });
+        viewState.hydrate();
+
         viewerWindowContext = new ViewerWindowContext(
             webgl,
             registration,
             creator,
             instanceIDs,
+            viewState,
         );
 
         resolve(viewerWindowContext);

@@ -1,12 +1,19 @@
-from os import PathLike
 from typing import Any, Iterable, List, Optional, Tuple
 
 import numpy as np
 import torch
 
-from eyened_orm import AttributeDataType
-from eyened_orm.inference.attribute_inference import TorchAttributeInferencePipeline
-from eyened_orm.inference.utils import preprocess_image
+from eyened_orm import AttributeDataType, Modality
+from eyened_orm.inference.attribute_inference import (
+    InferenceItem,
+    TorchAttributeInferencePipeline,
+)
+from eyened_orm.inference.cfi_preprocess import cfi_roi_from_input_values, crop_fundus_from_roi
+from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
+from eyened_orm.inference.model_versions import (
+    huggingface_artifact_version,
+    huggingface_pipeline_version,
+)
 from rtnls_inference.ensembles import HeatmapRegressionEnsemble
 
 
@@ -36,11 +43,17 @@ def get_coordinate(T, heatmap):
 class CFIKeypoints(TorchAttributeInferencePipeline):
     """CFI keypoints detection pipeline - detects fovea and disc edge locations."""
 
+    HF_ARTIFACTS = (
+        "Eyened/vascx:fovea/fovea_july24.pt",
+        "Eyened/vascx:discedge/discedge_july24.pt",
+    )
+
     model_name = "CFI_Keypoints"
-    model_version = "july24"
     model_description = "https://github.com/Eyened/retinalysis-inference Eyened/vascx:fovea Eyened/vascx:discedge"
     attribute_name = "CFI_Keypoints"
     attribute_data_type = AttributeDataType.JSON
+    supported_modalities = (Modality.ColorFundus,)
+    required_inputs = (CFI_ROI_INPUT,)
 
     def __init__(
         self,
@@ -50,6 +63,7 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
         batch_size: int = 8,
         **kwargs,
     ):
+        self.model_version = huggingface_pipeline_version(*self.HF_ARTIFACTS)
         super().__init__(
             session, n_workers=n_workers, batch_size=batch_size, device=device
         )
@@ -62,12 +76,12 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
         """Load both fovea and disc edge ensemble models."""
         print("loading fovea models")
         self.ensemble_fovea = HeatmapRegressionEnsemble.from_huggingface(
-            "Eyened/vascx:fovea/fovea_july24.pt"
+            self.HF_ARTIFACTS[0]
         ).to(self.device)
 
         print("loading discedge models")
         self.ensemble_discedge = HeatmapRegressionEnsemble.from_huggingface(
-            "Eyened/vascx:discedge/discedge_july24.pt"
+            self.HF_ARTIFACTS[1]
         ).to(self.device)
 
         assert (
@@ -87,9 +101,16 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
         self.resize = 512
         self.apply_ce = True
 
-    def preprocess(self, image_path: PathLike[str]) -> Tuple[Any, np.ndarray]:
-        """Preprocess image for keypoint detection."""
-        return preprocess_image(image_path, resize=self.resize, apply_ce=self.apply_ce)
+    def preprocess(self, item: InferenceItem | None) -> Tuple[Any, np.ndarray] | None:
+        """Preprocess image for keypoint detection using stored CFI_ROI."""
+        if item is None or item.image_rgb is None:
+            return None
+        return crop_fundus_from_roi(
+            item.image_rgb,
+            cfi_roi_from_input_values(item.input_values),
+            resize=self.resize,
+            apply_ce=self.apply_ce,
+        )
 
     def process_batch(
         self, prep_batch: List[Tuple[Any, np.ndarray]]

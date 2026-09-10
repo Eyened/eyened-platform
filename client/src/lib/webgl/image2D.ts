@@ -62,6 +62,7 @@ export class Image2D extends AbstractImage {
             dimensions,
             meta,
         );
+        result.supportsColorRenderModes = true;
         result.initialize();
         return result;
     }
@@ -135,6 +136,8 @@ export class Image2D extends AbstractImage {
             dimensions,
             meta,
         );
+        // Multi-channel pixel data → color modes; single-channel stays grayscale menu
+        result.supportsColorRenderModes = source_num_channels !== 1;
         result.initialize();
         return result;
     }

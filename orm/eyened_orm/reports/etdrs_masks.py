@@ -82,18 +82,32 @@ class ETDRS_masks:
         include_largest=True,
         skip_zero=True,
     ):
-        masked_images = {field: getattr(self, field) & binary_image for field in fields}
         result = {}
-        for field, masked_image in masked_images.items():
+        regions = None
+        if include_count or include_largest:
+            # One connected-component pass on the full mask; each field then
+            # intersects those regions. Equivalent to per-field label/regionprops
+            # for compact lesions that do not re-enter a field through another.
+            regions = measure.regionprops(measure.label(binary_image))
+
+        for field in fields:
+            field_mask = getattr(self, field)
             if include_area:
-                result[f"{field}_area"] = self.calculate_area(masked_image)
-            if include_largest or include_count:
-                labeled_image = measure.label(masked_image)
+                result[f"{field}_area"] = self.calculate_area(
+                    field_mask & binary_image
+                )
+            if include_count or include_largest:
+                inter_areas = []
+                for region in regions:
+                    coords = region.coords
+                    area_in_field = int(field_mask[coords[:, 0], coords[:, 1]].sum())
+                    if area_in_field:
+                        inter_areas.append(area_in_field)
                 if include_count:
-                    result[f"{field}_count"] = self._calculate_count(labeled_image)
+                    result[f"{field}_count"] = len(inter_areas)
                 if include_largest:
-                    result[f"{field}_largest"] = self.calculate_largest_area(
-                        labeled_image
+                    result[f"{field}_largest"] = float(
+                        max(inter_areas, default=0) * self.pixel_area
                     )
         if skip_zero:
             result = {k: v for k, v in result.items() if v}
@@ -123,22 +137,24 @@ class ETDRS_masks:
     def total(self):
         return np.ones((self.h, self.w), dtype=bool)
 
-    # rings
+    # rings (independent distance cuts so grid does not force the three rings)
     @cached_property
     def center(self):
         return self.distance_to_fovea < 0.5
 
     @cached_property
     def inner(self):
-        return (self.distance_to_fovea < 1.5) & ~self.center
+        d = self.distance_to_fovea
+        return (d < 1.5) & (d >= 0.5)
 
     @cached_property
     def outer(self):
-        return (self.distance_to_fovea < 3) & ~(self.center | self.inner)
+        d = self.distance_to_fovea
+        return (d < 3) & (d >= 1.5)
 
     @cached_property
     def grid(self):
-        return self.center | self.inner | self.outer
+        return self.distance_to_fovea < 3
 
     # quadrants
     @cached_property

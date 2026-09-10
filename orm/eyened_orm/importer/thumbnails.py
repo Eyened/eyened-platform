@@ -3,18 +3,21 @@
 Shared by:
 - :class:`~eyened_orm.importer.postimport.PostImport` (after import)
 - ``eorm update-thumbnails`` (CLI bulk repair)
+- ``eorm clean-thumbnails`` (CLI FS/DB hygiene)
 - API RQ workers (``run_update_thumbnails_*_job``)
 """
 
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
 from PIL import Image, ImageOps
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tqdm import tqdm
 
@@ -25,6 +28,7 @@ if TYPE_CHECKING:
 
 THUMBNAIL_SIZES: tuple[int, ...] = (144, 540)
 THUMBNAIL_COMMIT_INTERVAL = 100
+_THUMBNAIL_SIZE_SUFFIXES: tuple[str, ...] = tuple(f"_{size}.jpg" for size in THUMBNAIL_SIZES)
 
 
 def allocate_thumbnail_path(project_id: int) -> str:
@@ -182,10 +186,7 @@ def _needs_cfi_roi(im: ImageInstance) -> bool:
 
     if im.Modality != Modality.ColorFundus:
         return False
-    roi = im.roi
-    if roi is None:
-        return True
-    return roi.get("success") is False
+    return im.roi is None
 
 
 def ensure_cfi_roi_for_thumbnails(session: Session, images: list[ImageInstance]) -> None:
@@ -299,3 +300,230 @@ def run_update_thumbnails_for_image_ids_job(
             sizes=THUMBNAIL_SIZES,
             print_errors=print_errors,
         )
+
+
+@dataclass(frozen=True)
+class BrokenThumbnailRef:
+    """An ``ImageInstance`` whose ``ThumbnailPath`` is set but files are missing on disk."""
+
+    image_instance_id: int
+    thumbnail_path: str
+    missing_sizes: tuple[int, ...]
+
+
+@dataclass
+class ThumbnailCleanupReport:
+    """Result of comparing the thumbnails folder against ``ImageInstance.ThumbnailPath``."""
+
+    dangling_files: list[Path] = field(default_factory=list)
+    broken_refs: list[BrokenThumbnailRef] = field(default_factory=list)
+    deleted_files: list[Path] = field(default_factory=list)
+    indexed_prefixes: int = 0
+    scanned_files: int = 0
+
+
+def parse_thumbnail_relative_path(relative_path: str) -> tuple[str, int] | None:
+    """Parse ``{prefix}_{size}.jpg`` into ``(prefix, size)``, or ``None`` if not a known size."""
+    for size, suffix in zip(THUMBNAIL_SIZES, _THUMBNAIL_SIZE_SUFFIXES):
+        if relative_path.endswith(suffix):
+            prefix = relative_path[: -len(suffix)]
+            if prefix:
+                return prefix, size
+    return None
+
+
+def load_indexed_thumbnail_paths(
+    session: Session,
+) -> dict[str, list[int]]:
+    """Map non-empty ``ThumbnailPath`` prefixes to the ``ImageInstanceID``s that reference them.
+
+    Includes inactive instances so their files are not treated as dangling.
+    """
+    from eyened_orm import ImageInstance
+
+    rows = session.execute(
+        select(ImageInstance.ImageInstanceID, ImageInstance.ThumbnailPath).where(
+            ImageInstance.ThumbnailPath.isnot(None),
+            ImageInstance.ThumbnailPath != "",
+        )
+    ).all()
+    indexed: dict[str, list[int]] = {}
+    for image_instance_id, thumbnail_path in rows:
+        indexed.setdefault(thumbnail_path, []).append(image_instance_id)
+    return indexed
+
+
+def iter_thumbnail_files(folder: Path):
+    """Yield JPEG files under ``folder`` whose names match a known thumbnail size suffix."""
+    if not folder.exists():
+        return
+    for path in folder.rglob("*.jpg"):
+        if not path.is_file():
+            continue
+        try:
+            relative = path.relative_to(folder).as_posix()
+        except ValueError:
+            continue
+        if parse_thumbnail_relative_path(relative) is not None:
+            yield path
+
+
+def find_dangling_thumbnail_files(
+    folder: Path,
+    indexed_prefixes: set[str],
+    *,
+    sizes: tuple[int, ...] = THUMBNAIL_SIZES,
+) -> tuple[list[Path], int]:
+    """Return ``(dangling paths, scanned file count)`` under ``folder``.
+
+    Dangling files are on-disk ``_{size}.jpg`` files not referenced by any indexed
+    ``ThumbnailPath`` prefix.
+    """
+    expected = {
+        thumbnail_filename(prefix, size)
+        for prefix in indexed_prefixes
+        for size in sizes
+    }
+    dangling: list[Path] = []
+    scanned = 0
+    for path in iter_thumbnail_files(folder):
+        scanned += 1
+        relative = path.relative_to(folder).as_posix()
+        if relative not in expected:
+            dangling.append(path)
+    dangling.sort()
+    return dangling, scanned
+
+
+def find_broken_thumbnail_refs(
+    folder: Path,
+    indexed: dict[str, list[int]],
+    *,
+    sizes: tuple[int, ...] = THUMBNAIL_SIZES,
+) -> list[BrokenThumbnailRef]:
+    """DB prefixes where at least one size file is missing on disk."""
+    broken: list[BrokenThumbnailRef] = []
+    for thumbnail_path, image_ids in sorted(indexed.items()):
+        missing = tuple(
+            size
+            for size in sizes
+            if not (folder / thumbnail_filename(thumbnail_path, size)).is_file()
+        )
+        if not missing:
+            continue
+        for image_instance_id in sorted(image_ids):
+            broken.append(
+                BrokenThumbnailRef(
+                    image_instance_id=image_instance_id,
+                    thumbnail_path=thumbnail_path,
+                    missing_sizes=missing,
+                )
+            )
+    return broken
+
+
+def delete_thumbnail_files(paths: list[Path], *, folder: Path) -> list[Path]:
+    """Delete ``paths`` and prune empty parent directories under ``folder``."""
+    deleted: list[Path] = []
+    parents: set[Path] = set()
+    for path in paths:
+        if path.is_file():
+            path.unlink()
+            deleted.append(path)
+            parent = path.parent
+            if folder in parent.parents or parent == folder:
+                parents.add(parent)
+    # deepest first so nested empty dirs collapse
+    for parent in sorted(parents, key=lambda p: len(p.parts), reverse=True):
+        current = parent
+        while current != folder and folder in current.parents:
+            try:
+                current.rmdir()
+            except OSError:
+                break
+            current = current.parent
+    return deleted
+
+
+def clean_thumbnails(
+    session: Session,
+    *,
+    thumbnails_folder: Path,
+    sizes: tuple[int, ...] = THUMBNAIL_SIZES,
+    apply: bool = False,
+) -> ThumbnailCleanupReport:
+    """Compare the thumbnails folder to the database and optionally delete orphans.
+
+    - **Dangling files**: on-disk ``_{size}.jpg`` files not referenced by any
+      non-empty ``ImageInstance.ThumbnailPath``.
+    - **Broken refs**: instances whose ``ThumbnailPath`` is set but at least one
+      size file is missing.
+    """
+    indexed = load_indexed_thumbnail_paths(session)
+    dangling, scanned = find_dangling_thumbnail_files(
+        thumbnails_folder, set(indexed), sizes=sizes
+    )
+    broken = find_broken_thumbnail_refs(thumbnails_folder, indexed, sizes=sizes)
+    deleted: list[Path] = []
+    if apply and dangling:
+        deleted = delete_thumbnail_files(dangling, folder=thumbnails_folder)
+    return ThumbnailCleanupReport(
+        dangling_files=dangling,
+        broken_refs=broken,
+        deleted_files=deleted,
+        indexed_prefixes=len(indexed),
+        scanned_files=scanned,
+    )
+
+
+def run_clean_thumbnails_job(
+    database: Database,
+    *,
+    apply: bool = False,
+    print_limit: int = 50,
+) -> ThumbnailCleanupReport:
+    """Run thumbnail FS/DB cleanup (used by ``eorm clean-thumbnails``)."""
+    folder = thumbnails_folder()
+    print(f"Thumbnails folder: {folder}")
+    with database.get_session() as session:
+        report = clean_thumbnails(
+            session,
+            thumbnails_folder=folder,
+            sizes=THUMBNAIL_SIZES,
+            apply=apply,
+        )
+
+    print(f"Indexed ThumbnailPath prefixes: {report.indexed_prefixes}")
+    print(f"Scanned thumbnail files: {report.scanned_files}")
+    print(f"Dangling files: {len(report.dangling_files)}")
+    print(f"Broken ImageInstance refs: {len(report.broken_refs)}")
+
+    if report.dangling_files:
+        print("\nDangling files" + (" (deleted):" if apply else " (dry-run, not deleted):"))
+        for path in report.dangling_files[:print_limit]:
+            print(f"  {path}")
+        if len(report.dangling_files) > print_limit:
+            print(f"  ... and {len(report.dangling_files) - print_limit} more")
+
+    if report.broken_refs:
+        print("\nBroken ImageInstance thumbnail refs (path set, file(s) missing):")
+        for ref in report.broken_refs[:print_limit]:
+            missing = ",".join(str(s) for s in ref.missing_sizes)
+            print(
+                f"  ImageInstanceID={ref.image_instance_id} "
+                f"ThumbnailPath={ref.thumbnail_path!r} missing=[{missing}]"
+            )
+        if len(report.broken_refs) > print_limit:
+            print(f"  ... and {len(report.broken_refs) - print_limit} more")
+        print(
+            "\nHint: regenerate with "
+            "`eorm update-thumbnails --image-ids <ids>` or clear ThumbnailPath "
+            "and run `eorm update-thumbnails`."
+        )
+
+    if apply:
+        print(f"\nDeleted {len(report.deleted_files)} dangling file(s).")
+    elif report.dangling_files:
+        print("\nDry-run only. Re-run with --apply to delete dangling files.")
+
+    return report

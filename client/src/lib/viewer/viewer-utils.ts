@@ -14,11 +14,44 @@ export type RenderMode =
     | "Green"
     | "Blue";
 
+/** Volumes / single-channel images: Original + CLAHE only. */
+export const GRAYSCALE_RENDER_MODES: readonly RenderMode[] = [
+    "Original",
+    "CLAHE",
+] as const;
+
+/** Color fundus-style images: full preprocessing / channel menu. */
+export const COLOR_RENDER_MODES: readonly RenderMode[] = [
+    "Original",
+    "Contrast enhanced",
+    "Color balanced",
+    "CLAHE",
+    "Sharpened",
+    "Histogram matched",
+    "Luminance",
+    "Red",
+    "Green",
+    "Blue",
+] as const;
+
+export function getAvailableRenderModes(supportsColor: boolean): RenderMode[] {
+    return supportsColor
+        ? [...COLOR_RENDER_MODES]
+        : [...GRAYSCALE_RENDER_MODES];
+}
+
+export function isRenderModeAvailable(
+    supportsColor: boolean,
+    mode: RenderMode,
+): boolean {
+    return getAvailableRenderModes(supportsColor).includes(mode);
+}
+
 export type EnfaceProjectionMode = "off" | "binary" | "heatmap";
 
 export type WindowLevel = { min: number; max: number };
 
-export type PanelName =
+export type BuiltinPanelName =
     | "Info"
     | "Rendering"
     | "ETDRS"
@@ -28,12 +61,10 @@ export type PanelName =
     | "Segmentation"
     | "LayerSegmentation";
 
-export type ToolName =
-    | "brush"
-    | "polygon"
-    | "registration"
-    | "ETRDS-grid"
-    | "AV nicking tool";
+/** Builtin names or task-configured custom panel titles (e.g. "Grading"). */
+export type PanelName = BuiltinPanelName | (string & {});
+
+export type ToolName = "brush" | "polygon" | "AV nicking tool" | "point";
 
 export type Dimension2D = { width: number; height: number };
 

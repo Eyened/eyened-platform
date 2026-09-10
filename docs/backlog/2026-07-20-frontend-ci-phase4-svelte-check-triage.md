@@ -7,13 +7,15 @@
 
 ## Measured baseline
 
+Re-measured 2026-08-24 on `development` @ `46853f47`:
+
 ```
-COMPLETED 1384 FILES 93 ERRORS 103 WARNINGS 66 FILES_WITH_PROBLEMS
+COMPLETED 1414 FILES 91 ERRORS 102 WARNINGS 64 FILES_WITH_PROBLEMS
 ```
 
-Errors live in **32 files**, warnings in **39**; the two sets overlap in 5, which is where `66 FILES_WITH_PROBLEMS` comes from. `66` is **not** the error-file count — an easy misread when scoping.
+Errors live in **30 files**, warnings in **39**; the two sets overlap in 5, which is where `64 FILES_WITH_PROBLEMS` comes from. `64` is **not** the error-file count — an easy misread when scoping.
 
-The design's `158 errors / 103 warnings` figure is stale: Phase 3's sweep took errors **158 → 93** as a side effect. Warnings are unchanged at 103.
+The design's `158 errors / 103 warnings` figure is stale: Phase 3's sweep took errors **158 → 93** as a side effect, and five weeks of unrelated merges have since drifted them to 91 / 102. Nothing here was fixed on purpose.
 
 ### Reproducing this (read before you trust a number)
 
@@ -30,13 +32,15 @@ docker exec -w /app/client eyened-platform-dev-kaustav-client-1 \
 
 ## The design's root-cause hypothesis is wrong
 
-The design expects the bulk to be **generated-type / stale-sync drift** (`src/types/openapi.ts`, `.svelte-kit`) — i.e. regenerate types and most errors evaporate. Measured: **exactly 1 of 93** errors carries that signature (`Two different types with this name exist, but they are unrelated`, in `src/routes/tasks/[taskid]/grade/[setid]/+page.svelte`, where `instanceIDs` is `string[]` vs `number[]`).
+The design expects the bulk to be **generated-type / stale-sync drift** (`src/types/openapi.ts`, `.svelte-kit`) — i.e. regenerate types and most errors evaporate. Measured: **exactly 1 of 91** errors carries that signature, at `src/routes/tasks/[taskid]/grade/[setid]/+page.svelte:24:11`, where `instanceIDs` is `string[]` vs `number[]`.
 
-**There is no regenerate-and-done available.** Phase 4 is ~92 individually-judged type fixes, not a type-sync operation. Scope Phase 4 accordingly — and note the design's own escape hatch ("sub-phase if the real count is large") applies.
+**Its message changed while the defect did not.** TypeScript reported it as `Two different types with this name exist, but they are unrelated` in July; today the same line reports `Type 'Promise<…>' is not assignable to type 'Promise<…>'`. Anyone grepping for the old phrase will wrongly conclude it was fixed — match on the file and line, not the wording.
+
+**There is no regenerate-and-done available.** Phase 4 is ~90 individually-judged type fixes, not a type-sync operation. Scope Phase 4 accordingly — and note the design's own escape hatch ("sub-phase if the real count is large") applies.
 
 ---
 
-## Error triage (93)
+## Error triage (91)
 
 | # | Category | Count | Nature |
 |---|---|---|---|
@@ -45,9 +49,9 @@ The design expects the bulk to be **generated-type / stale-sync drift** (`src/ty
 | 3 | Implicit-`any` parameters | 16 | Mechanical annotations |
 | 4 | `possibly null/undefined` + `of type unknown` | 16 | Real missing guards |
 | 5 | Generated-type drift | 1 | The hypothesis above |
-| 6 | Scattered genuine type errors | 41 | Individually judged |
+| 6 | Scattered genuine type errors | 39 | Individually judged |
 
-Concentration — the top 10 files hold **67** errors; the tail is 4 files with 2 and **18 files with exactly 1**:
+Concentration — the top 10 files hold **67** errors; the tail is 4 files with 2 and **16 files with exactly 1**:
 
 | Errors | File |
 |---|---|
@@ -84,6 +88,8 @@ Concentration — the top 10 files hold **67** errors; the tail is 4 files with 
 
 **Why:** Best effort-to-error ratio in the whole set — plausibly ~10% of the backlog for one fix. Worth attempting first to size the rest.
 
+**Coupled to item 1.** `renderTexture.ts`'s only importer anywhere in `client/src` is the dead `_color-standardization.ts:3`. Deleting that file per item 1 orphans this one too, so the pair is one decision: fix these 9 errors, or delete 19. Settle it before Phase 4 is scoped.
+
 ---
 
 ## 3. `src/lib/viewer-window/DoubleRangeSlider.svelte` — 18 errors (largest single file)
@@ -108,27 +114,27 @@ Concentration — the top 10 files hold **67** errors; the tail is 4 files with 
 
 ---
 
-## 5. Warning triage (103) — three-quarters are latent reactivity bugs
+## 5. Warning triage (102) — three-quarters are latent reactivity bugs
 
 **Status:** open
 
 | Warning | Count | Note |
 |---|---|---|
-| `state_referenced_locally` | **76** | Svelte 5 reactivity trap — likely real bugs |
+| `state_referenced_locally` | **75** | Svelte 5 reactivity trap — likely real bugs |
 | `css_unused_selector` | 21 | Dead CSS; mostly `DataTable.svelte` |
 | `a11y_label_has_associated_control` | 4 | Accessibility |
 | `slot_element_deprecated` | 1 | Svelte 4 → 5 migration leftover |
 | `non_reactive_update` | 1 | Value mutated but not `$state(...)` |
 
-**What:** Triage the 76 `state_referenced_locally` warnings. Each means a `$state`/`$props` value was read outside a reactive context, so **the reference captures only the initial value and silently never updates**. Most-affected: `DataTable.svelte` (14 warnings), `InstanceComponent.svelte` (8), `ViewerWindow.svelte` (6), `TagEditForm.svelte` (5). Commonest subjects: `image` (11), `instance` (9), `segmentation` (7), `viewerWindowContext` (5), `study` (5).
+**What:** Triage the 75 `state_referenced_locally` warnings. Each means a `$state`/`$props` value was read outside a reactive context, so **the reference captures only the initial value and silently never updates**. Most-affected: `DataTable.svelte` (14 warnings), `InstanceComponent.svelte` (8), `ViewerWindow.svelte` (6), `TagEditForm.svelte` (5). Commonest subjects: `image` (11), `instance` (9), `segmentation` (7), `viewerWindowContext` (5), `study` (5).
 
 **Why:** This is the same failure family as `svelte/prefer-svelte-reactivity` (28) already tracked in the [Phase 3 ESLint follow-ups](2026-07-16-frontend-ci-phase3-eslint-followups.md) — stale UI that shows first-render data forever. Being a *warning* undersells it; some fraction are user-visible bugs.
 
-**Gate interaction — deliberate decision needed:** `npm run check` does **not** pass `--fail-on-warnings`, so all 103 warnings are invisible to CI even after Phase 4 lands. If Phase 4 baselines errors only, this 76-warning bug surface stays permanently unenforced and will grow. Decide explicitly whether the Phase 4 gate covers warnings; do not let it default silently.
+**Gate interaction — deliberate decision needed:** `npm run check` does **not** pass `--fail-on-warnings`, so all 102 warnings are invisible to CI even after Phase 4 lands. If Phase 4 baselines errors only, this 75-warning bug surface stays permanently unenforced and will grow. Decide explicitly whether the Phase 4 gate covers warnings; do not let it default silently.
 
 ---
 
-## 6. Ratcheting Phase 4 instead of fixing 93 errors first
+## 6. Ratcheting Phase 4 instead of fixing 91 errors first
 
 **Status:** open — evaluated 2026-07-20, not built
 
@@ -140,4 +146,4 @@ Two properties make that viable: machine-output paths are already **workspace-re
 
 **Known limitation, identical to the ESLint ratchet:** per-file *counts*, not error *identity* — fixing one error in a 2-error file while introducing a different one keeps the count at 2 and passes. Pinning line numbers instead would churn the baseline on every unrelated edit.
 
-**Prerequisite:** item 1 (delete the dead file) lands first, so the baseline starts at **83 errors / 31 files** rather than enshrining 10 undeletable phantoms.
+**Prerequisite:** item 1 (delete the dead file) lands first, so the baseline starts at **81 errors / 29 files** rather than enshrining 10 undeletable phantoms — or **72 / 28** if item 2's `renderTexture.ts` goes with it, which it can, since the dead file is its only importer. Decide that pair before fixing the baseline number.

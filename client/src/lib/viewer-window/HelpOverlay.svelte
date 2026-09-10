@@ -27,6 +27,10 @@
                     action: "Add image as side panel",
                     keys: "Shift + click thumbnail",
                 },
+                {
+                    action: "Update linked cursor from thumbnail",
+                    keys: "Shift + move",
+                },
             ],
         },
         {
@@ -37,7 +41,7 @@
             ],
         },
         {
-            title: "Render modes",
+            title: "Render modes (color images)",
             shortcuts: [
                 { action: "Original", keys: "R" },
                 { action: "Luminance", keys: "L" },
@@ -46,6 +50,13 @@
                 { action: "CLAHE", keys: "H" },
                 { action: "Sharpened", keys: "S" },
                 { action: "Histogram matched", keys: "M" },
+            ],
+        },
+        {
+            title: "Render modes (grayscale / OCT)",
+            shortcuts: [
+                { action: "Original", keys: "R" },
+                { action: "CLAHE", keys: "H" },
             ],
         },
         {
