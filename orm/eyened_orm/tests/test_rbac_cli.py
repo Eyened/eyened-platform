@@ -412,6 +412,7 @@ def test_set_admin_on_an_unknown_user_is_a_clean_error_not_a_traceback(
     result = CliRunner().invoke(set_admin_cmd, ["--user", "nosuchuser", "--off"])
     assert result.exit_code == 1
     assert "nosuchuser" in result.output
+    assert "Traceback" not in result.output
 
 
 def test_revoke_removes_the_single_membership_and_echoes_it(
