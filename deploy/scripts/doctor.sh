@@ -328,9 +328,13 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     if [ -n "$(unquote "$(env_get EYENED_API_SECRET_KEY)")" ]; then
         ok "EYENED_API_SECRET_KEY is set"
     else
-        problem "EYENED_API_SECRET_KEY is empty in deploy/.env, so sessions cannot be
-      signed. It is normally generated on first run.
-      Fix: remove deploy/.env and re-run, or set it to a long random value."
+        problem "EYENED_API_SECRET_KEY is missing from deploy/.env, so sessions cannot
+      be signed. The installer generates one automatically for dev and
+      install; a deploy/.env copied by hand from deploy/.env.example —
+      what './eyened prod' requires — never gets one.
+      Fix: set EYENED_API_SECRET_KEY in deploy/.env to a long random value
+           (od -An -N32 -tx1 /dev/urandom | tr -d ' \n'), or delete
+           deploy/.env and re-run to have one generated."
     fi
 
     # ${VAR:?} in compose.yaml rejects these three when ABSENT or EMPTY, never
