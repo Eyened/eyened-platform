@@ -6,9 +6,9 @@ dependencies:
 | Dockerfile | Base | Queues it is wired to |
 |---|---|---|
 | `Dockerfile.cfi-roi` | `python:3.12-slim` (CPU) | `cfi-roi`, `default` |
-| `Dockerfile.inference` | `pytorch:2.7.1-cuda12.8` | `default`, `cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality` |
-| `Dockerfile.cfi-amd` | `pytorch:2.7.1-cuda12.8` | `cfi-amd` |
-| `Dockerfile.layersegmentation` | `pytorch:2.7.1-cuda12.8` | `layer-segmentation` |
+| `Dockerfile.inference` | `pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime` | `default`, `cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality` |
+| `Dockerfile.cfi-amd` | `pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime` | `cfi-amd` |
+| `Dockerfile.layersegmentation` | `pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime` | `layer-segmentation` |
 
 **How to run them: `deploy/compose.workers.yaml`.** One file, for workers on
 the platform host and on a separate GPU box alike. There is no `.env` here any
