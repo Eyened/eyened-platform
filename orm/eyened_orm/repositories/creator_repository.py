@@ -30,3 +30,32 @@ class CreatorRepository:
     def add(self, creator: Creator) -> None:
         self._session.add(creator)
         self._session.flush()
+
+    def list_authenticatable(self) -> list[Creator]:
+        """Every human, active creator that can authenticate -- the cutover set.
+
+        ``PasswordHash.is_not(None)`` rather than a password-validity check on
+        purpose. ``disable_password`` writes ``'!'``, a valid hash that verifies
+        nothing, and OIDC-provisioned accounts get exactly that (auth.py's
+        create_user call passes password=None). They can authenticate -- just
+        not by password -- so they belong in the cutover grant. Only rows with
+        no PasswordHash at all (AI models, attribution-only creators) are
+        skipped.
+        """
+        return list(
+            self._session.scalars(
+                select(Creator).where(
+                    Creator.IsHuman.is_(True),
+                    Creator.Inactive.is_(False),
+                    Creator.PasswordHash.is_not(None),
+                )
+            ).all()
+        )
+
+    def save(self, creator: Creator) -> None:
+        """Persist in-place mutations to ``creator`` within the caller's transaction.
+
+        ``creator`` names what is being saved; the flush covers the whole unit
+        of work, deliberately not just this row.
+        """
+        self._session.flush()

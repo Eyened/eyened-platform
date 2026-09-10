@@ -554,3 +554,28 @@ def test_admin_entity_not_found_names_which_lookup_failed():
     exc = AdminEntityNotFound("no creator named 'bob'", entity="Creator")
     assert exc.entity == "Creator"
     assert str(exc) == "no creator named 'bob'"
+
+
+def test_list_authenticatable_includes_an_account_whose_password_is_disabled(session):
+    """`disable_password` writes '!' -- a valid hash that verifies nothing --
+    and OIDC-provisioned accounts get exactly that. They can authenticate, just
+    not by password, so they belong in the cutover grant. Only rows with no
+    PasswordHash at all are skipped."""
+    from eyened_orm.repositories import CreatorRepository
+    from eyened_orm.utils.db_users import create_user
+    from eyened_orm.utils.factories import admin_scope
+
+    create_user(session, "oidc-user", None)
+    model = create_user(session, "a-model", None)
+    model.IsHuman = False
+    inactive = create_user(session, "gone", "pw")
+    inactive.Inactive = True
+    session.commit()
+
+    names = {
+        c.CreatorName
+        for c in CreatorRepository(session, scope=admin_scope()).list_authenticatable()
+    }
+    assert "oidc-user" in names
+    assert "a-model" not in names
+    assert "gone" not in names
