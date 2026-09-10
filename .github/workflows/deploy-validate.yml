@@ -346,6 +346,22 @@ jobs:
       - name: write_env names the fix when deploy/ is not writable
         run: |
           set -e
+          # Everything that separates `true >` from `: >` below is the fact
+          # that /bin/sh is a shell where `:` is a SPECIAL built-in: dash
+          # aborts on the redirection error, bash does not. Measured: rewrite
+          # the `/bin/sh -c` below as `/bin/bash -c` and this step goes green
+          # on the `: >` spelling too — a guard that cannot fail. GitHub's
+          # runners ship dash as /bin/sh, but asserting it here means a runner
+          # image change — or this job moving to a container or a self-hosted
+          # image where /bin/sh is bash — shows up as a clear failure rather
+          # than as this step quietly pinning nothing. Step 6's `/bin/sh -c`,
+          # whose whole point is that bash would RUN the bashisms dash rejects,
+          # rests on the same property and is covered by these lines too; it is
+          # asserted once, here, rather than in both steps.
+          if /bin/sh -c ': > /nonexistent-dir-xyz/f || echo REACHED' 2>/dev/null | command grep -q REACHED; then
+            echo "::error::/bin/sh on this runner does not abort on a redirection error against the ':' special built-in (it is bash, or a shell that behaves like it), so this step cannot tell 'true >' from ': >' and pins nothing"; exit 1
+          fi
+
           scratch=$(mktemp -d)
           # chmod before rm: this step leaves deploy/ at mode 555, and rm -rf
           # cannot recurse into a directory it may not write.
@@ -367,7 +383,19 @@ jobs:
           # shell aborting on the redirection itself gives 2. Both are
           # non-zero, so "it failed" would not tell the fixed and broken
           # spellings apart.
-          [ "$rc" = "1" ] || { echo "::error::write_env against an unwritable deploy/ exited $rc, want 1 (die's own status). With ': >' in place of 'true >' the shell aborts on the redirection itself and the '|| die' after it never runs — dash exits 2. A job running as root would land here too, since root ignores the directory mode"; exit 1; }
+          #
+          # Split by status rather than one message for every non-1 rc. The
+          # `: >` regression is rc 2 specifically — and it is not the only way
+          # to reach rc 2 (measured: a `Bad substitution` bashism in lib.sh
+          # aborts dash the same way), so even that arm names it as the
+          # regression this pins and points at the output above rather than
+          # asserting a cause this step has not established.
+          case "$rc" in
+            1) ;;
+            2) echo "::error::write_env against an unwritable deploy/ exited 2, want 1 (die's own status): /bin/sh aborted instead of reaching the '|| die' after the redirection. The regression this pins is ': >' in place of 'true >', where a redirection error on a special built-in exits the shell outright — but any other abort of the '/bin/sh -c' above lands here too, so read write_env's own output printed above"; exit 1 ;;
+            0) echo "::error::write_env against an unwritable deploy/ SUCCEEDED, so this step tested nothing. A job running as root lands here, since root ignores the directory mode"; exit 1 ;;
+            *) echo "::error::write_env against an unwritable deploy/ exited $rc, want 1 (die's own status) — its own output is above"; exit 1 ;;
+          esac
           case "$out" in
             *"could not create"*) ;;
             *) echo "::error::write_env against an unwritable deploy/ never printed its own 'could not create ...' message, so the shell aborted on the redirection instead and the operator gets a bare 'cannot create ...: Permission denied' with no fix in it"; exit 1 ;;
