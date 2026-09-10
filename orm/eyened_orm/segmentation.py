@@ -328,6 +328,31 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
         adapter = get_data_access_adapter()
         return adapter.read_segmentation_data(self, axis=axis, slice_index=slice_index)
 
+    def data_to_binary_mask(self, data: np.ndarray) -> np.ndarray:
+        """Threshold an array in this segmentation's representation to a boolean mask."""
+        if (
+            self.DataRepresentation == DataRepresentation.MultiClass
+            or self.DataRepresentation == DataRepresentation.MultiLabel
+        ):
+            raise ValueError(
+                "MultiClass and MultiLabel data representations are not supported for binary masks"
+            )
+
+        if self.DataRepresentation == DataRepresentation.Binary:
+            return data > 0
+        if self.DataRepresentation == DataRepresentation.DualBitMask:
+            return (data & 1) > 0
+        if self.DataRepresentation == DataRepresentation.Probability:
+            threshold = self.Threshold or 0
+            if self.DataType in (Datatype.R8, Datatype.R8UI):
+                return data > 255 * threshold
+            if self.DataType == Datatype.R32F:
+                return data > threshold
+            raise ValueError(f"Unsupported data type: {self.DataType}")
+        raise ValueError(
+            f"Unsupported data representation: {self.DataRepresentation}"
+        )
+
     @property
     def binary_mask(self) -> np.ndarray | None:
         """
@@ -339,34 +364,11 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
           singleton axes and return the squeezed mask.
         - For 3D segmentations, this returns the full 3D volume.
         """
-        if (
-            self.DataRepresentation == DataRepresentation.MultiClass
-            or self.DataRepresentation == DataRepresentation.MultiLabel
-        ):
-            raise ValueError(
-                "MultiClass and MultiLabel data representations are not supported for binary masks"
-            )
-
         data = self.read_data()
         if data is None:
             return None
 
-        if self.DataRepresentation == DataRepresentation.Binary:
-            mask = data > 0
-        elif self.DataRepresentation == DataRepresentation.DualBitMask:
-            mask = (data & 1) > 0
-        elif self.DataRepresentation == DataRepresentation.Probability:
-            threshold = self.Threshold or 0
-            if self.DataType in (Datatype.R8, Datatype.R8UI):
-                mask = data > 255 * threshold
-            elif self.DataType == Datatype.R32F:
-                mask = data > threshold
-            else:
-                raise ValueError(f"Unsupported data type: {self.DataType}")
-        else:
-            raise ValueError(
-                f"Unsupported data representation: {self.DataRepresentation}"
-            )
+        mask = self.data_to_binary_mask(data)
 
         # Convenience: for "2D" segmentations (any singleton axis), return the squeezed mask.
         # Examples:
