@@ -255,13 +255,22 @@ cfi-quality`, so running it beside the slim one double-consumes two queues.
 Set `EYENED_RQ_QUEUES_INFERENCE` in `deploy/.env` to drop them if you want each
 job handled once.
 
-**Remote** — the workers on a separate GPU box. Copy the repo there and set, in
-that box's `deploy/.env`:
+**Remote** — the workers on a separate GPU box. Copy the repo there. This box
+never runs `./eyened` (see below), so nothing writes `deploy/.env` for you —
+start it as a plain copy of the template:
+
+```bash
+cp deploy/.env.example deploy/.env
+```
+
+Then set, in that box's `deploy/.env`:
 
 ```
 COMPOSE_FILE=compose.workers.yaml:compose.storage.yaml
 EYENED_REDIS_HOST=<platform host>
+EYENED_REDIS_PASSWORD=<copied from the platform host's deploy/.env>
 EYENED_DATABASE_HOST=<platform host>
+EYENED_DATABASE_PASSWORD=<copied from the platform host's deploy/.env>
 PLATFORM_STORAGE_PATH=<absolute path to platform storage on this box>
 ```
 
