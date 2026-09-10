@@ -74,15 +74,11 @@ description: EyeNED Platform v2026.07.0 release notes
   it — see `deploy/README.md`'s **Sharing a machine** section.
 - **`make db-snapshot` / `db-restore` are gone.** `./eyened backup` and `./eyened restore`
   replace them and are not a rename: the new pair is xtrabackup-based, takes a path rather
-  than `NAME=`, and never stops the database to take a backup — only `restore` does.
-  `./eyened restore` refuses an old `deploy/snapshots/*.tgz` outright — it is a `tar czf` of
-  the whole datadir, not an xtrabackup directory, and does not have the shape it expects. The
-  old `deploy/scripts/db-restore.sh` is the only thing that can still read one, so copy it out
-  before you update your checkout if you may need to. See `deploy/README.md`'s **Backup and
-  rollback** section. Anyone with existing archives under the old default path,
-  `deploy/snapshots/`, should move or delete them — `.gitignore` covers that path again, but
-  they are not moved automatically, and `./eyened backup` has no default destination:
-  `deploy/backups/` is merely the suggested one (`<dir>` is a required argument).
+  than `NAME=`, and never stops the database to take a backup — only `restore` does. See
+  `deploy/README.md`'s **Backup and rollback** section. Anyone with existing archives under the
+  old default path, `deploy/snapshots/`, should move or delete them — `.gitignore` covers that
+  path again, but they are not moved automatically, and `./eyened backup` has no default
+  destination: `deploy/backups/` is merely the suggested one (`<dir>` is a required argument).
 - **`worker/`'s compose files and `.env` are gone.** The four `worker/docker-compose.*.yml`
   files and `worker/.env*` are replaced by `deploy/compose.workers.yaml`, which reads
   `deploy/.env` — there is no separate worker env file any more. See `worker/README.md`.
