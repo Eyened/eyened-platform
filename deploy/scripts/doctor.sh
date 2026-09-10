@@ -15,7 +15,7 @@ REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 
 case "$MODE" in
     dev|client) ;;
-    *) die "usage: doctor.sh [dev|client]" ;;
+    *) die "usage: ${EYENED_INVOKED_AS:-doctor.sh} [dev|client]" ;;
 esac
 
 failed=0
