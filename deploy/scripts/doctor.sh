@@ -333,8 +333,9 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       install; a deploy/.env copied by hand from deploy/.env.example —
       what './eyened prod' requires — never gets one.
       Fix: set EYENED_API_SECRET_KEY in deploy/.env to a long random value
-           (od -An -N32 -tx1 /dev/urandom | tr -d ' \n'), or delete
-           deploy/.env and re-run to have one generated."
+           (od -An -N32 -tx1 /dev/urandom | tr -d ' \n'), or, if you have
+           not yet configured this file for a site, delete deploy/.env and
+           re-run to have one generated."
     fi
 
     # ${VAR:?} in compose.yaml rejects these three when ABSENT or EMPTY, never
