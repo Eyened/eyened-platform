@@ -23,7 +23,7 @@ the other place a `Creator` gets created, does audit it.
 Creating a principal is the one unattributed action in an otherwise fully
 attributed CLI workflow: every state change made *to* an account is on the
 audit trail, but the account's own creation is not. Low urgency -- the command
-is a trusted path already (see `authz/administration.py`'s module docstring),
+is a trusted path already (see `authz/actor.py`'s module docstring),
 and this is a gap in coverage, not a new escalation.
 
 ## Related

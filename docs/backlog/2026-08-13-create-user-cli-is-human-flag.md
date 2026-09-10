@@ -31,8 +31,9 @@ While in there: `create_user` in `orm/eyened_orm/utils/db_users.py` also accepts
 
 No non-human `Creator` (AI model, attribution-only account) can be minted from
 the CLI. That matters for `grant_all`, which selects on
-`Creator.IsHuman.is_(True)` (`orm/eyened_orm/authz/administration.py`) precisely
-to keep non-human creators out of the cutover grant. The exclusion cannot be
+`Creator.IsHuman.is_(True)` (`CreatorRepository.list_authenticatable()` in
+`orm/eyened_orm/repositories/creator_repository.py`) precisely to keep
+non-human creators out of the cutover grant. The exclusion cannot be
 exercised end-to-end without hand-writing the row, so the one branch the flag
 exists to produce is the one no CLI test can reach.
 

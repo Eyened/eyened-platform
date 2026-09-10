@@ -253,8 +253,11 @@ def test_the_round_trip_persists_and_reports_each_outcome(session, stub_database
 
 @pytest.mark.parametrize("command", (deactivate_cmd, reactivate_cmd))
 def test_an_unknown_user_is_a_clean_error_not_a_traceback(session, stub_database, command):
-    """ClickException exits 1 with its message on the stream; an unhandled
-    LookupError exits 1 too, so the message is what separates them."""
+    """ClickException exits 1 with its message on the stream and no traceback;
+    AdminEntityNotFound is deliberately not a LookupError, so a stray KeyError
+    or IndexError inside the call would surface as an unhandled exception with
+    a traceback instead of this clean exit -- the traceback check is what
+    separates them."""
     result = CliRunner().invoke(command, ["--user", "nosuchuser"])
     assert result.exit_code == 1
     assert "nosuchuser" in result.output
@@ -401,8 +404,11 @@ def test_set_admin_round_trip_persists_and_reports_each_outcome(
 def test_set_admin_on_an_unknown_user_is_a_clean_error_not_a_traceback(
     session, stub_database
 ):
-    """ClickException exits 1 with its message on the stream; an unhandled
-    LookupError exits 1 too, so the message is what separates them."""
+    """ClickException exits 1 with its message on the stream and no traceback;
+    AdminEntityNotFound is deliberately not a LookupError, so a stray KeyError
+    or IndexError inside the call would surface as an unhandled exception with
+    a traceback instead of this clean exit -- the traceback check is what
+    separates them."""
     result = CliRunner().invoke(set_admin_cmd, ["--user", "nosuchuser", "--off"])
     assert result.exit_code == 1
     assert "nosuchuser" in result.output
