@@ -13,7 +13,14 @@ REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 resolve_compose
 
 SRC=${1:-}
-[ -n "$SRC" ] || die "usage: db-restore.sh <backup-dir|backup.tgz>"
+# EYENED_INVOKED_AS: set by ./eyened (only on the 'restore' dispatch) to the
+# command the operator actually typed, so this and the mid-restore recovery
+# message below never name a command they didn't run. ${VAR:-default} is
+# safe under this script's own `set -eu` even when the caller never set it
+# (direct 'db-restore.sh' invocation) — that is what the :- form is for, not
+# a bashism. Falls back to this script's own name, still correct and
+# runnable for that entry point.
+[ -n "$SRC" ] || die "usage: ${EYENED_INVOKED_AS:-db-restore.sh} <backup-dir|backup.tgz>"
 
 # Bind mounts need an absolute host path; resolve relative paths against deploy/.
 case "$SRC" in /*) ;; *) SRC="$DEPLOY_DIR/${SRC#./}" ;; esac
@@ -174,8 +181,8 @@ cleanup() {
       only partially copied back. The database has been left STOPPED on
       purpose: starting MySQL on a half-written datadir risks it coming up on
       corrupt files instead of failing loudly.
-      Fix: re-run './eyened restore $ORIG_SRC' to finish the restore before
-      using this database again." >&2
+      Fix: re-run '${EYENED_INVOKED_AS:-db-restore.sh} $ORIG_SRC' to finish the
+      restore before using this database again." >&2
         else
             echo "==> interrupted or failed: restarting the database" >&2
             compose start database ||
