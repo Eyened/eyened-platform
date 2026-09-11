@@ -143,6 +143,19 @@ When enabled, the Eyened platform will accept all authenticated sessions from OI
 Only the value in the `creator.EmployeeIdentifier` field matters for OIDC authentication. Feel free to adjust the name in `creator.CreatorName` to whatever is convenient for displaying in the Eyened frontend. Values in the `creator` table are only touched during account creation.
 :::
 
-## General note on authentication
+## Locking an account out
 
-There is no easy way to lock existing accounts out of the Eyened application. This is due to the fact that, once authenticated, the token that allows access to the application, can be refreshed indefinitely within the refresh token lifetime (default: 7 days). Only a new authentication will check the password (for password authentication) or force OIDC authentication again. To force re-authentication, you will need to set a new secret key (See `EYENED_API_SECRET_KEY`), or change the `CreatorName` value for an account.
+`eorm deactivate --user U` refuses the account at scope resolution: it cannot log in, cannot refresh a token, and every route that reads or writes project data closes to it on its **next request**, even with a valid token. Memberships are kept, so `eorm reactivate` restores exactly what it had. A `Creator` row is never deleted — deactivation is the retirement path.
+
+Two limits are worth knowing:
+
+- **It is not instantaneous for `GET /api/auth/me`.** That route resolves the token without re-reading the account's status, so an unexpired access token the user already holds still returns their own account details until it expires on its own schedule. One other authenticated route answers the same way — `GET /api/import/status/{task_id}`, which reports a queued job's bare status and carries no project data. Everything that reads or writes project data resolves the scope fresh and closes.
+- **It is not absolute against OIDC.** A deactivated password-only account has `EmployeeIdentifier = NULL`, which the OIDC existing-account lookup matches on, so with `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` the same person can sign in through the provider under a different username and receive a **new** account. That new account holds no memberships, so it reaches no project data until someone grants it; an exact username match is refused with 409 rather than linked.
+
+To force re-authentication across the board, set a new `EYENED_API_SECRET_KEY` — this invalidates every outstanding token, including refresh tokens (default lifetime: 7 days).
+
+## Access is separate from authentication
+
+Signing in successfully grants nothing on its own. What a user can see comes from their project memberships, so an account created here — by `eorm create-user`, by self-registration, or by OIDC auto-provisioning — sees an **empty platform** until it is granted a role.
+
+See **[Access control](/eyened-platform/guides/access_control)** for the model, and **[CLI reference — Users and access](/eyened-platform/orm/cli#users-and-access)** for the commands.

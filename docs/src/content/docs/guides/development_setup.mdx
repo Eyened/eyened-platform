@@ -67,10 +67,35 @@ To run `eorm` or `pytest` on the host (outside containers), install the ORM — 
     docker compose exec server bash
     eorm initialize-database
     eorm seed-form-schemas
-    eorm create-user
+    eorm init-admin --username <EYENED_API_ADMIN_USERNAME>
     ```
 
     Or run the same commands on the host with `dev/.env` loaded if `eyened_orm` is installed locally.
+
+    :::caution
+    `eorm create-user` is **not** enough to get a working login. Access comes from project memberships, so a `create-user` account signs in and sees an empty platform. `init-admin` is the bootstrap. See **[Access control](/eyened-platform/guides/access_control)**.
+    :::
+
+7. Choose how you authenticate while developing:
+
+    | Setting | Effect |
+    |---------|--------|
+    | `EYENED_API_PUBLIC_AUTH_DISABLED=true` | Skips login and runs as the `EYENED_API_ADMIN_USERNAME` account, promoting it to administrator if it is not one. Convenient for feature work; it hides every 403 and 404 |
+    | `EYENED_API_PUBLIC_AUTH_DISABLED=false` | Normal login as a specific account, with exactly the access its flag and memberships grant. Use this whenever you touch permissions |
+
+    Keep it `false` in production.
+
+    To exercise enforcement, drive a second account from the CLI and watch the viewer — scope resolves per request, so each change lands on a refresh with no re-login:
+
+    ```bash
+    eorm create-user --username test_user --password test-pw   # empty platform
+    eorm grant --user test_user --project P --role read_only   # P's data appears
+    eorm grant --user test_user --project P --role grader      # writes now succeed
+    eorm set-admin --user test_user --on                       # restrictions vanish
+    eorm revoke --user test_user --all                         # back to empty
+    ```
+
+    A `Creator` row cannot be deleted — `eorm deactivate` is the way to retire an account, and `eorm set-password` recovers a forgotten one.
 
 ## Daily use
 

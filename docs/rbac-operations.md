@@ -1,5 +1,13 @@
 # RBAC operations
 
+> **The access-control model and the `eorm` command reference now live in the
+> documentation site**, so they are published rather than buried here:
+> [Access control](https://eyened.github.io/eyened-platform/guides/access_control/)
+> and [CLI reference — Users and access](https://eyened.github.io/eyened-platform/orm/cli/#users-and-access).
+> This file keeps the two things that are not reference material: the one-time
+> **cutover** below, and the **accepted risks**. Update the site pages, not this
+> file, when the model changes.
+
 The task project declaration (`TaskProject`) ships in its own release with its
 own migration chain and its own window. That deployment is not covered here --
 see `docs/runbooks/2026-08-25-task-project-declaration-cutover.md`. What the
@@ -112,9 +120,18 @@ do nothing. There is no feature flag: a flag means two code paths where the
 | **Delete another user's annotation** | yes | **no** -- project admin |
 | **Delete a populated task** | yes | **no** -- project admin |
 
-The first is the requirement doing its job. The other two are collateral from
-`grader` not reaching `project_admin`, and both have a working recovery path:
-administrators are data superusers and can perform them immediately.
+The first is the requirement doing its job, and it is the one with **no** recovery
+path at all: `require_owner` is author-only with no admin clause ("403 for
+everyone else, administrators included"), so no role and no flag permits editing
+someone else's annotation, and a row whose author is NULL is permanently
+unmodifiable.
+
+The other two are collateral from `grader` not reaching `project_admin`, and both
+have a working recovery path: administrators are data superusers *for these two*
+and can perform them immediately -- the annotation delete through
+`require_owner_or_project_admin`, the task delete through the `project_admin`
+floor on `DELETE /task/{id}`. Both reach the administrator by the same route,
+`AccessScope.effective_role` returning `project_admin` for every project.
 
 ## RBAC ships inert
 

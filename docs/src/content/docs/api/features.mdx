@@ -11,24 +11,29 @@ Features name what is being segmented (layers, lesions, regions). They support h
 
 ## API Endpoints
 
-### POST /features
+### GET /api/features
+
+- Returns every feature, with its subfeature list
+- `?with_counts=true` adds a per-feature segmentation count
+
+### POST /api/features
 - Creates a new feature with optional subfeature relationships
 - Accepts feature name and list of subfeature IDs
 - Automatically creates parent-child links with indexed ordering
 - Returns the created feature with populated subfeature names
 
-### GET /features/\{feature_id\}
+### GET /api/features/\{feature_id\}
 - Retrieves a single feature by ID
 - Returns feature details including subfeature list
 - Returns 404 if feature not found
 
-### PATCH /features/\{feature_id\}
+### PATCH /api/features/\{feature_id\}
 - Partially updates an existing feature
 - Supports updating feature name and/or subfeature relationships
 - Replaces entire subfeature list when provided (not additive)
 - Returns updated feature with current state
 
-### DELETE /features/\{feature_id\}
+### DELETE /api/features/\{feature_id\}
 - Deletes a feature with comprehensive safety checks
 - Returns 409 with `FEATURE_HAS_SEGMENTATIONS` if feature has linked segmentations
 - Returns 409 with `FEATURE_IS_CHILD` if feature is referenced as a child by other features

@@ -7,15 +7,19 @@ sidebar:
 
 All routes are under `/api` and require authentication unless noted. Prefer topic pages for context; this page is a quick lookup.
 
+Responses are scoped to the caller's project memberships: an object in a project you do not hold is **404**, and one you hold but lack the role for is **403**. See **[Access control](/eyened-platform/guides/access_control)**.
+
 **Overview:** **[API overview](/eyened-platform/api)** · **PublicID** for most image routes · **`GET /health`** (no auth, outside `/api`).
 
 | Route | Topic page |
 |-------|------------|
 | `POST /api/auth/login`, `/token`, `/me`, `/logout`, … | [Authentication](/eyened-platform/api/authentication) |
+| `GET /api/auth/options` | [Authentication](/eyened-platform/api/authentication) (no auth) |
+| `GET /api/auth/oidc/authorize`, `POST /api/auth/oidc/authenticate` | [Authentication](/eyened-platform/api/authentication) (no auth) |
 | `GET /api/images/{id}`, `/data`, `/thumbnail`, … | [Images & patients](/eyened-platform/api/images) |
 | `GET /api/patients/{id}` | [Images & patients](/eyened-platform/api/images) |
 | `POST /api/import/*` | [Import](/eyened-platform/api/import) |
-| `GET /api/import/status/{task_id}` | [Import](/eyened-platform/api/import) (no auth) |
+| `GET /api/import/status/{task_id}` | [Import](/eyened-platform/api/import) |
 | `/api/segmentations/*`, `/api/model-segmentations/*` | [Segmentations](/eyened-platform/api/segmentations) |
 | `/api/features/*` | [Features](/eyened-platform/api/features) |
 | `/api/form-annotations/*`, `/api/form-schemas/*` | [Forms](/eyened-platform/api/forms) |

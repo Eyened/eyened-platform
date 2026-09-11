@@ -35,7 +35,7 @@ See **[Thumbnails](/eyened-platform/thumbnails)**.
 
 ### GET /api/import/status/\{task_id\}
 
-Poll RQ job status. **No authentication required.**
+Poll RQ job status. **Authenticated**, but not scoped to project memberships — the response carries no project data. Job ids are `uuid4` and are not enumerable here.
 
 **Response:** `{ "task_id", "status", "result" }` or `{ "error": "job not found" }`
 
