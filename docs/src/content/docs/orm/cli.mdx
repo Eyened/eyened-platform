@@ -111,6 +111,6 @@ Inspect or compact `{EYENED_STORAGE_ROOT}/segmentations.zarr`.
 Load or create SQL dumps. **`load-dump` is destructive** — drops and recreates the target database.
 
 ```bash
-eorm save-dump -p /path/to/dump_dir
-eorm load-dump -p /path/to/dump.sql
+eorm save-dump -d /path/to/dump_dir
+eorm load-dump -d /path/to/dump_dir
 ```
