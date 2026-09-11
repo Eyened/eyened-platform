@@ -122,6 +122,11 @@ Apply pending migrations from `orm/migrations/`:
 ./eyened migrate
 ```
 
+A dump taken before the migration squash is the exception: its `alembic_version` row holds a
+revision id the squash removed from the map, so `./eyened migrate` cannot resolve it and fails.
+`./eyened up` reports that state and names the recovery instead of guessing — see
+`deploy/README.md`'s **Migrations** section.
+
 ## Tests
 
 Install test dependencies once (`pip install -r server/test-requirements.txt`), then from the repo root:

@@ -376,10 +376,15 @@ has a schema.
 **Restoring a pre-squash dump:** its `alembic_version` table carries a
 revision id the squash removed from the map, so `alembic current` — and
 therefore this command too — cannot resolve it. That is expected, not a
-broken database. `./eyened install`/`up`'s bootstrap step recognises the
-documented case (a dump already at the legacy head) and prints the stamp
-command to run instead of upgrading, rather than guessing; an older dump
-follows `docs/runbooks/2026-08-20-alembic-squash-cutover.md`.
+broken database. `./eyened install`/`up`'s bootstrap step reads that row
+itself before letting alembic see it, so it recognises the state for **any**
+id the squash removed, not just the legacy head, and reports it instead of
+dying on alembic's output — it never stamps or migrates on its own. For a
+dump already at the legacy head (`b2e2800000b2`) it prints the two commands
+that finish the job, a `stamp --purge orm_baseline` followed by an upgrade to
+head; for anything further back it names
+`docs/runbooks/2026-08-20-alembic-squash-cutover.md`, which walks such a dump
+forward on a pre-squash checkout first.
 
 ## Backup and rollback
 
