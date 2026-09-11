@@ -44,8 +44,9 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 
 **5. `alembic current`, then `alembic check`.**
 
-- Expect: `orm_baseline (head)` and a clean check — done.
-- Drift reported here is expected at a site carrying pre-existing schema differences: record it and escalate, do not roll back.
+- Expect: bare `orm_baseline`, with **no** `(head)`, and a check that is **not** clean. Five revisions — `d3ce100ab2b6`, `4eae42457fa2`, `99724789b34d`, `b45090e1544e`, `2db0e63195db` — now sit above `orm_baseline`, and `2db0e63195db` is head, so the database really is five migrations behind and `alembic check` reports their schema as drift. That is this cutover finishing correctly, not a fault.
+- This cutover is done at that point. Bringing the database to head is the next one: `docs/runbooks/2026-08-25-task-project-declaration-cutover.md`, which deploys exactly those five revisions and expects `alembic current` to read `orm_baseline` before it starts.
+- Drift beyond those five revisions is a site carrying pre-existing schema differences: record it and escalate, do not roll back.
 
 ## Recovery and rollback
 
