@@ -133,6 +133,16 @@ services:
       # the pydantic default (server/config.py) — same trap as
       # EYENED_OIDC_PROVIDER_NAME below.
       EYENED_API_AUTH_PASSWORD_ENABLED: ${EYENED_API_AUTH_PASSWORD_ENABLED:-true}
+      # Names the account 'eorm init-admin' bootstraps on first run AND the
+      # account the dev-auth bypass (server/services/current_user.py) resolves
+      # -- the two must agree, or the bypass silently creates a second
+      # account. Has to reach the container the same way
+      # EYENED_API_AUTH_PASSWORD_ENABLED above does: 'server' has no
+      # env_file, and compose reads .env for INTERPOLATION only. Restated as
+      # 'admin' and NOT written `${X:-}`: same trap as that variable --
+      # `${X:-}` sets the EMPTY STRING, which overrides the pydantic default
+      # (server/config.py) rather than leaving it alone.
+      EYENED_API_ADMIN_USERNAME: ${EYENED_API_ADMIN_USERNAME:-admin}
       # Always /storage inside the container; what backs it is decided below.
       EYENED_STORAGE_ROOT: /storage
       # Operator-set, never derived. The bundled Keycloak (compose.oidc.yaml)

@@ -26,8 +26,9 @@ cd eyened-platform
 
 That is the whole thing. `./eyened up` runs preflight checks, creates `deploy/.env` from the template
 with generated secrets, builds the images, starts the stack, and — because the database is empty
-on a fresh clone — creates the schema, seeds the builtin form schemas, and creates an `admin`
-account whose password it prints once.
+on a fresh clone — creates the schema, seeds the builtin form schemas, and creates an
+administrator account (`admin` by default; see `EYENED_API_ADMIN_USERNAME` in
+`deploy/.env.example`) whose password it prints once.
 
 ### On a machine shared with other developers
 

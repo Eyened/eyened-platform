@@ -1,5 +1,9 @@
 #!/bin/sh
-# First-run bootstrap: create the schema, seed form schemas, create an admin.
+# First-run bootstrap: create the schema, seed form schemas, and put this
+# stack under an active administrator — creating one on a genuinely empty
+# database, or refusing loudly and naming the fix when accounts already exist
+# but none of them administers anything. Never promotes an existing account
+# on its own; see section 4.
 #
 # Gated on database STATE, not on which stack is running: it acts only when
 # this stack OWNS its database (local-db profile, EYENED_DATABASE_HOST still
@@ -223,11 +227,25 @@ else
     fi
 fi
 
-# --- 4. An admin account, once ---------------------------------------------
+# --- 4. An administrator, once ----------------------------------------------
+# Three states, not two: RBAC enforcement means the account count alone no
+# longer says whether this stack can be administered — Creator.IsAdmin
+# defaults to false (orm/eyened_orm/creator.py), so an account existing is
+# not the same as an administrator existing.
 if [ "$schema_ok" != "1" ]; then
-    echo "bootstrap: skipping the admin-account check — the schema above is not in a"
+    echo "bootstrap: skipping the administrator check — the schema above is not in a"
     echo "bootstrap: known-good state."
 else
+    # Shell environment overrides deploy/.env, the same precedence compose
+    # itself resolves EYENED_API_ADMIN_USERNAME with when it interpolates the
+    # server service (see step 0 above for COMPOSE_PROFILES/EYENED_DATABASE_HOST,
+    # the same trap) — so the account bootstrap creates and the account the
+    # dev-auth bypass resolves (server/services/current_user.py) cannot
+    # disagree just because one of them read .env and the other read the
+    # calling shell.
+    admin_username=${EYENED_API_ADMIN_USERNAME:-$(env_get EYENED_API_ADMIN_USERNAME)}
+    admin_username=${admin_username:-admin}
+
     accounts=$(compose exec -T server python -c '
 from sqlalchemy import func, select
 from eyened_orm import Creator, Database
@@ -236,11 +254,22 @@ with Database().get_session() as session:
 ' | tr -d '\r' | tail -n 1)
     require_count "$accounts" "the account count"
 
+    # count_admins() is imported rather than re-spelled here so the "active
+    # administrator" definition can never drift from the one
+    # orm/eyened_orm/authz/bootstrap.py itself uses for the last-admin guard.
+    admins=$(compose exec -T server python -c '
+from eyened_orm import Database
+from eyened_orm.authz.bootstrap import count_admins
+with Database().get_session() as session:
+    print(count_admins(session))
+' | tr -d '\r' | tail -n 1)
+    require_count "$admins" "the active-administrator count"
+
     if [ "$accounts" = "0" ]; then
         admin_password=$(gen_hex 12)
         # The password goes in over stdin, not `--password` on the command
         # line: an argv value is visible to any other user on this host who
-        # runs `ps` for the life of the exec. `create-user`'s --password is a
+        # runs `ps` for the life of the exec. `init-admin`'s --password is a
         # click option with prompt=True and confirmation_prompt=True, so
         # omitting the flag makes it prompt twice on stdin instead.
         pw_file=$(mktemp) || die "bootstrap: could not create a temp file for the admin password."
@@ -253,24 +282,51 @@ with Database().get_session() as session:
         trap 'rm -f "$pw_file"; exit 130' INT
         trap 'rm -f "$pw_file"; exit 143' TERM
         printf '%s\n%s\n' "$admin_password" "$admin_password" > "$pw_file"
-        compose exec -T server eorm create-user \
-            --username admin \
-            --description "created by deploy/scripts/bootstrap.sh on first run" \
-            < "$pw_file"
+        outcome=$(compose exec -T server eorm init-admin \
+            --username "$admin_username" \
+            < "$pw_file" | tr -d '\r' | tail -n 1)
         rm -f "$pw_file"
         trap - EXIT INT TERM
-        cat <<EOF
+        # init-admin reports its own outcome (created, promoted, unchanged,
+        # ...). Only 'created' confirms this branch's premise (0 accounts)
+        # still held when the command ran, so only 'created' may claim an
+        # account was made or print a password — see orm/eyened_orm/commands/rbac.py.
+        case "$outcome" in
+            "$admin_username: created")
+                cat <<EOF
 
 ------------------------------------------------------------------------
 An administrator account was created. This password is shown ONCE:
 
-    username: admin
+    username: $admin_username
     password: $admin_password
 
 Copy it now. More users can be created from the user interface.
 ------------------------------------------------------------------------
 EOF
+                ;;
+            *)
+                die "bootstrap: 'eorm init-admin' did not report creating '$admin_username'.
+      Got: '$outcome'
+      No password was printed. Inspect the account by hand before assuming
+      one exists — run:
+          cd deploy && $COMPOSE_BIN exec server eorm init-admin --username $admin_username" ;;
+        esac
+    elif [ "$admins" = "0" ]; then
+        # Refuse loudly, never promote. ensure_admin() resets an existing
+        # account's password whenever a supplied password does not already
+        # verify (orm/eyened_orm/authz/bootstrap.py) — handing this run's
+        # freshly generated password to an existing '$admin_username' account
+        # would silently change that account's password. Only an operator who
+        # deliberately means to do that should run init-admin themselves.
+        die "bootstrap: $accounts account(s) already exist and NONE of them is an
+      active administrator. Nobody can administer this stack, and bootstrap
+      will not promote an existing account automatically.
+      Fix: run
+          cd deploy && $COMPOSE_BIN exec server eorm init-admin --username $admin_username
+      (docker-compose in place of docker compose if that is what this host
+      has — see deploy/README.md) and follow its prompts."
     else
-        echo "bootstrap: $accounts account(s) already exist — not creating an admin."
+        echo "bootstrap: $accounts account(s) exist, $admins of them an active administrator — nothing to do."
     fi
 fi
