@@ -44,8 +44,9 @@ The 24 legacy revisions under `orm/migrations/alembic/versions/` are replaced by
 
 **5. `alembic current`, then `alembic check`.**
 
-- Expect: `orm_baseline (head)` and a clean check — done.
-- Drift reported here is expected at a site carrying pre-existing schema differences: record it and escalate, do not roll back.
+- Expect: `orm_baseline`, **without** `(head)`. Five revisions sit above it (`d3ce100ab2b6` through `2db0e63195db`), so the stamp is correct and the trail is simply not finished. `alembic check` reports drift for the same reason — the models describe those five revisions' schema.
+- Apply them with `alembic upgrade head` (step 9 of the upgrade notes in `RELEASE_NOTES.md`), then re-run both. `alembic current` prints `2db0e63195db (head)` — done.
+- Drift that survives a clean upgrade to head is a site carrying pre-existing schema differences: record it and escalate, do not roll back.
 
 ## Recovery and rollback
 
