@@ -206,9 +206,10 @@ else
     # Reading that row directly first — the same probe shape section 4 uses
     # — is what separates the two, without an allow-list of ids. A row this
     # probe could READ proves the container is up, the credentials work and
-    # the database is reachable; an 'alembic current' that then fails is
-    # therefore failing on the VALUE, which is the diagnosable state. A row
-    # it could NOT read (no table, or the exec itself failed) leaves
+    # the database is reachable — but NOT that an 'alembic current' which
+    # then fails is failing on the VALUE: it needs more than the probe does
+    # (see below), so alembic's own text is what settles that. A row it
+    # could NOT read (no table, or the exec itself failed) leaves
     # version_num empty, and the condition below falls through to
     # alembic_current() unchanged — so a genuine failure (wrong password,
     # container down, unrelated error) still dies loudly with the raw
@@ -244,11 +245,30 @@ else:
             version_num='' ;;
     esac
 
-    if [ -n "$version_num" ] && ! alembic_cmd current >/dev/null 2>&1; then
-        # Costs one extra 'alembic current' on a healthy populated database.
-        # That is the price of leaving alembic_current()'s die untouched: the
-        # alternative is inlining its failure handling here, i.e. two copies
-        # of the loud path to keep in step instead of one.
+    # The probe and 'alembic current' do not depend on the same things: the
+    # probe is a direct query, while 'alembic current' additionally needs
+    # orm/migrations to exist in the container and the whole revision map on
+    # disk to BUILD. The dev stack bind-mounts ../orm into the container, so
+    # a half-written migration in this working tree breaks that map while
+    # the version row still reads perfectly — and a database sitting at
+    # orm_baseline would then be reported as a pre-squash dump. Alembic says
+    # which of the two it is, so capture its output rather than discarding
+    # it, and only read "pre-squash dump" out of a failure that names an id
+    # alembic could not place.
+    #
+    # Costs one extra 'alembic current' on a healthy populated database.
+    # That is the price of leaving alembic_current()'s die untouched: the
+    # alternative is inlining its failure handling here, i.e. two copies
+    # of the loud path to keep in step instead of one.
+    alembic_current_state=ok
+    if [ -n "$version_num" ] && ! alembic_current_out=$(alembic_cmd current 2>&1); then
+        case "$alembic_current_out" in
+            *"Can't locate revision"*) alembic_current_state=unresolvable ;;
+            *)                         alembic_current_state=failed ;;
+        esac
+    fi
+
+    if [ "$alembic_current_state" = unresolvable ]; then
         echo "bootstrap: WARNING — this database's alembic_version table holds"
         echo "bootstrap: $version_num, which 'alembic current' cannot resolve. The read above"
         echo "bootstrap: succeeded, so the container and the database are reachable — it is the"
@@ -285,6 +305,15 @@ else:
         fi
         echo "bootstrap: Nothing was changed. The stack itself still comes up, but this"
         echo "bootstrap: database is not usable by it until the above is done."
+    elif [ "$alembic_current_state" = failed ]; then
+        echo "bootstrap: WARNING — 'alembic current' failed inside the server container, and"
+        echo "bootstrap: not on a revision id it could not place, so bootstrap cannot say what"
+        echo "bootstrap: this database is. The version row itself reads fine ($version_num)."
+        echo "bootstrap: A revision map that does not build is the reachable cause: the dev"
+        echo "bootstrap: stack mounts this working tree's orm/ into the container, so an"
+        echo "bootstrap: unfinished migration in it breaks the map. Alembic said:"
+        printf '%s\n' "$alembic_current_out" | sed 's/^/bootstrap:   /'
+        echo "bootstrap: Fix that first, then re-run. Nothing was changed."
     else
         current=$(alembic_current)
         head=$(alembic_head heads)

@@ -234,9 +234,10 @@ this order. Detail for each step is in its runbook — read all three before you
    the database until step 9 finishes.
 7. `alembic stamp --purge orm_baseline` (`--purge` is required — the squash drops the
    pre-cutover id from the revision map). Verify `alembic current` prints bare
-   `orm_baseline`, with **no** `(head)`: the five revisions step 9 applies sit above it, so
-   the database is five migrations behind here and `alembic check` reports them as drift
-   until step 9 runs.
+   `orm_baseline`, with **no** `(head)`: the five revisions step 9 applies sit above it.
+   Do not check for drift here — on a behind-head database `alembic check` refuses to run
+   (`Target database is not up to date.`) rather than reporting anything. Step 9 is where
+   it becomes meaningful.
 8. Stop the database and copy its data directory. **This copy is the only rollback path
    for the next step.** With the server stopped the copy is consistent by construction.
    Start the database again.
