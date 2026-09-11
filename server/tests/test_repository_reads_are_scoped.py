@@ -77,13 +77,6 @@ _UNSCOPED_METHODS = {
     # would delete exactly the projects the check exists to catch and make
     # every floor built on it pass vacuously.
     "TaskRepository.project_ids": "resolves the projects a write is judged on",
-    # Not project resolution like its neighbours above -- this answers "which
-    # of these ids exist" for a CLI operator who named them, and Task is in
-    # SET_VALUED_ENTITIES, so scoping it would really filter and report a task
-    # that genuinely exists as missing.
-    "TaskRepository.existing_ids": "answers which of these ids exist for a CLI "
-    "operator who named them; Task is in SET_VALUED_ENTITIES, so scoping it "
-    "would report a task that genuinely exists as missing",
     "SubTaskRepository.project_ids": "resolves the projects a write is judged on",
     "SegmentationRepository.project_ids": "resolves the projects a write is judged on",
     "ModelSegmentationRepository.project_ids": "resolves the projects a write is "
@@ -100,6 +93,13 @@ _UNSCOPED_METHODS = {
     "own to resolve yet",
     "SubTaskRepository.project_ids_of_image": "resolves the project an image "
     "would bring into a task; the *after* half of a link write",
+    # Not project resolution like its neighbours above -- this answers "which
+    # of these ids exist" for a CLI operator who named them, and Task is in
+    # SET_VALUED_ENTITIES, so scoping it would really filter and report a task
+    # that genuinely exists as missing.
+    "TaskRepository.existing_ids": "answers which of these ids exist for a CLI "
+    "operator who named them; Task is in SET_VALUED_ENTITIES, so scoping it "
+    "would report a task that genuinely exists as missing",
     "SubTaskRepository.resolve_image_instance_id": "PublicID -> id resolution only; "
     "returns an int that is unusable without a subtask to attach it to",
     "SubTaskRepository.next_image_index": "returns an integer, not a row",

@@ -156,6 +156,13 @@ def _offenders(
     for the two server roots, ``orm/`` for the ORM one -- so a
     ``services/auth.py`` and an ``eyened_orm/authz/auth.py`` cannot ever collide
     in one another's allow-list.
+
+    ``root_key`` and ``allowed`` must be passed together. ``allowed`` defaults
+    to ``_SIGNATURE_ALLOWED``, whose keys are relative to ``server/``, so
+    ``_offenders(some_orm_root, root_key=_ORM_ROOT)`` with no matching
+    ``allowed`` would match ORM-relative paths against server-relative keys and
+    exempt nothing -- the guard goes wrong rather than failing loudly, which is
+    the one failure mode a guard cannot afford.
     """
     allowed = _SIGNATURE_ALLOWED if allowed is None else allowed
     # A moved/renamed test file (_SERVICES/_ROUTES derive from __file__) would

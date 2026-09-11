@@ -9,90 +9,75 @@ because a production trusted path (``auth:register``) already exists that is not
 is valid Python that writes a plausible, wrong audit row -- provenance that
 reads as authoritative and names the wrong command. Nothing else would catch it.
 
+The two halves of the pair are read from the two places that own them: the
+command name off the ``click.Command`` object the decorator produced (Click
+computed it, so nothing here has to reproduce Click -- see ``_registered_names``),
+and the ``TrustedPath`` literal off the same function's AST.
+
 Scope: this matches the literal shape. A name built at runtime
 (``TrustedPath(f"eorm {name}")``) is invisible here, which is one reason the
-call sites are written as literals.
+call sites are written as literals. Likewise a command built inside a function
+rather than at module scope: it is not in the module's namespace, so the pairing
+below never sees it.
 """
 from __future__ import annotations
 
 import ast
 import pathlib
+import types
+
+import click
+
+from eyened_orm import cli as cli_module
+from eyened_orm.commands import rbac as rbac_module
 
 _ORM = pathlib.Path(__file__).resolve().parents[1]
-_FILES = (_ORM / "commands" / "rbac.py", _ORM / "cli.py")
+# Each file paired with the module it is the source of: the AST supplies the
+# TrustedPath literals, the imported module supplies the names Click registered.
+_FILES = (
+    (_ORM / "commands" / "rbac.py", rbac_module),
+    (_ORM / "cli.py", cli_module),
+)
 
 
-def _click_derived_name(func_name: str) -> str:
-    """Reproduce Click's bare-decorator name derivation (click/decorators.py).
+def _registered_names(module: types.ModuleType) -> dict[str, str]:
+    """Map ``function name -> the command name Click registered it under``.
 
-    Confirmed empirically against the installed click (``orm/setup.py`` pins
-    ``click==8.*``; 8.4.2 is what's installed) and against its source: Click
-    lowercases the function name, turns underscores into dashes, then -- as
-    of click 8.2 -- strips one trailing ``-command``, ``-cmd``, ``-group``, or
-    ``-grp`` segment. So ``grant_for_task_cmd`` becomes ``grant-for-task``,
-    not ``grant-for-task-cmd``; the suffix must be the trailing segment, so
-    ``cmd_foo`` is unaffected and becomes ``cmd-foo``, not ``foo``.
+    Ask Click rather than reproduce it. Every decorated module-level object
+    *is* a ``click.Command`` -- ``click.Group`` too, which subclasses it and is
+    how the ``eorm`` group in ``cli.py`` arrives here -- carrying a ``.name``
+    Click itself computed and a ``.callback`` that is the undecorated function,
+    whose ``__name__`` is what the AST walk below sees.
+
+    That closes every decorator shape at once: a positional name, ``name=``,
+    ``@eorm.command()``, and a bare ``@click.command`` with no parentheses --
+    including any shape a future Click adds. The derivation this replaces
+    (lowercase, ``_`` to ``-``, then strip one trailing
+    ``-command``/``-cmd``/``-group``/``-grp``) is Click 8.2-and-later behaviour
+    while ``orm/setup.py`` pins only ``click==8.*``, so a reimplementation could
+    disagree with what Click actually registers under a version the pin already
+    permits -- and this guard would then go quietly wrong instead of failing.
     """
-    cmd_name = func_name.lower().replace("_", "-")
-    cmd_left, sep, suffix = cmd_name.rpartition("-")
-    if sep and suffix in {"command", "cmd", "group", "grp"}:
-        cmd_name = cmd_left
-    return cmd_name
-
-
-def _command_name(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str | None:
-    """The Click command name this function is registered under, or None.
-
-    Three decorator shapes appear in this repo: ``@click.command("grant")``
-    (an explicit name, returned as-is), ``@eorm.command()`` (a bare call with
-    no name, so Click derives one -- see ``_click_derived_name``), and a bare
-    ``@click.command`` with no parentheses at all (Click permits applying the
-    decorator unapplied; the same derivation applies). None of the current
-    commands pass the name as a keyword, but Click's signature is
-    ``command(name=None, cls=None, **attrs)``, so ``@click.command(name="rm")``
-    is legal and would otherwise register under ``rm`` while this function
-    kept returning the derived name -- checked below so a future command
-    written that way is not silently mismatched.
-    """
-    for decorator in node.decorator_list:
-        if isinstance(decorator, ast.Call):
-            func = decorator.func
-            args = decorator.args
-            keywords = decorator.keywords
-        elif isinstance(decorator, ast.Attribute):
-            func = decorator
-            args = ()
-            keywords = ()
-        else:
-            continue
-        if not (isinstance(func, ast.Attribute) and func.attr == "command"):
-            continue
-        for arg in args:
-            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                return arg.value
-        for kw in keywords:
-            if (
-                kw.arg == "name"
-                and isinstance(kw.value, ast.Constant)
-                and isinstance(kw.value.value, str)
-            ):
-                return kw.value.value
-        return _click_derived_name(node.name)
-    return None
+    return {
+        obj.callback.__name__: obj.name
+        for obj in vars(module).values()
+        if isinstance(obj, click.Command) and obj.callback is not None
+    }
 
 
 def _mismatches() -> list[str]:
     bad: list[str] = []
     checked = 0
-    for path in _FILES:
+    for path, module in _FILES:
         # A renamed or moved module would otherwise make this guard scan
         # nothing and `assert [] == []` pass vacuously.
         assert path.is_file(), f"{path} is missing -- guard would scan nothing"
+        registered = _registered_names(module)
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            name = _command_name(node)
+            name = registered.get(node.name)
             if name is None:
                 continue
             for call in ast.walk(node):

@@ -415,6 +415,87 @@ def test_set_admin_on_an_unknown_user_is_a_clean_error_not_a_traceback(
     assert "Traceback" not in result.output
 
 
+def test_grant_echoes_a_fresh_grant_without_a_previous_role(
+    session, stub_database, alice
+):
+    """The fresh-grant echo, which carries no `(was ...)` because there was no
+    previous role. Pinned as the whole line: a suffix that leaked onto this
+    path -- `(was None)`, or the new role repeated -- would still contain the
+    substring an `in result.output` check looks for, and the membership row
+    below is identical either way."""
+    project = make_project(session, "A")
+    session.commit()
+
+    result = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "grader"]
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == "alice: grader in A"
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {
+        project.ProjectID: ProjectRole.grader
+    }
+
+
+def test_grant_that_changes_a_role_names_the_role_it_replaced(
+    session, stub_database, alice
+):
+    """The `(was ...)` variant, in both directions. `previous` is the role that
+    was *replaced*, so an echo that read it off the new grant instead would
+    print `(was project_admin)` on the downgrade -- telling an administrator
+    that the privilege they just removed is the one still held. Both legs also
+    take the changed=True branch, so neither is distinguishable from the fresh
+    grant above by exit code or by the row."""
+    project = make_project(session, "A")
+    session.commit()
+
+    seed = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "read_only"]
+    )
+    assert seed.exit_code == 0, seed.output
+
+    up = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "project_admin"]
+    )
+    assert up.exit_code == 0, up.output
+    assert up.output.strip() == "alice: project_admin in A (was read_only)"
+
+    down = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "grader"]
+    )
+    assert down.exit_code == 0, down.output
+    assert down.output.strip() == "alice: grader in A (was project_admin)"
+    # One membership throughout: a change replaces the role, it does not stack
+    # a second row that `roles_for`'s dict would then hide behind one key.
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {
+        project.ProjectID: ProjectRole.grader
+    }
+    assert _memberships(session) == 1
+
+
+def test_granting_a_role_the_user_already_holds_reports_no_change(
+    session, stub_database, alice
+):
+    """The idempotent branch. A re-grant that fell through to the changed=True
+    echo would print `alice: grader in A` and leave the same row behind, so the
+    text is the only thing that separates "did nothing" from "did it again"."""
+    project = make_project(session, "A")
+    session.commit()
+
+    first = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "grader"]
+    )
+    assert first.exit_code == 0, first.output
+
+    result = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "grader"]
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == "alice: already grader in A; no change"
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {
+        project.ProjectID: ProjectRole.grader
+    }
+
+
 def test_revoke_removes_the_single_membership_and_echoes_it(
     session, stub_database, alice
 ):
@@ -576,9 +657,13 @@ def test_revoke_all_rows_name_the_command_that_ran(session, stub_database, alice
     session.commit()
 
     for name in ("A", "B"):
-        CliRunner().invoke(
+        # Checked, not discarded: a grant that failed here would surface as a
+        # confusing assertion about DELETE rows below instead of naming the
+        # arrange that never happened.
+        granted = CliRunner().invoke(
             grant_cmd, ["--user", "alice", "--project", name, "--role", "grader"]
         )
+        assert granted.exit_code == 0, granted.output
     result = CliRunner().invoke(revoke_cmd, ["--user", "alice", "--all", "--yes"])
     assert result.exit_code == 0
 
