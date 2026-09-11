@@ -125,6 +125,22 @@ services:
       # whereas this value lands in a shell expansion, where `:-` substitutes
       # for empty as well as unset (measured: unset and empty both yield 4).
       WORKERS: ${WORKERS:-4}
+      # Reach the container for the same reason WORKERS above does: `server`
+      # has no env_file, and compose reads .env for INTERPOLATION only.
+      # Restated defaults, NOT `${X:-}`, for the same reason
+      # EYENED_API_AUTH_PASSWORD_ENABLED below is: these five are read by
+      # pydantic (server/config.py), which accepts the empty string in place
+      # of its own default -- unlike WORKERS above, whose `:-` guards a SHELL
+      # expansion, where empty and unset already behave the same. Three of
+      # the five (threadpool_limit, pool_size, max_overflow) are bound by a
+      # startup validator that refuses to boot the server if violated; the
+      # other two are not. deploy/.env.example carries the arithmetic and
+      # which is which.
+      EYENED_API_THREADPOOL_LIMIT: ${EYENED_API_THREADPOOL_LIMIT:-16}
+      EYENED_API_POOL_SIZE: ${EYENED_API_POOL_SIZE:-16}
+      EYENED_API_MAX_OVERFLOW: ${EYENED_API_MAX_OVERFLOW:-4}
+      EYENED_API_POOL_TIMEOUT: ${EYENED_API_POOL_TIMEOUT:-5}
+      EYENED_API_PASSWORD_HASH_CONCURRENCY: ${EYENED_API_PASSWORD_HASH_CONCURRENCY:-4}
       # Whether the login page offers username/password at all. Documented as
       # the thing you turn off once OIDC works, so it has to reach a container:
       # `server` has no env_file, and compose reads .env for INTERPOLATION
