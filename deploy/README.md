@@ -373,6 +373,14 @@ creates the whole schema itself, so there is no separate table-creation step.
 `./eyened migrate` is for applying new migrations to a database that already
 has a schema.
 
+**Restoring a pre-squash dump:** its `alembic_version` table carries a
+revision id the squash removed from the map, so `alembic current` — and
+therefore this command too — cannot resolve it. That is expected, not a
+broken database. `./eyened install`/`up`'s bootstrap step recognises the
+documented case (a dump already at the legacy head) and prints the stamp
+command to run instead of upgrading, rather than guessing; an older dump
+follows `docs/runbooks/2026-08-20-alembic-squash-cutover.md`.
+
 ## Backup and rollback
 
 | Case | Tool |

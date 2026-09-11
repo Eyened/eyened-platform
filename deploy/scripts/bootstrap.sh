@@ -195,35 +195,84 @@ if [ "$tables" = "0" ]; then
     schema_ok=1
 else
     echo "bootstrap: the database already has $tables tables — it will not be migrated."
-    current=$(alembic_current)
-    head=$(alembic_head heads)
-    if [ -z "$current" ]; then
-        # Tables exist but no alembic_version row. initialize-database runs the
-        # migration trail, and alembic writes that row as it applies, so this is
-        # no longer "create_all succeeded and stamping did not" — that sequence
-        # no longer exists. What remains are a schema restored from a logical
-        # dump that did not carry its alembic_version table, a schema created by
-        # a release older than the migration squash, or a run that died partway
-        # (MySQL DDL is not transactional, so a half-applied migration leaves
-        # tables behind). Which revision such a schema should be stamped at
-        # depends on what it actually contains, so bootstrap reports and stops
-        # rather than guessing — applying migrations blind would misdiagnose all
-        # three.
-        echo "bootstrap: WARNING — this database has tables but no alembic_version row."
-        echo "bootstrap: That is usually a schema restored from a logical dump that did not"
-        echo "bootstrap: include the alembic_version table, or one created by a release older"
-        echo "bootstrap: than the migration squash. Which revision it should be stamped at"
-        echo "bootstrap: depends on what the schema actually is, so bootstrap will not guess —"
-        echo "bootstrap: inspect the database directly before proceeding."
-    elif [ "${current%% *}" = "${head%% *}" ]; then
-        echo "bootstrap: schema is at head ($head). Nothing to do."
-        schema_ok=1
+
+    # alembic_current() dies (see above) the moment alembic_version holds a
+    # revision id it cannot resolve — before any branch below ever runs. A
+    # database restored from a pre-squash dump is exactly that: it carries
+    # alembic_version, but the squash moved every legacy id off alembic's
+    # search path (orm/migrations/alembic/versions_archive/), so it is the
+    # VALUE that fails to resolve, not the invocation. Reading it directly
+    # first — the same probe shape section 4 uses — lets the one documented
+    # case (b2e2800000b2, the legacy head; see
+    # docs/runbooks/2026-08-20-alembic-squash-cutover.md) be recognised
+    # before alembic ever sees it and dies on it. Anything else this read
+    # comes back with (a different id, or empty because the table does not
+    # exist or the exec itself failed) falls through to alembic_current()
+    # unchanged, so a genuine failure — wrong password, container down,
+    # unrelated error — still dies loudly with the raw output. This is a
+    # narrow, additional check, not a replacement for that die.
+    version_num=$(compose exec -T server python -c '
+from sqlalchemy import inspect, text
+from eyened_orm import Database
+engine = Database().engine
+if inspect(engine).has_table("alembic_version"):
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT version_num FROM alembic_version")).fetchone()
+    print(row[0] if row else "")
+else:
+    print("")
+' | tr -d '\r' | tail -n 1)
+
+    if [ "$version_num" = "b2e2800000b2" ]; then
+        # The same state the squash cutover runbook's step 2 checks for,
+        # reached through a different door — a dump restored later, rather
+        # than a live site walked through the cutover. The recovery is the
+        # same: stamp at the new root rather than trying to resolve an id the
+        # squash removed from the map. Bootstrap does not run it itself —
+        # same "reports and stops" contract as the two branches below.
+        echo "bootstrap: WARNING — this database's alembic_version table holds"
+        echo "bootstrap: $version_num, the legacy head from before the migration squash."
+        echo "bootstrap: The squash removed that id from the revision map, so 'alembic"
+        echo "bootstrap: current' cannot resolve it — this is a dump restored from before"
+        echo "bootstrap: the squash, not a broken schema."
+        echo "bootstrap: Stamp it at the new root instead of upgrading (--purge skips"
+        echo "bootstrap: resolving the legacy id), then bring it up to head:"
+        echo "bootstrap:   cd deploy && $COMPOSE_BIN exec -it server sh -c 'cd orm/migrations && alembic stamp --purge orm_baseline'"
+        echo "bootstrap:   ./eyened migrate"
+        echo "bootstrap: A dump from further back — not already at the legacy head — follows"
+        echo "bootstrap: docs/runbooks/2026-08-20-alembic-squash-cutover.md instead. Nothing"
+        echo "bootstrap: was changed."
     else
-        echo "bootstrap: WARNING — this database is not at the latest revision."
-        echo "bootstrap:   current: $current"
-        echo "bootstrap:   head:    $head"
-        echo "bootstrap: Run './eyened migrate' when you are sure this is the database"
-        echo "bootstrap: you want to migrate. Nothing was changed."
+        current=$(alembic_current)
+        head=$(alembic_head heads)
+        if [ -z "$current" ]; then
+            # Tables exist but no alembic_version row. initialize-database runs the
+            # migration trail, and alembic writes that row as it applies, so this is
+            # no longer "create_all succeeded and stamping did not" — that sequence
+            # no longer exists. What remains are a schema restored from a logical
+            # dump that did not carry its alembic_version table, a schema created by
+            # a release older than the migration squash, or a run that died partway
+            # (MySQL DDL is not transactional, so a half-applied migration leaves
+            # tables behind). Which revision such a schema should be stamped at
+            # depends on what it actually contains, so bootstrap reports and stops
+            # rather than guessing — applying migrations blind would misdiagnose all
+            # three.
+            echo "bootstrap: WARNING — this database has tables but no alembic_version row."
+            echo "bootstrap: That is usually a schema restored from a logical dump that did not"
+            echo "bootstrap: include the alembic_version table, or one created by a release older"
+            echo "bootstrap: than the migration squash. Which revision it should be stamped at"
+            echo "bootstrap: depends on what the schema actually is, so bootstrap will not guess —"
+            echo "bootstrap: inspect the database directly before proceeding."
+        elif [ "${current%% *}" = "${head%% *}" ]; then
+            echo "bootstrap: schema is at head ($head). Nothing to do."
+            schema_ok=1
+        else
+            echo "bootstrap: WARNING — this database is not at the latest revision."
+            echo "bootstrap:   current: $current"
+            echo "bootstrap:   head:    $head"
+            echo "bootstrap: Run './eyened migrate' when you are sure this is the database"
+            echo "bootstrap: you want to migrate. Nothing was changed."
+        fi
     fi
 fi
 
