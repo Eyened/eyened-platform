@@ -121,21 +121,24 @@ services:
       # silently wins instead. The `:-4` restates the Dockerfile's own default
       # to keep it visible here and in step with it. That is NOT the ${X:-}
       # trap EYENED_API_AUTH_PASSWORD_ENABLED below documents: that one bites
-      # because pydantic accepts the empty string in place of its own default,
-      # whereas this value lands in a shell expansion, where `:-` substitutes
-      # for empty as well as unset (measured: unset and empty both yield 4).
+      # because pydantic rejects the empty string for that bool field with a
+      # ValidationError, crashing the server at startup, whereas this value
+      # lands in a shell expansion, where `:-` substitutes for empty as well
+      # as unset (measured: unset and empty both yield 4).
       WORKERS: ${WORKERS:-4}
       # Reach the container for the same reason WORKERS above does: `server`
       # has no env_file, and compose reads .env for INTERPOLATION only.
       # Restated defaults, NOT `${X:-}`, for the same reason
-      # EYENED_API_AUTH_PASSWORD_ENABLED below is: these five are read by
-      # pydantic (server/config.py), which accepts the empty string in place
-      # of its own default -- unlike WORKERS above, whose `:-` guards a SHELL
-      # expansion, where empty and unset already behave the same. Three of
-      # the five (threadpool_limit, pool_size, max_overflow) are bound by a
-      # startup validator that refuses to boot the server if violated; the
-      # other two are not. deploy/.env.example carries the arithmetic and
-      # which is which.
+      # EYENED_API_AUTH_PASSWORD_ENABLED below is: these five are int fields
+      # read by pydantic (server/config.py), which rejects an empty string
+      # for an int with a ValidationError instead of falling back to its own
+      # default -- so the bare form would crash the server at startup on the
+      # default, unset case -- unlike WORKERS above, whose `:-` guards a
+      # SHELL expansion, where empty and unset already behave the same.
+      # Three of the five (threadpool_limit, pool_size, max_overflow) are
+      # bound by a startup validator that refuses to boot the server if
+      # violated; the other two are not. deploy/.env.example carries the
+      # arithmetic and which is which.
       EYENED_API_THREADPOOL_LIMIT: ${EYENED_API_THREADPOOL_LIMIT:-16}
       EYENED_API_POOL_SIZE: ${EYENED_API_POOL_SIZE:-16}
       EYENED_API_MAX_OVERFLOW: ${EYENED_API_MAX_OVERFLOW:-4}
@@ -145,9 +148,13 @@ services:
       # the thing you turn off once OIDC works, so it has to reach a container:
       # `server` has no env_file, and compose reads .env for INTERPOLATION
       # only. The default is restated as `true` and NOT written `${X:-}`,
-      # because that form sets the EMPTY STRING and an empty string overrides
-      # the pydantic default (server/config.py) — same trap as
-      # EYENED_OIDC_PROVIDER_NAME below.
+      # because that form sets the EMPTY STRING and pydantic rejects an empty
+      # string for this bool field (server/config.py) with a ValidationError,
+      # crashing the server at startup even on the default, unset case --
+      # unlike EYENED_OIDC_PROVIDER_NAME below, whose str default has no length
+      # constraint, so an empty string is accepted there and silently overrides
+      # it instead. Not a str-vs-bool rule: EYENED_API_ADMIN_USERNAME below is
+      # also str and also raises, via its own min_length=1.
       EYENED_API_AUTH_PASSWORD_ENABLED: ${EYENED_API_AUTH_PASSWORD_ENABLED:-true}
       # Names the account 'eorm init-admin' bootstraps on first run AND the
       # account the dev-auth bypass (server/services/current_user.py) resolves
@@ -155,9 +162,12 @@ services:
       # account. Has to reach the container the same way
       # EYENED_API_AUTH_PASSWORD_ENABLED above does: 'server' has no
       # env_file, and compose reads .env for INTERPOLATION only. Restated as
-      # 'admin' and NOT written `${X:-}`: same trap as that variable --
-      # `${X:-}` sets the EMPTY STRING, which overrides the pydantic default
-      # (server/config.py) rather than leaving it alone.
+      # 'admin' and NOT written `${X:-}`: same outcome as that variable --
+      # crashes the server at startup on the default, unset case --
+      # but for a different reason: this is a str field, and pydantic normally
+      # accepts an empty string for str; here it is this field's own
+      # min_length=1 constraint (server/config.py) that rejects the empty
+      # string with a ValidationError instead.
       EYENED_API_ADMIN_USERNAME: ${EYENED_API_ADMIN_USERNAME:-admin}
       # Always /storage inside the container; what backs it is decided below.
       EYENED_STORAGE_ROOT: /storage
@@ -189,14 +199,18 @@ services:
       EYENED_OIDC_CLIENT_ID: ${EYENED_OIDC_CLIENT_ID:-}
       EYENED_OIDC_CLIENT_SECRET: ${EYENED_OIDC_CLIENT_SECRET:-}
       # NOT `:-`, and do not "tidy" it to match the four around it: `X: ${X:-}`
-      # sets X to the EMPTY STRING in the container, it does not leave X unset,
-      # and an empty string overrides a pydantic default. That is harmless for
-      # the two above (server/config.py defaults both to "") and for the two
-      # booleans, but provider_name defaults to "OpenID Connect" and
-      # /auth/options hands it straight to the login page — so `:-` would blank
-      # the provider label on every stack that never set it. Restating the
-      # default here is the same convention EYENED_API_PUBLIC_AUTH_DISABLED and
-      # EYENED_API_DEBUG already follow.
+      # sets X to the EMPTY STRING in the container, it does not leave X unset.
+      # For the two above (str, server/config.py defaults both to "") that
+      # empty string is harmless -- pydantic accepts it and it matches their
+      # own default. It is NOT harmless for the two booleans around it
+      # (AUTH_OIDC_ENABLED above, CREATE_NEW_ACCOUNTS below): pydantic rejects
+      # an empty string for a bool with a ValidationError, crashing the
+      # server at startup -- which is why both are already written restated,
+      # not bare, same as here. provider_name itself defaults to "OpenID
+      # Connect", not "", and /auth/options hands it straight to the login
+      # page — so `:-` would blank the provider label on every stack that
+      # never set it. Restating the default here is the same convention
+      # EYENED_API_PUBLIC_AUTH_DISABLED and EYENED_API_DEBUG already follow.
       EYENED_OIDC_PROVIDER_NAME: "${EYENED_OIDC_PROVIDER_NAME:-OpenID Connect}"
       EYENED_OIDC_CREATE_NEW_ACCOUNTS: ${EYENED_OIDC_CREATE_NEW_ACCOUNTS:-false}
     volumes:
