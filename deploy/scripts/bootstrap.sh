@@ -228,10 +228,11 @@ else
 fi
 
 # --- 4. An administrator, once ----------------------------------------------
-# Three states, not two: RBAC enforcement means the account count alone no
+# Four states, not two: RBAC enforcement means the account count alone no
 # longer says whether this stack can be administered — Creator.IsAdmin
 # defaults to false (orm/eyened_orm/creator.py), so an account existing is
-# not the same as an administrator existing.
+# not the same as an administrator existing, and an administrator existing is
+# not the same as an ACTIVE one.
 if [ "$schema_ok" != "1" ]; then
     echo "bootstrap: skipping the administrator check — the schema above is not in a"
     echo "bootstrap: known-good state."
@@ -257,13 +258,28 @@ with Database().get_session() as session:
     # count_admins() is imported rather than re-spelled here so the "active
     # administrator" definition can never drift from the one
     # orm/eyened_orm/authz/bootstrap.py itself uses for the last-admin guard.
-    admins=$(compose exec -T server python -c '
-from eyened_orm import Database
+    # The second number counts IsAdmin rows whatever their Inactive flag: that
+    # is what separates "no administrator exists" from "the only administrator
+    # is deactivated" below, two states that need two different commands. One
+    # round-trip for both, so they cannot describe two different moments.
+    admin_counts=$(compose exec -T server python -c '
+from sqlalchemy import func, select
+from eyened_orm import Creator, Database
 from eyened_orm.authz.bootstrap import count_admins
 with Database().get_session() as session:
-    print(count_admins(session))
+    print(count_admins(session), session.execute(
+        select(func.count()).select_from(Creator).where(Creator.IsAdmin.is_(True))
+    ).scalar_one())
 ' | tr -d '\r' | tail -n 1)
+    # `read`, not two ${..%% *}/${..#* } strips: if the probe ever prints only
+    # one number, those would silently hand back the SAME number twice and the
+    # deactivated state would be misread as "no administrator". read leaves
+    # admin_rows empty instead, and require_count refuses it.
+    read -r admins admin_rows <<EOF
+$admin_counts
+EOF
     require_count "$admins" "the active-administrator count"
+    require_count "$admin_rows" "the administrator count"
 
     if [ "$accounts" = "0" ]; then
         admin_password=$(gen_hex 12)
@@ -282,18 +298,38 @@ with Database().get_session() as session:
         trap 'rm -f "$pw_file"; exit 130' INT
         trap 'rm -f "$pw_file"; exit 143' TERM
         printf '%s\n%s\n' "$admin_password" "$admin_password" > "$pw_file"
-        outcome=$(compose exec -T server eorm init-admin \
-            --username "$admin_username" \
-            < "$pw_file" | tr -d '\r' | tail -n 1)
+        # Not a pipeline, and not a stdout match. `... | tr | tail -n 1` keeps
+        # only the LAST stage's exit status (see the note above alembic_cmd),
+        # which would swallow a failure of the one state-changing command in
+        # this script. And what init-admin writes to stdout is not a contract:
+        # click 8.1.x echoes the hidden password prompt there, get_database()
+        # prints its connection line into the same stream, and orm/setup.py
+        # pins neither their order nor the click minor. The database is the
+        # truth, so the same probe that got us here is what decides whether
+        # this run produced an administrator.
+        if compose exec -T server eorm init-admin --username "$admin_username" < "$pw_file"; then
+            init_rc=0
+        else
+            init_rc=$?
+        fi
         rm -f "$pw_file"
         trap - EXIT INT TERM
-        # init-admin reports its own outcome (created, promoted, unchanged,
-        # ...). Only 'created' confirms this branch's premise (0 accounts)
-        # still held when the command ran, so only 'created' may claim an
-        # account was made or print a password — see orm/eyened_orm/commands/rbac.py.
-        case "$outcome" in
-            "$admin_username: created")
-                cat <<EOF
+        admins=$(compose exec -T server python -c '
+from eyened_orm import Database
+from eyened_orm.authz.bootstrap import count_admins
+with Database().get_session() as session:
+    print(count_admins(session))
+' | tr -d '\r' | tail -n 1)
+        require_count "$admins" "the active-administrator count after init-admin"
+        if [ "$init_rc" != "0" ] || [ "$admins" = "0" ]; then
+            die "bootstrap: 'eorm init-admin' exited $init_rc and this database now reports
+      $admins active administrator(s), so no password is printed here.
+      An account may exist whose password was set to the one this run
+      generated and has now discarded — inspect it by hand before assuming
+      it does not, and run:
+          cd deploy && $COMPOSE_BIN exec server eorm init-admin --username \"$admin_username\""
+        fi
+        cat <<EOF
 
 ------------------------------------------------------------------------
 An administrator account was created. This password is shown ONCE:
@@ -304,14 +340,6 @@ An administrator account was created. This password is shown ONCE:
 Copy it now. More users can be created from the user interface.
 ------------------------------------------------------------------------
 EOF
-                ;;
-            *)
-                die "bootstrap: 'eorm init-admin' did not report creating '$admin_username'.
-      Got: '$outcome'
-      No password was printed. Inspect the account by hand before assuming
-      one exists — run:
-          cd deploy && $COMPOSE_BIN exec server eorm init-admin --username $admin_username" ;;
-        esac
     elif [ "$admins" = "0" ]; then
         # Refuse loudly, never promote. ensure_admin() resets an existing
         # account's password whenever a supplied password does not already
@@ -319,13 +347,28 @@ EOF
         # freshly generated password to an existing '$admin_username' account
         # would silently change that account's password. Only an operator who
         # deliberately means to do that should run init-admin themselves.
-        die "bootstrap: $accounts account(s) already exist and NONE of them is an
-      active administrator. Nobody can administer this stack, and bootstrap
-      will not promote an existing account automatically.
+        #
+        # Two states here, and they need two different commands: init-admin
+        # promotes an account but never clears Inactive (ensure_admin()'s
+        # `reactivate` is opt-in and init-admin does not pass it), so naming it
+        # where the only administrators are deactivated would reset a real
+        # user's password and still leave count_admins() at 0 — the next run
+        # would refuse identically. 'eorm reactivate' is the recovery path.
+        if [ "$admin_rows" = "0" ]; then
+            die "bootstrap: $accounts account(s) already exist and NONE of them is an
+      administrator. Nobody can administer this stack, and bootstrap will not
+      promote an existing account automatically.
       Fix: run
-          cd deploy && $COMPOSE_BIN exec server eorm init-admin --username $admin_username
-      (docker-compose in place of docker compose if that is what this host
-      has — see deploy/README.md) and follow its prompts."
+          cd deploy && $COMPOSE_BIN exec server eorm init-admin --username \"$admin_username\"
+      and follow its prompts."
+        fi
+        die "bootstrap: $accounts account(s) already exist, $admin_rows of them with
+      administrator rights — but every one of those is DEACTIVATED, so nobody
+      can administer this stack. bootstrap will not reactivate an account
+      automatically, and 'eorm init-admin' would not reactivate one either.
+      Fix: reactivate the deactivated administrator by name (replace it below
+      if it is not '$admin_username'):
+          cd deploy && $COMPOSE_BIN exec server eorm reactivate --user \"$admin_username\""
     else
         echo "bootstrap: $accounts account(s) exist, $admins of them an active administrator — nothing to do."
     fi

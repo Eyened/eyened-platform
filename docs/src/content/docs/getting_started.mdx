@@ -38,9 +38,10 @@ anything. Supported platforms are Linux and macOS natively, and Windows via WSL2
     ```
 
     It checks your machine, creates `deploy/.env` with freshly generated secrets, builds the
-    images, and starts the stack. On a genuinely empty database — a fresh clone's first run — it
-    also creates the schema, seeds the builtin form schemas, creates an administrator, and prints
-    the URL together with a one-time administrator password. Nothing needs to be edited by hand.
+    images, starts the stack, and prints the URL. On a genuinely empty database — a fresh clone's
+    first run — it also creates the schema, seeds the builtin form schemas, creates an
+    administrator, and prints a one-time administrator password. Nothing needs to be edited by
+    hand.
 
 3. Open the printed URL and sign in as the administrator it just created (`admin`, unless you set
    `EYENED_API_ADMIN_USERNAME`).

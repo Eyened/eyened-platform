@@ -57,10 +57,10 @@ genuinely empty database — the one case where bootstrap can be sure no
 administrator already exists. On a database that already has accounts but
 none of them an administrator, bootstrap refuses instead and prints the
 `eorm init-admin` command to fix it; it never promotes an existing account on
-its own. Either way, a completed run is followed by a "day-to-day commands"
-block. Those commands are run plainly from `deploy/`, with no wrapper and no
-`-f` flags — the install already recorded which layers this stack uses in
-`deploy/.env`:
+its own. A run that gets that far ends with a "day-to-day commands" block; a
+refusal exits non-zero instead, and that block is not printed. Those commands
+are run plainly from `deploy/`, with no wrapper and no `-f` flags — the
+install already recorded which layers this stack uses in `deploy/.env`:
 
 ```bash
 cd deploy

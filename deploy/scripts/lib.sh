@@ -86,8 +86,20 @@ gen_hex() {
     printf '%s\n' "$_hex"
 }
 
-# Read a value from an env file. Last assignment wins; values are taken
-# verbatim, which is what compose does too.
+# Read a value from an env file. Last assignment wins; the value is taken
+# verbatim.
+#
+# NOT a dotenv parser, and it does not match compose's: measured against
+# `docker compose config`, a value written as "curator" or 'curator' reaches
+# compose as curator and reaches this function WITH the quotes; `KEY=v # note`
+# reaches compose as v; an `export KEY=v` line compose accepts is not seen here
+# at all; and \n inside double quotes becomes a real newline for compose. Only
+# a plain unquoted, uncommented KEY=value — how deploy/.env.example writes
+# every key and how write_env writes them — reads the same both ways. Anything
+# read here and also interpolated into compose (EYENED_API_ADMIN_USERNAME is
+# the one that matters: bootstrap creates that account, the dev-auth bypass
+# resolves it) can therefore disagree if it is hand-edited into a fancier
+# spelling. Closing that would mean reimplementing compose's parser here.
 env_get() {
     _file=${2:-$DEPLOY_DIR/.env}
     [ -f "$_file" ] || return 0
