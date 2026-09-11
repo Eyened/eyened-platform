@@ -31,11 +31,26 @@ eorm seed-form-schemas [--update]
 
 ### create-user
 
-Interactive user creation for viewer/API login.
+Interactive user creation for viewer/API login. **Never grants administrator
+rights** -- an account it creates is an ordinary, unprivileged user; use
+`init-admin` to create or promote an administrator.
 
 ```bash
 eorm create-user
 ```
+
+### init-admin
+
+Creates or promotes **the** platform administrator (idempotent) -- the
+supported way to get an account that can log in as one.
+
+```bash
+eorm init-admin --username U [--password P]
+```
+
+`--password` reads `EYENED_API_ADMIN_PASSWORD` if set, otherwise prompts
+twice without echoing input. Leaving it blank leaves password login disabled
+for a new account, and unchanged for an existing one.
 
 ## Inference (summary)
 
