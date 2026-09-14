@@ -59,14 +59,14 @@ data_mount() {
 wait_for_db() { until docker exec "$DB" mysqladmin ping --silent 2>/dev/null; do sleep 2; done; }
 keep_for_rollback() {
   for svc in $(docker compose -f "$1" config --services); do
-    img=$(docker compose -f "$1" config --images "$svc"); case "$img" in *:*) continue;; esac
     id=$(docker compose -f "$1" ps -q "$svc"); [ -n "$id" ] || continue
+    img=$(docker inspect -f '{{.Config.Image}}' "$id"); case "$img" in *:*) continue;; esac
     docker tag "$(docker inspect -f '{{.Image}}' "$id")" "$img:v2026.08.0" && echo "kept $img:v2026.08.0"
   done
 }
 use_rollback_images() {
-  for svc in $(docker compose -f "$1" config --services); do
-    img=$(docker compose -f "$1" config --images "$svc"); case "$img" in *:*) continue;; esac
+  for img in $(docker compose -f "$1" config --images); do
+    case "$img" in *:*) continue;; esac
     docker image inspect "$img:v2026.08.0" >/dev/null 2>&1 && docker tag "$img:v2026.08.0" "$img:latest" && echo "restored $img"
   done
 }
