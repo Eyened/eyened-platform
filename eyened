@@ -7,10 +7,14 @@
 #
 # Docker is the only prerequisite. Run './eyened help' for the command list.
 #
-# This absorbs what used to be install.sh, the Makefile, deploy/scripts/dc.sh,
-# stack.sh, reset.sh and check-storage.sh. The large pieces still live in
-# deploy/scripts/ and are called from here: doctor.sh, bootstrap.sh,
-# gen-storage.sh, db-backup.sh, db-restore.sh.
+# This is the only entry point to the stack. It replaces the three separate
+# `docker compose` invocations that used to be needed, in dev/, docker/ and
+# database/. The repository's Makefile is gone too, but nothing of it moved
+# here: its three targets were codegen, and they are now `npm run gen:types`
+# in client/.
+#
+# The large pieces live in deploy/scripts/ and are called from here:
+# doctor.sh, bootstrap.sh, gen-storage.sh, db-backup.sh, db-restore.sh.
 #
 # POSIX sh, and sh has no locals: every helper below is one flat namespace
 # shared with deploy/scripts/lib.sh. The `_`-prefixed names here are therefore

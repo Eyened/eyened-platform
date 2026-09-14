@@ -72,13 +72,11 @@ docker compose up -d
 (or `docker-compose` in place of `docker compose`, per [The compose
 binary](#the-compose-binary) above.)
 
-> **Upgrading an existing stack past the dev-client fix:** if you
-> already have this stack running from before that change, a plain `up -d`
-> is not enough to pick it up — it reuses the existing `client` image, and
-> the fix lives in that image's entrypoint. Run `docker compose up -d
-> --build` once (or just re-run `./eyened install` / `./eyened up`, which both run
-> `up -d --build` for you), then plain `up -d` is correct again for every
-> start after that.
+> **After moving the checkout, rebuild.** The plain `up -d` above reuses the
+> images you already built and picks up nothing — including the dev client's
+> entrypoint, which is baked into its image rather than mounted. Run `docker
+> compose up -d --build`, or re-run `./eyened install` / `./eyened up`, which
+> do it for you. Plain `up -d` is correct again for every start after that.
 
 ## Layer selection
 
@@ -501,8 +499,8 @@ from elsewhere, use an absolute path or `cd` to the repository root first.
 
 **`make` is not a prerequisite, and there is no Makefile.** `./eyened` is one
 `#!/bin/sh` file at the repository root and needs nothing but a POSIX shell
-and Docker. It is also the only entry point: the separate installer and the
-four thin scripts that used to sit beside it are now subcommands of it.
+and Docker. The repository's Makefile held three codegen targets and never
+drove the stack; they are now `npm run gen:types` in `client/`.
 
 `./eyened down` and `./eyened logs` hold no machinery: they are `docker
 compose` (or `docker-compose`) run from `deploy/`, so `cd deploy && docker
