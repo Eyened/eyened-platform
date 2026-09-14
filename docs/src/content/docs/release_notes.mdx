@@ -91,13 +91,6 @@ database.
   wrote. `backup` never stops the database; `restore` does. For any other database, including an
   external one, `eorm save-dump` / `eorm load-dump` are unchanged. See `deploy/README.md`'s
   **Backup and rollback** section.
-- **`./eyened backup` needs four privileges granted by hand, once per install.** The bundled
-  database's application account is created by the MySQL image with `ALL PRIVILEGES` on its own
-  schema and nothing else, which XtraBackup is refused on — `./eyened backup` exits 1 with
-  `LOCK INSTANCE FOR BACKUP ... you need (at least one of) the BACKUP_ADMIN privilege(s)`. This
-  affects every bundled-database install, a fresh one included, not just a database brought across
-  from the old stack. The `GRANT` statement, and what it means for the account the application
-  connects as, are in `deploy/README.md` under **Moving an existing database into this stack**.
 - **`worker/`'s compose files and `.env` are gone.** The four `worker/docker-compose.*.yml` files
   and `worker/.env*` are replaced by `deploy/compose.workers.yaml`, which reads `deploy/.env` —
   there is no separate worker env file any more. `EYENED_WORKER_DIR` is renamed

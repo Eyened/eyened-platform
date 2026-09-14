@@ -96,10 +96,11 @@ gen_hex() {
 # at all; and \n inside double quotes becomes a real newline for compose. Only
 # a plain unquoted, uncommented KEY=value — how deploy/.env.example writes
 # every key and how write_env writes them — reads the same both ways. Anything
-# read here and also interpolated into compose (EYENED_API_ADMIN_USERNAME is
-# the one that matters: bootstrap creates that account, the dev-auth bypass
-# resolves it) can therefore disagree if it is hand-edited into a fancier
-# spelling. Closing that would mean reimplementing compose's parser here.
+# read here and also interpolated into compose (EYENED_API_ADMIN_USERNAME and
+# MYSQL_ROOT_PASSWORD are the ones that matter: bootstrap creates that account,
+# the dev-auth bypass resolves it, and the backup authenticates with the
+# latter) can therefore disagree if it is hand-edited into a fancier spelling.
+# Closing that would mean reimplementing compose's parser here.
 env_get() {
     _file=${2:-$DEPLOY_DIR/.env}
     [ -f "$_file" ] || return 0
