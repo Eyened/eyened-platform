@@ -1,0 +1,379 @@
+---
+title: Upgrading to v2026.09.0
+description: The one procedure for taking a site from v2026.08.0 or earlier to v2026.09.0, run entirely with containers
+---
+
+**Not a rolling upgrade.** The API, the RQ workers and all imports stay stopped from step 1 to step 7. Budget: [Time budget](#time-budget) plus backup time.
+
+This release crosses three changes at once:
+
+- the Alembic history is squashed into `orm_baseline`;
+- per-project access control is enforced;
+- tasks declare their projects, which adds `NOT NULL` columns down the patient chain.
+
+Every command runs as a container, from a shell on the Docker host that runs the database.
+
+## Before you start
+
+### What you need
+
+| | |
+|---|---|
+| **v2026.09.0 checkout** | `git clone --branch v2026.09.0 https://github.com/Eyened/eyened-platform.git`, with your `docker/.env` (and `worker/.env`) copied in. Commands run from its root. |
+| **DDL env file** | `EYENED_DATABASE_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `_DATABASE` for an account with `ALL PRIVILEGES` on the database. The host is as seen from a container, e.g. `host.docker.internal`. |
+| **Database container name** | From `docker ps`. |
+| **Backup directory** | On the Docker host, with room for a compressed copy of the data directory. |
+| **Administrator** | `EYENED_API_ADMIN_USERNAME` from `docker/.env` (default `admin`), and a password for it. |
+| **Free disk** | `imageinstance_mb` + 17 % of `schema_mb`, from the pre-flight snapshot. |
+
+### Set up your shell
+
+Use one shell for the whole procedure. Replace each placeholder in angle brackets.
+
+```bash title="setup-shell"
+cd <release checkout>
+export DDL_ENV=<ddl.env>                   # absolute path
+export DB=<db container>
+export BACKUP=<backup dir>                 # absolute path
+WORKER_STACKS="<worker compose files>"     # e.g. "worker/docker-compose.inference.yml"; "" if none
+APP="docker compose -f docker/docker-compose.yaml"
+
+new_alembic() {
+  $APP run --rm --no-deps -w /app/orm/migrations -v "$DDL_ENV:/run/ddl.env:ro" \
+    server alembic -x env_file=/run/ddl.env "$@"
+}
+new_eorm() {
+  $APP run --rm --no-deps -v "$DDL_ENV:/run/ddl.env:ro" server eorm -e /run/ddl.env "$@"
+}
+legacy_alembic() {
+  docker run --rm -it --add-host host.docker.internal:host-gateway -w /app/orm/migrations \
+    -v "$DDL_ENV:/run/ddl.env:ro" eyened-upgrade:legacy-trail alembic -x env_file=/run/ddl.env "$@"
+}
+snapshot() {
+  $APP run --rm --no-deps -T -v "$DDL_ENV:/run/ddl.env:ro" \
+    -v "$PWD/upgrade-snapshot.py:/run/snapshot.py:ro" server python /run/snapshot.py
+}
+data_mount() {
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}' "$DB"
+}
+wait_for_db() { until docker exec "$DB" mysqladmin ping --silent 2>/dev/null; do sleep 2; done; }
+keep_for_rollback() {
+  for svc in $(docker compose -f "$1" config --services); do
+    img=$(docker compose -f "$1" config --images "$svc"); case "$img" in *:*) continue;; esac
+    id=$(docker compose -f "$1" ps -q "$svc"); [ -n "$id" ] || continue
+    docker tag "$(docker inspect -f '{{.Image}}' "$id")" "$img:v2026.08.0" && echo "kept $img:v2026.08.0"
+  done
+}
+use_rollback_images() {
+  for svc in $(docker compose -f "$1" config --services); do
+    img=$(docker compose -f "$1" config --images "$svc"); case "$img" in *:*) continue;; esac
+    docker image inspect "$img:v2026.08.0" >/dev/null 2>&1 && docker tag "$img:v2026.08.0" "$img:latest" && echo "restored $img"
+  done
+}
+```
+
+Save as `upgrade-snapshot.py` in the checkout root. Every gate reads its output.
+
+```python title="upgrade-snapshot.py"
+"""Print the database facts the v2026.09.0 upgrade guide gates on, one tab-separated line each."""
+from typing import Any
+
+from sqlalchemy import Connection, create_engine, inspect, text
+
+from eyened_orm.config import load_database_settings
+from eyened_orm.utils.env import load_env_file
+
+TAG_LINK_TABLES = {"AnnotationTag", "FormAnnotationTag", "ImageInstanceTag", "SegmentationTag", "StudyTag"}
+
+
+def emit(*fields: object) -> None:
+    print(*fields, sep="\t")
+
+
+def scalar(conn: Connection, sql: str) -> Any:
+    return conn.execute(text(sql)).scalar()
+
+
+load_env_file("/run/ddl.env", override=True)
+settings = load_database_settings()
+engine = create_engine(
+    f"mysql+pymysql://{settings.user}:{settings.password.get_secret_value()}"
+    f"@{settings.host}:{settings.port}/{settings.database}"
+)
+
+with engine.connect() as conn:
+    tables = set(inspect(conn).get_table_names())
+    emit("server_version", scalar(conn, "SELECT @@version"))
+    emit("threads_connected", conn.execute(text("SHOW GLOBAL STATUS LIKE 'Threads_connected'")).one()[1])
+    emit("sql_mode", scalar(conn, "SELECT @@SESSION.sql_mode"))
+    emit("foreign_key_checks", scalar(conn, "SELECT @@SESSION.foreign_key_checks"))
+    emit("log_bin", scalar(conn, "SELECT @@GLOBAL.log_bin"))
+    emit("binlog_format", scalar(conn, "SELECT @@GLOBAL.binlog_format"))
+    emit("max_connections", scalar(conn, "SELECT @@GLOBAL.max_connections"))
+    emit("schema_mb", scalar(conn,
+        "SELECT ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1048576) FROM information_schema.TABLES "
+        "WHERE TABLE_SCHEMA = DATABASE()"))
+    emit("imageinstance_mb", scalar(conn,
+        "SELECT ROUND((DATA_LENGTH + INDEX_LENGTH) / 1048576) FROM information_schema.TABLES "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ImageInstance'"))
+    versions = []
+    if "alembic_version" in tables:
+        versions = conn.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
+    emit("alembic_version", " ".join(versions) or "-")
+    emit("annotationdata_datemodified_default", scalar(conn,
+        "SELECT COALESCE(COLUMN_DEFAULT, 'NULL') FROM information_schema.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'AnnotationData' AND COLUMN_NAME = 'DateModified'"))
+    for table, rule in conn.execute(text(
+        "SELECT TABLE_NAME, DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS "
+        "WHERE CONSTRAINT_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = 'Tag' ORDER BY TABLE_NAME"
+    )):
+        if table in TAG_LINK_TABLES:
+            emit("tag_fk_on_delete", table, rule)
+    for table, nullable in conn.execute(text(
+        "SELECT TABLE_NAME, IS_NULLABLE FROM information_schema.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'ProjectID' "
+        "AND TABLE_NAME IN ('ImageInstance', 'Series', 'Study', 'SubTaskImageLink') ORDER BY TABLE_NAME"
+    )):
+        emit("projectid_nullable", table, nullable)
+    if "ProjectMember" in tables:
+        emit("projects", scalar(conn, "SELECT COUNT(*) FROM Project"))
+        emit("grant_all_eligible", scalar(conn,
+            "SELECT COUNT(*) FROM Creator WHERE IsHuman AND NOT Inactive AND PasswordHash IS NOT NULL"))
+        for name, has_password in conn.execute(text(
+            "SELECT CreatorName, PasswordHash IS NOT NULL AND PasswordHash <> '!' "
+            "FROM Creator WHERE IsAdmin ORDER BY CreatorName"
+        )):
+            emit("admin", name, "password_set" if has_password else "NO_PASSWORD")
+        for row in conn.execute(text(
+            "SELECT c.CreatorID, c.CreatorName, c.DateInserted, COUNT(pm.ProjectID) "
+            "FROM Creator c LEFT JOIN ProjectMember pm ON pm.CreatorID = c.CreatorID "
+            "WHERE c.IsHuman AND NOT c.Inactive AND c.PasswordHash IS NOT NULL "
+            "GROUP BY c.CreatorID ORDER BY c.DateInserted DESC"
+        )):
+            emit("member", *row)
+    for table in sorted(tables):
+        emit("rows", table, scalar(conn, f"SELECT COUNT(*) FROM `{table}`"))
+```
+
+## Prepare, with the site up
+
+Nothing here stops a service or changes the database.
+
+**Keep the running images for rollback**, before building anything:
+
+```bash title="prepare-keep-images"
+keep_for_rollback docker/docker-compose.yaml
+for f in $WORKER_STACKS; do keep_for_rollback "$f"; done
+docker image ls --filter reference='*:v2026.08.0'
+```
+
+Expect one `kept …:v2026.08.0` per running source-built service.
+
+**Build the new images, and the legacy-trail image** (the last commit before the squash, used in step 4 only):
+
+```bash title="prepare-build"
+$APP build
+for f in $WORKER_STACKS; do docker compose -f "$f" build; done
+docker build -f docker/Dockerfile.server -t eyened-upgrade:legacy-trail \
+  https://github.com/Eyened/eyened-platform.git#6c675e59745edba9ccced7872a907d76fc7560d0
+```
+
+**Pre-flight:**
+
+```bash title="prepare-preflight"
+snapshot > state-0-preflight.tsv
+grep -vP '^(rows|member)\t' state-0-preflight.tsv
+new_eorm check-dangling-references
+```
+
+| Fact | Must be |
+|---|---|
+| `sql_mode` | contains `STRICT_TRANS_TABLES` or `STRICT_ALL_TABLES` |
+| `foreign_key_checks` | `1`. Never disable it |
+| `binlog_format` | `ROW` when `log_bin` is `1` |
+| free disk | ≥ `imageinstance_mb` + 17 % of `schema_mb` |
+| `max_connections` | > `WORKERS` × (`EYENED_API_POOL_SIZE` + `EYENED_API_MAX_OVERFLOW`), plus workers and imports |
+| `check-dangling-references` | `No dangling references (5 hops checked).` Otherwise delete the orphaned rows or restore their parents first; left alone, step 5b fails with `ERROR 1138` |
+
+### Find your starting point
+
+| `alembic_version` in `state-0-preflight.tsv` | Do |
+|---|---|
+| any id listed by `legacy_alembic history`, up to `b2e2800000b2` | every step |
+| `orm_baseline`, `d3ce100ab2b6`, `4eae42457fa2`, `99724789b34d`, `b45090e1544e`, `2db0e63195db` | every step except 4 and 5a |
+| `5f1c2a9d7e30` | steps 1–3, 6 unless an `admin … password_set` line exists, then 7 |
+| `-`, several ids, anything else | stop and escalate |
+
+## The window
+
+### 1. Stop every writer
+
+```bash title="step-1-stop-writers"
+$APP stop server client fileserver
+for f in $WORKER_STACKS; do docker compose -f "$f" stop; done
+```
+
+Also suspend cron jobs, scripts and notebooks that write through `eorm` or `eyened_orm`. Redis stays up.
+
+### 2. Back up
+
+This archive is the only rollback.
+
+```bash title="step-2-backup"
+echo "data directory: $(data_mount)"
+docker stop "$DB"
+docker run --rm -v "$(data_mount):/from:ro" -v "$BACKUP:/to" alpine tar czf /to/pre-v2026.09.0.tar.gz -C /from .
+docker run --rm -v "$BACKUP:/to:ro" alpine sh -c 'gzip -t /to/pre-v2026.09.0.tar.gz && ls -lh /to/pre-v2026.09.0.tar.gz'
+docker start "$DB"
+wait_for_db
+```
+
+Expect a non-empty `data directory:` line and the archive size, with no `gzip` error.
+
+### 3. Record the starting state
+
+```bash title="step-3-record"
+snapshot > state-1-before.tsv
+grep -P '^(alembic_version|threads_connected)\t' state-1-before.tsv
+```
+
+`threads_connected` must be `1`. Higher means a writer reconnected: stop it and repeat from step 2.
+
+### 4. Finish the legacy trail
+
+Skip if your starting point says so. Answer `y`.
+
+```bash title="step-4-legacy-trail"
+legacy_alembic upgrade b2e2800000b2
+snapshot > state-2-legacy.tsv
+grep -P '^(alembic_version|tag_fk_on_delete)\t' state-2-legacy.tsv
+diff <(grep -P '^rows\t' state-1-before.tsv) <(grep -P '^rows\t' state-2-legacy.tsv) | grep '^[<>]'
+```
+
+Expect:
+- `alembic_version b2e2800000b2`;
+- `RESTRICT` for all five tag tables;
+- one diff line, `> rows ProjectMember 0`, plus `> rows AuditLog 0` if you started before `a1d1700000a1`.
+
+On any error, do not re-run: [roll back](#rollback) and restart at step 1.
+
+### 5. Join the new trail
+
+**5a. Stamp.** Skip if your starting point says so. Answer `y`.
+
+```bash title="step-5a-stamp"
+new_alembic stamp --purge orm_baseline
+new_alembic current
+```
+
+Expect `orm_baseline`, without `(head)`.
+
+**5b. Upgrade.** This is the long step. Answer `y`.
+
+```bash title="step-5b-upgrade"
+new_alembic upgrade head
+new_alembic current
+```
+
+Expect `5f1c2a9d7e30 (head)`.
+
+**5c. Check.**
+
+```bash title="step-5c-check"
+new_alembic check
+snapshot > state-3-migrated.tsv
+grep -P '^(alembic_version|annotationdata_datemodified_default|projectid_nullable)\t' state-3-migrated.tsv
+diff <(grep -P '^rows\t' state-2-legacy.tsv) <(grep -P '^rows\t' state-3-migrated.tsv) | grep '^[<>]'
+```
+
+Expect:
+- `No new upgrade operations detected.`;
+- default `CURRENT_TIMESTAMP`;
+- `projectid_nullable` `NO` for all four tables;
+- one diff line, `> rows TaskProject <n>`.
+
+If `check` reports differences, record them and escalate before step 7. Do not roll back.
+
+### 6. Bootstrap access control
+
+`init-admin` prompts for the password twice; `grant-all` asks for confirmation.
+
+```bash title="step-6-access"
+new_eorm init-admin --username <admin username>
+new_eorm grant-all
+snapshot > state-4-access.tsv
+grep -P '^(admin|projects|grant_all_eligible)\t' state-4-access.tsv
+grep -P '^rows\tProjectMember\t' state-4-access.tsv
+grep -P '^member\t' state-4-access.tsv
+```
+
+- The `admin` line must say `password_set`. `NO_PASSWORD` means re-run `init-admin` with a password.
+- `rows ProjectMember` must equal `projects` × `grant_all_eligible` on a site with no prior memberships.
+- Review the `member` lines (newest first) before users return. Accounts self-registered before the upgrade receive `grader` everywhere. Remove unknown ones with `new_eorm revoke --user <username> --all`.
+
+### 7. Start
+
+```bash title="step-7-start"
+$APP up -d
+for f in $WORKER_STACKS; do docker compose -f "$f" up -d; done
+$APP ps
+new_eorm check-declarations
+```
+
+- `server` shows `(healthy)`. If `$APP logs server` shows `Worker failed to boot`, set `EYENED_API_THREADPOOL_LIMIT` ≤ `EYENED_API_POOL_SIZE` + `EYENED_API_MAX_OVERFLOW`.
+- `check-declarations`: record the output; take no action.
+- Log in as the administrator, then as a non-administrator: the tasks page lists their tasks.
+- Resume the imports and jobs suspended in step 1.
+
+## Time budget
+
+Step 5b only, measured on MySQL 8.0.27 at development scale:
+
+| Revision | Time | Dominated by |
+|---|---:|---|
+| `d3ce100ab2b6` | 14 min 59 s | `ImageInstance` rebuilds (1.76 GB) |
+| `4eae42457fa2` | 3 min 43 s | `Series` rebuilds (532 MB) |
+| `99724789b34d` | 4.8 s | `TaskProject` backfill |
+| `b45090e1544e` | 9 min 16 s | composite foreign keys |
+| `2db0e63195db` | 43.8 s | `SubTaskImageLink` |
+| **step 5b** | **28 min 47 s** | |
+
+Scale step 5b by your `imageinstance_mb`, not by row counts.
+
+## Rollback
+
+This works from any step, before users are back on.
+
+```bash title="rollback"
+$APP stop
+for f in $WORKER_STACKS; do docker compose -f "$f" stop; done
+docker stop "$DB"
+docker run --rm -v "$(data_mount):/to" -v "$BACKUP:/from:ro" alpine sh -c \
+  'find /to -mindepth 1 -delete && tar xzf /from/pre-v2026.09.0.tar.gz -C /to'
+docker start "$DB"
+wait_for_db
+snapshot > state-rollback.tsv
+diff <(grep -P '^(alembic_version|rows)\t' state-1-before.tsv) <(grep -P '^(alembic_version|rows)\t' state-rollback.tsv)
+use_rollback_images docker/docker-compose.yaml
+for f in $WORKER_STACKS; do use_rollback_images "$f"; done
+$APP up -d --no-build
+for f in $WORKER_STACKS; do docker compose -f "$f" up -d --no-build; done
+```
+
+- The `diff` must print nothing.
+- Never use `alembic downgrade`: below `99724789b34d` it drops `TaskProject` irrecoverably.
+- Once users are back on, restoring loses their writes. Escalate instead.
+
+## If a step fails
+
+| Where | Output | Do |
+|---|---|---|
+| 4 | `Can't locate revision identified by '<id>'` | The database is not on the legacy trail; re-check your starting point |
+| 4 | any other error | Roll back, then restart at step 1 |
+| 5b | `ERROR 1138 Invalid use of NULL value` | `new_eorm check-dangling-references`, reconcile, then `new_alembic upgrade head` again |
+| 5b | interrupted | `new_alembic current`, then `new_alembic upgrade head` |
+| 5b | `… not declared in TaskProject … Reconcile first` | A writer is live: stop it, then `new_alembic upgrade head` |
+| 5b | `NOTE: N declared (task, project) pairs no link uses` | Informational |
+| 5c | `check` reports differences | Record and escalate before step 7 |
+| 7 | `server` not healthy | `$APP logs server` |
+| after 7 | a defect with users on | Escalate; do not restore |
