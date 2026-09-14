@@ -9,87 +9,98 @@ Changes merged since v2026.09.0. This section is renamed to the version heading 
 
 ### Deployment
 
-- **Upgrading an existing stack: rebuild once.** Routine `docker compose up -d` reuses the
-  images you already built, and the dev client's entrypoint is baked into its image rather
-  than mounted. Anyone who had a stack running before this release must run
-  `docker compose up -d --build` (or re-run `./eyened install` — `./eyened up` on a developer
-  stack — which do it) one time.
-  Without it the new dependency handling never engages and a stale `node_modules` volume keeps
-  serving old packages, with nothing reporting a problem. Plain `up -d` is correct again
-  afterwards.
-- **Keycloak is part of the stack.** `dev/keycloak/` moved to
-  `deploy/keycloak/` and the standalone `keycloak/docker-compose.keycloak.yml` overlay is gone.
-  OIDC setup used to mean adding `oidc` to `COMPOSE_PROFILES` in `deploy/.env` and setting
-  `PUBLIC_HOST`, with no second compose file to layer; it now means appending
-  `:compose.oidc.yaml` to `COMPOSE_FILE` instead, and an old `COMPOSE_PROFILES=oidc` is
-  silently inert rather than an error. Existing OIDC setups must also rename
-  `DEV_KEYCLOAK_PORT` to `KEYCLOAK_PORT` — see the renames below — and set the
-  `EYENED_OIDC_*` client settings, which `deploy/.env.example` now carries.
-- **One Docker stack.** `dev/`, `docker/`, and `database/` are replaced by a single `deploy/`
-  directory. Clients install with `./eyened install` (Docker is the only prerequisite);
-  developers use `./eyened up`; site deployments against an external database use
-  `./eyened prod`. The database is part of the stack rather than a second compose project.
-- **Upgrading: bring the old stacks down before you pull.** Deleting those directories takes their
-  compose files with them, so afterwards `cd dev && docker compose down` fails with "no
-  configuration file" and the legacy volumes — `db_data` from the `database` stack,
-  `client_node_modules` from the `dev` one — have nothing left to remove them. Nothing in `deploy/`
-  touches either. If you have already pulled, Compose can still address a project by name with no
-  file present (`docker compose -p <project> ps` lists it), or recover the file itself with
-  `git show <ref-before-this-release>:dev/docker-compose.yml`.
+The three compose stacks are replaced by one. Everything in this section is about moving from
+v2026.09.0 — `dev/` plus `database/` for developers, `docker/` for site deployments — to
+`deploy/`. Do the two "before you pull" items first.
+
+- **Before you pull: take a database backup with the tooling you have now, and keep the old
+  checkout.** Nothing in `deploy/` can take this backup; `deploy/` does not exist in the version
+  you are on. For the bundled `database/` stack that is `./save_dump.sh <dir>`, run from
+  `database/`. Two things about it: it authenticates as the `EYENED_DATABASE_USER` in
+  `database/.env`, which defaults to the application account `eyened` and has no `BACKUP_ADMIN`
+  privilege, so give it an account that has one; and it does `rm -rf` on `<dir>` without asking.
+  Rolling back means rolling code and data back together — check out the old revision and restore
+  with that checkout's `database/load_dump.sh`. `./eyened restore` reads only backups
+  `./eyened backup` wrote.
+- **Before you pull: bring the old stacks down.** The pull deletes `dev/`, `docker/` and
+  `database/`, and takes their compose files with them, so afterwards `cd dev && docker compose
+  down` fails with "no configuration file" and the legacy volumes — `db_data` from the `database`
+  stack, `client_node_modules` from the `dev` one — have nothing left to remove them. Nothing in
+  `deploy/` touches either. If you have already pulled, Compose can still address a project by
+  name with no file present (`docker compose -p <project> ps` lists it), or recover the file
+  itself with `git show <ref-before-this-release>:dev/docker-compose.yml`. Your `.env` files are
+  untracked, so they survive the pull in otherwise empty directories; nothing reads them any more.
+- **One Docker stack.** `dev/`, `docker/` and `database/` are replaced by a single `deploy/`
+  directory driven by one script at the repository root: `./eyened install` for a client install,
+  `./eyened up` for a developer stack, `./eyened prod` for a site deployment against an external
+  database. Docker is the only prerequisite. The database is part of the stack rather than a
+  second compose project to start first. Full reference: `deploy/README.md`.
+- **One env file.** `deploy/.env`, generated from `deploy/.env.example` on first run and written
+  once — nothing rewrites it afterwards. `dev/.env`, `docker/.env`, `database/.env` and
+  `worker/.env` are not read.
+- **Breaking: environment variables renamed.** `DEV_NGINX_PORT` → `HTTP_PORT`, the `docker/`
+  stack's `PORT` → `HTTP_PORT`, `DEV_PUBLIC_HOST` → `PUBLIC_HOST`, `DEV_KEYCLOAK_PORT` →
+  `KEYCLOAK_PORT`. One stack now serves development and production, so the `DEV_` prefix was
+  misleading.
+- **Breaking: `EYENED_STORAGE_ROOT` is no longer an operator setting.** The container path is
+  pinned to `/storage`. Platform storage is placed on the host with `PLATFORM_STORAGE_PATH`, and
+  image datasets are configured in `deploy/storage-mounts.conf`. `EYENED_STORAGE_ROOT` in
+  `deploy/.env` is a preflight failure rather than a warning, so carrying that line over from
+  `docker/.env` stops the build until you remove it.
+- **Breaking: the `Makefile` is gone.** Its three targets — `gen-openapi`, `gen-types`,
+  `gen-client-types` — are now the single command `npm run gen:types` in `client/`. `./eyened`
+  absorbs none of them: it drives the stack, which the Makefile never did. `make` is not a
+  prerequisite.
 - **Breaking: Docker Compose 2.26 or newer is now required.** The server's dependency on the
   bundled database uses `depends_on: required: false`, which is what lets the same stack run
   with a bundled or an external database. Older Compose either rejects it or silently drops the
   dependency, which makes the server race MySQL and crash-loop on first boot. `./eyened doctor`
   refuses to continue below the floor rather than letting it fail obscurely later.
+- **Adminer is gone.** It used to start automatically with the `database` stack, on
+  `EYENED_ADMINER_PORT` (default `8080`); nothing in `deploy/` starts it. Use `./eyened db-shell`
+  for a MySQL shell. For a GUI, append `:compose.host-ports.yaml` to `COMPOSE_FILE` in
+  `deploy/.env` to publish MySQL on a loopback host port, then point a locally installed client
+  (DBeaver, TablePlus, etc.) at it — see `deploy/README.md`'s **Sharing a machine** section.
+- **Keycloak is part of the stack.** `dev/keycloak/` moved to `deploy/keycloak/` and the
+  standalone `docker-compose.keycloak.yml` overlay it was layered with is gone: enable OIDC by
+  appending `:compose.oidc.yaml` to `COMPOSE_FILE` in `deploy/.env`. Existing OIDC setups must
+  also rename `DEV_KEYCLOAK_PORT` to `KEYCLOAK_PORT` — see the renames above — and set the
+  `EYENED_OIDC_*` client settings, which `deploy/.env.example` now carries.
+- **`database/save_dump.sh` and `load_dump.sh` are gone.** `./eyened backup <dir>` and
+  `./eyened restore <dir>` are this stack's backup pair, and `restore` reads only what `backup`
+  wrote. `backup` never stops the database; `restore` does. For any other database, including an
+  external one, `eorm save-dump` / `eorm load-dump` are unchanged. See `deploy/README.md`'s
+  **Backup and rollback** section.
+- **`worker/`'s compose files and `.env` are gone.** The four `worker/docker-compose.*.yml` files
+  and `worker/.env*` are replaced by `deploy/compose.workers.yaml`, which reads `deploy/.env` —
+  there is no separate worker env file any more. `EYENED_WORKER_DIR` is renamed
+  `EYENED_DEPLOY_DIR`; the old name is ignored, with a warning. The Docker workers no longer take
+  `EYENED_RQ_WORKER_QUEUES` from the env file — set `EYENED_RQ_QUEUES_CFI_ROI` or
+  `EYENED_RQ_QUEUES_INFERENCE` instead. See `worker/README.md`.
+- **After moving the checkout, rebuild.** Images are built from your checkout, so a plain
+  `docker compose up -d` reuses the images you already have and picks up nothing. `./eyened
+  install` and `./eyened up` rebuild every time; by hand it is `docker compose up -d --build`.
 - **The production frontend is served by nginx, not by Node.** The app is a static SPA
   (`adapter-static`), so production no longer runs `vite preview` behind a proxy — the built
   output is baked into the fileserver image. One fewer container, one fewer proxy hop, and no
   Node process in production. Development is unchanged: vite with hot reload.
 - **MySQL is pinned to 8.0.46** (was 8.0.27, which has no arm64 image and therefore ran
   emulated on Apple Silicon).
-- **Container logs are capped** at 10 MB × 3 files per service, so a long-running install
-  cannot fill the disk.
-- **Breaking: environment variables renamed.** `DEV_NGINX_PORT` → `HTTP_PORT`,
-  `DEV_PUBLIC_HOST` → `PUBLIC_HOST`, `DEV_KEYCLOAK_PORT` → `KEYCLOAK_PORT`. The same variables
-  now serve production, so the `DEV_` prefix was misleading. Existing `.env` files must be
-  updated; `deploy/.env.example` is the new template.
 - **Storage mounts have one source of truth.** `deploy/storage-mounts.conf` generates the
-  container bind mounts, the nginx `location` blocks, and `EYENED_STORAGE_MOUNTS`, replacing
-  three places that had to be edited in agreement.
+  container bind mounts, the nginx `location` blocks, and the server container's
+  `EYENED_STORAGE_MOUNTS` — three things that previously had to be edited by hand, in agreement,
+  across the compose file, `nginx.conf` and the env file. Getting one of the three wrong is what
+  made Python-side pixel reads (thumbnail regeneration, inference, reports) fail while the viewer
+  still worked.
+- **No placeholder secrets.** `dev/sample.env` and `docker/.env.example` shipped `change_me`
+  values that kept working if you never changed them. `deploy/.env.example` ships none: first run
+  generates them into `deploy/.env`, and a hand-copied `.env` fails at `docker compose up` until
+  real values are set. That is deliberate, not a regression.
+- **Container logs are capped** at 10 MB × 3 files per service, so a long-running install cannot
+  fill the disk.
 - **`eorm` confirmation prompts on database state.** `initialize-database` and `load-dump` ask
   for the typed confirmation code only when the target database contains tables, which is what
   makes an unattended first-run bootstrap possible. A populated database is still gated.
-- **Fixed: in-process image reads.** Once datasets are configured in `deploy/storage-mounts.conf`,
-  the server container receives `EYENED_STORAGE_MOUNTS`, so Python-side pixel reads (thumbnail
-  regeneration, inference, reports) use local files instead of failing in the API adapter.
-- **Breaking: `make` and `./install.sh` are gone.** Both were replaced by one script,
-  `./eyened`, which absorbs every `make` target except `gen-openapi`, `gen-types`, and
-  `gen-client-types` — those three move to `npm run gen:types` in `client/`. `make` is no
-  longer a prerequisite, and there is no Makefile. An operator upgrading through this whole
-  cycle meets every item below at once.
-- **`oidc` is a compose layer, not a profile.** Append `:compose.oidc.yaml` to `COMPOSE_FILE`
-  in `deploy/.env` instead of adding `oidc` to `COMPOSE_PROFILES` — see the Keycloak bullet
-  above, which described the profile-based form this replaces.
-- **The `tools` profile and Adminer are gone.** Use `./eyened db-shell` for a MySQL shell. For
-  a GUI, append `:compose.host-ports.yaml` to `COMPOSE_FILE` in `deploy/.env` to publish MySQL
-  on a loopback host port, then point a locally installed client (DBeaver, TablePlus, etc.) at
-  it — see `deploy/README.md`'s **Sharing a machine** section.
-- **`make db-snapshot` / `db-restore` are gone.** `./eyened backup` and `./eyened restore`
-  replace them and are not a rename: the new pair is xtrabackup-based, takes a path rather
-  than `NAME=`, and never stops the database to take a backup — only `restore` does. See
-  `deploy/README.md`'s **Backup and rollback** section. Anyone with existing archives under the
-  old default path, `deploy/snapshots/`, should move or delete them — `.gitignore` covers that
-  path again, but they are not moved automatically, and `./eyened backup` has no default
-  destination: `deploy/backups/` is merely the suggested one (`<dir>` is a required argument).
-- **`worker/`'s compose files and `.env` are gone.** The four `worker/docker-compose.*.yml`
-  files and `worker/.env*` are replaced by `deploy/compose.workers.yaml`, which reads
-  `deploy/.env` — there is no separate worker env file any more. See `worker/README.md`.
-- **`deploy/.env.example` no longer ships placeholder secrets.** A hand-copied `.env` now fails
-  at `docker compose up` until real values are set — that is deliberate, not a regression.
-- **An existing `deploy/.env` keeps working.** Nothing rewrites it, so a `COMPOSE_PROFILES`
-  still naming `oidc` or `tools` is inert rather than an error — it is simply ignored. For
-  `oidc`, add `:compose.oidc.yaml` to `COMPOSE_FILE` above to get the same behavior back. There
-  is no replacement layer for `tools` — use `./eyened db-shell` instead, per the bullet above.
 
 ## v2026.09.0
 

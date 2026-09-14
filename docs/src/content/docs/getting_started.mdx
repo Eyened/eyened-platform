@@ -73,6 +73,10 @@ Images are built from your checkout, so moving between versions is a checkout pl
 Two things that rebuild does **not** do: it does not migrate an existing database, and it is not
 reversible on its own. The steps below handle both.
 
+Upgrading from a version that predates `deploy/` is a different job: `./eyened` does not exist in
+the checkout you are on, so step 1 below cannot run. Read the **Deployment** section of the
+[release notes](/eyened-platform/release_notes) first.
+
 First record where you are — this is what a rollback returns to, so note it before anything
 moves:
 
