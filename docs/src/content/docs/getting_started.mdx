@@ -82,8 +82,8 @@ With this setup you will be able to:
     docker compose up -d --build
     ```
 
-8. Initialize the application.
-    On first setup, initialize the database and create a login user:
+8. Initialize the database.
+    On first setup, create the schema and seed the builtin form schemas:
 
     ```bash
     docker compose exec -it server bash
@@ -96,13 +96,28 @@ With this setup you will be able to:
 
     This runs the Alembic migration trail to head. You will be prompted to confirm the target database.
 
-    ```bash
-    eorm create-user
-    ```
-
     The `seed-form-schemas` command inserts builtin viewer FormSchemas (ETDRS grid, registration). See **[Form schemas](/eyened-platform/orm/form_schemas)**, **[Registration](/eyened-platform/orm/registration)**, and the **[ETDRS panel](/eyened-platform/client/panels/etdrs)**.
 
-    New users can also be added through the user interface.
+9. Create the administrator account.
+
+    ```bash
+    EYENED_API_ADMIN_PASSWORD='...' eorm init-admin --username <EYENED_API_ADMIN_USERNAME>
+    ```
+
+    :::caution
+    Use `init-admin`, not `create-user`. Access is enforced from project memberships and there is no feature flag, so an account made with `eorm create-user` — or through self-registration in the user interface — logs in successfully and then sees **nothing**: no projects, no patients, no tasks. `init-admin` is the only command that bootstraps an account with access.
+    :::
+
+    Omitting the password stores an unusable hash, leaving an administrator that cannot log in. The command is idempotent, and re-running it without a password leaves an existing one alone.
+
+10. Add the remaining users, and grant each one access.
+
+    ```bash
+    eorm create-user --username alice --password '...'
+    eorm grant --user alice --project "AMD-Study" --role grader
+    ```
+
+    Roles are `read_only`, `grader`, and `project_admin`. Grants take effect on the user's next request — no re-login. See **[Access control](/eyened-platform/guides/access_control)** for the model and **[CLI reference](/eyened-platform/orm/cli#users-and-access)** for every command.
 
 :::note
 For local development, see [Development Setup](/eyened-platform/guides/development_setup).

@@ -1,0 +1,115 @@
+---
+title: Access control
+description: Project roles, memberships, and how the platform decides what each user may see and change
+sidebar:
+  order: 3
+---
+
+Every authenticated request is resolved against the caller's project memberships. There is **no feature flag** — enforcement is always on, and a brand-new account holds nothing.
+
+**Administering access is a CLI job:** see **[CLI reference — Users and access](/eyened-platform/orm/cli#users-and-access)**. Deployment cutover steps and the accepted risks of this design live in `docs/rbac-operations.md` in the repository.
+
+## The model
+
+Access has three independent parts. A request must satisfy all of them.
+
+| Part | Stored in | Meaning |
+|------|-----------|---------|
+| **Project membership** | `ProjectMember` | A role in one project. The `(CreatorID, ProjectID)` composite primary key means a user holds **exactly one role per project** |
+| **Administrator flag** | `Creator.IsAdmin` | Platform administrator — treated as `project_admin` in *every* project, with the one exception under [Ownership](#ownership) |
+| **Ownership** | `CreatorID` on the row | Who authored an annotation. Not role-derived, and it overrides roles |
+
+### Roles
+
+Roles are ordered, and every check is a floor (`role >= floor`) rather than a set membership — so a higher role always includes the lower ones.
+
+| Role | Stored as | May |
+|------|-----------|-----|
+| **Read only** | `read_only` | Read everything in the project |
+| **Grader** | `grader` | The above, plus create annotations and modify or delete **their own** |
+| **Project admin** | `project_admin` | The above, plus delete **other users'** annotations in that project |
+
+A user with no membership in a project cannot see that project's data at all.
+
+### Ownership
+
+The ownership overlay sits outside the role hierarchy, so it applies at every role:
+
+- **Modifying** another user's annotation is refused for everyone — `read_only`, `grader`, `project_admin` **and platform administrators alike**.
+- **Deleting** another user's annotation requires `project_admin` in every project the row touches. Administrators pass.
+
+:::caution
+Administrators are data superusers for reads and deletes, but **not** for modifying someone else's annotation — there is no role or flag that permits that. A row whose author is NULL is therefore permanently unmodifiable.
+:::
+
+## Visibility and containment
+
+An object is reachable only if the actor holds **every** project it touches. This single rule produces both the containment behaviour and the status codes:
+
+| Situation | Response |
+|-----------|----------|
+| Actor is missing at least one of the object's projects | **404** — the object is not findable, and the response body confirms nothing |
+| Actor holds every project but sits below the required role | **403** |
+
+There are no partial views. A task spanning projects A and B is invisible to someone who holds only A — it does not appear with fewer subtasks, it does not appear at all.
+
+:::note
+Objects that touch **no** project are unrestricted for reads: any authenticated user can see them. Writes fail closed instead. This is not reachable through the API — `POST /api/task` requires a non-empty declaration — but it exists in migrated data: the backfill derived each task's declaration from the projects of its linked images, so a task that had no images at that moment carries no `TaskProject` rows and is visible to everyone.
+:::
+
+### Tasks declare their projects
+
+`POST /api/task` takes a non-empty `projects` declaration and requires `grader` in every project named. Visibility then follows the declaration, not the images currently linked:
+
+- Adding an image outside the declaration is a **409** (`image_outside_task_declaration`), refused at the database as well as the service. Extend the declaration first.
+- Removing an image never widens access — unlinking does not touch the declaration.
+- Declaring a task broadly hides it from everyone who does not hold *all* of it, from the moment it is created.
+
+`eorm grant-for-task` answers "which projects does this task need", and `GET /api/task/\{task_id\}` returns the declaration; `GET /api/task` returns it only with `?include_projects=true`.
+
+## Scope is resolved per request
+
+The JWT carries identity only — the username and the actor id. The admin flag and the role map are read from the database on **every request**.
+
+This is deliberate: a grant or a revocation takes effect on the user's **next request**, with no re-login and no token expiry to wait out. In the viewer, a refresh is enough.
+
+## A new account has no access
+
+Creating an account and granting access are separate steps, and nothing grants access implicitly:
+
+| How the account appears | What it can see |
+|--------------------------|-----------------|
+| `eorm create-user` | Nothing |
+| `POST /api/auth/register` (unauthenticated) | Nothing |
+| OIDC auto-provisioning with `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` | Nothing |
+| `eorm init-admin` | Everything — this is the bootstrap administrator |
+
+So the first account on a new deployment must be created with **`eorm init-admin`**, not `create-user`. See **[Getting started](/eyened-platform/getting_started)**.
+
+For every account after that, create it and then grant it:
+
+```bash
+eorm create-user --username alice --password '...'
+eorm grant --user alice --project "AMD-Study" --role grader
+```
+
+## Deactivation
+
+`eorm deactivate` refuses the user at scope resolution: they cannot log in, refresh a token, or reach any route that reads or writes project data. Their memberships are kept, so `eorm reactivate` restores exactly what they had.
+
+:::caution
+Deactivation is **not** an immediate blackout. `GET /api/auth/me` still answers for an unexpired access token the user already holds — it returns their own account details and nothing else, and expires on its own schedule. If an account must be shut immediately, deactivation is not the tool.
+
+It is also not absolute against OIDC: a deactivated password-only account has `EmployeeIdentifier = NULL`, which the OIDC lookup matches on, so with `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` the same person can sign in under a different username and receive a **new, zero-access** account. The setting defaults to `false`, and an exact username match is refused with 409 rather than linked.
+:::
+
+## Auditing
+
+Membership and administrator changes are written to `AuditLog`. Commands run through `eorm` are a **trusted path**: the CLI does not authenticate its operator, so anyone with shell access on the server can grant themselves anything, and the audit row names no actor (`ActorID` is NULL by design on that path).
+
+## Related
+
+- **[CLI reference — Users and access](/eyened-platform/orm/cli#users-and-access)** — every command
+- **[Guides — Authentication](/eyened-platform/guides/authentication)** — how users log in, OIDC setup
+- **[API overview](/eyened-platform/api)** — endpoint groups and identifiers
+- **[Tasks data model](/eyened-platform/orm/data_model/tasks)** — `TaskProject` and the declaration

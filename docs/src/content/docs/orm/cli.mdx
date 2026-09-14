@@ -29,13 +29,46 @@ Inserts builtin viewer FormSchemas (ETDRS, registration). See **[Form schemas](/
 eorm seed-form-schemas [--update]
 ```
 
-### create-user
+## Users and access
 
-Interactive user creation for viewer/API login.
+Accounts and permissions are managed here — there is no admin UI for them. The model these commands write to is described in **[Access control](/eyened-platform/guides/access_control)**.
+
+:::caution
+`eorm` is a **trusted path**: it does not authenticate its operator. Anyone with shell access on the server can run `set-admin` and self-promote, and the resulting audit row names no actor.
+:::
+
+### The first account
+
+`create-user` makes an account that can log in and **see nothing** — it writes no membership and sets no administrator flag. On a new deployment the first account must be the administrator:
 
 ```bash
-eorm create-user
+EYENED_API_ADMIN_PASSWORD='...' eorm init-admin --username <EYENED_API_ADMIN_USERNAME>
 ```
+
+Idempotent, and it promotes an existing account as readily as it creates one. Omitting the password stores an unusable hash — an administrator that cannot log in — so set it unless you intend password login to stay disabled. Re-running without a password leaves an existing one alone.
+
+### Accounts
+
+| Command | Purpose |
+|---------|---------|
+| `eorm init-admin --username U [--password P]` | Create or promote the platform administrator (idempotent). Reads `EYENED_API_ADMIN_PASSWORD`, otherwise prompts twice |
+| `eorm create-user --username U --password P` | Create a normal account. Grants nothing — follow it with `grant` |
+| `eorm set-admin --user U --on\|--off` | Set or clear administrator status on an existing account. The only way back down |
+| `eorm set-password --user U [--password P]` | Set an existing user's password, including for an account never meant to log in by password |
+| `eorm deactivate --user U` | Refuse the user all access; memberships are kept |
+| `eorm reactivate --user U` | Restore a deactivated user — their memberships were never removed |
+
+### Memberships
+
+| Command | Purpose |
+|---------|---------|
+| `eorm grant --user U --project P --role R` | Grant or change a role. `R` is one of `read_only`, `grader`, `project_admin` |
+| `eorm revoke --user U --project P` | Remove one membership |
+| `eorm revoke --user U --all [--yes]` | Remove every membership the user holds; confirms unless `--yes` |
+| `eorm grant-for-task --user U --task N [--task M] --role R [--yes]` | Grant every project the given tasks **declare**. A convenience over `grant`, not a different kind of grant — a declaration may be a strict superset of where the images sit |
+| `eorm grant-all [--yes]` | Cutover only: `grader` in every project for every real account. See the accepted risks in `docs/rbac-operations.md` before running it |
+
+Grants and revocations take effect on the user's **next request** — no re-login. A `Creator` row cannot be deleted; `deactivate` exists for that reason.
 
 ## Inference (summary)
 
@@ -77,6 +110,17 @@ eorm update-thumbnails --path ids.txt
 
 Backfill missing `ThumbnailPath` values. See **[Thumbnails — CLI](/eyened-platform/thumbnails#cli)**.
 
+### clean-thumbnails
+
+Compare `{EYENED_STORAGE_ROOT}/thumbnails/` against non-empty `ImageInstance.ThumbnailPath` values: deletes on-disk `_144.jpg` / `_540.jpg` files the database does not index, and lists rows whose `ThumbnailPath` is set but missing a size on disk.
+
+**Dry-run by default** — reports only. Pass `--apply` to delete.
+
+```bash
+eorm clean-thumbnails            # report
+eorm clean-thumbnails --apply    # delete the unindexed files
+```
+
 ### update-hashes
 
 Fill missing `FileChecksum` and `DataHash` on image instances.
@@ -88,6 +132,18 @@ Validate `FormAnnotation` JSON against schemas.
 ### zarr-tree / defragment-zarr
 
 Inspect or compact `{EYENED_STORAGE_ROOT}/segmentations.zarr`.
+
+## Integrity checks
+
+Both are read-only reports that always exit 0 — they surface judgement calls rather than gate anything.
+
+### check-declarations
+
+List `(task, project)` declarations that no image link uses. Rows here are **expected**, not faults: a task declares its projects at creation and acquires links afterwards, and removing links leaves the declaration standing. Nothing in `eorm` reconciles them.
+
+### check-dangling-references
+
+Report rows whose parent is missing. `--sample N` sets how many offending ids to print per hop (default 20).
 
 ## Database dumps
 
