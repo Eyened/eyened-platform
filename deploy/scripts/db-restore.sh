@@ -10,6 +10,26 @@ set -eu
 
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 . "$REPO_ROOT/deploy/scripts/lib.sh"
+
+# Before resolve_compose — the position db-backup.sh:27 uses, and for the same
+# structural reason: './eyened restore' dispatches straight to this script and
+# does not refuse on its behalf, so this is the only guard on the path. What
+# sudo costs HERE is not what it costs on the backup path, though. This script
+# writes no backup; what it creates is its own host state — the .tgz scratch
+# directory, and the $TMPDIR progress sentinel cleanup() reads to tell a
+# half-restored datadir from an untouched one — and under sudo both land
+# root-owned, so an interrupted restore leaves litter its own operator cannot
+# clear.
+#
+# The reason that earns a refusal rather than a chown-back is the one
+# refuse_sudo's own message names. An unreadable backup directory (the
+# checkpoints test below) surfaces as a permission error, and 'sudo ./eyened
+# restore' is the obvious next thing to reach for. It would succeed: read a
+# backup the operator cannot read, and wipe this stack's entire datadir on the
+# strength of it, instead of fixing the ownership. Refusing keeps that one
+# message in charge of the remedy.
+refuse_sudo
+
 resolve_compose
 
 SRC=${1:-}
