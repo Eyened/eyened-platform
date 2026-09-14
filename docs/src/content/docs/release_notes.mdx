@@ -13,6 +13,10 @@ The three compose stacks are replaced by one. Everything in this section is abou
 v2026.09.0 — `dev/` plus `database/` for developers, `docker/` for site deployments — to
 `deploy/`. Do the two "before you pull" items first.
 
+**This is not a data migration.** The new stack starts with an empty database, and following this
+section does not bring existing data across; moving an existing database into `deploy/` is not
+documented here yet, so if you have data you need, do not upgrade yet.
+
 - **Before you pull: take a database backup with the tooling you have now, and keep the old
   checkout.** Nothing in `deploy/` can take this backup; `deploy/` does not exist in the version
   you are on. For the bundled `database/` stack that is `./save_dump.sh <dir>`, run from
@@ -41,7 +45,9 @@ v2026.09.0 — `dev/` plus `database/` for developers, `docker/` for site deploy
 - **Breaking: environment variables renamed.** `DEV_NGINX_PORT` → `HTTP_PORT`, the `docker/`
   stack's `PORT` → `HTTP_PORT`, `DEV_PUBLIC_HOST` → `PUBLIC_HOST`, `DEV_KEYCLOAK_PORT` →
   `KEYCLOAK_PORT`. One stack now serves development and production, so the `DEV_` prefix was
-  misleading.
+  misleading. The `PORT` rename changes the value with it: the default is `8080`, not `80`, and
+  `deploy/.env` is generated, so a site that served on `:80` moves to `:8080` unless you set
+  `HTTP_PORT=80` yourself — check whatever is in front of it (reverse proxy, firewall rule).
 - **Breaking: `EYENED_STORAGE_ROOT` is no longer an operator setting.** The container path is
   pinned to `/storage`. Platform storage is placed on the host with `PLATFORM_STORAGE_PATH`, and
   image datasets are configured in `deploy/storage-mounts.conf`. `EYENED_STORAGE_ROOT` in
@@ -56,6 +62,13 @@ v2026.09.0 — `dev/` plus `database/` for developers, `docker/` for site deploy
   with a bundled or an external database. Older Compose either rejects it or silently drops the
   dependency, which makes the server race MySQL and crash-loop on first boot. `./eyened doctor`
   refuses to continue below the floor rather than letting it fail obscurely later.
+- **Breaking: MySQL and Redis no longer publish host ports.** Both used to be published on every
+  interface — MySQL by the `database` stack, Redis by `dev/` and `docker/`. Neither is published
+  by default now: append `:compose.host-ports.yaml` to `COMPOSE_FILE` in `deploy/.env` and set
+  `DB_PUBLISH_PORT` / `REDIS_PUBLISH_PORT`, which bind to loopback only. An external RQ worker
+  configured from `worker/.env` can no longer reach Redis, so jobs are enqueued and never run with
+  nothing reporting a problem; host-side `eorm`, alembic and database GUIs lose `localhost:3306`
+  the same way.
 - **Adminer is gone.** It used to start automatically with the `database` stack, on
   `EYENED_ADMINER_PORT` (default `8080`); nothing in `deploy/` starts it. Use `./eyened db-shell`
   for a MySQL shell. For a GUI, append `:compose.host-ports.yaml` to `COMPOSE_FILE` in
@@ -92,10 +105,10 @@ v2026.09.0 — `dev/` plus `database/` for developers, `docker/` for site deploy
   across the compose file, `nginx.conf` and the env file. Getting one of the three wrong is what
   made Python-side pixel reads (thumbnail regeneration, inference, reports) fail while the viewer
   still worked.
-- **No placeholder secrets.** `dev/sample.env` and `docker/.env.example` shipped `change_me`
-  values that kept working if you never changed them. `deploy/.env.example` ships none: first run
-  generates them into `deploy/.env`, and a hand-copied `.env` fails at `docker compose up` until
-  real values are set. That is deliberate, not a regression.
+- **No placeholder secrets.** `docker/.env.example` and `database/.env.example` shipped
+  `change_me` values that kept working if you never changed them. `deploy/.env.example` ships
+  none: first run generates them into `deploy/.env`, and a hand-copied `.env` fails at `docker
+  compose up` until real values are set. That is deliberate, not a regression.
 - **Container logs are capped** at 10 MB × 3 files per service, so a long-running install cannot
   fill the disk.
 - **`eorm` confirmation prompts on database state.** `initialize-database` and `load-dump` ask

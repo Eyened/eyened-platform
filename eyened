@@ -7,11 +7,10 @@
 #
 # Docker is the only prerequisite. Run './eyened help' for the command list.
 #
-# This is the only entry point to the stack. It replaces the three separate
-# `docker compose` invocations that used to be needed, in dev/, docker/ and
-# database/. The repository's Makefile is gone too, but nothing of it moved
-# here: its three targets were codegen, and they are now `npm run gen:types`
-# in client/.
+# This is the only entry point to the stack. It replaces the separate compose
+# stacks that used to live in dev/, docker/, database/ and worker/. The
+# repository's Makefile is gone too, but nothing of it moved here: its three
+# targets were codegen, and they are now `npm run gen:types` in client/.
 #
 # The large pieces live in deploy/scripts/ and are called from here:
 # doctor.sh, bootstrap.sh, gen-storage.sh, db-backup.sh, db-restore.sh.
