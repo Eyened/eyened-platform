@@ -600,6 +600,8 @@ jobs:
           # No container but `database` may be handed the MySQL root password.
           # This is what dropping env_file: bought; without a check it silently
           # comes back the first time someone adds `env_file: .env` to a service.
+          # One sanctioned exception: db-backup.sh hands it to its one-shot
+          # `xtrabackup` run with `run -e`, which `compose config` never shows.
           n=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config \
                 | command grep -c 'MYSQL_ROOT_PASSWORD' || true)
           if [ "$n" = "1" ]; then

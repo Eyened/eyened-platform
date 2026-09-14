@@ -155,14 +155,19 @@ cid=$(compose ps -a -q database) || cid=""
 # error pointing at a line this script does not own, and under `set -e` that
 # ends the run with no message of its own. Measured on a real .env. env_get
 # reads one assignment with sed and has no opinion on the value.
-DB_USER=$(env_get EYENED_DATABASE_USER "$ENV_FILE")
-DB_PASS=$(env_get EYENED_DATABASE_PASSWORD "$ENV_FILE")
+#
+# XtraBackup connects as root, NOT as the application account: the mysql image
+# creates that account with ALL on its own schema and nothing server-wide, and
+# XtraBackup is refused without BACKUP_ADMIN, PROCESS, RELOAD and SELECT on
+# performance_schema. Root already has them on a fresh datadir and on a
+# migrated one alike, where no init script ever runs.
+MYSQL_ROOT_PASSWORD=$(env_get MYSQL_ROOT_PASSWORD "$ENV_FILE")
 DB_NAME=$(env_get EYENED_DATABASE_DATABASE "$ENV_FILE")
 [ -n "$DB_NAME" ] || DB_NAME=eyened_database   # compose.yaml's own default
 
-[ -n "$DB_USER" ] && [ -n "$DB_PASS" ] ||
-    die "error: EYENED_DATABASE_USER and EYENED_DATABASE_PASSWORD must both be
-      set in $ENV_FILE, and at least one is empty.
+[ -n "$MYSQL_ROOT_PASSWORD" ] ||
+    die "error: MYSQL_ROOT_PASSWORD is empty or missing in $ENV_FILE, and the
+      backup connects to MySQL as root.
       Fix: check $ENV_FILE, or pass a different one with -e."
 
 # Is there actually a schema in there? mysqld initialises its own system
@@ -246,18 +251,21 @@ mkdir -p "$DEST" || die "error: could not create $DEST.
       Fix: check permissions on $(dirname "$DEST"), or pass a different
            <output-dir>."
 
-# -e for the container, because docker-compose v1 has no --env-file on `run`.
-# \$ expands inside the container, not here.
+# `-e MYSQL_ROOT_PASSWORD` by NAME, with the value exported into compose's own
+# environment: `-e NAME=value` would put the root password in the host compose
+# command line, readable in `ps` by every user on a shared host. An exported
+# value also beats compose's own read of deploy/.env, so -e envfile is honoured.
+# The quoted $ expands inside the container, not here.
+export MYSQL_ROOT_PASSWORD
 compose --profile backup run --rm --user 0:0 \
-    -e EYENED_DATABASE_USER="$DB_USER" \
-    -e EYENED_DATABASE_PASSWORD="$DB_PASS" \
+    -e MYSQL_ROOT_PASSWORD \
     -v "$DEST:/backup-out" \
     --entrypoint sh \
     xtrabackup -c 'set -eu
 xtrabackup --backup \
   --host=database \
-  --user=${EYENED_DATABASE_USER} \
-  --password=${EYENED_DATABASE_PASSWORD} \
+  --user=root \
+  --password="$MYSQL_ROOT_PASSWORD" \
   --target-dir=/backup-out
 xtrabackup --prepare --target-dir=/backup-out'
 
