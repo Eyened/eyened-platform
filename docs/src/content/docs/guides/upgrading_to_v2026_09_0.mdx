@@ -3,7 +3,7 @@ title: Upgrading to v2026.09.0
 description: The one procedure for taking a site from v2026.08.0 or earlier to v2026.09.0, run entirely with containers
 ---
 
-**Not a rolling upgrade.** The API, the RQ workers and all imports stay stopped from step 1 to step 7. Budget: [Time budget](#time-budget) plus backup time.
+**Not a rolling upgrade.** The API, the RQ workers and all imports stay stopped from step 1 to step 7. Budget: [Time budget](#time-budget).
 
 This release crosses three changes at once:
 
@@ -327,18 +327,23 @@ new_eorm check-declarations
 
 ## Time budget
 
-Step 5b only, measured on MySQL 8.0.27 at development scale:
+Rehearsed on MySQL 8.4.11, development data (`schema_mb` 5473, `imageinstance_mb` 1637):
 
-| Revision | Time | Dominated by |
-|---|---:|---|
-| `d3ce100ab2b6` | 14 min 59 s | `ImageInstance` rebuilds (1.76 GB) |
-| `4eae42457fa2` | 3 min 43 s | `Series` rebuilds (532 MB) |
-| `99724789b34d` | 4.8 s | `TaskProject` backfill |
-| `b45090e1544e` | 9 min 16 s | composite foreign keys |
-| `2db0e63195db` | 43.8 s | `SubTaskImageLink` |
-| **step 5b** | **28 min 47 s** | |
+| Step | Time |
+|---|---:|
+| 1. Stop every writer | 11 s |
+| 2. Back up (archive 1.6 GB) | 4 min 42 s |
+| 3. Record | 6 s |
+| 4. Legacy trail | 11 s |
+| 5a. Stamp | 8 s |
+| 5b. Upgrade | 9 min 18 s |
+| 5c. Check | 10 s |
+| 6. Access control | 16 s |
+| 7. Start | 17 s |
+| **Window (1–7)** | **15 min 19 s** |
+| Rollback | 1 min 32 s |
 
-Scale step 5b by your `imageinstance_mb`, not by row counts.
+Preparing took 3 min 7 s, before the window. Scale steps 2 and 5b by your `schema_mb` and `imageinstance_mb`.
 
 ## Rollback
 

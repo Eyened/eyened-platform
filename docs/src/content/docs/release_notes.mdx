@@ -16,7 +16,7 @@ API serves requests concurrently for the first time. This release is also relice
 under AGPL-3.0.
 
 **This release cannot be deployed as a rolling upgrade.** It needs a planned outage of
-roughly 45 minutes plus backup time. Follow [Upgrading to v2026.09.0](/eyened-platform/guides/upgrading_to_v2026_09_0/).
+about 15 minutes at development scale, backup included. Follow [Upgrading to v2026.09.0](/eyened-platform/guides/upgrading_to_v2026_09_0/).
 
 ### Highlights
 
@@ -127,7 +127,7 @@ Things that worked one way in v2026.08.0 and work differently now.
 
 **Not a rolling upgrade.** Follow **[Upgrading to v2026.09.0](/eyened-platform/guides/upgrading_to_v2026_09_0/)**. In summary:
 
-- Outage: roughly 45 minutes plus backup time. The API, the RQ workers and all imports stay stopped.
+- Outage: about 15 minutes at development scale, backup included. The API, the RQ workers and all imports stay stopped.
 - Finish the legacy migrations from an image built at `6c675e5`, stamp `orm_baseline`, then apply six revisions with the new image.
 - Before users return: `eorm init-admin` with a password, `eorm grant-all`, then review the grant.
 - Rebuild every image containing `eyened_orm` (the server and every worker): this release adds `passlib` and `argon2-cffi`.
