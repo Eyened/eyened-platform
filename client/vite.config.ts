@@ -33,7 +33,7 @@ export default defineConfig({
             // the gate instead of passing vacuously.
             include: ["src/**/*.{ts,svelte}"],
             exclude: [
-                "src/types/openapi.ts", // generated: make gen-client-types
+                "src/types/openapi.ts", // generated: npm run gen:types
                 "src/lib/components/ui/**", // generated: shadcn-svelte
                 "src/**/*.{test,spec}.ts",
                 "src/**/*.d.ts",
