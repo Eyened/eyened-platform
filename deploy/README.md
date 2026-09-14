@@ -215,9 +215,15 @@ database passwords must be supplied by hand.** First run generates
 is absent — and a freshly generated password will not open a database that
 is already sitting on that disk. This presents as a config bug (wrong
 password) rather than the lifecycle mistake it actually is (a new `.env`
-pointed at old data), so if you are attaching `DB_DATA_PATH` to existing
-data, set `MYSQL_ROOT_PASSWORD` and `EYENED_DATABASE_PASSWORD` in
-`deploy/.env` to the values that database already uses, before first run.
+pointed at old data).
+
+There is no way to do this before the first run: `deploy/.env` does not exist
+until an entry point creates it, and a hand-made one fails preflight. Run the
+entry point once, set `MYSQL_ROOT_PASSWORD` and `EYENED_DATABASE_PASSWORD` in
+the `deploy/.env` it generated to the values that database already uses, then
+run it again. If the existing database is the old `database` stack's, follow
+[Moving an existing database into this stack](#moving-an-existing-database-into-this-stack)
+instead — the order there matters for more than the passwords.
 
 ## Adding your first dataset
 
@@ -354,6 +360,213 @@ is not optional: `./eyened doctor` fails while it is absent, empty, `admin` or
 `change_me` and `compose.oidc.yaml` is enabled, so the stack will not build
 until you set it.
 
+## Moving an existing database into this stack
+
+`./eyened install` starts an **empty** database. This is the tested way to bring an
+existing one across: the old `database` stack's `db_data` volume is copied onto a
+host path, and attached with `DB_DATA_PATH`.
+
+**This is an outage.** The old database is stopped cold before the copy and stays
+down until the new stack serves. **Only the database moves** — platform storage
+(thumbnails, `segmentations.zarr`) and the datasets in `storage-mounts.conf` are
+not touched by any of it.
+
+Two things to have ready:
+
+- **From the old `database/.env`:** `MYSQL_ROOT_PASSWORD` and `MYSQL_PASSWORD`, plus
+  `MYSQL_USER` and `MYSQL_DATABASE` if they are not the stock `eyened` /
+  `eyened_database`. Do **not** carry over that file's `EYENED_DATABASE_USER` /
+  `EYENED_DATABASE_PASSWORD`: those are `save_dump.sh`'s client credentials, not the
+  database's own accounts.
+- **Room for a second full copy of the datadir**, on the filesystem you point
+  `DB_DATA_PATH` at. `./eyened doctor`'s free-space check does not cover this — it
+  measures Docker's data root, which is usually a different filesystem.
+
+Nothing in this stack inspects what `DB_DATA_PATH` actually contains, and doctor
+skips its leftover-volume check entirely once that variable is set. The checks
+written into steps 2, 3 and 8 below are what catch a bad copy. None of them is
+optional.
+
+### 1. Install once, while the old stack is still serving
+
+```bash
+./eyened install
+```
+
+This builds every image and writes `deploy/.env` with its generated secrets. It is
+not a dry run — it also initialises a full MySQL datadir, which step 4 throws away.
+Running it before the outage is the point: it is the slow step. Writing
+`deploy/.env` by hand instead does not work; preflight rejects both obvious ways of
+producing one.
+
+**If anything already holds `HTTP_PORT`, preflight refuses here and nothing is
+built** ("Port 8080 is already in use"). There is no `deploy/.env` yet, so doctor
+reads `HTTP_PORT` from `.env.example`, where it is `8080` — and the old `database`
+stack publishes adminer on `8080` by default. You cannot pre-set the port, because
+the file that would carry it does not exist yet. Stop whatever holds it first: for
+adminer that is `docker compose stop adminer` in the old checkout's `database/`
+(find the project name as in step 2), which leaves the old database serving. Once
+`deploy/.env` exists you can set `HTTP_PORT` in it to any free port.
+
+### 2. Stop the old stack cold — the outage starts here
+
+Find the project name compose actually uses. Do not guess it:
+`database/docker-compose.yaml` carries a hardcoded `name:`, so it is usually neither
+`eyened` nor the directory name.
+
+```bash
+cd /path/to/old-checkout/database
+docker compose config | grep '^name:'
+docker volume ls | grep db_data      # note the EXACT volume name
+
+docker compose down                  # no -v: this KEEPS the volume
+docker compose ps -a                 # MUST list nothing
+```
+
+`docker compose down` against a project that does not exist prints nothing and exits
+0. If `ps -a` still lists a running container you addressed the wrong project, and
+the copy in step 3 would be taken hot.
+
+**Keep that volume.** Until step 8 passes it is your only way back — no path from the
+new stack back to the old one has been tested. Do not run `docker volume prune` or
+`docker system prune` anywhere in this procedure.
+
+### 3. Copy the datadir onto a host path
+
+```bash
+mkdir -p /abs/path/eyened-db
+docker volume inspect <old-project>_db_data >/dev/null   # MUST exit 0
+
+docker run --rm \
+  -v <old-project>_db_data:/from \
+  -v /abs/path/eyened-db:/to \
+  --user 0:0 --entrypoint sh \
+  mysql:8.0.27 -c 'cp -a /from/. /to/'
+
+ls -A /abs/path/eyened-db | wc -l    # MUST be greater than 0
+ls -ld /abs/path/eyened-db           # MUST show owner 999
+```
+
+The `docker volume inspect` is not a formality: `docker run -v <wrong-name>:/from`
+**creates** an empty volume rather than failing, and `cp -a` then copies nothing and
+exits 0. If the file count comes back 0, stop here — step 6 would initialise a new
+empty database into that directory and report complete success.
+
+`--user 0:0` and `cp -a /from/. /to/` are what make the ownership come out right.
+Do not substitute a busybox-based image (`alpine`, `busybox`) — its `cp` does not
+behave the same way — and do not `chown` the result afterwards. `mysql:8.0.27` is
+what `database/docker-compose.yaml` has always pinned, so it is already on the host
+and no registry pull is needed mid-outage; if your old stack pinned a different tag,
+use that one. (8.0.27 is amd64-only; on arm64 use 8.0.29 or newer.)
+
+Afterwards you will not be able to read or delete that directory as yourself — it
+belongs to uid 999. That is correct, not a failure.
+
+### 4. Discard the throwaway database
+
+```bash
+cd /path/to/new-checkout
+./eyened down -v
+```
+
+This must happen **before** step 5. Once `DB_DATA_PATH` is set, `./eyened reset`
+refuses by design and `down -v` no longer names that volume, so nothing in this
+repository can remove it any more.
+
+`./eyened down -v` asks for no confirmation and deletes this project's `db_data`
+**and** `platform_storage` volumes. The precondition is that the only stack in this
+checkout is the throwaway from step 1.
+
+### 5. Point `deploy/.env` at the copy
+
+Append the block. Compose takes the last assignment of a key, so appending beats
+every line above it.
+
+```bash
+cat >> deploy/.env <<'EOF'
+
+DB_DATA_PATH=/abs/path/eyened-db
+MYSQL_ROOT_PASSWORD=<the OLD database/.env MYSQL_ROOT_PASSWORD>
+EYENED_DATABASE_USER=<the OLD database/.env MYSQL_USER>
+EYENED_DATABASE_PASSWORD=<the OLD database/.env MYSQL_PASSWORD>
+EYENED_DATABASE_DATABASE=<the OLD database/.env MYSQL_DATABASE>
+EOF
+```
+
+The copied datadir carries the old `mysql.user` table, so the passwords generated in
+step 1 will not open it. The `USER` and `DATABASE` lines are only needed if your old
+values were not the stock `eyened` / `eyened_database`.
+
+If either old password contains a space followed by `#`, a `$`, or begins and ends
+with a quote, compose silently mangles it. A mangled `EYENED_DATABASE_PASSWORD` is a
+loud access-denied; a mangled `MYSQL_ROOT_PASSWORD` is silent, because the datadir
+decides the real root password. Change the password in the old database first, or
+use one with none of those characters.
+
+### 6. Start on the migrated datadir
+
+```bash
+./eyened install
+```
+
+MySQL runs its in-place datadir upgrade here, and bootstrap sees a populated schema
+and leaves it alone. `deploy/.env` is left exactly as you edited it.
+
+### 7. Grant the four privileges the backup needs
+
+`./eyened backup` does not work on **any** install of this stack until four
+privileges are granted: the application account is created with `ALL PRIVILEGES` on
+its own schema and nothing else, and XtraBackup needs more than that. This is not
+caused by the migration — a fresh install has the identical account. It belongs here
+because until the backup works, this stack cannot protect itself, and the old volume
+from step 2 is still your only way back.
+
+Run it as root. `./eyened db-shell` connects as the application account, which is
+the one that cannot grant:
+
+```bash
+cd deploy
+docker compose exec -T database mysql -uroot -p'<OLD root password>' -e "
+  SELECT user, host FROM mysql.user;
+  GRANT BACKUP_ADMIN, PROCESS, RELOAD ON *.* TO '<user>'@'%';
+  GRANT SELECT ON performance_schema.* TO '<user>'@'%';
+  FLUSH PRIVILEGES;"
+```
+
+Check that the `SELECT` output names the account you are granting to: MySQL refuses
+to grant to a user that does not exist (ERROR 1410) rather than creating one.
+
+This is the set that was measured to work, not a minimal one — `BACKUP_ADMIN` alone
+is not enough. The privileges land on the account **the application connects as**:
+`EYENED_DATABASE_USER` is a single variable, read by the server, the workers and the
+backup alike, so the backup cannot be given a separate identity without a code
+change. It widens that account from `ALL` on one schema to four server-wide
+privileges — `PROCESS` and `SELECT` on `performance_schema` expose every session's
+statement text and the account tables, `RELOAD` permits `FLUSH TABLES WITH READ
+LOCK` and `RESET MASTER`, and `BACKUP_ADMIN` permits holding the instance backup
+lock.
+
+### 8. Verify with an authenticated read
+
+```bash
+cd ..
+./eyened backup /abs/path/verify-backup     # must exit 0
+```
+
+Then log in, through the UI or the API, as an account that existed in the **old**
+database, and confirm your own data is there.
+
+**Nothing cheaper than that will tell you.** A migration that copied nothing still
+produces healthy containers, `./eyened install` exiting 0, the "The platform is
+running." banner, a full set of tables, alembic at head, `./eyened check-storage`
+exiting 0 — and the old root password logging in, because MySQL will have
+initialised a brand-new datadir using the password you just put in `deploy/.env`.
+All of those were measured identical between a real migration and one that copied
+nothing. Only reading a row that existed beforehand tells them apart.
+
+Once that login succeeds you have a working stack and a backup of it, and the old
+volume from step 2 can go.
+
 ## Migrations
 
 ```bash
@@ -397,6 +610,14 @@ InnoDB datadir, so the machine you restore onto must run a compatible MySQL
 8.0 — true by construction here, since the stack pins `mysql:8.0.46`.
 `./eyened backup -t <dir>` also writes a single `.tgz`; `./eyened restore`
 accepts either form.
+
+**The first `./eyened backup` on a new install fails until four privileges are
+granted.** The bundled database's application account is created with
+`ALL PRIVILEGES` on its own schema and nothing else, which is not enough for
+XtraBackup. This is true of a fresh install, not only a migrated one. The
+`GRANT` statement is in step 7 of
+[Moving an existing database into this stack](#moving-an-existing-database-into-this-stack),
+along with what it means for the account the application connects as.
 
 A relative `<dir>` is resolved under `deploy/` — `deploy/backups/` is the
 suggested one and is gitignored. `<dir>` is refused outright if it resolves
