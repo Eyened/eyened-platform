@@ -394,8 +394,8 @@ optional.
 ### 1. Install once, while the old stack is still serving
 
 ```bash
-ls deploy/.env    # MUST fail — unless an earlier attempt at this step wrote it, an
-                  # existing deploy/.env means this checkout already has a stack; stop
+ls deploy/.env    # MUST fail — unless an earlier attempt at this step FAILED after
+                  # writing it; otherwise this checkout already has a stack: stop
 ./eyened install
 ```
 
@@ -471,8 +471,8 @@ belongs to uid 999. That is correct, not a failure.
 ### 4. Discard the throwaway database
 
 **Precondition:** the only stack in this compose project is the throwaway installed
-by step 1 (a retried attempt still counts). `./eyened down -v` asks for no
-confirmation and deletes this project's `db_data` **and** `platform_storage`
+by step 1 (a retry after a failed attempt still counts). `./eyened down -v` asks
+for no confirmation and deletes this project's `db_data` **and** `platform_storage`
 volumes.
 
 ```bash
