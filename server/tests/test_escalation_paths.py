@@ -140,7 +140,6 @@ def test_is_admin_is_written_only_by_the_allow_listed_writers():
         "orm/setup.py",
         "notebooks",
         "server",
-        "dev",
     }
     scanned = {str(p.relative_to(_ROOT)) for p in _python_sources()}
     unreached = {
