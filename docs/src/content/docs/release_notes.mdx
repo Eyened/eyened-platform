@@ -13,9 +13,10 @@ The three compose stacks are replaced by one. Everything in this section is abou
 v2026.09.0 — `dev/` plus `database/` for developers, `docker/` for site deployments — to
 `deploy/`. Do the two "before you pull" items first.
 
-**This is not a data migration.** The new stack starts with an empty database, and following this
-section does not bring existing data across; moving an existing database into `deploy/` is not
-documented here yet, so if you have data you need, do not upgrade yet.
+**This is not a data migration.** The bundled database starts empty, and following this section
+does not bring existing data across; moving an existing database into `deploy/` is not documented
+here yet, so if you have data you need, do not upgrade yet. A site running against an external
+database is the exception — it keeps using that database.
 
 - **Before you pull: take a database backup with the tooling you have now, and keep the old
   checkout.** Nothing in `deploy/` can take this backup; `deploy/` does not exist in the version
@@ -48,9 +49,10 @@ documented here yet, so if you have data you need, do not upgrade yet.
   misleading. The `PORT` rename changes the value with it: the default is `8080`, not `80`, and
   `deploy/.env` is generated, so a site that served on `:80` moves to `:8080` unless you set
   `HTTP_PORT=80` yourself — check whatever is in front of it (reverse proxy, firewall rule).
-  One name survived with a new meaning: `EYENED_DATABASE_PORT` used to publish MySQL on the host,
-  and now tells the server which port to connect to. A carried-over non-default value points the
-  server at a port nothing is listening on.
+  `EYENED_DATABASE_PORT` keeps its name but not always its meaning: the `database` stack published
+  MySQL on the host at that port, while `docker/` already used it as the server's connect port. It
+  is now always the connect port — so a value carried from the `database` stack points the server
+  at nothing, while one carried from `docker/` is still correct.
 - **Breaking: `EYENED_STORAGE_ROOT` is no longer an operator setting.** The container path is
   pinned to `/storage`. Platform storage is placed on the host with `PLATFORM_STORAGE_PATH`, and
   image datasets are configured in `deploy/storage-mounts.conf`. `EYENED_STORAGE_ROOT` in
