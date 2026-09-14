@@ -523,11 +523,11 @@ you edited it.
 ### 7. Grant the four privileges the backup needs
 
 `./eyened backup` does not work on **any bundled-database install** of this stack
-until four privileges are granted: the application account is created with `ALL PRIVILEGES` on
-its own schema and nothing else, and XtraBackup needs more than that. This is not
-caused by the migration — a fresh install has the identical account. It belongs here
-because until the backup works, this stack cannot protect itself, and the old volume
-from step 2 is still your only way back.
+until four privileges are granted: the application account is created with
+`ALL PRIVILEGES` on its own schema and nothing else, and XtraBackup needs more than
+that. This is not caused by the migration — a fresh install has the identical
+account. It belongs here because until the backup works, this stack cannot protect
+itself, and the old volume from step 2 is still your only way back.
 
 Run it as root. `./eyened db-shell` connects as the application account, which is
 the one that cannot grant:

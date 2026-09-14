@@ -96,8 +96,8 @@ database.
   schema and nothing else, which XtraBackup is refused on — `./eyened backup` exits 1 with
   `LOCK INSTANCE FOR BACKUP ... you need (at least one of) the BACKUP_ADMIN privilege(s)`. This
   affects every bundled-database install, a fresh one included, not just a database brought across
-  from the old stack. The `GRANT` statement, and what it means for the account the application connects as, are
-  in `deploy/README.md` under **Moving an existing database into this stack**.
+  from the old stack. The `GRANT` statement, and what it means for the account the application
+  connects as, are in `deploy/README.md` under **Moving an existing database into this stack**.
 - **`worker/`'s compose files and `.env` are gone.** The four `worker/docker-compose.*.yml` files
   and `worker/.env*` are replaced by `deploy/compose.workers.yaml`, which reads `deploy/.env` —
   there is no separate worker env file any more. `EYENED_WORKER_DIR` is renamed
