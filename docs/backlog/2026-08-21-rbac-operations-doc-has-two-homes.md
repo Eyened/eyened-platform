@@ -1,6 +1,6 @@
 # `docs/rbac-operations.md` is two documents in one file
 
-**Status:** open
+**Status:** in progress — the cutover half is replaced by `guides/upgrading_to_v2026_09_0.mdx`; the local loop and `test_user` table remain in `docs/rbac-operations.md`.
 
 ## Source
 
