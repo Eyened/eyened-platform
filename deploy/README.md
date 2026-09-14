@@ -510,9 +510,8 @@ with a quote, compose silently mangles it. A mangled `EYENED_DATABASE_PASSWORD` 
 loud access-denied; a wrong `MYSQL_ROOT_PASSWORD` is not caught at step 6 (the
 datadir decides the real root password) but at step 7, where `./eyened backup` is
 refused with access denied for root — the backup reads the value exactly as
-written, quotes included, unlike compose (measured; see the `env_get` comment in
-`deploy/scripts/lib.sh:89-102`). Change the password in the old database first, or
-use one with none of those characters.
+written, quotes included, unlike compose. Change the password in the old database
+first, or use one with none of those characters.
 
 ### 6. Start on the migrated datadir
 
