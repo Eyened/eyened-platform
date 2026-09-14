@@ -134,6 +134,23 @@ checkpoints="$SRC/xtrabackup_checkpoints"
       Fix: pass a directory db-backup.sh produced, or a .tgz written by
            'db-backup.sh -t'."; }
 
+# Present but unREADABLE is a different failure from unprepared, and nothing
+# downstream can tell them apart: the sed below runs as the invoking user, so a
+# denied read leaves $backup_type empty and the != full-prepared test then
+# reports a perfectly good backup as unprepared — with a Fix ('--prepare') that
+# cannot touch an ownership problem. Tested here rather than inferred from the
+# sed's empty output, because empty is also what a truncated or hand-edited
+# checkpoints file gives, and those two want opposite advice.
+[ -r "$checkpoints" ] || { rm -rf "$untarred" 2>/dev/null; die "error: $ORIG_SRC has an xtrabackup_checkpoints file that this command cannot
+      read, so whether the backup is prepared cannot be determined. That is an
+      ownership problem, not a bad backup. Nothing was changed.
+      Fix: hand the backup back to yourself, then re-run this command:
+             sudo chown -R $(id -u):$(id -g) $ORIG_SRC
+           or, on a host with docker but no sudo:
+             docker run --rm -v $ORIG_SRC:/b --user 0:0 alpine chown -R $(id -u):$(id -g) /b
+           Do not put sudo in front of this command: it is refused, and it
+           would work around the ownership rather than fix it."; }
+
 backup_type=$(sed -n 's/^backup_type[[:space:]]*=[[:space:]]*//p' "$checkpoints" | tr -d '[:space:]')
 if [ "$backup_type" != "full-prepared" ]; then
     rm -rf "$untarred" 2>/dev/null
