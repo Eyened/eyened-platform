@@ -602,6 +602,8 @@ jobs:
           # comes back the first time someone adds `env_file: .env` to a service.
           # One sanctioned exception: db-backup.sh hands it to its one-shot
           # `xtrabackup` run with `run -e`, which `compose config` never shows.
+          # Only `local-db` is rendered, so the `backup` profile's service
+          # definitions are not checked here either.
           n=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config \
                 | command grep -c 'MYSQL_ROOT_PASSWORD' || true)
           if [ "$n" = "1" ]; then

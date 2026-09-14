@@ -160,7 +160,9 @@ cid=$(compose ps -a -q database) || cid=""
 # creates that account with ALL on its own schema and nothing server-wide, and
 # XtraBackup is refused without BACKUP_ADMIN, PROCESS, RELOAD and SELECT on
 # performance_schema. Root already has them on a fresh datadir and on a
-# migrated one alike, where no init script ever runs.
+# migrated one alike, where no init script ever runs. It connects over TCP
+# (--host=database), so it also relies on a root account that accepts network
+# connections — the mysql image's root@'%', present on both.
 MYSQL_ROOT_PASSWORD=$(env_get MYSQL_ROOT_PASSWORD "$ENV_FILE")
 DB_NAME=$(env_get EYENED_DATABASE_DATABASE "$ENV_FILE")
 [ -n "$DB_NAME" ] || DB_NAME=eyened_database   # compose.yaml's own default
@@ -267,7 +269,12 @@ xtrabackup --backup \
   --user=root \
   --password="$MYSQL_ROOT_PASSWORD" \
   --target-dir=/backup-out
-xtrabackup --prepare --target-dir=/backup-out'
+xtrabackup --prepare --target-dir=/backup-out' ||
+    die "error: XtraBackup failed (its output is above), so $DEST is not a usable
+      backup. \"Access denied for user 'root'\" there means MYSQL_ROOT_PASSWORD
+      in $ENV_FILE is not this database's current root password.
+      Fix: for that error, set MYSQL_ROOT_PASSWORD in $ENV_FILE to the root
+           password the database actually has, or pass a different file with -e."
 
 # xtrabackup writes as root inside the container; hand the result back so the
 # invoking user can read, tar or scp their own backup.
