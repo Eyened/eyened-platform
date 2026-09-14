@@ -142,14 +142,17 @@ checkpoints="$SRC/xtrabackup_checkpoints"
 # sed's empty output, because empty is also what a truncated or hand-edited
 # checkpoints file gives, and those two want opposite advice.
 [ -r "$checkpoints" ] || { rm -rf "$untarred" 2>/dev/null; die "error: $ORIG_SRC has an xtrabackup_checkpoints file that this command cannot
-      read, so whether the backup is prepared cannot be determined. That is an
-      ownership problem, not a bad backup. Nothing was changed.
+      read, so whether the backup is prepared cannot be determined. Usually that
+      is ownership — the backup was written by root — and occasionally the mode.
+      Nothing was changed.
       Fix: hand the backup back to yourself, then re-run this command:
-             sudo chown -R $(id -u):$(id -g) $ORIG_SRC
+             sudo chown -R $(id -u):$(id -g) \"$ORIG_SRC\"
            or, on a host with docker but no sudo:
-             docker run --rm -v $ORIG_SRC:/b --user 0:0 alpine chown -R $(id -u):$(id -g) /b
-           Do not put sudo in front of this command: it is refused, and it
-           would work around the ownership rather than fix it."; }
+             docker run --rm -v \"$ORIG_SRC\":/b --user 0:0 alpine chown -R $(id -u):$(id -g) /b
+           If it is already yours, the mode is what denies the read:
+             chmod -R u+rX \"$ORIG_SRC\"
+           Do not put sudo in front of ${EYENED_INVOKED_AS:-db-restore.sh}: it is
+           refused, and it would work around the ownership rather than fix it."; }
 
 backup_type=$(sed -n 's/^backup_type[[:space:]]*=[[:space:]]*//p' "$checkpoints" | tr -d '[:space:]')
 if [ "$backup_type" != "full-prepared" ]; then
