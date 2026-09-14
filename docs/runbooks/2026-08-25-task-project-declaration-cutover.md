@@ -43,6 +43,7 @@ Alembic needs an account with DDL rights, which the application's own database a
 **2. Stop the database, then copy its data directory.** This is the backup and the only rollback path. With the server stopped the copy is consistent by construction — no dump, no `--single-transaction`, no prepare step.
 
 ```bash
+cd deploy
 docker compose stop database
 docker run --rm -v <db_volume>:/from -v <backup_dir>:/to alpine \
   tar czf /to/pre-cutover.tar.gz -C /from .
@@ -50,7 +51,7 @@ docker run --rm -v <db_volume>:/from -v <backup_dir>:/to alpine \
 
 **3. Start the database.** Plain restart is fine, and the chain will take about as long as the table above says.
 
-*Optional, and untimed:* the compose file passes MySQL one flag, `--innodb-buffer-pool-size`; everything else is 8.0.27 default, including a 48 MB redo log that these rebuilds overrun continuously. For this window only, and only because step 2's copy exists and no user is connected:
+*Optional, and untimed:* the compose file passes MySQL one flag, `--innodb-buffer-pool-size`; everything else is `mysql:8.0.46` default (`deploy/compose.yaml:31`). Since MySQL 8.0.30, redo log sizing is controlled by `innodb_redo_log_capacity`, not the deprecated `innodb_log_file_size` / `innodb_log_files_in_group` pair; its default, when none of the three is set, is 104,857,600 bytes (100 MB) — still small enough for these rebuilds to overrun continuously. The deprecated flag below still works: MySQL computes `innodb_redo_log_capacity` from it and `innodb_log_files_in_group` (default 2) when the newer variable is not set directly, per the MySQL 8.0 Reference Manual — but confirm the resulting capacity against your own server before relying on it. For this window only, and only because step 2's copy exists and no user is connected:
 
 ```
 --innodb-log-file-size=2G
