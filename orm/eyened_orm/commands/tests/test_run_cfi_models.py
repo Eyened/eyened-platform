@@ -219,6 +219,62 @@ def test_run_cfi_models_passes_processing_options(
     assert call["commit_interval"] == 50
 
 
+def test_run_cfi_models_cfi_roi_does_not_resolve_torch_device(
+    cli_runner, pipeline_calls, monkeypatch, session
+):
+    """cfi-roi uses fundusprep/OpenCV. Resolving a torch device breaks the server image."""
+
+    def boom(_device):
+        raise AssertionError("cfi-roi must not resolve a torch device")
+
+    monkeypatch.setattr(
+        "eyened_orm.commands.model_processing._get_device",
+        boom,
+    )
+    _import_images(session, count=1)
+    session.commit()
+
+    result = cli_runner.invoke(run_cfi_models, ["-m", "cfi-roi"])
+
+    assert result.exit_code == 0, result.output
+    assert len(pipeline_calls) == 1
+    assert pipeline_calls[0]["slug"] == "cfi-roi"
+    assert pipeline_calls[0]["device"] is None
+
+
+def test_run_cfi_models_only_torch_slugs_get_a_device(
+    cli_runner, pipeline_calls, session
+):
+    _import_images(session, count=1)
+    session.commit()
+
+    result = cli_runner.invoke(run_cfi_models, [])
+
+    assert result.exit_code == 0, result.output
+    by_slug = {call["slug"]: call["device"] for call in pipeline_calls}
+    assert by_slug["cfi-roi"] is None
+    for slug in ("cfi-keypoints", "cfi-odfd", "cfi-quality"):
+        assert by_slug[slug] == "mock-device"
+
+
+def test_get_device_missing_torch_points_at_inference_worker(monkeypatch):
+    import builtins
+
+    from eyened_orm.commands.model_processing import _get_device
+
+    real_import = builtins.__import__
+
+    def blocked(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "torch" or name.startswith("torch."):
+            raise ImportError("No module named 'torch'")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", blocked)
+
+    with pytest.raises(RuntimeError, match="worker/docker-compose.inference.yml"):
+        _get_device(None)
+
+
 def test_run_cfi_attribute_pipeline_filters_before_chunking(session, monkeypatch, capsys):
     from eyened_orm.commands import model_processing
     from eyened_orm.commands.model_processing import run_cfi_attribute_pipeline

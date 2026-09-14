@@ -41,7 +41,7 @@ Poll RQ job status. **No authentication required.**
 
 ### POST /api/import/run_cfi_models
 
-Queue CFI attribute models (`cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality`).
+Queue CFI attribute models (`cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality`). GPU models run on the inference worker (`worker/docker-compose.inference.yml`); `cfi-roi` can run on the slim ROI worker. See **[Inference — workers](/eyened-platform/orm/inference#workers-and-images)**.
 
 **Request body:**
 ```json
