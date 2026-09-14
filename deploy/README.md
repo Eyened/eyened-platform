@@ -218,7 +218,8 @@ password) rather than the lifecycle mistake it actually is (a new `.env`
 pointed at old data).
 
 There is no way to do this before the first run: `deploy/.env` does not exist
-until an entry point creates it, and a hand-made one fails preflight. Run the
+until an entry point creates it, and both obvious ways of producing one by hand
+fail preflight. Run the
 entry point once, set `MYSQL_ROOT_PASSWORD` and `EYENED_DATABASE_PASSWORD` in
 the `deploy/.env` it generated to the values that database already uses, then
 run it again. If the existing database is the old `database` stack's, follow
@@ -379,17 +380,21 @@ Two things to have ready:
   `EYENED_DATABASE_PASSWORD`: those are `save_dump.sh`'s client credentials, not the
   database's own accounts.
 - **Room for a second full copy of the datadir**, on the filesystem you point
-  `DB_DATA_PATH` at. `./eyened doctor`'s free-space check does not cover this — it
-  measures Docker's data root, which is usually a different filesystem.
+  `DB_DATA_PATH` at — and room for step 8's `./eyened backup`, wherever that backup
+  path points, which may be a different filesystem again. `./eyened doctor`'s
+  free-space check does not cover this — it measures Docker's data root, which is
+  usually a different filesystem.
 
-Nothing in this stack inspects what `DB_DATA_PATH` actually contains, and doctor
-skips its leftover-volume check entirely once that variable is set. The checks
+Nothing in this stack inspects what `DB_DATA_PATH` actually contains — doctor's
+leftover-volume check (the one that mentions `DB_DATA_PATH`) only runs before
+`deploy/.env` exists, so from step 1 onward it does not run at all. The checks
 written into steps 2, 3 and 8 below are what catch a bad copy. None of them is
 optional.
 
 ### 1. Install once, while the old stack is still serving
 
 ```bash
+ls deploy/.env    # MUST fail — if it exists, this checkout already runs a stack; stop
 ./eyened install
 ```
 
@@ -444,7 +449,7 @@ docker run --rm \
   mysql:8.0.27 -c 'cp -a /from/. /to/'
 
 ls -A /abs/path/eyened-db | wc -l    # MUST be greater than 0
-ls -ld /abs/path/eyened-db           # MUST show owner 999
+ls -ldn /abs/path/eyened-db          # MUST show owner 999
 ```
 
 The `docker volume inspect` is not a formality: `docker run -v <wrong-name>:/from`
@@ -464,6 +469,10 @@ belongs to uid 999. That is correct, not a failure.
 
 ### 4. Discard the throwaway database
 
+**Precondition:** step 1's check passed in this checkout, so the only stack here is
+the throwaway from step 1. `./eyened down -v` asks for no confirmation and deletes
+this project's `db_data` **and** `platform_storage` volumes.
+
 ```bash
 cd /path/to/new-checkout
 ./eyened down -v
@@ -472,10 +481,6 @@ cd /path/to/new-checkout
 This must happen **before** step 5. Once `DB_DATA_PATH` is set, `./eyened reset`
 refuses by design and `down -v` no longer names that volume, so nothing in this
 repository can remove it any more.
-
-`./eyened down -v` asks for no confirmation and deletes this project's `db_data`
-**and** `platform_storage` volumes. The precondition is that the only stack in this
-checkout is the throwaway from step 1.
 
 ### 5. Point `deploy/.env` at the copy
 
@@ -510,12 +515,15 @@ use one with none of those characters.
 ```
 
 MySQL runs its in-place datadir upgrade here, and bootstrap sees a populated schema
-and leaves it alone. `deploy/.env` is left exactly as you edited it.
+and leaves it alone. If it instead prints `bootstrap: the database is empty —
+creating the schema and seeding form schemas.`, the copy did not land — stop before
+step 7 (the old volume from step 2 is still there). `deploy/.env` is left exactly as
+you edited it.
 
 ### 7. Grant the four privileges the backup needs
 
-`./eyened backup` does not work on **any** install of this stack until four
-privileges are granted: the application account is created with `ALL PRIVILEGES` on
+`./eyened backup` does not work on **any bundled-database install** of this stack
+until four privileges are granted: the application account is created with `ALL PRIVILEGES` on
 its own schema and nothing else, and XtraBackup needs more than that. This is not
 caused by the migration — a fresh install has the identical account. It belongs here
 because until the backup works, this stack cannot protect itself, and the old volume
@@ -557,12 +565,13 @@ Then log in, through the UI or the API, as an account that existed in the **old*
 database, and confirm your own data is there.
 
 **Nothing cheaper than that will tell you.** A migration that copied nothing still
-produces healthy containers, `./eyened install` exiting 0, the "The platform is
-running." banner, a full set of tables, alembic at head, `./eyened check-storage`
-exiting 0 — and the old root password logging in, because MySQL will have
-initialised a brand-new datadir using the password you just put in `deploy/.env`.
-All of those were measured identical between a real migration and one that copied
-nothing. Only reading a row that existed beforehand tells them apart.
+produces healthy containers, an HTTP 200 on `/`, `./eyened install` exiting 0, the
+"The platform is running." banner, a full set of tables, alembic at head,
+`./eyened check-storage` exiting 0 — and the old root password logging in, because
+MySQL will have initialised a brand-new datadir using the password you just put in
+`deploy/.env`. All of those were measured identical between a real migration and
+one that copied nothing. Only reading a row that existed beforehand tells them
+apart.
 
 Once that login succeeds you have a working stack and a backup of it, and the old
 volume from step 2 can go.
