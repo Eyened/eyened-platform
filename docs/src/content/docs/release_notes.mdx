@@ -48,6 +48,9 @@ documented here yet, so if you have data you need, do not upgrade yet.
   misleading. The `PORT` rename changes the value with it: the default is `8080`, not `80`, and
   `deploy/.env` is generated, so a site that served on `:80` moves to `:8080` unless you set
   `HTTP_PORT=80` yourself — check whatever is in front of it (reverse proxy, firewall rule).
+  One name survived with a new meaning: `EYENED_DATABASE_PORT` used to publish MySQL on the host,
+  and now tells the server which port to connect to. A carried-over non-default value points the
+  server at a port nothing is listening on.
 - **Breaking: `EYENED_STORAGE_ROOT` is no longer an operator setting.** The container path is
   pinned to `/storage`. Platform storage is placed on the host with `PLATFORM_STORAGE_PATH`, and
   image datasets are configured in `deploy/storage-mounts.conf`. `EYENED_STORAGE_ROOT` in
