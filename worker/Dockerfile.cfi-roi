@@ -8,11 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxcb1 libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+# One resolution, as in deploy/Dockerfile.server: split installs hide conflicts.
 COPY orm /app/orm
-RUN pip install --no-cache-dir -e /app/orm
+COPY server/requirements.txt /app/server/requirements.txt
+RUN pip install --no-cache-dir -r /app/server/requirements.txt -e /app/orm
 
 COPY server /app/server
-RUN pip install --no-cache-dir -r /app/server/requirements.txt
 
 ENV PYTHONPATH=/app
 WORKDIR /app
