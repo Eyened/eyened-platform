@@ -15,9 +15,11 @@
 `EYENED_API_SECRET_KEY` is the JWT signing key that `write_env` generates once and never
 rewrites. `./eyened reset` deletes only the database and platform-storage volumes; it does
 not touch `deploy/.env`, so the key survives. `./eyened restore` replaces the datadir but
-likewise never rewrites `.env`. Both access and refresh tokens carry only `sub` (`CreatorID`)
-and `username` — `get_current_user` trusts the `CreatorID` in a validly-signed token and never
-checks that the row it names is the same identity the token was issued to.
+likewise never rewrites `.env`. The access token carries `sub` (`CreatorID`) and `username`;
+the refresh token carries only `sub` and `type` — neither carries anything that changes when
+the account behind that id does. `get_current_user` trusts the `CreatorID` in a
+validly-signed token and never checks that the row it names is the same identity the token
+was issued to.
 
 Measured on a scratch stack: a cookie issued to `alice` (`CreatorID` 2) before `./eyened
 reset`, presented again after a reset and after a freshly created account `bob` happened to

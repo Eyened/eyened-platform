@@ -11,10 +11,12 @@
 #   EYENED_REDIS_PASSWORD, EYENED_DATABASE_HOST / EYENED_DATABASE_PORT /
 #   EYENED_DATABASE_PASSWORD, and PLATFORM_STORAGE_PATH in deploy/.env to
 #   point at the platform host and at this box's platform storage —
-#   compose.host-ports.yaml on the platform host binds 127.0.0.1 only, so it
-#   must instead publish those ports on an interface this box can reach (a
-#   site-specific compose file, see deploy/README.md) and firewall them to
-#   this box — put compose.workers.yaml into COMPOSE_FILE, fill in
+#   compose.host-ports.yaml on the platform host binds 127.0.0.1 only and
+#   cannot just be combined with a site override to fix that (compose merges
+#   `ports` lists additively across files, so both bindings render and
+#   collide) — use a site-specific compose file INSTEAD OF it, publishing on
+#   a reachable interface directly (see deploy/README.md), and firewall those
+#   ports to this box — put compose.workers.yaml into COMPOSE_FILE, fill in
 #   storage-mounts.conf and run deploy/scripts/gen-storage.sh, then
 #     docker compose -f deploy/compose.workers.yaml -f deploy/compose.storage.yaml \
 #       up -d --build

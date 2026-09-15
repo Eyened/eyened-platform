@@ -289,16 +289,32 @@ EYENED_DATABASE_PASSWORD=<copied from the platform host's deploy/.env>
 PLATFORM_STORAGE_PATH=<absolute path to platform storage on this box>
 ```
 
-**The platform host publishes neither port reachably by default.**
-`:compose.host-ports.yaml` binds `127.0.0.1` only (`DB_PUBLISH_PORT` /
-`REDIS_PUBLISH_PORT`, default `13306`/`16379`) — this box cannot reach that. On
-the platform host, publish them on an interface this box can reach instead: a
-site-specific compose file overriding `host_ip` to a non-loopback address,
-appended to `COMPOSE_FILE` the same way [Per-site
-deployments](#per-site-deployments) describes — then set
-`EYENED_REDIS_PORT`/`EYENED_DATABASE_PORT` above to those published ports.
-**Restrict them to this worker box with a firewall** — they expose the
-database.
+**The platform host publishes neither port reachably by default, and
+`:compose.host-ports.yaml` cannot simply be added to fix that.** It binds
+`127.0.0.1` only (`DB_PUBLISH_PORT`/`REDIS_PUBLISH_PORT`, default
+`13306`/`16379`), unreachable from this box — and layering a site-specific
+override on top of it does not help: compose merges a service's `ports` list
+**additively** across files, so both bindings render side by side (measured
+with `docker compose config`), and they collide once either one is not
+loopback-only. Use a site-specific compose file **instead of**
+`:compose.host-ports.yaml`, publishing both services directly on a reachable
+interface itself, appended to `COMPOSE_FILE` the same way [Per-site
+deployments](#per-site-deployments) describes:
+
+```yaml
+# compose.<site>-worker-access.yaml
+services:
+  database:
+    ports:
+      - "<platform-host-address>:13306:3306"
+  redis:
+    ports:
+      - "<platform-host-address>:16379:6379"
+```
+
+Then set `EYENED_REDIS_PORT`/`EYENED_DATABASE_PORT` above to the ports it
+publishes. **Restrict them to this worker box with a firewall** — they
+expose the database.
 
 **Do not run `./eyened` on this box.** Nothing rewrites the `COMPOSE_FILE` you
 set above — `deploy/.env` is written once and never touched again — so the
@@ -427,12 +443,14 @@ producing one.
 
 **If anything already holds `HTTP_PORT`, preflight refuses here and nothing is
 built** ("Port 8080 is already in use"). There is no `deploy/.env` yet, so doctor
-reads `HTTP_PORT` from `.env.example`, where it is `8080` — and the old `database`
-stack publishes adminer on `8080` by default. You cannot pre-set the port, because
-the file that would carry it does not exist yet. Stop whatever holds it first: for
-adminer that is `docker compose stop adminer` in the old checkout's `database/`
-(find the project name as in step 2), which leaves the old database serving. Once
-`deploy/.env` exists you can set `HTTP_PORT` in it to any free port.
+reads an exported `HTTP_PORT` if you set one, else `.env.example`'s `8080` — and
+the old `database` stack publishes adminer on `8080` by default. Either export
+`HTTP_PORT` to a free port before this step (`./eyened install` records the
+export into the `deploy/.env` it creates, so a later run without the export still
+uses that port), or stop whatever holds it: for adminer that is `docker compose
+stop adminer` in the old checkout's `database/` (find the project name as in step
+2), which leaves the old database serving. Once `deploy/.env` exists you can also
+set `HTTP_PORT` in it to any free port.
 
 ### 2. Stop the old stack cold — the outage starts here
 
@@ -562,7 +580,7 @@ produces healthy containers, an HTTP 200 on `/`, `./eyened install` exiting 0, t
 and the old root password logging in, because MySQL will have initialised a
 brand-new datadir using the password you just put in `deploy/.env`. All of those
 were measured identical between a real migration and one that copied nothing.
-`./eyened check-storage` now exits non-zero if `storage-mounts.conf` configures
+`./eyened check-storage` exits non-zero if `storage-mounts.conf` configures
 anything, since a fresh empty schema has no matching `StorageBackend` rows — but
 on a site with no image datasets configured it still reports agreement either
 way. Only reading a row that existed beforehand tells the two apart for certain.
@@ -614,10 +632,13 @@ InnoDB datadir, so the machine you restore onto must run a compatible MySQL
 `./eyened backup -t <dir>` also writes a single `.tgz`, so moving a backup to
 another machine is one `scp`; `./eyened restore` accepts either form.
 **Restoring onto a different machine also brings the source's `mysql.user`
-table** — copy `MYSQL_ROOT_PASSWORD` and `EYENED_DATABASE_PASSWORD` from the
-source's `deploy/.env` into the target's before starting the restored stack,
-or the target's generated passwords will not match what the datadir actually
-holds.
+table.** Before running `./eyened restore` there, copy `MYSQL_ROOT_PASSWORD` and
+`EYENED_DATABASE_PASSWORD` from the source's `deploy/.env` into the target's —
+`./eyened restore` only stops and starts the existing `database` container, so
+it never re-reads `deploy/.env` itself, and the `server` container is already
+running with the target's OLD password in its own environment. Once the
+restore is done, run `./eyened install`/`./eyened up` again so `server` is
+recreated with the password that now matches the restored datadir.
 
 `./eyened backup` connects to MySQL as root, with `MYSQL_ROOT_PASSWORD` from
 `deploy/.env`. If root's password is ever changed in MySQL, it must be changed
@@ -752,9 +773,9 @@ needed.
 
 - **Port already in use.** `./eyened doctor` checks `HTTP_PORT` — an exported
   value wins over `deploy/.env` (even an exported *empty* one, which compose
-  then treats as unset and publishes `8080`) — and names the fix: export a
-  free port before the first run, or set `HTTP_PORT` in an existing
-  `deploy/.env`.
+  then treats as unset and publishes `8080`) — and names the fix accordingly:
+  export a free port before the first run; set `HTTP_PORT` in an existing
+  `deploy/.env`; or, if `HTTP_PORT` is already exported, change the export.
 - **`compose.oidc.yaml` is enabled and `KEYCLOAK_BIND` is loopback.**
   `./eyened doctor` **fails** on this — it is not advisory, and nothing is
   built. The server container reaches Keycloak's metadata document *through
@@ -782,6 +803,7 @@ needed.
   (`:compose.host-ports.yaml`, `:compose.oidc.yaml`, `:compose.workers.yaml`):
     - `compose.yaml:compose.dev.yaml:compose.storage.yaml` (`./eyened up`)
     - `compose.yaml:compose.storage.yaml:compose.prod.yaml` (`./eyened install`)
+
   `./eyened reset` is what deletes your data, if that is what you actually want.
 - **`COMPOSE_FILE` names both `compose.dev.yaml` and `compose.prod.yaml`.**
   Compose accepts this silently — it does not error, and does not warn —
