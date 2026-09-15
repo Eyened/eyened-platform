@@ -1,19 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
-# Mirrors compose.yaml's EYENED_OIDC_REDIRECT_URL: with a TLS-terminating
-# proxy in front (PUBLIC_URL set) the browser's origin is not this stack's
-# host:port, and Keycloak compares redirect URIs by exact string, so the URI
-# registered here must follow the same rule as the one the server sends.
+# Must agree with the operator's own EYENED_OIDC_REDIRECT_URL (deploy/.env,
+# read by the server via compose.yaml): with a TLS-terminating proxy in front
+# (PUBLIC_URL set) the browser's origin is not this stack's host:port, and
+# Keycloak compares redirect URIs by exact string, so the URI registered here
+# must be built from the same PUBLIC_HOST/HTTP_PORT/PUBLIC_URL the operator
+# used for EYENED_OIDC_REDIRECT_URL.
 #
-# Not the same TEXT, though: compose.yaml defaults the missing names
-# (${PUBLIC_HOST:-localhost}, ${HTTP_PORT:-8080}) where this file demands them
-# (${PUBLIC_HOST:?}). The two agree only because the keycloak service passes
-# PUBLIC_HOST/HTTP_PORT/PUBLIC_URL in already defaulted — so half of this
-# invariant lives in compose.yaml. Stop passing one of those three into the
-# container, or change a default on one side only, and the two sides drift.
-# The :? is deliberate: better to fail before kc.sh than to register a URI
-# nothing will ever match.
+# Not the same TEXT, though: compose.oidc.yaml defaults the names it passes in
+# (${PUBLIC_HOST:-localhost}, ${HTTP_PORT:-8080}, ${PUBLIC_URL:-}) where this
+# file demands PUBLIC_HOST and HTTP_PORT (${PUBLIC_HOST:?}, ${HTTP_PORT:?}).
+# The two agree only because compose.oidc.yaml's keycloak service passes them
+# in already defaulted — so half of this invariant lives there, not in
+# compose.yaml. Change a default on one side only, or stop passing one of
+# these three into the keycloak service, and the two sides drift. The :? is
+# deliberate: better to fail before kc.sh than to register a URI nothing will
+# ever match.
 #
 # ${PUBLIC_HOST:?} inside the fallback is evaluated ONLY when PUBLIC_URL is
 # unset or empty (compose passes it as "" when the user leaves it out) —
