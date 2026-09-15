@@ -7,14 +7,18 @@
 # catch a failing redirect, or a failure inside an `if`/`&&`/`||`).
 #
 # Usage: doctor.sh [dev|client]
+#
+# With no argument the mode is the stack an existing deploy/.env describes (the
+# same COMPOSE_FILE test the entry-point check below uses), and 'dev' when there
+# is no .env to read.
 set -eu
 
-MODE=${1:-dev}
+MODE=${1:-}
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 . "$REPO_ROOT/deploy/scripts/lib.sh"
 
 case "$MODE" in
-    dev|client) ;;
+    ''|dev|client) ;;
     *) die "usage: ${EYENED_INVOKED_AS:-doctor.sh} [dev|client]" ;;
 esac
 
@@ -241,6 +245,16 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
         *)                      env_stack=unrecognised ;;
     esac
 
+    # No argument: check the stack this .env describes. Only a clean 'client'
+    # reading makes it 'client'; everything else stays 'dev', as before, and
+    # the refusals below still fire for it.
+    if [ -z "$MODE" ]; then
+        case "$env_stack" in
+            client) MODE=client ;;
+            *)      MODE=dev ;;
+        esac
+    fi
+
     # The layer list this entry point actually builds, for the messages below.
     # Naming it beats "the other entry point", which is not always the cause.
     case "$MODE" in
@@ -264,8 +278,9 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       compose.prod.yaml ('$compose_file'). Compose accepts this silently, but
       the two layers disagree about which image serves the client and which
       nginx config it uses — one of them is not doing what you think.
-      Fix: delete deploy/.env and re-run, or edit COMPOSE_FILE to name only
-           one of the two." ;;
+      Fix: edit COMPOSE_FILE in deploy/.env to name only one of the two:
+             $COMPOSE_FILE_DEV   (./eyened up)
+             $COMPOSE_FILE_CLIENT   (./eyened install)" ;;
         workers:*)
             # The one configuration that reaches this check while being
             # entirely CORRECT. On a remote worker box deploy/.env holds a
@@ -285,8 +300,9 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
              docker compose -f deploy/compose.workers.yaml \\
                -f deploy/compose.storage.yaml up -d --build
            COMPOSE_PROFILES in this .env selects which workers start.
-           On the platform host this is the wrong .env: delete it and re-run.
-           That keeps your data — './eyened reset' is what deletes it." ;;
+           On the platform host this is the wrong .env: set COMPOSE_FILE in it to
+             $want_layers
+           and re-run." ;;
         unrecognised:*)
             # Empty, or a value naming none of the three layers above — which
             # covers more than "the other entry point wrote this": an empty or
@@ -301,8 +317,10 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       one hand-edited into an unrecognised value.
       Fix: set COMPOSE_FILE in deploy/.env to
              $want_layers
-           or delete deploy/.env and re-run. Deleting it keeps your data —
-           './eyened reset' is what deletes it." ;;
+           and re-run. Keep the rest of the file: its database passwords are
+           the ones any existing database volume was initialised with. Only
+           an empty or corrupted .env on a stack with no data yet is better
+           deleted and re-run." ;;
         *)
             # 'so it was created by the other entry point' used to stand here
             # as fact. It is not one: .env.example's own external-database
@@ -319,11 +337,14 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       .env — it is written once and never rewritten — or it was copied from
       deploy/.env.example by hand and still carries the template's own
       COMPOSE_FILE line.
-      Fix: if you configured this .env for this machine yourself, set
-           COMPOSE_FILE in it to
+      Fix: set COMPOSE_FILE in deploy/.env to
              $want_layers
-           Otherwise delete deploy/.env and re-run. Deleting it keeps your
-           data — './eyened reset' is what deletes it." ;;
+           and re-run. That is also how to switch an existing install between
+           the developer and client stacks: keep the rest of the file, whose
+           database passwords are the ones its database volume was initialised
+           with. Deleting deploy/.env only helps on a stack with no data yet
+           (or after './eyened reset'); with a database volume left behind,
+           the regenerated passwords cannot open it and doctor refuses." ;;
     esac
 
     if [ -n "$(unquote "$(env_get EYENED_API_SECRET_KEY)")" ]; then
@@ -385,7 +406,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
     esac
   fi
 else
-    ok "no deploy/.env yet — it will be created from .env.example"
+    ok "no deploy/.env yet — './eyened up' and './eyened install' create one; './eyened prod' needs one written by hand"
 
     # --- Leftover database volume on a first run --------------------------
     # No .env means the entry point is about to GENERATE MYSQL_ROOT_PASSWORD
@@ -404,8 +425,10 @@ else
     # instructive half — it was caused by RENAMING COMPOSE_PROJECT_NAME to
     # dodge the first, which does not move a volume, it abandons the old set
     # under the default name that the next clone then takes from
-    # .env.example. So the fix this reports is "delete it or restore its
-    # .env", never "rename the project".
+    # .env.example. So the fix this reports for your OWN volume is "delete it
+    # or restore its .env", never "rename the project". A volume that belongs
+    # to another stack on a shared machine is the one case where a different
+    # name is the fix — exported before the first run, so write_env records it.
     #
     # Values come from .env.example (there is no .env yet), but the process
     # environment wins where it is set, because that is compose's own
@@ -458,12 +481,16 @@ else
       existing volume keeps the credentials it was built with, and bootstrap
       then fails with (1045, 'Access denied for user ...') after the whole
       stack has already been built.
-      Fix: if that volume holds data you want, put back the deploy/.env that
-           goes with it. If it does not, delete it and re-run:
+      Fix: if that volume belongs to ANOTHER stack on this machine, leave it
+           alone: export COMPOSE_PROJECT_NAME and HTTP_PORT to values nobody
+           else uses before running, and they are recorded in the deploy/.env
+           that run creates. If the volume is yours and holds data you want,
+           put back the deploy/.env that goes with it. If it holds nothing you
+           want, delete it and re-run:
              docker volume rm ${stale_project}_db_data
-           Do NOT rename COMPOSE_PROJECT_NAME to get past this — that leaves
-           the volume behind under this name, where the next clone will
-           attach it instead."
+           Do NOT rename your own project to get past this — that leaves the
+           volume behind under this name, where the next clone will attach it
+           instead."
                 else
                     ok "no leftover '${stale_project}_db_data' volume — the database will initialise with the generated secrets"
                 fi ;;
@@ -481,11 +508,34 @@ fi
 # "sed: can't read ...: Permission denied" to stderr on top of the one
 # problem already reported above. Only read .env here when it is readable;
 # otherwise fall back to .env.example, same as when .env does not exist yet.
+#
+# An exported HTTP_PORT wins over both, the way the leftover-volume check above
+# honours an exported COMPOSE_PROJECT_NAME: compose gives the shell environment
+# precedence over .env, so that is the port it will publish. ':-', not '-':
+# compose.yaml publishes ${HTTP_PORT:-8080}, so an export left EMPTY does not
+# name a port. $port_fix is the remedy for wherever the port was read from:
+# no message may send the operator to edit a deploy/.env that does not exist.
 http_port=""
-if [ -r "$DEPLOY_DIR/.env" ]; then
+if [ -n "${HTTP_PORT:-}" ]; then
+    http_port=$HTTP_PORT
+elif [ -r "$DEPLOY_DIR/.env" ]; then
     http_port=$(unquote "$(env_get HTTP_PORT)")
 fi
 [ -n "$http_port" ] || http_port=$(unquote "$(env_get HTTP_PORT "$DEPLOY_DIR/.env.example")")
+
+if [ -n "${HTTP_PORT:-}" ]; then
+    port_fix="export HTTP_PORT as a free port instead — an exported value is
+           the one compose publishes, whatever deploy/.env says."
+elif [ -f "$DEPLOY_DIR/.env" ]; then
+    port_fix="set HTTP_PORT in deploy/.env to a free port. To change
+           COMPOSE_PROJECT_NAME too, './eyened down' this stack first: a
+           renamed project leaves the old one running."
+else
+    port_fix="before this first run, export HTTP_PORT as a free port and, on
+           a shared machine, COMPOSE_PROJECT_NAME as a name nobody else
+           uses. './eyened up' and './eyened install' record both in the
+           deploy/.env they create."
+fi
 
 port_probe() {
     # 0 = in use, 1 = free, 2 = cannot tell. "Cannot tell" is a real case and
@@ -514,9 +564,9 @@ sys.exit(0 if s.connect_ex(("127.0.0.1", int(sys.argv[1]))) == 0 else 1)' "$1" &
 
 case "$http_port" in
     ''|*[!0-9]*)
-        problem "HTTP_PORT in deploy/.env is not a plain number ('$http_port'), so it cannot
-      be checked or used to publish the platform.
-      Fix: set HTTP_PORT in deploy/.env to a numeric port, e.g. 8080." ;;
+        problem "HTTP_PORT is not a plain number ('$http_port'), so it cannot be checked
+      or used to publish the platform.
+      Fix: $port_fix" ;;
     *)
         # A re-run must not trip over its own listener — but only if the
         # running fileserver actually publishes THIS $http_port. compose ps
@@ -551,9 +601,8 @@ case "$http_port" in
             set -e
             case "$probe" in
                 0) problem "Port $http_port is already in use, so the platform cannot bind it.
-      Fix: set HTTP_PORT in deploy/.env to a free port (on a machine shared
-           with other developers, pick one nobody else is using), or stop
-           whatever is holding $http_port." ;;
+      Fix: $port_fix
+           Or stop whatever is holding $http_port." ;;
                 2) ok "port $http_port: no python3 here to probe with, check skipped" ;;
                 *) ok "port $http_port is free" ;;
             esac

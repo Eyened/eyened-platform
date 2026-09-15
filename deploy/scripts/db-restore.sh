@@ -255,4 +255,25 @@ compose start database
 restarted=1
 trap - EXIT INT TERM HUP
 rm -rf "$sentinel_dir" "$untarred" 2>/dev/null
+
+# `start` returns as soon as the container runs, while InnoDB is still
+# recovering the restored datadir, so a db-shell straight after it can fail.
+# The same bounded loop bootstrap.sh uses to wait for MySQL.
+cid=$(compose ps -q database || true)
+[ -n "$cid" ] || die "error: the database container is not running after the restore.
+      Look at: (cd $DEPLOY_DIR && $COMPOSE_BIN logs database)"
+printf '==> waiting for the database to become healthy'
+status=unknown
+i=0
+while [ "$i" -lt 120 ]; do
+    status=$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo unknown)
+    [ "$status" = healthy ] && break
+    printf '.'
+    sleep 2
+    i=$((i + 1))
+done
+echo
+[ "$status" = healthy ] || die "error: the database did not become healthy within 240s of the restore
+      (last status: $status). The datadir was restored; MySQL has not come up on it.
+      Look at: (cd $DEPLOY_DIR && $COMPOSE_BIN logs database)"
 echo "restored from $ORIG_SRC"

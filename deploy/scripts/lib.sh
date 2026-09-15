@@ -196,8 +196,15 @@ _one_line_or_die() {
 #     compose.workers.yaml — is now PERMANENTLY safe. Previously every re-run
 #     regenerated the base list and merged the extras back in, and the merge
 #     could not fully fix a CRLF-latched entry (its own comments said so).
-#   * Switching between the dev and client stacks means deleting .env and
-#     re-running. That is already what doctor tells you to do.
+#   * Switching an existing install between the dev and client stacks means
+#     editing COMPOSE_FILE in .env to the other layer list below, which is
+#     what doctor tells you to do. Deleting .env instead only works on a stack
+#     with no data: its regenerated database passwords cannot open a database
+#     volume that already exists, and doctor refuses that volume.
+#   * An exported COMPOSE_PROJECT_NAME or HTTP_PORT is recorded in the file.
+#     Compose would honour the export anyway; recording it keeps a later run
+#     WITHOUT the export on the same project and port, rather than silently
+#     starting a second stack from the template's 'eyened' on 8080.
 #   * A variable added to .env.example in a later release does not reach an
 #     existing .env. That was ALREADY true — the old in-place writer only ever
 #     touched COMPOSE_FILE and the five secrets — so it is not a regression.
@@ -229,8 +236,11 @@ write_env() {
     # ever reached.)
     if [ -f "$DEPLOY_DIR/.env" ]; then
         echo "==> deploy/.env exists — left exactly as it is, secrets and all."
-        echo "    To start over (the other stack, or fresh secrets) delete it and"
-        echo "    re-run. Deleting it keeps your data; './eyened reset' deletes that."
+        echo "    To switch to the other stack, set COMPOSE_FILE in it to"
+        echo "      $COMPOSE_FILE_DEV   (./eyened up), or"
+        echo "      $COMPOSE_FILE_CLIENT   (./eyened install)"
+        echo "    and re-run. For fresh secrets on a stack with no data yet (or after"
+        echo "    './eyened reset'), delete it and re-run."
         return 0
     fi
 
@@ -265,6 +275,22 @@ write_env() {
     _one_line_or_die "database root password"    "$_root_pw"
     _one_line_or_die "database password"         "$_db_pw"
     _one_line_or_die "Keycloak admin password"   "$_kc_pw"
+
+    # An exported identity is appended to the file below as one KEY=value
+    # line, so it must be one line and a value compose accepts: compose's own
+    # project-name rule, and a plain numeric port.
+    case "${COMPOSE_PROJECT_NAME:-}" in
+        *[!a-z0-9_-]*|[_-]*)
+            die "error: the exported COMPOSE_PROJECT_NAME '$COMPOSE_PROJECT_NAME' is not a valid
+      compose project name.
+      Fix: export it using only lowercase letters, digits, '-' and '_',
+           starting with a letter or digit." ;;
+    esac
+    case "${HTTP_PORT:-}" in
+        *[!0-9]*)
+            die "error: the exported HTTP_PORT '$HTTP_PORT' is not a plain number.
+      Fix: export it as a numeric port, e.g. HTTP_PORT=8081." ;;
+    esac
 
     # Create the temp EMPTY and restrict it BEFORE anything goes in: `>`
     # truncates without changing an existing file's mode, so no secret is ever
@@ -312,10 +338,13 @@ write_env() {
 # and never rewritten. Everything below overrides the same key above it:
 # compose reads the LAST assignment.
 #
-# Editing this block is fine — nothing here will overwrite your changes. To
-# start over (a different stack, regenerated secrets), DELETE this whole file
-# and re-run './eyened up' (developer stack) or './eyened install' (client
-# stack). Deleting it keeps your data; './eyened reset' is what deletes that.
+# Editing this block is fine — nothing here will overwrite your changes.
+# To switch stacks, set COMPOSE_FILE below to the other entry point's layers:
+#   $COMPOSE_FILE_DEV   './eyened up' (developer stack)
+#   $COMPOSE_FILE_CLIENT   './eyened install' (client stack)
+# Run './eyened down' before changing COMPOSE_PROJECT_NAME: a renamed project
+# leaves the old one running. Deleting this file for regenerated secrets only
+# works on a stack with no data yet, or after './eyened reset'.
 #
 # Appending your own layer to COMPOSE_FILE below is safe and permanent:
 #   :compose.host-ports.yaml   publish MySQL and Redis on the host
@@ -329,14 +358,18 @@ MYSQL_ROOT_PASSWORD=$_root_pw
 EYENED_DATABASE_PASSWORD=$_db_pw
 KEYCLOAK_ADMIN_PASSWORD=$_kc_pw
 EOF
+        { [ -z "${COMPOSE_PROJECT_NAME:-}" ] || printf 'COMPOSE_PROJECT_NAME=%s\n' "$COMPOSE_PROJECT_NAME"; } &&
+        { [ -z "${HTTP_PORT:-}" ] || printf 'HTTP_PORT=%s\n' "$HTTP_PORT"; }
     } >> "$_tmp" || { rm -f "$_tmp"; die "error: could not write $_tmp (see above)."; }
 
     mv "$_tmp" "$DEPLOY_DIR/.env" ||
         { rm -f "$_tmp"; die "error: could not put $_tmp into place as $DEPLOY_DIR/.env."; }
 
     echo "==> created deploy/.env with generated secrets"
-    echo "    On a shared machine, set COMPOSE_PROJECT_NAME and HTTP_PORT in"
-    echo "    deploy/.env to something nobody else is using, then re-run."
+    echo "    project '$(env_get COMPOSE_PROJECT_NAME)', port $(env_get HTTP_PORT)."
+    echo "    On a shared machine, export COMPOSE_PROJECT_NAME and HTTP_PORT to values"
+    echo "    nobody else uses BEFORE the first run; they are recorded here. To change"
+    echo "    COMPOSE_PROJECT_NAME later, './eyened down' first, then edit deploy/.env."
 }
 
 # The day-2 commands, printed with the binary THIS host actually has. Naming

@@ -270,6 +270,11 @@ jobs:
       # — it would RUN them. `./eyened help` above is the one step that
       # does source lib.sh under a `#!/bin/sh` shebang, and it only ever
       # reaches the file's TOP LEVEL — never a line inside this function.
+      #
+      # write_env runs with COMPOSE_PROJECT_NAME and HTTP_PORT exported, and the
+      # render below runs WITHOUT them: an exported identity must be recorded in
+      # the file, or a later run without the export silently starts as the
+      # template's 'eyened' on 8080 — on a shared host, someone else's stack.
       - name: write_env's last-assignment-wins is real, not assumed
         run: |
           set -e
@@ -287,7 +292,8 @@ jobs:
           # can never fire here and turn this into a check of nothing.
           rm -f "$scratch/deploy/.env"
 
-          /bin/sh -c 'REPO_ROOT=$1; . "$1/deploy/scripts/lib.sh"; write_env client' sh "$scratch" \
+          COMPOSE_PROJECT_NAME=ciwriteenv HTTP_PORT=18080 \
+            /bin/sh -c 'REPO_ROOT=$1; . "$1/deploy/scripts/lib.sh"; write_env client' sh "$scratch" \
             || { echo "::error::'write_env client' failed under /bin/sh — its own output is above"; exit 1; }
           env="$scratch/deploy/.env"
           [ -f "$env" ] || { echo "::error::write_env did not create $env"; exit 1; }
@@ -328,6 +334,14 @@ jobs:
           n=$(printf '%s\n' "$rendered" | command grep -c 'published: "13306"' || true)
           [ "$n" = "1" ] || { echo "::error::deploy/.env with compose.host-ports.yaml appended to the LAST COMPOSE_FILE line rendered 'published: \"13306\"' $n time(s), want 1 — compose is not reading the last assignment, or write_env's appended block is not actually the last COMPOSE_FILE line"; exit 1; }
           echo "ok: write_env's appended COMPOSE_FILE line is the one compose reads (last-assignment-wins, on the real generated file)"
+
+          # Rendered without the exports (this step's shell never had them), so
+          # both values can only have come from the file.
+          printf '%s\n' "$rendered" | command grep -qx 'name: ciwriteenv' \
+            || { echo "::error::a .env written by 'write_env client' with COMPOSE_PROJECT_NAME=ciwriteenv exported does not render as project ciwriteenv — write_env did not record the exported project name, so a later run without the export starts as the template's project"; exit 1; }
+          n=$(printf '%s\n' "$rendered" | command grep -c 'published: "18080"' || true)
+          [ "$n" = "1" ] || { echo "::error::a .env written by 'write_env client' with HTTP_PORT=18080 exported rendered 'published: \"18080\"' $n time(s), want 1 — write_env did not record the exported HTTP_PORT"; exit 1; }
+          echo "ok: write_env records an exported COMPOSE_PROJECT_NAME and HTTP_PORT in the .env it writes"
 
       # `true >`, not `: >`, in write_env (deploy/scripts/lib.sh). The two look
       # interchangeable and are not: `:` is a POSIX SPECIAL built-in, and a

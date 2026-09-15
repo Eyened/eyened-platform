@@ -38,9 +38,11 @@ Day to day
   down             stop this stack. Extra arguments go through to compose.
   logs             follow logs. Extra arguments go through to compose.
   doctor           preflight checks, building nothing:  ./eyened doctor [dev|client]
+                   (default: the stack deploy/.env describes, else dev)
   migrate          apply pending migrations inside the server container.
   db-shell         a MySQL shell in the bundled database.
-  check-storage    report configured mounts with no StorageBackend row, and vice versa.
+  check-storage    report configured mounts with no StorageBackend row, and vice versa;
+                   exits non-zero when they differ.
 
 Data
   backup           hot backup of the bundled database:  ./eyened backup [-t] <dir>
@@ -189,6 +191,18 @@ for key in sorted(rows - configured):
     print(f"StorageBackend row but not configured: {key}")
 if configured == rows:
     print(f"storage-mounts.conf and StorageBackend rows agree ({len(rows)} key(s)).")
+else:
+    # Non-zero, so a script or CI step can act on a mismatch. Printed to
+    # stdout, not as the SystemExit message, so it stays after the lines
+    # above instead of racing them on stderr. The configured side is the
+    # RUNNING server container environment, not the file.
+    print(
+        "storage-mounts.conf and StorageBackend rows differ.\n"
+        "The configured keys are read from the running server container, so an\n"
+        "edit to storage-mounts.conf shows here only after ./eyened up or\n"
+        "./eyened install has regenerated it and re-created the stack."
+    )
+    raise SystemExit(1)
 '
 }
 
@@ -197,11 +211,12 @@ if configured == rows:
 # Refuses outright when this stack is attached to storage or a database it does
 # not own, so it cannot be aimed at shared or production data.
 #
-# These guards read deploy/.env via env_get. Compose also honours the SHELL
-# environment, which overrides .env — so running this with, say,
-# COMPOSE_PROFILES set in the calling shell diverges from what the guard
-# inspected. Unset PLATFORM_STORAGE_PATH, DB_DATA_PATH, COMPOSE_PROFILES and
-# EYENED_DATABASE_HOST in your shell before relying on these.
+# These guards read deploy/.env via env_get, but compose — `config` for the
+# volume list and `down -v` itself — lets the SHELL environment override .env.
+# So reset refuses when any variable a guard reads is exported with a value
+# different from .env's: the guards and the prompt would describe one stack
+# while `down -v` deleted another. An export EQUAL to .env's is accepted,
+# since doctor tells operators to export COMPOSE_PROJECT_NAME.
 cmd_reset() {
     # This one writes no host files, so it is not the root-owned-file problem
     # the other refusals exist for. It is here because the sudo policy is the
@@ -221,6 +236,18 @@ cmd_reset() {
     [ -f "$DEPLOY_DIR/.env" ] || die "refusing: $DEPLOY_DIR/.env does not exist, so there is no stack here to
       reset — and nothing to check ownership against either.
       Fix: run './eyened install' or './eyened up' first if you meant to create one."
+
+    _diverged=""
+    for _guard_var in COMPOSE_PROJECT_NAME COMPOSE_PROFILES PLATFORM_STORAGE_PATH DB_DATA_PATH EYENED_DATABASE_HOST; do
+        eval "_guard_set=\${$_guard_var+set} _guard_val=\${$_guard_var-}"
+        [ "$_guard_set" = set ] || continue
+        [ "$_guard_val" = "$(env_get "$_guard_var")" ] || _diverged="$_diverged $_guard_var"
+    done
+    [ -z "$_diverged" ] || die "refusing: these variables are set in your shell to values different
+      from deploy/.env's:$_diverged
+      Compose would use the shell's values, so the checks and the project name
+      below would describe a different stack from the one 'down -v' deletes.
+      Fix: unset them (or export them equal to deploy/.env's values) and re-run."
 
     _platform_storage=$(env_get PLATFORM_STORAGE_PATH)
     [ -z "$_platform_storage" ] || die "refusing: PLATFORM_STORAGE_PATH is set to $_platform_storage.
@@ -326,7 +353,7 @@ case "$cmd" in
     prod)           stack prod ;;
     down)           resolve_compose; compose down "$@" ;;
     logs)           resolve_compose; compose logs -f "$@" ;;
-    doctor)         EYENED_INVOKED_AS="./eyened doctor" "$DEPLOY_DIR/scripts/doctor.sh" "${1:-dev}" ;;
+    doctor)         EYENED_INVOKED_AS="./eyened doctor" "$DEPLOY_DIR/scripts/doctor.sh" "$@" ;;
     migrate)
         # Interactive on purpose: alembic's own confirmation prompt still
         # guards manual runs against a populated database.
