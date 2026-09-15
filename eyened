@@ -18,7 +18,7 @@
 # POSIX sh, and sh has no locals: every helper below is one flat namespace
 # shared with deploy/scripts/lib.sh. The `_`-prefixed names here are therefore
 # chosen NOT to collide with the ones lib.sh assigns (_db_pw _file _hex _host
-# _kc_pw _layers _lf _mode _n _port _redis_pw _root_pw _secret _tmp) — see
+# _kc_pw _layers _lf _mode _n _port _redis_pw _root_pw _secret _tmp _v) — see
 # stack()'s _stack_mode, which would otherwise be overwritten by write_env.
 set -eu
 

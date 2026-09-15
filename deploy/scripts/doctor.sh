@@ -30,37 +30,6 @@ failed=0
 ok()      { printf 'ok    %s\n' "$1"; }
 problem() { printf 'FAIL  %s\n' "$1"; failed=1; }
 
-# Trim surrounding whitespace and unwrap one layer of matching quotes, because
-# compose's own dotenv parser does BOTH and env_get() in lib.sh does neither.
-# Measured on this host against both compose binaries (standalone v2.15.1 and
-# the v5.4.0 plugin): `PW="change_me"` and `PW=change_me   ` each reach the
-# container as exactly `change_me`. Every comparison below is an exact-match
-# `case`, so without this a hand-quoted MYSQL_ROOT_PASSWORD="change_me" reads
-# as a DIFFERENT string, sails through the published-default sweep, and the
-# stack boots on the published password with doctor reporting it fine.
-#
-# So this is dotenv SEMANTICS, not tolerance of a broken file: quoting a value
-# is legitimate — it is how a password containing special characters is
-# written — and doctor has to read a value the way the thing consuming it does.
-#
-# It no longer strips a CR explicitly, as it once did. That `tr -d '\r'` was
-# redundant: CR is in [:space:], so the trailing-whitespace trim in the body
-# below already absorbs the one place a CR can appear in a value (measured in
-# dash, /bin/sh and busybox sh, under LC_ALL unset, C and en_US.UTF-8). A CRLF
-# is no longer merely absorbed either way — it is REFUSED by name a few lines
-# below, so the file gets reported while the checks that follow still give
-# correct answers about it rather than being quietly foolable.
-unquote() {
-    _v=$1
-    _v=${_v%"${_v##*[![:space:]]}"}
-    _v=${_v#"${_v%%[![:space:]]*}"}
-    case "$_v" in
-        \"*\") _v=${_v#\"}; _v=${_v%\"} ;;
-        \'*\') _v=${_v#\'}; _v=${_v%\'} ;;
-    esac
-    printf '%s' "$_v"
-}
-
 # --- Docker daemon ---------------------------------------------------------
 if docker info >/dev/null 2>&1; then
     ok "docker daemon is reachable"
@@ -278,7 +247,9 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       compose.prod.yaml ('$compose_file'). Compose accepts this silently, but
       the two layers disagree about which image serves the client and which
       nginx config it uses — one of them is not doing what you think.
-      Fix: edit COMPOSE_FILE in deploy/.env to name only one of the two:
+      Fix: edit COMPOSE_FILE in deploy/.env to name only one of the two,
+           keeping any optional layers already appended to it
+           (:compose.host-ports.yaml, :compose.oidc.yaml, :compose.workers.yaml):
              $COMPOSE_FILE_DEV   (./eyened up)
              $COMPOSE_FILE_CLIENT   (./eyened install)" ;;
         workers:*)
@@ -302,6 +273,8 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
            COMPOSE_PROFILES in this .env selects which workers start.
            On the platform host this is the wrong .env: set COMPOSE_FILE in it to
              $want_layers
+           keeping any optional layers already appended to it
+           (:compose.host-ports.yaml, :compose.oidc.yaml, :compose.workers.yaml),
            and re-run." ;;
         unrecognised:*)
             # Empty, or a value naming none of the three layers above — which
@@ -317,6 +290,8 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       one hand-edited into an unrecognised value.
       Fix: set COMPOSE_FILE in deploy/.env to
              $want_layers
+           keeping any optional layers already appended to it
+           (:compose.host-ports.yaml, :compose.oidc.yaml, :compose.workers.yaml),
            and re-run. Keep the rest of the file: its database passwords are
            the ones any existing database volume was initialised with. Only
            an empty or corrupted .env on a stack with no data yet is better
@@ -339,6 +314,8 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       COMPOSE_FILE line.
       Fix: set COMPOSE_FILE in deploy/.env to
              $want_layers
+           keeping any optional layers already appended to it
+           (:compose.host-ports.yaml, :compose.oidc.yaml, :compose.workers.yaml),
            and re-run. That is also how to switch an existing install between
            the developer and client stacks: keep the rest of the file, whose
            database passwords are the ones its database volume was initialised
@@ -511,19 +488,21 @@ fi
 #
 # An exported HTTP_PORT wins over both, the way the leftover-volume check above
 # honours an exported COMPOSE_PROJECT_NAME: compose gives the shell environment
-# precedence over .env, so that is the port it will publish. ':-', not '-':
-# compose.yaml publishes ${HTTP_PORT:-8080}, so an export left EMPTY does not
-# name a port. $port_fix is the remedy for wherever the port was read from:
-# no message may send the operator to edit a deploy/.env that does not exist.
+# precedence over .env, so that is the port it will publish. That includes an
+# export left EMPTY: it still overrides .env, and compose.yaml's
+# ${HTTP_PORT:-8080} then publishes 8080 (measured with 'docker compose
+# config'), so that is what gets checked. $port_fix is the remedy for
+# wherever the port was read from: no message may send the operator to edit a
+# deploy/.env that does not exist.
 http_port=""
-if [ -n "${HTTP_PORT:-}" ]; then
-    http_port=$HTTP_PORT
+if [ -n "${HTTP_PORT+set}" ]; then
+    http_port=${HTTP_PORT:-8080}
 elif [ -r "$DEPLOY_DIR/.env" ]; then
     http_port=$(unquote "$(env_get HTTP_PORT)")
 fi
 [ -n "$http_port" ] || http_port=$(unquote "$(env_get HTTP_PORT "$DEPLOY_DIR/.env.example")")
 
-if [ -n "${HTTP_PORT:-}" ]; then
+if [ -n "${HTTP_PORT+set}" ]; then
     port_fix="export HTTP_PORT as a free port instead — an exported value is
            the one compose publishes, whatever deploy/.env says."
 elif [ -f "$DEPLOY_DIR/.env" ]; then

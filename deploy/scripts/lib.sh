@@ -107,6 +107,37 @@ env_get() {
     sed -n "s/^[[:space:]]*$1=//p" "$_file" | tail -n 1
 }
 
+# Trim surrounding whitespace and unwrap one layer of matching quotes, because
+# compose's own dotenv parser does BOTH and env_get() above does neither.
+# Measured on this host against both compose binaries (standalone v2.15.1 and
+# the v5.4.0 plugin): `PW="change_me"` and `PW=change_me   ` each reach the
+# container as exactly `change_me`. Every comparison in doctor.sh is an exact-match
+# `case`, so without this a hand-quoted MYSQL_ROOT_PASSWORD="change_me" reads
+# as a DIFFERENT string, sails through the published-default sweep, and the
+# stack boots on the published password with doctor reporting it fine.
+#
+# So this is dotenv SEMANTICS, not tolerance of a broken file: quoting a value
+# is legitimate — it is how a password containing special characters is
+# written — and doctor has to read a value the way the thing consuming it does.
+#
+# It no longer strips a CR explicitly, as it once did. That `tr -d '\r'` was
+# redundant: CR is in [:space:], so the trailing-whitespace trim in the body
+# below already absorbs the one place a CR can appear in a value (measured in
+# dash, /bin/sh and busybox sh, under LC_ALL unset, C and en_US.UTF-8). A CRLF
+# is no longer merely absorbed either way — doctor.sh REFUSES it by name, so
+# the file gets reported while the checks that follow still give
+# correct answers about it rather than being quietly foolable.
+unquote() {
+    _v=$1
+    _v=${_v%"${_v##*[![:space:]]}"}
+    _v=${_v#"${_v%%[![:space:]]*}"}
+    case "$_v" in
+        \"*\") _v=${_v#\"}; _v=${_v%\"} ;;
+        \'*\') _v=${_v#\'}; _v=${_v%\'} ;;
+    esac
+    printf '%s' "$_v"
+}
+
 # `sudo` is refused rather than compensated for. Docker itself does not need it
 # (the daemon SOCKET needs privilege, not this script), and under sudo
 # everything written here lands root-owned — a deploy/.env at mode 600 that the
@@ -239,6 +270,8 @@ write_env() {
         echo "    To switch to the other stack, set COMPOSE_FILE in it to"
         echo "      $COMPOSE_FILE_DEV   (./eyened up), or"
         echo "      $COMPOSE_FILE_CLIENT   (./eyened install)"
+        echo "    keeping any optional layers already appended to it"
+        echo "    (:compose.host-ports.yaml, :compose.oidc.yaml, :compose.workers.yaml),"
         echo "    and re-run. For fresh secrets on a stack with no data yet (or after"
         echo "    './eyened reset'), delete it and re-run."
         return 0
@@ -275,22 +308,6 @@ write_env() {
     _one_line_or_die "database root password"    "$_root_pw"
     _one_line_or_die "database password"         "$_db_pw"
     _one_line_or_die "Keycloak admin password"   "$_kc_pw"
-
-    # An exported identity is appended to the file below as one KEY=value
-    # line, so it must be one line and a value compose accepts: compose's own
-    # project-name rule, and a plain numeric port.
-    case "${COMPOSE_PROJECT_NAME:-}" in
-        *[!a-z0-9_-]*|[_-]*)
-            die "error: the exported COMPOSE_PROJECT_NAME '$COMPOSE_PROJECT_NAME' is not a valid
-      compose project name.
-      Fix: export it using only lowercase letters, digits, '-' and '_',
-           starting with a letter or digit." ;;
-    esac
-    case "${HTTP_PORT:-}" in
-        *[!0-9]*)
-            die "error: the exported HTTP_PORT '$HTTP_PORT' is not a plain number.
-      Fix: export it as a numeric port, e.g. HTTP_PORT=8081." ;;
-    esac
 
     # Create the temp EMPTY and restrict it BEFORE anything goes in: `>`
     # truncates without changing an existing file's mode, so no secret is ever
@@ -331,7 +348,12 @@ write_env() {
         # block needs — that each value is a single LINE — is enforced above by
         # _one_line_or_die rather than trusted, because re-quoting the heredoc
         # would not fix a newline: it would still end the assignment early.
-        cat <<EOF
+        #
+        # `&&` on the heredoc's opening line, so the exported-identity lines
+        # after EOF stay in the same list: the group's status must be every
+        # write's, or a failed template copy is swallowed and a truncated .env
+        # moved into place.
+        cat <<EOF &&
 
 # ============================================================================
 # Written once — by './eyened up' or './eyened install', whichever you ran —
@@ -339,7 +361,8 @@ write_env() {
 # compose reads the LAST assignment.
 #
 # Editing this block is fine — nothing here will overwrite your changes.
-# To switch stacks, set COMPOSE_FILE below to the other entry point's layers:
+# To switch stacks, set COMPOSE_FILE below to the other entry point's layers,
+# keeping any optional layers you appended (listed at the end of this block):
 #   $COMPOSE_FILE_DEV   './eyened up' (developer stack)
 #   $COMPOSE_FILE_CLIENT   './eyened install' (client stack)
 # Run './eyened down' before changing COMPOSE_PROJECT_NAME: a renamed project
@@ -366,7 +389,7 @@ EOF
         { rm -f "$_tmp"; die "error: could not put $_tmp into place as $DEPLOY_DIR/.env."; }
 
     echo "==> created deploy/.env with generated secrets"
-    echo "    project '$(env_get COMPOSE_PROJECT_NAME)', port $(env_get HTTP_PORT)."
+    echo "    project '$(unquote "$(env_get COMPOSE_PROJECT_NAME)")', port $(unquote "$(env_get HTTP_PORT)")."
     echo "    On a shared machine, export COMPOSE_PROJECT_NAME and HTTP_PORT to values"
     echo "    nobody else uses BEFORE the first run; they are recorded here. To change"
     echo "    COMPOSE_PROJECT_NAME later, './eyened down' first, then edit deploy/.env."
