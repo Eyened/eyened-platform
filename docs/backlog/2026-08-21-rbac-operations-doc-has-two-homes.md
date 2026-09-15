@@ -1,6 +1,6 @@
 # `docs/rbac-operations.md` is two documents in one file
 
-**Status:** open
+**Status:** in progress — the cutover half is replaced by `guides/upgrading_to_v2026_09_0.mdx`; the local loop and `test_user` table remain in `docs/rbac-operations.md`.
 
 ## Source
 
@@ -25,7 +25,7 @@ The file is 262 lines holding two documents with different lifecycles:
 
 Both halves now have a home that did not exist when the file was written:
 `docs/runbooks/` (created 2026-08-20 by
-[`2026-08-20-alembic-squash-cutover.md`](../runbooks/2026-08-20-alembic-squash-cutover.md),
+`2026-08-20-alembic-squash-cutover.md`,
 which sets the Rules / Steps / Recovery-and-rollback pattern) and the Astro docs
 site under `docs/src/content/docs/`.
 

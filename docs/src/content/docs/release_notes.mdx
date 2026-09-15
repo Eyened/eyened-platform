@@ -16,7 +16,7 @@ API serves requests concurrently for the first time. This release is also relice
 under AGPL-3.0.
 
 **This release cannot be deployed as a rolling upgrade.** It needs a planned outage of
-roughly 45 minutes plus backup time. Read the upgrade notes before you start.
+about 15 minutes at development scale, backup included. Follow [Upgrading to v2026.09.0](/eyened-platform/guides/upgrading_to_v2026_09_0/).
 
 ### Highlights
 
@@ -120,82 +120,19 @@ Things that worked one way in v2026.08.0 and work differently now.
   flush when the window closes; blank B-scan indices are rejected (#178).
 - ETDRS ring masks are computed as independent distance bands, so building the 3 mm grid
   no longer materialises all three rings (#223). Measured areas and counts are unchanged.
+- `alembic check` no longer reports drift on sites upgraded through the legacy trail:
+  `AnnotationData.DateModified` gets its missing `DEFAULT CURRENT_TIMESTAMP`. Existing values are unchanged.
 
 ### Upgrade notes
 
-This release layers three cutovers that were designed as separate deployments: the Alembic
-squash, the RBAC flip, and the task-project declaration. Run them as **one window**, in
-this order. Detail for each step is in its runbook — read all three before you start:
-`docs/runbooks/2026-08-20-alembic-squash-cutover.md`, `docs/rbac-operations.md`, and
-`docs/runbooks/2026-08-25-task-project-declaration-cutover.md`.
+**Not a rolling upgrade.** Follow **[Upgrading to v2026.09.0](/eyened-platform/guides/upgrading_to_v2026_09_0/)**. In summary:
 
-**Before the window, with the site still up**
-
-1. `eorm check-dangling-references` — must print
-   `No dangling references (5 hops checked).` If it does not, reconcile first. Left alone,
-   the migration chain dies part-way through the window with
-   `ERROR 1138 Invalid use of NULL value`, which names no table, column, or row.
-2. `alembic current` on your current checkout — expect exactly one revision you recognise.
-3. Confirm on the target database: strict `sql_mode`, `binlog_format=ROW`,
-   `foreign_key_checks=1` (never disable it), and free disk of at least the size of
-   `ImageInstance` plus 17% of the schema.
-
-**In the window — stop the application *and* the importer first**
-
-4. Take a full backup.
-5. On your **current (old)** checkout: `alembic upgrade head`. This creates `AuditLog` and
-   `ProjectMember`, adds `Creator.IsAdmin` and `Creator.Inactive`, and flips five tag
-   foreign keys to `ON DELETE RESTRICT`. Verify `alembic current` prints
-   `b2e2800000b2 (head)`. **Do not go further until it does** — deploying past this point
-   strands the database, because the revisions it still needs are no longer on the trail.
-6. Deploy the new release, but **do not start serving traffic**. The new code cannot read
-   the database until step 9 finishes.
-7. `alembic stamp --purge orm_baseline` (`--purge` is required — the squash drops the
-   pre-cutover id from the revision map). Verify `alembic current` prints
-   `orm_baseline` — without `(head)`, because step 9's five revisions sit above it.
-8. Stop the database and copy its data directory. **This copy is the only rollback path
-   for the next step.** With the server stopped the copy is consistent by construction.
-   Start the database again.
-9. `alembic upgrade head` — applies five revisions ending at `2db0e63195db`, denormalizing
-   `ProjectID` down the patient chain and creating `TaskProject`. **This is the long step:
-   28 min 47 s measured at dev scale**, dominated by InnoDB rebuilding `ImageInstance` and
-   `Series`. Verify `alembic current` and `alembic check`.
-10. Bootstrap access control, still before traffic:
-    - `EYENED_API_ADMIN_PASSWORD='...' eorm init-admin --username <EYENED_API_ADMIN_USERNAME>`.
-      **Set the password.** Omitting it stores `'!'` — a valid hash that verifies nothing —
-      and you get an administrator who can never log in.
-    - `eorm grant-all` — grants `grader` in every project to every active human account.
-    - **Review the result before announcing.** `POST /auth/register` needs no
-      authentication and self-registered accounts match the grant filter exactly, so anyone
-      who registered before the cutover receives `grader` everywhere. The confirmation
-      prompt names no one and counts no one, and totals print after the commit. Run the
-      review query in `docs/rbac-operations.md` step 4 and remove anyone you do not
-      recognise with `eorm revoke --user <U> --all`.
-11. Start the application and the importer.
-12. Verify: `eorm check-declarations` (record what it reports; do not act on it), and open
-    the tasks page as a non-admin member to confirm they see the tasks they expect.
-
-**Rollback** is redeploying the previous release and restoring the backup — at every
-point. Do not use `alembic downgrade`: downgrading past `99724789b34d` drops `TaskProject`,
-which cannot be reconstructed for any declaration broader than a task's images.
-
-**Also required**
-
-13. **Reinstall `eyened_orm`** — this release adds `passlib` and `argon2-cffi`.
-14. **Review your database connection budget** before raising `WORKERS`. Each API process
-    can now open `EYENED_API_POOL_SIZE + EYENED_API_MAX_OVERFLOW` = 20 connections, so
-    `WORKERS=4` is 80 from the API alone against MySQL's default `max_connections` of 151.
-    The server also **refuses to boot** if `EYENED_API_THREADPOOL_LIMIT` exceeds pool size
-    plus overflow; lower all three together.
-15. Keep `EYENED_API_PUBLIC_AUTH_DISABLED=false` in production. The dev bypass now promotes
-    its account to administrator.
-
-**What this does and does not restrict.** Granting everyone `grader` everywhere writes down
-the status quo rather than escalating it — any authenticated user could already do all of
-this. But until memberships are pruned to the intended list, **the mechanism is enforcing a
-policy that permits nearly everything**. Pruning needs the consortium's membership list; it
-cannot be derived from a query, because users who only read are indistinguishable under the
-bulk grant.
+- Outage: about 15 minutes at development scale, backup included. The API, the RQ workers and all imports stay stopped.
+- Finish the legacy migrations from an image built at `6c675e5`, stamp `orm_baseline`, then apply six revisions with the new image.
+- Before users return: `eorm init-admin` with a password, `eorm grant-all`, then review the grant.
+- Rebuild every image containing `eyened_orm` (the server and every worker): this release adds `passlib` and `argon2-cffi`.
+- Connection budget: each API process can open `EYENED_API_POOL_SIZE + EYENED_API_MAX_OVERFLOW` = 20 connections; the server refuses to boot if `EYENED_API_THREADPOOL_LIMIT` exceeds that.
+- Keep `EYENED_API_PUBLIC_AUTH_DISABLED=false` in production: the dev bypass promotes its account to administrator.
 
 ### New settings
 
@@ -214,6 +151,7 @@ bulk grant.
 ### Documentation
 
 - [Release notes](/eyened-platform/release_notes/)
+- [Upgrading to v2026.09.0](/eyened-platform/guides/upgrading_to_v2026_09_0/)
 - [Getting started](/eyened-platform/getting_started/)
 - [DICOM export](/eyened-platform/orm/dicom_export/)
 - [Tasks](/eyened-platform/orm/data_model/tasks/)
