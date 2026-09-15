@@ -32,14 +32,19 @@ administrator account (`admin` by default; see `EYENED_API_ADMIN_USERNAME` in
 
 ### On a machine shared with other developers
 
-`deploy/.env` does not exist on a clean clone, so these cannot be set before the first
-`./eyened up`. Run it once — that creates `deploy/.env` — then set these to values nobody
-else is using and run `./eyened up` again, before your stack collides with someone else's:
+Export `COMPOSE_PROJECT_NAME` and `HTTP_PORT` to values nobody else is using **before**
+the first `./eyened up` — `deploy/.env` does not exist yet on a clean clone, so these
+cannot be set there beforehand, but `./eyened up` records whatever you exported into the
+`deploy/.env` it creates, so a later run without the export still uses the same project
+and port:
 
 | Variable | Purpose |
 | --- | --- |
 | `COMPOSE_PROJECT_NAME` | Prefix for containers and volumes — makes your stack independent |
 | `HTTP_PORT` | The port you open in a browser |
+
+To rename `COMPOSE_PROJECT_NAME` on an existing install, run `./eyened down` first — a
+renamed project otherwise leaves the old one running.
 
 The bundled MySQL and Redis publish **no** host ports by default, which removes the commonest
 source of collisions. For a MySQL shell with no port exposed at all, use `./eyened db-shell`. If

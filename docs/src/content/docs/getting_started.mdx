@@ -52,7 +52,10 @@ The administrator password is printed **once**. Copy it before closing the termi
 
 4. Add the remaining users, and grant each one access. Access comes from project memberships, so
    an account made with `eorm create-user` — or through self-registration in the user interface —
-   logs in and sees **nothing** until it is granted a role:
+   logs in and sees **nothing** until it is granted a role in an **existing** project. There is no
+   command to create an empty one; a `Project` row is created as a side effect of importing data
+   into it — see **[Importing data](/eyened-platform/importing_data)**. Assuming a project named
+   `AMD-Study` already exists:
 
     ```bash
     cd deploy
@@ -61,9 +64,11 @@ The administrator password is printed **once**. Copy it before closing the termi
     ```
 
     Roles are `read_only`, `grader`, and `project_admin`. Grants take effect on the user's next
-    request — no re-login. Another administrator needs `eorm init-admin` instead — `create-user`
-    cannot make one. See **[Access control](/eyened-platform/guides/access_control)** for the
-    model and **[CLI reference](/eyened-platform/orm/cli#users-and-access)** for every command.
+    request — no re-login. Another administrator needs `eorm set-admin --user <username> --on`
+    instead — `create-user` cannot make one, and running `init-admin` on an existing username only
+    resets that account's password. See **[Access control](/eyened-platform/guides/access_control)**
+    for the model and **[CLI reference](/eyened-platform/orm/cli#users-and-access)** for every
+    command.
 
 ### Day-to-day
 
@@ -177,7 +182,9 @@ but blank viewer. To point the platform at a directory of images:
    [Importing Data](/eyened-platform/importing_data). The storage backend record is created
    automatically on first import, so there is no separate registration step.
 
-4. Confirm the configuration and the database agree:
+4. Confirm the configuration and the database agree — this exits non-zero if they do not,
+   and reads the configured side from the **running server container's** environment, so
+   re-run `./eyened install` first if you just edited `storage-mounts.conf`:
 
     ```bash
     ./eyened check-storage

@@ -74,12 +74,12 @@ Every process has its own pool. Connections open lazily, so the numbers below ar
 
 | Consumer | Processes | Per process | Total |
 |----------|-----------|-------------|-------|
-| **Server** (`docker/`, gunicorn) | `WORKERS` (default `4`, set in `docker/.env`) | 20 | 80 |
-| **Server** (`dev/`, single uvicorn) | 1 | 20 | 20 |
+| **Server** (`deploy/`, client/prod, gunicorn) | `WORKERS` (default `4`, set in `deploy/.env`) | 20 | 80 |
+| **Server** (`deploy/`, dev, single uvicorn) | 1 | 20 | 20 |
 | **Worker** (RQ) | one pool per running job | 15 | varies with concurrency |
 | `eorm` CLI / importer | occasional | 15 | varies |
 
-That sum must stay under the database's `max_connections`. MySQL's documented default is `151`, and the `database/` stack does not override it — confirm the value on the target server before raising any of the settings above. Only the server's pool is tuned; the worker, the CLI and the importer all keep the conservative ORM default of 5 + 10.
+That sum must stay under the database's `max_connections`. MySQL's documented default is `151`, and the `deploy/` stack does not override it — confirm the value on the target server before raising any of the settings above. Only the server's pool is tuned; the worker, the CLI and the importer all keep the conservative ORM default of 5 + 10.
 
 To shrink the footprint, lower `EYENED_API_POOL_SIZE` and `EYENED_API_THREADPOOL_LIMIT` together — the startup validator rejects a threadpool larger than the pool.
 

@@ -16,10 +16,14 @@
 # semantics, which is why they no longer share a name.
 set -eu
 
-# Backups hold patient data: without this, files inside land group/world-
-# readable (whatever the invoker's umask happens to be) and the -t archive
-# tar writes comes out world-readable regardless of umask. 077 makes every
-# path this script creates from here on owner-only.
+# Backups hold patient data: without this, the output directory and the
+# -t archive this script creates land group/world-readable (whatever the
+# invoker's umask happens to be), letting anyone on the machine list and
+# read what is inside. 077 makes every path THIS SCRIPT creates — the output
+# directory (700) and the .tgz (600) — owner-only. It is that directory's
+# mode which protects the files xtrabackup writes inside it, not theirs:
+# they are written by the container as root and keep whatever mode it gave
+# them.
 umask 077
 
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)

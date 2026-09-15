@@ -5,7 +5,7 @@
   deliberately left out of that landing because neither can be verified without a running
   stack.
 - **Files:** `deploy/compose.yaml` (keycloak service, `EYENED_OIDC_METADATA_URL`),
-  `deploy/compose.dev.yaml` (`extra_hosts`), `deploy/scripts/doctor.sh`.
+  `deploy/compose.oidc.yaml` (`extra_hosts`), `deploy/scripts/doctor.sh`.
 
 ---
 
@@ -17,7 +17,7 @@
 OIDC metadata document at `http://keycloak:8080/...` directly. It does not. Its
 `EYENED_OIDC_METADATA_URL` is the **browser-facing** URL (`${PUBLIC_HOST}:${KEYCLOAK_PORT}`),
 so the call leaves the container, goes out to the published host port, and comes back in —
-which is why `compose.dev.yaml` has to alias `PUBLIC_HOST` to `host-gateway`.
+which is why `compose.oidc.yaml` has to alias `PUBLIC_HOST` to `host-gateway`.
 
 The reason it uses the browser-facing URL is real: the issuer the server validates has to be
 byte-identical to the one the browser was redirected to, and
@@ -31,7 +31,7 @@ byte-identical to the one the browser was redirected to, and
 - The bundled Keycloak has to be published on `0.0.0.0` — on a shared host, that is an
   admin console for the realm the platform trusts, exposed to the network. The mitigation
   in place is the generated `KEYCLOAK_ADMIN_PASSWORD`, not the bind address.
-- `compose.dev.yaml` carries an `extra_hosts` entry that exists only for this.
+- `compose.oidc.yaml` carries an `extra_hosts` entry that exists only for this.
 
 **Proposed fix** (needs a running stack to verify, which is why it is here):
 
@@ -75,10 +75,12 @@ says not to run that configuration in production. On a production install it wou
 protecting real accounts with a development-mode identity provider whose realm resets on the
 next upgrade.
 
-It is also probably already broken there rather than merely inadvisable: the `host-gateway`
-alias that lets the server reach the published Keycloak port lives in `compose.dev.yaml`
-only, so under the prod layer the metadata fetch has no route at all. That should be
-confirmed rather than assumed.
+The route concern this item originally raised no longer applies: the `host-gateway` alias
+that lets the server reach the published Keycloak port lives in `compose.oidc.yaml` itself
+now, added whenever that layer is in `COMPOSE_FILE` rather than only under
+`compose.dev.yaml` — so the metadata fetch has a route under the prod layer too. The
+identity-provider concern above (dev-mode Keycloak, no volume, no HTTPS enforcement) is
+unaffected and remains the actual open item.
 
 **Proposed fix:** have `doctor.sh` refuse `:compose.oidc.yaml` together with the prod layer,
 pointing the operator at an external IdP — the configuration the `EYENED_OIDC_*` settings

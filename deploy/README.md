@@ -235,7 +235,10 @@ matters for more than the passwords.
    `StorageBackend` row is created automatically on import; there is no
    separate registration step.
 4. Run `./eyened check-storage` to confirm `storage-mounts.conf` and the
-   database's `StorageBackend` rows agree.
+   database's `StorageBackend` rows agree. It exits non-zero when they do
+   not, and reads the configured side from the **running server
+   container's** environment — re-run `./eyened install`/`./eyened up` after
+   editing `storage-mounts.conf`, before checking.
 
 ## Workers
 
@@ -278,11 +281,24 @@ Then set, in that box's `deploy/.env`:
 ```
 COMPOSE_FILE=compose.workers.yaml:compose.storage.yaml
 EYENED_REDIS_HOST=<platform host>
+EYENED_REDIS_PORT=<published on the platform host, see below>
 EYENED_REDIS_PASSWORD=<copied from the platform host's deploy/.env>
 EYENED_DATABASE_HOST=<platform host>
+EYENED_DATABASE_PORT=<published on the platform host, see below>
 EYENED_DATABASE_PASSWORD=<copied from the platform host's deploy/.env>
 PLATFORM_STORAGE_PATH=<absolute path to platform storage on this box>
 ```
+
+**The platform host publishes neither port reachably by default.**
+`:compose.host-ports.yaml` binds `127.0.0.1` only (`DB_PUBLISH_PORT` /
+`REDIS_PUBLISH_PORT`, default `13306`/`16379`) — this box cannot reach that. On
+the platform host, publish them on an interface this box can reach instead: a
+site-specific compose file overriding `host_ip` to a non-loopback address,
+appended to `COMPOSE_FILE` the same way [Per-site
+deployments](#per-site-deployments) describes — then set
+`EYENED_REDIS_PORT`/`EYENED_DATABASE_PORT` above to those published ports.
+**Restrict them to this worker box with a firewall** — they expose the
+database.
 
 **Do not run `./eyened` on this box.** Nothing rewrites the `COMPOSE_FILE` you
 set above — `deploy/.env` is written once and never touched again — so the
@@ -336,14 +352,17 @@ docker compose -f compose.workers.yaml --profile gpu-cfi-amd build worker-cfi-am
 
 ## Sharing a machine
 
-On a host shared with other developers, set these in `deploy/.env` to values
-nobody else is using — all three are already present in `.env.example`:
+On a host shared with other developers, avoid colliding with someone else's stack:
 
-- `COMPOSE_PROJECT_NAME` — isolates containers, volumes and networks per
-  stack.
-- `HTTP_PORT` (default `8080`) — the platform's own port.
+- `COMPOSE_PROJECT_NAME` and `HTTP_PORT` — **export** both, to values nobody
+  else is using, **before** the first `./eyened up` or `./eyened install`.
+  `write_env` records whatever you exported into the `deploy/.env` it creates,
+  so a later run without the export still uses the same project and port. To
+  rename `COMPOSE_PROJECT_NAME` on an existing install, run `./eyened down`
+  first — a renamed project otherwise leaves the old one running.
 - `KEYCLOAK_PORT` (default `8180`) — only published when `compose.oidc.yaml`
-  is in `COMPOSE_FILE`.
+  is in `COMPOSE_FILE`. Unlike the two above, this one is not captured by
+  `write_env`: set it directly in `deploy/.env`.
 
 No database or redis port is published by default — that is the commonest
 source of collisions between developers on one machine. If you need one (for
@@ -539,12 +558,14 @@ database, and confirm your own data is there.
 
 **Nothing cheaper than that will tell you.** A migration that copied nothing still
 produces healthy containers, an HTTP 200 on `/`, `./eyened install` exiting 0, the
-"The platform is running." banner, a full set of tables, alembic at head,
-`./eyened check-storage` exiting 0 — and the old root password logging in, because
-MySQL will have initialised a brand-new datadir using the password you just put in
-`deploy/.env`. All of those were measured identical between a real migration and
-one that copied nothing. Only reading a row that existed beforehand tells them
-apart.
+"The platform is running." banner, a full set of tables, and alembic at head —
+and the old root password logging in, because MySQL will have initialised a
+brand-new datadir using the password you just put in `deploy/.env`. All of those
+were measured identical between a real migration and one that copied nothing.
+`./eyened check-storage` now exits non-zero if `storage-mounts.conf` configures
+anything, since a fresh empty schema has no matching `StorageBackend` rows — but
+on a site with no image datasets configured it still reports agreement either
+way. Only reading a row that existed beforehand tells the two apart for certain.
 
 Once that login succeeds you have a working stack and a backup of it, and the old
 volume from step 2 can go.
@@ -590,8 +611,13 @@ forward on a pre-squash checkout first.
 `backup` profile. The database keeps serving throughout. The output is a raw
 InnoDB datadir, so the machine you restore onto must run a compatible MySQL
 8.4 — true by construction here, since the stack pins `mysql:8.4.11`.
-`./eyened backup -t <dir>` also writes a single `.tgz`; `./eyened restore`
-accepts either form.
+`./eyened backup -t <dir>` also writes a single `.tgz`, so moving a backup to
+another machine is one `scp`; `./eyened restore` accepts either form.
+**Restoring onto a different machine also brings the source's `mysql.user`
+table** — copy `MYSQL_ROOT_PASSWORD` and `EYENED_DATABASE_PASSWORD` from the
+source's `deploy/.env` into the target's before starting the restored stack,
+or the target's generated passwords will not match what the datadir actually
+holds.
 
 `./eyened backup` connects to MySQL as root, with `MYSQL_ROOT_PASSWORD` from
 `deploy/.env`. If root's password is ever changed in MySQL, it must be changed
@@ -603,9 +629,9 @@ inside the checkout and git does **not** ignore it, so a backup (a raw
 MySQL datadir) can never end up in `git add -A`'s path in this public repo;
 pass an absolute path outside the checkout, or a gitignored one, instead.
 
-`./eyened restore` stops the database, replaces the entire datadir, and starts
-it again. There is no undo. An interrupt is safe: it leaves the database
-stopped and tells you to re-run.
+`./eyened restore` stops the database, replaces the entire datadir, starts it
+again, and waits until it reports healthy before returning. There is no undo.
+An interrupt is safe: it leaves the database stopped and tells you to re-run.
 
 `eorm save-dump` / `eorm load-dump` are a different mechanism — a logical dump
 via `mysqlsh`, with a `--legacy-sql` fallback — and the tool for a
@@ -641,6 +667,13 @@ own what it would be deleting — or whenever it cannot tell:
   to check ownership against. (Without this check every other guard below
   reads empty and the `COMPOSE_PROFILES` one fires first, diagnosing a
   configuration that was never created.)
+- Any of `COMPOSE_PROJECT_NAME`, `COMPOSE_PROFILES`, `PLATFORM_STORAGE_PATH`,
+  `DB_DATA_PATH` or `EYENED_DATABASE_HOST` is **exported** in your shell with
+  a value different from `deploy/.env`'s. Compose lets the shell override
+  `.env`, so `down -v` would act on a different stack from the one the
+  checks below and the confirmation prompt describe. An export **equal** to
+  `.env`'s value is fine — `./eyened doctor` tells operators to export
+  `COMPOSE_PROJECT_NAME` on a shared host.
 - `PLATFORM_STORAGE_PATH` is set — this stack is attached to storage it does
   not own.
 - `DB_DATA_PATH` is set — `/var/lib/mysql` is then a bind mount rather than
@@ -687,10 +720,10 @@ from elsewhere, use an absolute path or `cd` to the repository root first.
 | `./eyened prod` | `eyened` | a site deployment against an external database. |
 | `./eyened down` | `eyened` | stop this stack. Extra arguments go through to compose. |
 | `./eyened logs` | `eyened` | follow logs. Extra arguments go through to compose. |
-| `./eyened doctor [dev\|client]` | `deploy/scripts/doctor.sh` | preflight checks, building nothing. |
+| `./eyened doctor [dev\|client]` | `deploy/scripts/doctor.sh` | preflight checks, building nothing (default: the stack `deploy/.env` describes, else `dev`). |
 | `./eyened migrate` | `eyened` | `alembic upgrade head` inside the server container, interactively. |
 | `./eyened db-shell` | `eyened` | a MySQL shell in the bundled database. |
-| `./eyened check-storage` | `eyened` | report configured mounts with no `StorageBackend` row, and vice versa. |
+| `./eyened check-storage` | `eyened` | report configured mounts with no `StorageBackend` row, and vice versa; exits non-zero when they differ. |
 | `./eyened backup [-t] <dir>` | `deploy/scripts/db-backup.sh` | hot backup of the bundled database — see [Backup and rollback](#backup-and-rollback). |
 | `./eyened restore <dir\|backup.tgz>` | `deploy/scripts/db-restore.sh` | restore one. |
 | `./eyened reset` | `eyened` | stop this stack and delete its volumes. Guarded; asks for confirmation. |
@@ -717,8 +750,11 @@ needed.
 
 ## Troubleshooting
 
-- **Port already in use.** `./eyened doctor` checks `HTTP_PORT` and names the
-  fix (pick a free port in `deploy/.env`).
+- **Port already in use.** `./eyened doctor` checks `HTTP_PORT` — an exported
+  value wins over `deploy/.env` (even an exported *empty* one, which compose
+  then treats as unset and publishes `8080`) — and names the fix: export a
+  free port before the first run, or set `HTTP_PORT` in an existing
+  `deploy/.env`.
 - **`compose.oidc.yaml` is enabled and `KEYCLOAK_BIND` is loopback.**
   `./eyened doctor` **fails** on this — it is not advisory, and nothing is
   built. The server container reaches Keycloak's metadata document *through
@@ -737,15 +773,22 @@ needed.
   required](#compose-226-or-newer-is-required).
 - **`deploy/.env` was written by the other entry point.** `./eyened doctor`
   detects a dev-mode `.env` under `./eyened install` (or vice versa). Because
-  `.env` is written once and never rewritten, the fix is to delete it and
-  re-run — that is what switching between the two stacks means. Deleting it
-  keeps your data; `./eyened reset` is what deletes that.
+  `.env` is written once and never rewritten, the fix is **not** to delete
+  it: that only works on a stack with no data yet, since regenerated
+  database passwords cannot open an existing volume (and doctor refuses that
+  volume). To switch an existing install between the developer and client
+  stacks, edit `COMPOSE_FILE` in `deploy/.env` to the other entry point's
+  layer list, keeping any optional layers already appended to it
+  (`:compose.host-ports.yaml`, `:compose.oidc.yaml`, `:compose.workers.yaml`):
+    - `compose.yaml:compose.dev.yaml:compose.storage.yaml` (`./eyened up`)
+    - `compose.yaml:compose.storage.yaml:compose.prod.yaml` (`./eyened install`)
+  `./eyened reset` is what deletes your data, if that is what you actually want.
 - **`COMPOSE_FILE` names both `compose.dev.yaml` and `compose.prod.yaml`.**
   Compose accepts this silently — it does not error, and does not warn —
   but the two layers disagree about which image serves the client and which
-  nginx config it uses. `deploy/scripts/doctor.sh` catches it; the fix it
-  gives is to delete `deploy/.env` and re-run, or to edit `COMPOSE_FILE` by
-  hand to name only one of the two layers.
+  nginx config it uses. `deploy/scripts/doctor.sh` catches it; the fix is to
+  edit `COMPOSE_FILE` in `deploy/.env` to name only one of the two layers
+  above, keeping any optional layers already appended to it.
 - **MySQL never becomes healthy.** Check `docker compose logs database`;
   `./eyened doctor` cannot detect this ahead of time since it only checks
   configuration, not runtime health.

@@ -33,3 +33,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [API pool sizing assumes one connection per thread; a request takes several](2026-08-24-api-pool-sizing-multi-hop-checkout.md)
 - [Cross-project data cleaning has no safe path, and the ORM actively misleads](2026-08-25-cross-project-data-cleaning-has-no-safe-path.md)
 - [Packaging follow-ups from PR #202: `pyproject.toml` and the GPU worker installs](2026-09-15-pr202-packaging-followups.md)
+- [Session tokens outlive reset and restore](2026-09-15-session-tokens-outlive-reset-and-restore.md)
