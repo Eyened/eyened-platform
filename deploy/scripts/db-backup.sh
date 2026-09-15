@@ -16,6 +16,12 @@
 # semantics, which is why they no longer share a name.
 set -eu
 
+# Backups hold patient data: without this, files inside land group/world-
+# readable (whatever the invoker's umask happens to be) and the -t archive
+# tar writes comes out world-readable regardless of umask. 077 makes every
+# path this script creates from here on owner-only.
+umask 077
+
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 . "$REPO_ROOT/deploy/scripts/lib.sh"
 
