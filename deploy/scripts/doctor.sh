@@ -247,8 +247,9 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       compose.prod.yaml ('$compose_file'). Compose accepts this silently, but
       the two layers disagree about which image serves the client and which
       nginx config it uses — one of them is not doing what you think.
-      Fix: edit COMPOSE_FILE in deploy/.env to name only one of the two,
-           keeping any optional layers already appended to it
+      Fix: run './eyened down' first, then edit the LAST COMPOSE_FILE line in
+           deploy/.env to name only one of the two, keeping any optional
+           layers already appended to it
            (:compose.host-ports.yaml, :compose.oidc.yaml, :compose.workers.yaml):
              $COMPOSE_FILE_DEV   (./eyened up)
              $COMPOSE_FILE_CLIENT   (./eyened install)" ;;
@@ -271,7 +272,8 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
              docker compose -f deploy/compose.workers.yaml \\
                -f deploy/compose.storage.yaml up -d --build
            COMPOSE_PROFILES in this .env selects which workers start.
-           On the platform host this is the wrong .env: set COMPOSE_FILE in it to
+           On the platform host this is the wrong .env: run './eyened down'
+           first, then edit the LAST COMPOSE_FILE line to
              $want_layers
            keeping any optional layers already appended to it
            (:compose.host-ports.yaml, :compose.oidc.yaml, :compose.workers.yaml),
@@ -288,7 +290,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       compose.dev.yaml or compose.prod.yaml, so it is not a stack either
       entry point builds. This can happen with an empty or corrupted .env, or
       one hand-edited into an unrecognised value.
-      Fix: set COMPOSE_FILE in deploy/.env to
+      Fix: run './eyened down' first, then edit the LAST COMPOSE_FILE line to
              $want_layers
            keeping any optional layers already appended to it
            (:compose.host-ports.yaml, :compose.oidc.yaml, :compose.workers.yaml),
@@ -312,7 +314,7 @@ if [ -f "$DEPLOY_DIR/.env" ]; then
       .env — it is written once and never rewritten — or it was copied from
       deploy/.env.example by hand and still carries the template's own
       COMPOSE_FILE line.
-      Fix: set COMPOSE_FILE in deploy/.env to
+      Fix: run './eyened down' first, then edit the LAST COMPOSE_FILE line to
              $want_layers
            keeping any optional layers already appended to it
            (:compose.host-ports.yaml, :compose.oidc.yaml, :compose.workers.yaml),
@@ -506,9 +508,7 @@ if [ -n "${HTTP_PORT+set}" ]; then
     port_fix="export HTTP_PORT as a free port instead — an exported value is
            the one compose publishes, whatever deploy/.env says."
 elif [ -f "$DEPLOY_DIR/.env" ]; then
-    port_fix="set HTTP_PORT in deploy/.env to a free port. To change
-           COMPOSE_PROJECT_NAME too, './eyened down' this stack first: a
-           renamed project leaves the old one running."
+    port_fix="set HTTP_PORT in deploy/.env to a free port."
 else
     port_fix="before this first run, export HTTP_PORT as a free port and, on
            a shared machine, COMPOSE_PROJECT_NAME as a name nobody else

@@ -15,8 +15,10 @@
 #   cannot just be combined with a site override to fix that (compose merges
 #   `ports` lists additively across files, so both bindings render and
 #   collide) — use a site-specific compose file INSTEAD OF it, publishing on
-#   a reachable interface directly (see deploy/README.md), and firewall those
-#   ports to this box — put compose.workers.yaml into COMPOSE_FILE, fill in
+#   a reachable interface directly (see deploy/README.md). Host firewalls
+#   such as ufw do not filter ports Docker publishes, so bind to an address
+#   only the worker host can reach (or filter in the DOCKER-USER chain) —
+#   put compose.workers.yaml into COMPOSE_FILE, fill in
 #   storage-mounts.conf and run deploy/scripts/gen-storage.sh, then
 #     docker compose -f deploy/compose.workers.yaml -f deploy/compose.storage.yaml \
 #       up -d --build

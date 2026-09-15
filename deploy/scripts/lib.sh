@@ -267,7 +267,8 @@ write_env() {
     # ever reached.)
     if [ -f "$DEPLOY_DIR/.env" ]; then
         echo "==> deploy/.env exists — left exactly as it is, secrets and all."
-        echo "    To switch to the other stack, set COMPOSE_FILE in it to"
+        echo "    To switch to the other stack, run './eyened down' first, then set"
+        echo "    the LAST COMPOSE_FILE= line in it to"
         echo "      $COMPOSE_FILE_DEV   (./eyened up), or"
         echo "      $COMPOSE_FILE_CLIENT   (./eyened install)"
         echo "    keeping any optional layers already appended to it"
@@ -361,13 +362,13 @@ write_env() {
 # compose reads the LAST assignment.
 #
 # Editing this block is fine — nothing here will overwrite your changes.
-# To switch stacks, set COMPOSE_FILE below to the other entry point's layers,
-# keeping any optional layers you appended (listed at the end of this block):
+# To switch stacks, run './eyened down', then set COMPOSE_FILE below to the
+# other entry point's layers, keeping any optional layers you appended
+# (listed at the end of this block):
 #   $COMPOSE_FILE_DEV   './eyened up' (developer stack)
 #   $COMPOSE_FILE_CLIENT   './eyened install' (client stack)
-# Run './eyened down' before changing COMPOSE_PROJECT_NAME: a renamed project
-# leaves the old one running. Deleting this file for regenerated secrets only
-# works on a stack with no data yet, or after './eyened reset'.
+# Deleting this file for regenerated secrets only works on a stack with no
+# data yet, or after './eyened reset'.
 #
 # Appending your own layer to COMPOSE_FILE below is safe and permanent:
 #   :compose.host-ports.yaml   publish MySQL and Redis on the host
@@ -391,8 +392,7 @@ EOF
     echo "==> created deploy/.env with generated secrets"
     echo "    project '$(unquote "$(env_get COMPOSE_PROJECT_NAME)")', port $(unquote "$(env_get HTTP_PORT)")."
     echo "    On a shared machine, export COMPOSE_PROJECT_NAME and HTTP_PORT to values"
-    echo "    nobody else uses BEFORE the first run; they are recorded here. To change"
-    echo "    COMPOSE_PROJECT_NAME later, './eyened down' first, then edit deploy/.env."
+    echo "    nobody else uses BEFORE the first run; they are recorded here."
 }
 
 # The day-2 commands, printed with the binary THIS host actually has. Naming

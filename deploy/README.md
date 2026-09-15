@@ -56,11 +56,12 @@ Both doors create an administrator and print its password once, but only on a
 genuinely empty database — the one case where bootstrap can be sure no
 administrator already exists. On a database that already has accounts but
 none of them an administrator, bootstrap refuses instead and prints the
-`eorm init-admin` command to fix it; it never promotes an existing account on
-its own. A run that gets that far ends with a "day-to-day commands" block; a
-refusal exits non-zero instead, and that block is not printed. Those commands
-are run plainly from `deploy/`, with no wrapper and no `-f` flags — the
-install already recorded which layers this stack uses in `deploy/.env`:
+`eorm init-admin` command to fix it; bootstrap never promotes an existing
+account on its own. A run that gets that far ends with a "day-to-day
+commands" block; a refusal exits non-zero instead, and that block is not
+printed. Those commands are run plainly from `deploy/`, with no wrapper and
+no `-f` flags — the install already recorded which layers this stack uses in
+`deploy/.env`:
 
 ```bash
 cd deploy
@@ -313,8 +314,9 @@ services:
 ```
 
 Then set `EYENED_REDIS_PORT`/`EYENED_DATABASE_PORT` above to the ports it
-publishes. **Restrict them to this worker box with a firewall** — they
-expose the database.
+publishes. Host firewalls such as ufw do not filter ports Docker publishes,
+so bind to an address only the worker host can reach (or filter in the
+DOCKER-USER chain).
 
 **Do not run `./eyened` on this box.** Nothing rewrites the `COMPOSE_FILE` you
 set above — `deploy/.env` is written once and never touched again — so the
@@ -373,9 +375,7 @@ On a host shared with other developers, avoid colliding with someone else's stac
 - `COMPOSE_PROJECT_NAME` and `HTTP_PORT` — **export** both, to values nobody
   else is using, **before** the first `./eyened up` or `./eyened install`.
   `write_env` records whatever you exported into the `deploy/.env` it creates,
-  so a later run without the export still uses the same project and port. To
-  rename `COMPOSE_PROJECT_NAME` on an existing install, run `./eyened down`
-  first — a renamed project otherwise leaves the old one running.
+  so a later run without the export still uses the same project and port.
 - `KEYCLOAK_PORT` (default `8180`) — only published when `compose.oidc.yaml`
   is in `COMPOSE_FILE`. Unlike the two above, this one is not captured by
   `write_env`: set it directly in `deploy/.env`.
@@ -798,8 +798,9 @@ needed.
   it: that only works on a stack with no data yet, since regenerated
   database passwords cannot open an existing volume (and doctor refuses that
   volume). To switch an existing install between the developer and client
-  stacks, edit `COMPOSE_FILE` in `deploy/.env` to the other entry point's
-  layer list, keeping any optional layers already appended to it
+  stacks, run `./eyened down` first, then edit the **last** `COMPOSE_FILE=`
+  line in `deploy/.env` to the other entry point's layer list, keeping any
+  optional layers already appended to it
   (`:compose.host-ports.yaml`, `:compose.oidc.yaml`, `:compose.workers.yaml`):
     - `compose.yaml:compose.dev.yaml:compose.storage.yaml` (`./eyened up`)
     - `compose.yaml:compose.storage.yaml:compose.prod.yaml` (`./eyened install`)

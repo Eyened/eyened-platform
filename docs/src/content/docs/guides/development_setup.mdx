@@ -43,9 +43,6 @@ and port:
 | `COMPOSE_PROJECT_NAME` | Prefix for containers and volumes — makes your stack independent |
 | `HTTP_PORT` | The port you open in a browser |
 
-To rename `COMPOSE_PROJECT_NAME` on an existing install, run `./eyened down` first — a
-renamed project otherwise leaves the old one running.
-
 The bundled MySQL and Redis publish **no** host ports by default, which removes the commonest
 source of collisions. For a MySQL shell with no port exposed at all, use `./eyened db-shell`. If
 you need a host port instead — DBeaver, or a host-side alembic — append
