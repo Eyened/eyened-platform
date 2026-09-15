@@ -259,7 +259,7 @@ def grant_all(
 ) -> tuple[int, int, int]:
     """Grant ``role`` in every project to every creator that can authenticate.
 
-    Cutover step 3, and nothing else. `grader` rather than `project_admin`
+    Once, during the v2026.09.0 upgrade, and nothing else. `grader` rather than `project_admin`
     because the two are identical in security terms on day one -- everyone
     holds every project either way -- but they converge differently: pruning
     means removing projects from people, not adjusting roles, so

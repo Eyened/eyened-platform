@@ -221,7 +221,7 @@ This archive is the only rollback.
 
 ```bash title="step-2-backup"
 echo "data directory: $(data_mount)"
-docker stop "$DB"
+docker stop -t 600 "$DB"
 docker run --rm -v "$(data_mount):/from:ro" -v "$BACKUP:/to" alpine tar czf /to/pre-v2026.09.0.tar.gz -C /from .
 docker run --rm -v "$BACKUP:/to:ro" alpine sh -c 'gzip -t /to/pre-v2026.09.0.tar.gz && ls -lh /to/pre-v2026.09.0.tar.gz'
 docker start "$DB"
@@ -283,20 +283,20 @@ Expect `5f1c2a9d7e30 (head)`.
 new_alembic check
 snapshot > state-3-migrated.tsv
 grep -P '^(alembic_version|annotationdata_datemodified_default|projectid_nullable)\t' state-3-migrated.tsv
-diff <(grep -P '^rows\t' state-2-legacy.tsv) <(grep -P '^rows\t' state-3-migrated.tsv) | grep '^[<>]'
+diff <(grep -P '^rows\t' state-1-before.tsv) <(grep -P '^rows\t' state-3-migrated.tsv) | grep '^[<>]'
 ```
 
 Expect:
 - `No new upgrade operations detected.`;
 - default `CURRENT_TIMESTAMP`;
 - `projectid_nullable` `NO` for all four tables;
-- one diff line, `> rows TaskProject <n>`.
+- no diff line starting with `<` (no table lost rows).
 
 If `check` reports differences, record them and escalate before step 7. Do not roll back.
 
 ### 6. Bootstrap access control
 
-`init-admin` prompts for the password twice; `grant-all` asks for confirmation.
+`init-admin` prompts for the password twice; `grant-all` asks for confirmation. Skip `grant-all` if `state-0-preflight.tsv` shows `rows ProjectMember` above 0.
 
 ```bash title="step-6-access"
 new_eorm init-admin --username <admin username>
@@ -323,7 +323,7 @@ new_eorm check-declarations
 - `server` shows `(healthy)`. If `$APP logs server` shows `Worker failed to boot`, set `EYENED_API_THREADPOOL_LIMIT` ≤ `EYENED_API_POOL_SIZE` + `EYENED_API_MAX_OVERFLOW`.
 - `check-declarations`: record the output; take no action.
 - Log in as the administrator, then as a non-administrator: the tasks page lists their tasks.
-- Resume the imports and jobs suspended in step 1.
+- Upgrade `eyened_orm` to v2026.09.0 wherever the jobs suspended in step 1 run, then resume them. An older install cannot insert images into the new schema.
 
 ## Time budget
 
@@ -354,7 +354,7 @@ $APP stop
 for f in $WORKER_STACKS; do docker compose -f "$f" stop; done
 docker stop "$DB"
 docker run --rm -v "$(data_mount):/to" -v "$BACKUP:/from:ro" alpine sh -c \
-  'find /to -mindepth 1 -delete && tar xzf /from/pre-v2026.09.0.tar.gz -C /to'
+  'gzip -t /from/pre-v2026.09.0.tar.gz && find /to -mindepth 1 -delete && tar xzf /from/pre-v2026.09.0.tar.gz -C /to'
 docker start "$DB"
 wait_for_db
 snapshot > state-rollback.tsv
