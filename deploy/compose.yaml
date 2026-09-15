@@ -25,10 +25,9 @@ services:
 
   database:
     profiles: ["local-db"]
-    # Exact pin, and NOT 8.0.27: that tag is amd64-only (arm64 starts at
-    # 8.0.29), which would make the published "macOS natively" claim false on
-    # Apple Silicon.
-    image: mysql:8.0.46
+    # Exact pin, moved together with the xtrabackup pin below: XtraBackup's
+    # major version must match the server's, and 8.4 backs up 8.4 only.
+    image: mysql:8.4.11
     logging: *default-logging
     restart: *default-restart
     environment:
@@ -65,7 +64,7 @@ services:
   # into nothing while reporting success and the live database sat untouched.
   xtrabackup:
     profiles: ["backup"]
-    image: percona/percona-xtrabackup:8.0
+    image: percona/percona-xtrabackup:8.4.0-6.1
     volumes:
       - ${DB_DATA_PATH:-db_data}:/var/lib/mysql
 

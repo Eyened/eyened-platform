@@ -117,8 +117,8 @@ fi
 # directory took the datadir with it before the error was even printed.
 #
 # xtrabackup_checkpoints is the marker, and this is measured against
-# percona/percona-xtrabackup:8.0 (xtrabackup 8.0.35-36), the image this script
-# runs, not inferred:
+# percona/percona-xtrabackup:8.4.0-6.1 (xtrabackup 8.4.0-6), the image this
+# script runs, not inferred:
 #   * `xtrabackup --backup` writes it with `backup_type = full-backuped`;
 #     `xtrabackup --prepare` rewrites the same line to `full-prepared`.
 #   * `--copy-back` reads ./xtrabackup_checkpoints first of all.

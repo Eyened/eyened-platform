@@ -9,8 +9,8 @@
 # one scp. db-restore.sh accepts either form.
 #
 # The output is a raw InnoDB datadir, NOT logical SQL, so the destination must
-# run a compatible MySQL 8.0 — satisfied by construction, since compose.yaml
-# pins mysql:8.0.46. For a portable, cross-version dump, or for a database
+# run a compatible MySQL 8.4 — satisfied by construction, since compose.yaml
+# pins mysql:8.4.11. For a portable, cross-version dump, or for a database
 # this stack does not own, use the HOST tool `eorm save-dump` instead. See
 # deploy/README.md; the two are different mechanisms with different restore
 # semantics, which is why they no longer share a name.

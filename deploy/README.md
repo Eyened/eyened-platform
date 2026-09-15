@@ -101,7 +101,7 @@ Compose declares two profiles, both defined in `deploy/compose.yaml`:
 | Profile | Service | What it starts |
 |---|---|---|
 | `local-db` | `database` | the bundled MySQL |
-| `backup` | `xtrabackup` | a `percona/percona-xtrabackup:8.0` one-shot, used by `./eyened backup` and `./eyened restore` (`deploy/scripts/db-backup.sh` / `db-restore.sh`) — never a long-running service. See [Backup and rollback](#backup-and-rollback) |
+| `backup` | `xtrabackup` | a `percona/percona-xtrabackup:8.4.0-6.1` one-shot, used by `./eyened backup` and `./eyened restore` (`deploy/scripts/db-backup.sh` / `db-restore.sh`) — never a long-running service. See [Backup and rollback](#backup-and-rollback) |
 
 `deploy/compose.workers.yaml` declares three more, one per GPU model worker:
 
@@ -519,8 +519,9 @@ first, or use one with none of those characters.
 ./eyened install
 ```
 
-MySQL runs its in-place datadir upgrade here, and bootstrap sees a populated schema
-and leaves it alone. If it instead prints
+MySQL upgrades the copied datadir from 8.0 to 8.4 in place here. MySQL 8.0 cannot
+open it afterwards, so the old volume from step 2 stays your way back. Bootstrap
+sees a populated schema and leaves it alone. If it instead prints
 `bootstrap: the database is empty — creating the schema and seeding form schemas.`,
 the copy did not land, or step 5 names the wrong database — stop here (the
 old volume from step 2 is still there). `deploy/.env` is left exactly as you edited
@@ -587,7 +588,7 @@ forward on a pre-squash checkout first.
 `./eyened backup` runs Percona XtraBackup in a one-shot container under the
 `backup` profile. The database keeps serving throughout. The output is a raw
 InnoDB datadir, so the machine you restore onto must run a compatible MySQL
-8.0 — true by construction here, since the stack pins `mysql:8.0.46`.
+8.4 — true by construction here, since the stack pins `mysql:8.4.11`.
 `./eyened backup -t <dir>` also writes a single `.tgz`; `./eyened restore`
 accepts either form.
 

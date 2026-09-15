@@ -104,8 +104,8 @@ database.
   (`adapter-static`), so production no longer runs `vite preview` behind a proxy — the built
   output is baked into the fileserver image. One fewer container, one fewer proxy hop, and no
   Node process in production. Development is unchanged: vite with hot reload.
-- **MySQL is pinned to 8.0.46** (was 8.0.27, which has no arm64 image and therefore ran
-  emulated on Apple Silicon).
+- **MySQL is pinned to 8.4.11 LTS** (was 8.0.27; MySQL 8.0 is out of support). The first
+  start on an existing 8.0 datadir upgrades it in place, and 8.0 cannot open it again.
 - **Storage mounts have one source of truth.** `deploy/storage-mounts.conf` generates the
   container bind mounts, the nginx `location` blocks, and the server container's
   `EYENED_STORAGE_MOUNTS` — three things that previously had to be edited by hand, in agreement,
