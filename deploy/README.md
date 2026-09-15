@@ -448,7 +448,7 @@ docker run --rm \
   -v <old-project>_db_data:/from \
   -v /abs/path/eyened-db:/to \
   --user 0:0 --entrypoint sh \
-  mysql:8.0.27 -c 'cp -a /from/. /to/'
+  mysql:8.0.27 -c 'cp -a /from/. /to/ && chmod 750 /to'
 
 ls -A /abs/path/eyened-db | wc -l    # MUST be greater than 0
 ls -ldn /abs/path/eyened-db          # MUST show owner 999
@@ -466,8 +466,9 @@ what `database/docker-compose.yaml` has always pinned, so it is already on the h
 and no registry pull is needed mid-outage; if your old stack pinned a different tag,
 use that one. (8.0.27 is amd64-only; on arm64 use 8.0.29 or newer.)
 
-Afterwards you will not be able to read or delete that directory as yourself — it
-belongs to uid 999. That is correct, not a failure.
+Afterwards you will not be able to list, read, or delete that directory as yourself — every
+level of it, top included, belongs to uid 999 and the `chmod 750` above closes it to anyone
+else. That is correct, not a failure.
 
 ### 4. Discard the throwaway database
 

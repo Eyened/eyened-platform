@@ -290,7 +290,7 @@ this order. Detail for each step is in its runbook — read all three before you
 12. Verify: `eorm check-declarations` (record what it reports; do not act on it), and open
     the tasks page as a non-admin member to confirm they see the tasks they expect.
 
-**Rollback** is redeploying the previous release and restoring the backup — at every
+**Rollback** is restoring the backup and then redeploying the previous release — at every
 point. Do not use `alembic downgrade`: downgrading past `99724789b34d` drops `TaskProject`,
 which cannot be reconstructed for any declaration broader than a task's images.
 

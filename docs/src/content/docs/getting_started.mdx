@@ -146,17 +146,18 @@ already built. After moving the checkout, always go through `./eyened install` (
 `docker compose up -d --build`).
 :::
 
-To roll back, check out the commit-ish you recorded above and run `./eyened install` again. **A
-rollback of the code is not a rollback of the database:** MySQL commits each schema change as it
-is applied, so if the upgrade ran `./eyened migrate`, returning to the old code leaves the new
-schema in place. That is what the step-1 backup is for — restore it as well:
+To roll back, check out the commit-ish you recorded above, then restore the database **before**
+reinstalling: MySQL commits each schema change as it is applied, so if the upgrade ran
+`./eyened migrate`, the new schema is still in place, and running `./eyened install` against it
+with the old code makes bootstrap print a misleading "pre-squash dump" warning. Restore the
+step-1 backup first:
 
 ```bash
 ./eyened restore backups/before-upgrade
 ```
 
 `./eyened restore` stops the database, replaces the entire datadir, and starts it again — there
-is no undo.
+is no undo. Once it finishes, run `./eyened install` to bring the old code up.
 
 ### Adding your first dataset
 
