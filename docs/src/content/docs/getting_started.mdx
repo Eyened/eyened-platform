@@ -47,10 +47,23 @@ anything. Supported platforms are Linux and macOS natively, and Windows via WSL2
    `EYENED_API_ADMIN_USERNAME`).
 
 :::caution
-The administrator password is printed **once**. Copy it before closing the terminal. More
-(non-administrator) users can be created from the user interface, or with `eorm create-user`.
-Another administrator needs `eorm init-admin` instead — `create-user` cannot make one.
+The administrator password is printed **once**. Copy it before closing the terminal.
 :::
+
+4. Add the remaining users, and grant each one access. Access comes from project memberships, so
+   an account made with `eorm create-user` — or through self-registration in the user interface —
+   logs in and sees **nothing** until it is granted a role:
+
+    ```bash
+    cd deploy
+    docker compose exec server eorm create-user --username alice --password '...'
+    docker compose exec server eorm grant --user alice --project "AMD-Study" --role grader
+    ```
+
+    Roles are `read_only`, `grader`, and `project_admin`. Grants take effect on the user's next
+    request — no re-login. Another administrator needs `eorm init-admin` instead — `create-user`
+    cannot make one. See **[Access control](/eyened-platform/guides/access_control)** for the
+    model and **[CLI reference](/eyened-platform/orm/cli#users-and-access)** for every command.
 
 ### Day-to-day
 

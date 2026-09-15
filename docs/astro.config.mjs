@@ -30,6 +30,7 @@ export default defineConfig({
                     items: [
                         { slug: 'guides/development_setup' },
                         { slug: 'guides/authentication' },
+                        { slug: 'guides/access_control' },
                     ],
                 },
                 {

@@ -458,7 +458,8 @@ An administrator account was created. This password is shown ONCE:
     username: $admin_username
     password: $admin_password
 
-Copy it now. More users can be created from the user interface.
+Copy it now. Other accounts see nothing until granted a project role:
+    cd deploy && $COMPOSE_BIN exec server eorm grant --user <name> --project <P> --role grader
 ------------------------------------------------------------------------
 EOF
     elif [ "$admins" = "0" ]; then
