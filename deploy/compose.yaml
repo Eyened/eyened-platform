@@ -89,6 +89,11 @@ services:
       dockerfile: deploy/Dockerfile.server
     logging: *default-logging
     restart: *default-restart
+    # MySQL or Redis on the Docker host (EYENED_DATABASE_HOST /
+    # EYENED_REDIS_HOST set to host.docker.internal) needs this alias to
+    # resolve at all.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # Deliberately NO `env_file: .env`, for the same reason the fileserver has
     # none: .env holds MYSQL_ROOT_PASSWORD, which this container never needs
     # and which `docker inspect` would hand to anyone who can reach the daemon.

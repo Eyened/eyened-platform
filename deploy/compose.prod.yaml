@@ -30,7 +30,10 @@ services:
     # and the base already set `image: nginx:1.27-alpine`. Without this line
     # the built image would be tagged `nginx:1.27-alpine` in the local daemon,
     # shadowing the official one for every other project on this host.
-    image: eyened-fileserver:local
+    # Scoped by project, not a bare tag: `eyened-fileserver:local` alone is
+    # ONE tag shared by every project on the host, so a second checkout's
+    # install retags it under the first stack.
+    image: ${COMPOSE_PROJECT_NAME:-eyened}-fileserver:local
     build:
       context: ..
       dockerfile: deploy/Dockerfile.fileserver

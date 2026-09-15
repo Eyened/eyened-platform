@@ -113,6 +113,11 @@ services:
       - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
     logging: *worker-logging
     restart: unless-stopped
+    # MySQL or Redis on the Docker host (EYENED_DATABASE_HOST /
+    # EYENED_REDIS_HOST set to host.docker.internal) needs this alias to
+    # resolve at all.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # The general GPU worker. Sets no queue list of its own by default, so it
   # falls back to RqSettings.worker_queues in server/config.py:
@@ -132,6 +137,11 @@ services:
       - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
     logging: *worker-logging
     restart: unless-stopped
+    # MySQL or Redis on the Docker host (EYENED_DATABASE_HOST /
+    # EYENED_REDIS_HOST set to host.docker.internal) needs this alias to
+    # resolve at all.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # `gpus: all` is a late Compose Spec field the 2.26 floor this project
     # promises does not carry — measured: the standalone docker-compose 2.15.1
     # rejects the WHOLE FILE at parse time ('Additional property gpus is not
@@ -160,6 +170,11 @@ services:
       - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
     logging: *worker-logging
     restart: unless-stopped
+    # MySQL or Redis on the Docker host (EYENED_DATABASE_HOST /
+    # EYENED_REDIS_HOST set to host.docker.internal) needs this alias to
+    # resolve at all.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # See worker-inference above: `gpus: all` breaks the 2.26 compose floor,
     # this older form does not.
     deploy:
@@ -186,6 +201,11 @@ services:
       - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
     logging: *worker-logging
     restart: unless-stopped
+    # MySQL or Redis on the Docker host (EYENED_DATABASE_HOST /
+    # EYENED_REDIS_HOST set to host.docker.internal) needs this alias to
+    # resolve at all.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # See worker-inference above: `gpus: all` breaks the 2.26 compose floor,
     # this older form does not.
     deploy:
