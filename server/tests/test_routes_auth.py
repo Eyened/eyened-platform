@@ -6,7 +6,11 @@ import pytest
 from eyened_orm import AuditLog, Creator
 from eyened_orm.utils.db_users import hash_password
 
-from server.routes.auth import generate_secure_token, validate_secure_token
+from server.routes.auth import (
+    create_access_token,
+    generate_secure_token,
+    validate_secure_token,
+)
 
 
 def test_generate_verify_secure_token():
@@ -480,3 +484,39 @@ def test_the_access_token_no_longer_carries_a_role_claim(signed_jwts):
         algorithms=[settings.jwt_algorithm],
     )
     assert "role" not in payload
+
+
+def _seed_user(session, name, *, password="pw0", is_admin=False):
+    """A password account, committed; its id is read before the commit expires it."""
+    creator = Creator(
+        CreatorName=name,
+        PasswordHash=hash_password(password),
+        IsHuman=True,
+        IsAdmin=is_admin,
+    )
+    session.add(creator)
+    session.flush()
+    creator_id = creator.CreatorID
+    session.commit()
+    return creator_id
+
+
+def _bearer(creator_id, username):
+    """An Authorization header carrying a real access token for this account."""
+    return {"Authorization": f"Bearer {create_access_token(creator_id, username)}"}
+
+
+def test_me_reports_is_admin_for_an_administrator_and_for_everyone_else(
+    client_anonymous, session, signed_jwts
+):
+    """/auth/me's is_admin is true for an administrator and false for a non-administrator."""
+    admin_id = _seed_user(session, "an-admin", is_admin=True)
+    member_id = _seed_user(session, "a-member")
+
+    as_admin = client_anonymous.get("/auth/me", headers=_bearer(admin_id, "an-admin"))
+    as_member = client_anonymous.get("/auth/me", headers=_bearer(member_id, "a-member"))
+
+    assert as_admin.status_code == 200, as_admin.text
+    assert as_member.status_code == 200, as_member.text
+    # control: both directions at once, so a hard-coded value fails one of them
+    assert (as_admin.json()["is_admin"], as_member.json()["is_admin"]) == (True, False)

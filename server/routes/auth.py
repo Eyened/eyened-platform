@@ -65,6 +65,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     role: int | None
+    is_admin: bool
     starred_tags: list[int] = []
 
 
@@ -182,6 +183,7 @@ def creator_to_response(
         id=creator.CreatorID,
         username=creator.CreatorName,
         role=creator.Role,
+        is_admin=creator.IsAdmin,
         starred_tags=starred,
     )
 

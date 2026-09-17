@@ -2573,6 +2573,8 @@ export interface components {
             username: string;
             /** Role */
             role: number | null;
+            /** Is Admin */
+            is_admin: boolean;
             /**
              * Starred Tags
              * @default []
