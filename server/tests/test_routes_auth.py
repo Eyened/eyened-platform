@@ -459,9 +459,10 @@ def test_registering_a_taken_username_is_a_409_not_a_500(client, session):
     A 409 does not remove the distinction -- a registration endpoint cannot
     hide a collision and still refuse the write -- and the endpoint staying
     unauthenticated is separately an accepted risk. What it removes is the
-    server error: the collision is now an answer the route gives on purpose,
-    matching ``check_oidc_login``'s handling of the same ``ValueError`` in
-    this same module.
+    server error: the collision is now an answer the route gives on purpose.
+    ``check_oidc_login`` answers its own auto-provision collision the same way,
+    but by a different path -- it catches ``create_user``'s ``ValueError`` in
+    ``routes/auth.py``, where this raises ``ConflictError`` from the service.
 
     The free-name control is what makes the 409 mean "taken" rather than
     "registration is broken".
