@@ -371,7 +371,7 @@ else
     # dev-auth bypass resolves (server/services/current_user.py) cannot
     # disagree just because one of them read .env and the other read the
     # calling shell.
-    admin_username=${EYENED_API_ADMIN_USERNAME:-$(env_get EYENED_API_ADMIN_USERNAME)}
+    admin_username=${EYENED_API_ADMIN_USERNAME:-$(unquote "$(env_get EYENED_API_ADMIN_USERNAME)")}
     admin_username=${admin_username:-admin}
 
     accounts=$(compose exec -T server python -c '
