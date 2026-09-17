@@ -54,7 +54,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-      start_period: 30s
+      # start_period, not retries: probes failing inside it never count against
+      # the container. A datadir copied from MySQL 8.0 upgrades its data
+      # dictionary and system tables in place on this first boot, before port
+      # 3306 opens, and that can take minutes on a large database — the old 30s
+      # left this racing that upgrade. Since Docker 25 the first successful
+      # probe ends the period early, so a normal boot is not slowed by this.
+      start_period: 600s
     # No host port by default — see compose.host-ports.yaml.
 
   # Used only by deploy/scripts/db-backup.sh and db-restore.sh. Must mount the
