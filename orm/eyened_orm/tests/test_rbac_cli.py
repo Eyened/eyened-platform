@@ -594,7 +594,7 @@ def test_set_password_replaces_the_hash_so_only_the_new_password_verifies(
 def test_set_password_clears_the_legacy_hash_so_the_old_password_stops_working(
     session, stub_database
 ):
-    """check_login (server/routes/auth.py) verifies PasswordHash first and
+    """AuthService.authenticate (server/services/auth_service.py) verifies PasswordHash first and
     falls through to the legacy `Password` column if that misses. If
     `set_password` left a pre-existing legacy hash in place, the password
     being reset away from would keep authenticating through that fallback --

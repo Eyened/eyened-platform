@@ -9807,6 +9807,10 @@
             ],
             "title": "Role"
           },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin"
+          },
           "starred_tags": {
             "items": {
               "type": "integer"
@@ -9820,7 +9824,8 @@
         "required": [
           "id",
           "username",
-          "role"
+          "role",
+          "is_admin"
         ],
         "title": "UserResponse"
       },

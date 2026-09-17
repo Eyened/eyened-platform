@@ -59,6 +59,17 @@ class ConflictError(ServiceError):
     status_code = 409
 
 
+class UnauthenticatedError(ServiceError):
+    """Credentials did not authenticate (maps to HTTP 401).
+
+    One type for every refusal, with no subtypes: an unknown username, a
+    deactivated account and a wrong password must produce the same response,
+    or the difference between them becomes an account-enumeration oracle.
+    """
+
+    status_code = 401
+
+
 class OutOfDeclarationError(ConflictError):
     """An image's project is not among those its task declares."""
 

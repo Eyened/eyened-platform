@@ -64,7 +64,7 @@ def client(session, monkeypatch):
     # the real, un-overridden server.db.get_db against it for every request.
     monkeypatch.setattr(server_db, "database", _SessionBoundDatabase(session))
 
-    # A CurrentUser with no backing Creator row: search never calls get_creator(),
+    # A CurrentUser with no backing Creator row: search never loads it,
     # and seeding one would pollute /instances/search/signature's creator list.
     app_api.dependency_overrides[get_current_user] = lambda: CurrentUser(
         creator_id=1, username="tester"
