@@ -111,6 +111,34 @@ fi
       Fix: check the path for a typo, or pass a prepared xtrabackup
            directory, or a .tgz written by 'db-backup.sh -t'."; }
 
+# Shared by the two unreadable-backup checks below (this directory, and the
+# checkpoints file inside it): both have the same cause and the same fix, so
+# the remedy is written once. $1 is the sentence naming what could not be
+# read; the Fix: block naming the actual remedy is appended after it.
+die_unreadable_backup() {
+    die "error: $1
+      Fix: hand the backup back to yourself, then re-run this command:
+             sudo chown -R $(id -u):$(id -g) \"$ORIG_SRC\"
+           or, on a host with docker but no sudo:
+             docker run --rm -v \"$ORIG_SRC\":/b --user 0:0 alpine chown -R $(id -u):$(id -g) /b
+           If it is already yours, the mode is what denies the read:
+             chmod -R u+rX \"$ORIG_SRC\"
+           Do not put sudo in front of ${EYENED_INVOKED_AS:-db-restore.sh}: it is
+           refused, and it would work around the ownership rather than fix it."
+}
+
+# An unreadable or unsearchable DIRECTORY fails the checkpoints-file test just
+# below instead of reporting its own cause: on a directory at mode 000,
+# `[ -f "$SRC/xtrabackup_checkpoints" ]` is false because the directory cannot
+# be searched, not because the file is missing (measured) — so without this
+# check, the next guard fires and sends the operator to look for a different
+# backup, when the backup is fine and the fix is ownership, exactly as below.
+[ -r "$SRC" ] && [ -x "$SRC" ] ||
+    { rm -rf "$untarred" 2>/dev/null; die_unreadable_backup "$ORIG_SRC is a backup directory that this command cannot read or search, so
+      whether it is prepared cannot be determined. Usually that is ownership —
+      the backup was written by root — and occasionally the mode. Nothing was
+      changed."; }
+
 # Validate the source BEFORE anything is destroyed. The container command
 # below runs `rm -rf /var/lib/mysql/*` first and only then lets
 # `xtrabackup --copy-back` look at /restore, so a wrong or unprepared
@@ -141,18 +169,11 @@ checkpoints="$SRC/xtrabackup_checkpoints"
 # cannot touch an ownership problem. Tested here rather than inferred from the
 # sed's empty output, because empty is also what a truncated or hand-edited
 # checkpoints file gives, and those two want opposite advice.
-[ -r "$checkpoints" ] || { rm -rf "$untarred" 2>/dev/null; die "error: $ORIG_SRC has an xtrabackup_checkpoints file that this command cannot
+[ -r "$checkpoints" ] ||
+    { rm -rf "$untarred" 2>/dev/null; die_unreadable_backup "$ORIG_SRC has an xtrabackup_checkpoints file that this command cannot
       read, so whether the backup is prepared cannot be determined. Usually that
       is ownership — the backup was written by root — and occasionally the mode.
-      Nothing was changed.
-      Fix: hand the backup back to yourself, then re-run this command:
-             sudo chown -R $(id -u):$(id -g) \"$ORIG_SRC\"
-           or, on a host with docker but no sudo:
-             docker run --rm -v \"$ORIG_SRC\":/b --user 0:0 alpine chown -R $(id -u):$(id -g) /b
-           If it is already yours, the mode is what denies the read:
-             chmod -R u+rX \"$ORIG_SRC\"
-           Do not put sudo in front of ${EYENED_INVOKED_AS:-db-restore.sh}: it is
-           refused, and it would work around the ownership rather than fix it."; }
+      Nothing was changed."; }
 
 backup_type=$(sed -n 's/^backup_type[[:space:]]*=[[:space:]]*//p' "$checkpoints" | tr -d '[:space:]')
 if [ "$backup_type" != "full-prepared" ]; then

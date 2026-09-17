@@ -173,8 +173,8 @@ cid=$(compose ps -a -q database) || cid=""
 # migrated one alike, where no init script ever runs. It connects over TCP
 # (--host=database), so it also relies on a root account that accepts network
 # connections — the mysql image's root@'%', present on both.
-MYSQL_ROOT_PASSWORD=$(env_get MYSQL_ROOT_PASSWORD "$ENV_FILE")
-DB_NAME=$(env_get EYENED_DATABASE_DATABASE "$ENV_FILE")
+MYSQL_ROOT_PASSWORD=$(unquote "$(env_get MYSQL_ROOT_PASSWORD "$ENV_FILE")")
+DB_NAME=$(unquote "$(env_get EYENED_DATABASE_DATABASE "$ENV_FILE")")
 [ -n "$DB_NAME" ] || DB_NAME=eyened_database   # compose.yaml's own default
 
 [ -n "$MYSQL_ROOT_PASSWORD" ] ||
