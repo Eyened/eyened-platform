@@ -450,10 +450,11 @@ def test_a_deactivated_account_cannot_authenticate_through_oidc(session):
 
 
 def test_registering_a_taken_username_is_a_409_not_a_500(client, session):
-    """``create_user`` raises a bare ``ValueError`` for a taken name, which the
-    route did not catch, so ``main.py``'s blanket handler turned it into a 500.
-    An unauthenticated caller could then tell 200 (name free) from 500 (name
-    taken) and enumerate every account name on the platform.
+    """``AuthService.register`` checks ``CreatorRepository.get_by_name`` for a
+    taken name and raises ``ConflictError`` directly, rather than letting the
+    insert fail; uncaught, a taken name would reach ``main.py``'s blanket
+    handler as a 500. An unauthenticated caller could then tell 200 (name free)
+    from 500 (name taken) and enumerate every account name on the platform.
 
     A 409 does not remove the distinction -- a registration endpoint cannot
     hide a collision and still refuse the write -- and the endpoint staying
@@ -660,6 +661,29 @@ def test_register_writes_one_audit_row_on_the_auth_register_trusted_path(
     )
     assert (row.ActorID, row.TrustedPath) == (None, "auth:register")
     assert row.Changes == {"username": "newcomer", "is_human": True}
+
+
+def test_registering_then_authenticating_with_the_same_password_succeeds(
+    client_anonymous, signed_jwts
+):
+    """A password set by /auth/register authenticates through /auth/token."""
+    register = client_anonymous.post(
+        "/auth/register", json={"username": "fresh-account", "password": "pw0"}
+    )
+    assert register.status_code == 200, register.text
+
+    right = client_anonymous.post(
+        "/auth/token", json={"username": "fresh-account", "password": "pw0"}
+    )
+    assert right.status_code == 200, right.text
+
+    # control: a wrong password must still be refused, so a register that
+    # stores an unusable hash -- or a verify that accepts anything -- cannot
+    # satisfy the assertion above
+    wrong = client_anonymous.post(
+        "/auth/token", json={"username": "fresh-account", "password": "not-pw0"}
+    )
+    assert wrong.status_code == 401, wrong.text
 
 
 @pytest.mark.parametrize(

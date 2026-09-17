@@ -5,8 +5,18 @@
 > **2026-09-14, RBAC admin P1** (commits `11457683`, `7075fd17`): `check_login`,
 > `CurrentUser.get_creator`, `creator_to_response`'s read and `register` moved into
 > `AuthService`; six of seven handlers hold no `Session`; 12 allowlist entries closed.
+> `register`'s `password_hash_capacity()` gate narrowed in the move: the old route
+> held it across `create_user`'s uniqueness `SELECT` and its hash (with a comment
+> saying the restructure to avoid that was not worth it); `AuthService.register`
+> holds it only across `hash_password`, and the comment was deleted rather than
+> moved. A scarce hashing slot no longer sits open across a database round-trip --
+> a strict improvement -- but no test observes it, and it is an undeclared
+> concurrency-behaviour change on an unauthenticated path.
 > Remaining: `check_oidc_login` / `oidc_authenticate` (no deployment uses OIDC; no
-> token-validation harness). `CurrentUser` did not change.
+> token-validation harness). `CurrentUser` did not change. A reviewer also
+> proposed collapsing `register`/`create_user`'s duplication behind a session-free
+> `build_user(...)` helper in `db_users.py`, shared by both callers -- recorded as
+> an option, not a commitment.
 
 ## Source
 
