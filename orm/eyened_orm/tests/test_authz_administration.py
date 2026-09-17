@@ -634,7 +634,7 @@ def test_set_password_replaces_the_hash_and_clears_the_legacy_column(session, ac
     """`set_password` is otherwise exercised only through the CLI shell.
     Mirrors the two `test_set_password_*` cases in test_rbac_cli.py: both
     halves of the replacement matter (old stops verifying, new starts), and
-    the legacy `Password` column -- `check_login`'s fallback -- must be
+    the legacy `Password` column -- `AuthService.authenticate`'s fallback -- must be
     cleared or a reset away from a password would not actually revoke it."""
     from eyened_orm import Creator
     from eyened_orm.utils.db_users import verify_password

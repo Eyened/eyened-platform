@@ -140,7 +140,7 @@ class AccountAdministration:
         """
         creator = self._creator(username)
         creator.PasswordHash = hash_password(password)
-        # check_login falls through to this legacy pbkdf2 column when PasswordHash
+        # AuthService.authenticate falls through to this legacy pbkdf2 column when PasswordHash
         # misses. Leaving it set would let the password this command is resetting
         # away from keep authenticating -- a reset that doesn't reset. Do not
         # "simplify" this away: on a row with no legacy hash it is a no-op, but on

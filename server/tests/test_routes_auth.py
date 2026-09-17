@@ -33,7 +33,7 @@ def test_generate_verify_secure_token():
 
 
 def _legacy_hash(password: str) -> bytes:
-    """Reproduce check_login's legacy pbkdf2 hash for seeding a pre-migration Creator."""
+    """Reproduce AuthService.authenticate's legacy pbkdf2 hash for seeding a pre-migration Creator."""
     return pbkdf2_hmac("sha256", password.encode(), "6f4b661212".encode(), 10000)
 
 
@@ -42,7 +42,7 @@ def test_login_with_legacy_password_migrates_hash_and_audits_once(
 ):
     """Legacy-hash login migrates PasswordHash/clears Password and records exactly
     one AuditLog UPDATE row for Creator -- committed only at the request boundary
-    (get_db), not mid-handler inside check_login."""
+    (get_db), not mid-handler inside AuthService.authenticate."""
     creator = Creator(
         CreatorName="legacy-user",
         Password=_legacy_hash("old-password"),
@@ -83,7 +83,7 @@ def test_login_with_legacy_password_migrates_hash_and_audits_once(
     assert audit_rows[0].Changes == {"password_hash": "migrated from legacy"}
 
     # Exactly one commit -- get_db's request-boundary commit. A second commit here
-    # would mean check_login is still committing mid-handler.
+    # would mean AuthService.authenticate is still committing mid-handler.
     assert commit_calls == [1]
 
 
@@ -367,7 +367,7 @@ def test_a_deactivated_account_cannot_authenticate(
     ``GET /auth/me`` is pinned at 200 in *both* halves on purpose. It is
     decided entirely by the signature on an already-issued access token --
     ``get_current_user`` makes no database read on the header path -- so the
-    fix to ``check_login``/``/auth/refresh``/``check_oidc_login`` does not and
+    fix to ``AuthService.authenticate``/``/auth/refresh``/``check_oidc_login`` does not and
     should not move it. Pinning it states that residual rather than leaving it
     unmeasured: a deactivated holder of an unexpired token can still read back
     their own username until it expires, and reaches no data with it.
