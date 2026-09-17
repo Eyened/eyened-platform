@@ -273,6 +273,14 @@ def test_every_service_factory_threads_its_resolved_scope():
                     callee.endswith("Repository") or callee.endswith("Service")
                 ):
                     continue
+                # The same _EXEMPT test_every_repository_requires_a_scope
+                # honours: ProjectMemberRepository builds the scope, so there is
+                # no resolved scope to thread into it. get_access_scope has
+                # always constructed it this way; it is simply not a
+                # ``get_*_service`` factory, so this guard met the case for the
+                # first time in get_admin_service.
+                if callee in _EXEMPT:
+                    continue
                 passed = {
                     kw.arg: kw.value for kw in node.keywords if kw.arg == "scope"
                 }
