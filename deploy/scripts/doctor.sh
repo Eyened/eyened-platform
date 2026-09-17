@@ -670,15 +670,21 @@ fi
 # "Where Docker will build" is Docker's data root (default /var/lib/docker)
 # plus its volumes — usually a different filesystem from this checkout, and
 # the one that actually needs the headroom. `docker info` reports it; fall
-# back to DEPLOY_DIR (and say so) only when the daemon is unreachable, since
-# the daemon check above may already have failed.
+# back to DEPLOY_DIR (and say so) when the daemon is unreachable, or when the
+# reported path is not a directory on this host: Docker Desktop (including
+# for Linux) reports DockerRootDir as the path inside its VM, e.g.
+# /var/lib/docker, which usually does not exist on the host running this
+# script — without this check that host could never pass preflight.
 set +e
 docker_root=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null)
 docker_root_status=$?
 set -e
-if [ "$docker_root_status" -eq 0 ] && [ -n "$docker_root" ]; then
+if [ "$docker_root_status" -eq 0 ] && [ -n "$docker_root" ] && [ -d "$docker_root" ]; then
     disk_target=$docker_root
     disk_label="Docker's data root ($docker_root)"
+elif [ "$docker_root_status" -eq 0 ] && [ -n "$docker_root" ]; then
+    disk_target=$DEPLOY_DIR
+    disk_label="$DEPLOY_DIR (Docker's data root, $docker_root, is not on this host)"
 else
     disk_target=$DEPLOY_DIR
     disk_label="$DEPLOY_DIR (Docker's data root could not be determined)"
