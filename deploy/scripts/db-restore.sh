@@ -286,7 +286,12 @@ cid=$(compose ps -q database || true)
 printf '==> waiting for the database to become healthy'
 status=unknown
 i=0
-while [ "$i" -lt 120 ]; do
+# This budget must stay at least as large as deploy/compose.yaml's database
+# start_period plus its retries window (600s + 10*5s = 650s): `compose start`
+# never evaluates depends_on or health gating at all, so this loop is the sole
+# protection, and ordinary InnoDB crash recovery on a large restored datadir
+# can exceed a shorter wait on its own, with no version upgrade needed.
+while [ "$i" -lt 330 ]; do
     status=$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo unknown)
     [ "$status" = healthy ] && break
     printf '.'
@@ -294,7 +299,7 @@ while [ "$i" -lt 120 ]; do
     i=$((i + 1))
 done
 echo
-[ "$status" = healthy ] || die "error: the database did not become healthy within 240s of the restore
+[ "$status" = healthy ] || die "error: the database did not become healthy within 660s of the restore
       (last status: $status). The datadir was restored; MySQL has not come up on it.
       Look at: (cd $DEPLOY_DIR && $COMPOSE_BIN logs database)"
 echo "restored from $ORIG_SRC"

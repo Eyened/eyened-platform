@@ -138,7 +138,13 @@ cid=$(compose ps -q database || true)
 printf 'bootstrap: waiting for MySQL to become healthy'
 status=unknown
 i=0
-while [ "$i" -lt 120 ]; do
+# This budget must stay at least as large as deploy/compose.yaml's database
+# start_period plus its retries window (600s + 10*5s = 650s), because a
+# datadir copied from MySQL 8.0 upgrades its data dictionary in place on first
+# boot, before port 3306 opens, and that can outlast a shorter wait here —
+# stopping this loop early only invites Ctrl-C or './eyened down' mid-upgrade,
+# which is the one thing that can corrupt it.
+while [ "$i" -lt 330 ]; do
     status=$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo unknown)
     [ "$status" = healthy ] && break
     printf '.'
@@ -146,7 +152,7 @@ while [ "$i" -lt 120 ]; do
     i=$((i + 1))
 done
 echo
-[ "$status" = healthy ] || die "bootstrap: MySQL did not become healthy within 240s (last status: $status).
+[ "$status" = healthy ] || die "bootstrap: MySQL did not become healthy within 660s (last status: $status).
       Look at: $COMPOSE_BIN logs database"
 
 # --- 3. Empty or populated? ------------------------------------------------
