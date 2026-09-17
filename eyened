@@ -35,7 +35,8 @@ Starting a stack
   prod             a site deployment against an EXTERNAL database.
 
 Day to day
-  down             stop this stack. Extra arguments go through to compose.
+  down             stop this stack. Extra arguments go through to compose;
+                   -v/--volumes is refused (deletes volumes) — see 'reset'.
   logs             follow logs. Extra arguments go through to compose.
   doctor           preflight checks, building nothing:  ./eyened doctor [dev|client]
                    (default: the stack deploy/.env describes, else dev)
@@ -351,7 +352,24 @@ case "$cmd" in
     install)        stack install ;;
     up)             stack dev ;;
     prod)           stack prod ;;
-    down)           resolve_compose; compose down "$@" ;;
+    down)
+        # -v/--volumes reaches 'compose down -v', which deletes platform_storage
+        # and db_data with none of cmd_reset's ownership checks or confirmation
+        # prompt — and -v means "verbose" in most CLIs an operator uses daily, so
+        # this is an easy-to-type synonym for the tool's most guarded command.
+        # Checked before resolve_compose so the refusal costs nothing and needs
+        # no Docker. Only these two exact spellings; a bundled '-tv' or
+        # '--volumes=true' still reaches compose, same as any other unmatched
+        # argument.
+        for _down_arg in "$@"; do
+            case "$_down_arg" in
+                -v|--volumes) die "refusing: '$_down_arg' would delete this stack's volumes with none
+      of './eyened reset's guards or its confirmation prompt.
+      Fix: run './eyened reset' instead." ;;
+            esac
+        done
+        resolve_compose
+        compose down "$@" ;;
     logs)           resolve_compose; compose logs -f "$@" ;;
     doctor)         EYENED_INVOKED_AS="./eyened doctor" "$DEPLOY_DIR/scripts/doctor.sh" "$@" ;;
     migrate)
