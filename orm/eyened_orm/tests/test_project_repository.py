@@ -54,3 +54,35 @@ def test_a_non_admin_scope_fails_closed_rather_than_reading_unfiltered(session):
     repo = ProjectRepository(session, scope=scope_for(project.ProjectID))
     with pytest.raises(KeyError, match="Project"):
         repo.get_by_name("A")
+
+
+def test_list_all_returns_every_project_name_ordered(session):
+    make_project(session, "B")
+    make_project(session, "A")
+    session.commit()
+
+    repo = ProjectRepository(session, scope=admin_scope())
+    assert [p.ProjectName for p in repo.list_all()] == ["A", "B"]
+
+
+def test_member_counts_omits_a_project_with_no_members(session):
+    """Absent, not zero -- the caller reads ``.get(pid, 0)``, which is what keeps
+    an empty project in the listing where a single joined read would drop it."""
+    from eyened_orm import ProjectMember
+    from eyened_orm.authz.roles import ProjectRole
+    from eyened_orm.utils.factories import make_creator
+
+    populated = make_project(session, "A")
+    make_project(session, "B")
+    creator = make_creator(session, "alice")
+    session.add(
+        ProjectMember(
+            CreatorID=creator.CreatorID,
+            ProjectID=populated.ProjectID,
+            Role=ProjectRole.grader,
+        )
+    )
+    session.commit()
+
+    repo = ProjectRepository(session, scope=admin_scope())
+    assert repo.member_counts() == {populated.ProjectID: 1}

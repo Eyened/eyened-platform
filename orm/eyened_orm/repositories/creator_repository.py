@@ -52,6 +52,22 @@ class CreatorRepository:
             ).all()
         )
 
+    def list_humans(self) -> list[Creator]:
+        """Every human creator, active and inactive alike -- the admin user list.
+
+        Deliberately wider than ``list_authenticatable`` above: activation and
+        credential state are reported per row rather than filtered on, because
+        the account an administrator is looking for is usually the deactivated
+        one or the one with no password.
+        """
+        return list(
+            self._session.scalars(
+                select(Creator)
+                .where(Creator.IsHuman.is_(True))
+                .order_by(Creator.CreatorName)
+            ).all()
+        )
+
     def save(self, creator: Creator) -> None:
         """Persist in-place mutations to ``creator`` within the caller's transaction.
 

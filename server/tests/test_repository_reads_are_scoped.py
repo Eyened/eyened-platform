@@ -134,7 +134,14 @@ _WRITE_PREFIXES = ("add", "save", "delete", "upsert", "remove", "replace", "clai
 # registries, so apply_scope is a no-op for an admin scope and fails closed
 # otherwise. Its sibling TaskRepository.existing_ids joined
 # _UNSCOPED_METHODS instead and so is not counted here.
-_EXPECTED_SCANNED_READS = 43
+# 43 -> 45 for ProjectRepository's two admin-listing reads (list_all,
+# member_counts), scoped through apply_scope like its three neighbours above --
+# counted, not exempted. member_counts scopes ProjectMember, which is in no
+# registry, so the call is a no-op for the admin scope and fails closed for
+# every other. CreatorRepository.list_humans, added in the same change, is not
+# among these two: CreatorRepository is in _UNSCOPED_REPOSITORIES and the walk
+# `continue`s on the class before inspecting a method.
+_EXPECTED_SCANNED_READS = 45
 
 # Read methods allowed to scope themselves by consuming ``self._scope`` instead
 # of calling ``apply_scope``/``scoped_one``. Set equality, like every other

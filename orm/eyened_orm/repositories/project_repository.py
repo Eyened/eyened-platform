@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from eyened_orm import Project
+from eyened_orm import Project, ProjectMember
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.authz.scoping import apply_scope
 
@@ -32,10 +32,9 @@ class ProjectRepository:
     ``SAFE_UNFILTERED_ENTITIES`` fallback and raises unconditionally, so it
     would reject an admin scope too.
 
-    No ``get_by_id``: P0 resolves projects by name, and an id lookup lands with
-    its first caller when step 2's URLs need one. Shipping it now would be an
-    untested public method, which the repo's 80% patch-coverage gate would
-    also flag.
+    No ``get_by_id``: none of step 2's endpoints needs one, and it lands with
+    P3's first id-keyed project URL. Shipping it now would be an untested
+    public method, which the repo's 80% patch-coverage gate would also flag.
     """
 
     def __init__(self, session: Session, *, scope: AccessScope) -> None:
@@ -82,3 +81,34 @@ class ProjectRepository:
             )
         ).all()
         return {int(project_id): name for project_id, name in rows}
+
+    def list_all(self) -> list[Project]:
+        """Every project, name-ordered."""
+        return list(
+            self._session.scalars(
+                apply_scope(select(Project), Project, self._scope).order_by(
+                    Project.ProjectName
+                )
+            ).all()
+        )
+
+    def member_counts(self) -> dict[int, int]:
+        """``{project_id: member count}``; a project with no members is absent.
+
+        Two methods rather than one joined read: a LEFT JOIN is what it would
+        otherwise take to keep empty projects in the listing.
+
+        ``apply_scope`` on ``ProjectMember`` filters nothing for the admin scope
+        that is the only one able to reach here, and raises for every other --
+        fail-closed, which is why this is not an ``_UNSCOPED_METHODS`` entry.
+        """
+        rows = self._session.execute(
+            apply_scope(
+                select(ProjectMember.ProjectID, func.count())
+                .select_from(ProjectMember)
+                .group_by(ProjectMember.ProjectID),
+                ProjectMember,
+                self._scope,
+            )
+        ).all()
+        return {int(project_id): int(count) for project_id, count in rows}
