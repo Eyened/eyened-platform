@@ -1,6 +1,12 @@
 # Auth service-layer conversion (last unconverted domain)
 
-**Status:** open
+**Status:** in progress -- password half done, OIDC half open
+
+> **2026-09-14, RBAC admin P1** (commits `11457683`, `7075fd17`): `check_login`,
+> `CurrentUser.get_creator`, `creator_to_response`'s read and `register` moved into
+> `AuthService`; six of seven handlers hold no `Session`; 12 allowlist entries closed.
+> Remaining: `check_oidc_login` / `oidc_authenticate` (no deployment uses OIDC; no
+> token-validation harness). `CurrentUser` did not change.
 
 ## Source
 
