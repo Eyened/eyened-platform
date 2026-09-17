@@ -34,3 +34,7 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [Cross-project data cleaning has no safe path, and the ORM actively misleads](2026-08-25-cross-project-data-cleaning-has-no-safe-path.md)
 - [`POST /auth/login` with `api_client: true` always returns 500](2026-09-14-login-api-client-branch-always-500s.md)
 - [`GET /auth/me` returns 500 when the token's Creator row is gone](2026-09-14-auth-me-500s-for-a-deleted-creator.md)
+- [The suite's warning floor hides a new warning](2026-09-17-test-suite-warning-floor.md)
+- [`change_password`'s `actor` argument is informationally redundant today](2026-09-17-change-password-actor-parameter-redundant.md)
+- [Cookie attributes on the auth responses are unpinned](2026-09-17-auth-cookie-attributes-unpinned.md)
+- [The session guards cannot detect a stale allow-list entry](2026-09-17-session-guard-allowlist-cannot-detect-stale-entries.md)
