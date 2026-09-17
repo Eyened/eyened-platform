@@ -34,3 +34,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [Cross-project data cleaning has no safe path, and the ORM actively misleads](2026-08-25-cross-project-data-cleaning-has-no-safe-path.md)
 - [Packaging follow-ups from PR #202: `pyproject.toml` and the GPU worker installs](2026-09-15-pr202-packaging-followups.md)
 - [Session tokens outlive reset and restore](2026-09-15-session-tokens-outlive-reset-and-restore.md)
+- [`deploy-validate.yml` never builds a Docker image](2026-09-17-deploy-validate-never-builds-an-image.md)
