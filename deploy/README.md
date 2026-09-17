@@ -510,18 +510,18 @@ else. That is correct, not a failure.
 ### 4. Discard the throwaway database
 
 **Precondition:** the only stack in this compose project is the throwaway installed
-by step 1 (a retry after a failed attempt still counts). `./eyened down -v` asks
-for no confirmation and deletes this project's `db_data` **and** `platform_storage`
-volumes.
+by step 1 (a retry after a failed attempt still counts). `./eyened reset` deletes
+this project's `db_data` **and** `platform_storage` volumes once you type the
+project name back to confirm.
 
 ```bash
 cd /path/to/new-checkout
-./eyened down -v
+./eyened reset
 ```
 
 This must happen **before** step 5. Once `DB_DATA_PATH` is set, `./eyened reset`
-refuses by design and `down -v` no longer names that volume, so nothing in this
-repository can remove it any more.
+refuses by design (its `DB_DATA_PATH` guard fires), so nothing in this repository
+can remove it any more.
 
 ### 5. Point `deploy/.env` at the copy
 
