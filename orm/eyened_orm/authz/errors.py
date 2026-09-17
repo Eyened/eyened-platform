@@ -76,11 +76,14 @@ class AdminEntityNotFound(Exception):
     CLI prints it verbatim via ``ClickException(str(exc))``.
 
     ``entity`` is carried separately from the message for the reason this
-    module's own docstring gives about ``AuthorizationError``: a bare
-    ``class ...: ...`` satisfies the status mapping and leaves nobody able to
-    answer *which* lookup failed. Step 2 maps this to a 404 whose body says
-    nothing, so the one fact the handler cannot recover from a formatted string
-    is the one that goes here. It is a separate argument rather than an
+    module's own docstring gives about ``AuthorizationError``: a bare ``class
+    ...: ...`` satisfies the status mapping and leaves nobody able to answer
+    *which* lookup failed. Nothing maps this to an HTTP status today -- the
+    registered handlers cover ``ServiceError`` and ``AuthorizationError``, and
+    it is neither, so it would reach the broad handler as a 500. The admin API
+    raises ``NotFoundError`` instead. This class is the CLI's, and ``entity``
+    is carried separately from the message so a future handler can answer
+    *which* lookup failed. It is a separate argument rather than an
     interpolation because the three messages do not share a shape -- two read
     "no X named Y", the task one reads "no task with ids A, B".
     """

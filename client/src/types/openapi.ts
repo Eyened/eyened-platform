@@ -1211,6 +1211,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Users
+         * @description Return every human account, name-ordered, with per-row state.
+         */
+        get: operations["list_users_admin_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}/memberships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List User Memberships
+         * @description Return one user's project memberships, ordered by project name.
+         */
+        get: operations["list_user_memberships_admin_users__user_id__memberships_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Projects
+         * @description Return every project, name-ordered, with its member count.
+         */
+        get: operations["list_projects_admin_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1219,6 +1279,36 @@ export interface components {
         AddImageRequest: {
             /** Instance Id */
             instance_id: string;
+        };
+        /**
+         * AdminProjectResponse
+         * @description One project and how many members it has.
+         */
+        AdminProjectResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Member Count */
+            member_count: number;
+        };
+        /**
+         * AdminUserResponse
+         * @description One human account. ``active`` and ``has_credential`` are orthogonal.
+         */
+        AdminUserResponse: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Is Admin */
+            is_admin: boolean;
+            /** Active */
+            active: boolean;
+            /** Has Credential */
+            has_credential: boolean;
+            /** Employee Identifier */
+            employee_identifier: string | null;
         };
         /** AttributeCondition */
         AttributeCondition: {
@@ -1834,6 +1924,21 @@ export interface components {
          * @enum {string}
          */
         Laterality: "L" | "R";
+        /**
+         * MembershipResponse
+         * @description One membership. ``role`` is the enum's name, not its int.
+         */
+        MembershipResponse: {
+            /** Project Id */
+            project_id: number;
+            /** Project Name */
+            project_name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "read_only" | "grader" | "project_admin";
+        };
         /**
          * Modality
          * @enum {string}
@@ -5596,6 +5701,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PatientDetailGET"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_admin_users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_user_memberships_admin_users__user_id__memberships_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_projects_admin_projects_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProjectResponse"][];
                 };
             };
             /** @description Validation Error */

@@ -38,3 +38,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [`change_password`'s `actor` argument is informationally redundant today](2026-09-17-change-password-actor-parameter-redundant.md)
 - [Cookie attributes on the auth responses are unpinned](2026-09-17-auth-cookie-attributes-unpinned.md)
 - [The session guards cannot detect a stale allow-list entry](2026-09-17-session-guard-allowlist-cannot-detect-stale-entries.md)
+- [The cutover grant skipped every legacy-credential human](2026-09-17-cutover-skipped-legacy-credential-humans.md)

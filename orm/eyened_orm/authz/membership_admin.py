@@ -1,8 +1,10 @@
 """Membership administration: grants, revocations, and the task-grant plan.
 
-The Click commands in ``commands/rbac.py`` are thin shells over this class, and
-the admin API of step 2 will be another. It holds repositories and never a
-``Session``, which is what lets one implementation serve both.
+The Click commands in ``commands/rbac.py`` are thin shells over this class. The
+admin API's reads are not: ``memberships_of`` is keyed on username where the URL
+carries an id, and this class requires a fourth repository (``TaskRepository``)
+that a membership read never touches. Its write endpoints do come back here. It
+holds repositories and never a ``Session``, which is what will let it serve both.
 
 v0.3 places the CLI outside RBAC enforcement as a trusted path, so nothing here
 authorizes its operator. Everything here **attributes**: each state change
