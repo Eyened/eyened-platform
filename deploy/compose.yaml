@@ -1,32 +1,32 @@
-# Base stack: the whole service graph with production-ready defaults.
-#
-# No `name:` — the project name comes from COMPOSE_PROJECT_NAME in .env, which
-# is what lets several developers run isolated stacks on one machine.
-#
-# Layers on top of this: compose.dev.yaml (dev), compose.prod.yaml
-# (deployments), compose.storage.yaml (generated). COMPOSE_FILE in .env names
-# the ones in play.
+# Base stack. deploy/.env picks the layers (COMPOSE_FILE) and whether the
+# bundled database runs (COMPOSE_PROFILES=local-db). See README.md.
 
-# Logs are capped everywhere, development included: several stacks share one
-# host, doctor's disk check runs only at install time, and a client install
-# runs unattended for months. 10 MB x 3 files per service.
+# Several stacks share hosts and client installs run unattended: cap every log.
 x-logging: &default-logging
   driver: json-file
   options:
     max-size: "10m"
     max-file: "3"
 
-# `unless-stopped`, not `always`: a client install runs unattended for months
-# and must come back after a host reboot or a dockerd restart, but an
-# operator's deliberate `docker compose stop` must stay stopped.
+# Come back after a reboot; a deliberate `docker compose stop` stays stopped.
 x-restart: &default-restart unless-stopped
+
+# Shared by `init` and `server` so the two cannot disagree about the database.
+x-app-env: &app-env
+  EYENED_DATABASE_HOST: ${EYENED_DATABASE_HOST:-database}
+  EYENED_DATABASE_PORT: ${EYENED_DATABASE_PORT:-3306}
+  EYENED_DATABASE_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
+  EYENED_DATABASE_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
+  EYENED_DATABASE_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
+  # The account init creates and the dev-auth bypass acts as. Restated, not
+  # `:-`: the server rejects an empty name.
+  EYENED_API_ADMIN_USERNAME: ${EYENED_API_ADMIN_USERNAME:-admin}
 
 services:
 
   database:
     profiles: ["local-db"]
-    # Exact pin, moved together with the xtrabackup pin below: XtraBackup's
-    # major version must match the server's, and 8.4 backs up 8.4 only.
+    # Moves together with the xtrabackup pin: XtraBackup must match MySQL's major version.
     image: mysql:8.4.11
     logging: *default-logging
     restart: *default-restart
@@ -35,45 +35,33 @@ services:
       MYSQL_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
       MYSQL_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
       MYSQL_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
-    # MySQL's own default (128M) is far too small for this database's real
-    # size; EYENED_DATABASE_BUFFER_POOL_SIZE in deploy/.env.example carries
-    # the measurement behind 2G and the advice to size it to the host.
     command:
       - --innodb-buffer-pool-size=${EYENED_DATABASE_BUFFER_POOL_SIZE:-2G}
     volumes:
-      # Unset -> the named volume db_data (this stack's own disk). Set to an
-      # absolute host path -> a bind mount, which is what puts MySQL on storage
-      # that outlives the machine. On SURF Research Cloud the workspace disk is
-      # deleted with the workspace and an external volume is not, so a durable
-      # deployment there MUST set this to a path under ~/data/<volume>.
+      # An absolute DB_DATA_PATH keeps the database outside Docker's volumes.
       - ${DB_DATA_PATH:-db_data}:/var/lib/mysql
-    # Liveness only: mysqladmin ping answers even when credentials are
-    # rejected, and a password on the command line would show up in `ps`.
+    # mysqladmin ping needs no credentials, so no password shows up in `ps`.
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
       interval: 5s
       timeout: 3s
       retries: 10
-      # start_period, not retries: probes failing inside it never count against
-      # the container. A datadir copied from MySQL 8.0 upgrades its data
-      # dictionary and system tables in place on this first boot, before port
-      # 3306 opens, and that can take minutes on a large database — the old 30s
-      # left this racing that upgrade. A successful probe ends the start
-      # period immediately, so a normal boot still reports healthy in
-      # seconds and is not slowed by this.
+      # Long because the first boot on a copied 8.0 datadir upgrades it before
+      # the port opens. A healthy probe ends the start period early.
       start_period: 600s
-    # No host port by default — see compose.host-ports.yaml.
 
-  # Used only by deploy/scripts/db-backup.sh and db-restore.sh. Must mount the
-  # SAME source as the database service above — a bare `db_data` here would
-  # attach to an unrelated, empty named volume whenever DB_DATA_PATH is set (a
-  # durable deployment's bind mount), so db-restore.sh would wipe and restore
-  # into nothing while reporting success and the live database sat untouched.
+  # One-shot backup tool; see README.md "Backup and restore".
   xtrabackup:
     profiles: ["backup"]
     image: percona/percona-xtrabackup:8.4.0-6.1
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in deploy/.env}
     volumes:
+      # Same source as `database`, or a DB_DATA_PATH site would back up an empty volume.
       - ${DB_DATA_PATH:-db_data}:/var/lib/mysql
+      - ${BACKUP_PATH:-./backups}:/backup
 
   redis:
     image: redis:7-alpine
@@ -88,169 +76,80 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-    # No host port by default — see compose.host-ports.yaml.
+
+  # Migrates, seeds and creates the first administrator, then exits; the
+  # server starts only after it succeeds. `docker compose logs init` shows what it did.
+  init:
+    # Built by `server` below.
+    image: ${COMPOSE_PROJECT_NAME:-eyened}-server:local
+    command: ["eorm", "bootstrap"]
+    logging: *default-logging
+    restart: "no"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      <<: *app-env
+      EYENED_AUTO_MIGRATE: ${EYENED_AUTO_MIGRATE:-true}
+      EYENED_API_ADMIN_PASSWORD: ${EYENED_API_ADMIN_PASSWORD:-}
+    depends_on:
+      # `required: false`: with the local-db profile off (an external
+      # database) there is no `database` service and init starts anyway.
+      database:
+        condition: service_healthy
+        required: false
 
   server:
+    image: ${COMPOSE_PROJECT_NAME:-eyened}-server:local
     build:
       context: ..
       dockerfile: deploy/Dockerfile.server
     logging: *default-logging
     restart: *default-restart
-    # MySQL or Redis on the Docker host (EYENED_DATABASE_HOST /
-    # EYENED_REDIS_HOST set to host.docker.internal) needs this alias to
-    # resolve at all.
+    # Lets EYENED_DATABASE_HOST / EYENED_REDIS_HOST name the Docker host.
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    # Deliberately NO `env_file: .env`, for the same reason the fileserver has
-    # none: .env holds MYSQL_ROOT_PASSWORD, which this container never needs
-    # and which `docker inspect` would hand to anyone who can reach the daemon.
-    # Listing the environment explicitly also means a variable added to .env
-    # later reaches the app only when someone decides it should.
-    #
-    # EYENED_API_URL / _USERNAME / _PASSWORD are intentionally absent: they
-    # configure the ORM's API adapter for OTHER hosts, and passing them as the
-    # empty string would satisfy pydantic and then fail as a connection error
-    # instead of the clear "url missing" that an unset value raises.
+    # No env_file: .env also holds MYSQL_ROOT_PASSWORD, and `docker inspect`
+    # shows a container's environment. Bool and int defaults are restated
+    # rather than written `:-`, because pydantic rejects an empty string for them.
     environment:
-      # Redis and MySQL are both addressed by variable, so pointing either at a
-      # managed service (ElastiCache, Azure Cache, RDS, Azure Database) is a
-      # one-line .env change and needs no compose edit.
+      <<: *app-env
       EYENED_REDIS_HOST: ${EYENED_REDIS_HOST:-redis}
       EYENED_REDIS_PORT: ${EYENED_REDIS_PORT:-6379}
       EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?set EYENED_REDIS_PASSWORD in deploy/.env}
-      EYENED_DATABASE_HOST: ${EYENED_DATABASE_HOST:-database}
-      EYENED_DATABASE_PORT: ${EYENED_DATABASE_PORT:-3306}
-      EYENED_DATABASE_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
-      EYENED_DATABASE_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
-      EYENED_DATABASE_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
-      EYENED_API_SECRET_KEY: ${EYENED_API_SECRET_KEY:?generated on first run; see deploy/.env}
+      EYENED_API_SECRET_KEY: ${EYENED_API_SECRET_KEY:?set EYENED_API_SECRET_KEY in deploy/.env}
       EYENED_API_PUBLIC_AUTH_DISABLED: ${EYENED_API_PUBLIC_AUTH_DISABLED:-false}
       EYENED_API_DEBUG: ${EYENED_API_DEBUG:-false}
-      # Read directly by the image's CMD (deploy/Dockerfile.server), not by
-      # the app — this service has no env_file, so without this line WORKERS
-      # in deploy/.env reaches no container and the image's own ${WORKERS:-4}
-      # silently wins instead. The `:-4` restates the Dockerfile's own default
-      # to keep it visible here and in step with it. That is NOT the ${X:-}
-      # trap EYENED_API_AUTH_PASSWORD_ENABLED below documents: that one bites
-      # because pydantic rejects the empty string for that bool field with a
-      # ValidationError, crashing the server at startup, whereas this value
-      # lands in a shell expansion, where `:-` substitutes for empty as well
-      # as unset (measured: unset and empty both yield 4).
+      # Read by the image's gunicorn CMD, not by the app.
       WORKERS: ${WORKERS:-4}
-      # Reach the container for the same reason WORKERS above does: `server`
-      # has no env_file, and compose reads .env for INTERPOLATION only.
-      # Restated defaults, NOT `${X:-}`, for the same reason
-      # EYENED_API_AUTH_PASSWORD_ENABLED below is: these five are int fields
-      # read by pydantic (server/config.py), which rejects an empty string
-      # for an int with a ValidationError instead of falling back to its own
-      # default -- so the bare form would crash the server at startup on the
-      # default, unset case -- unlike WORKERS above, whose `:-` guards a
-      # SHELL expansion, where empty and unset already behave the same.
-      # Three of the five (threadpool_limit, pool_size, max_overflow) are
-      # bound by a startup validator that refuses to boot the server if
-      # violated; the other two are not. deploy/.env.example carries the
-      # arithmetic and which is which.
       EYENED_API_THREADPOOL_LIMIT: ${EYENED_API_THREADPOOL_LIMIT:-16}
       EYENED_API_POOL_SIZE: ${EYENED_API_POOL_SIZE:-16}
       EYENED_API_MAX_OVERFLOW: ${EYENED_API_MAX_OVERFLOW:-4}
       EYENED_API_POOL_TIMEOUT: ${EYENED_API_POOL_TIMEOUT:-5}
       EYENED_API_PASSWORD_HASH_CONCURRENCY: ${EYENED_API_PASSWORD_HASH_CONCURRENCY:-4}
-      # Whether the login page offers username/password at all. Documented as
-      # the thing you turn off once OIDC works, so it has to reach a container:
-      # `server` has no env_file, and compose reads .env for INTERPOLATION
-      # only. The default is restated as `true` and NOT written `${X:-}`,
-      # because that form sets the EMPTY STRING and pydantic rejects an empty
-      # string for this bool field (server/config.py) with a ValidationError,
-      # crashing the server at startup even on the default, unset case --
-      # unlike EYENED_OIDC_PROVIDER_NAME below, whose str default has no length
-      # constraint, so an empty string is accepted there and silently overrides
-      # it instead. Not a str-vs-bool rule: EYENED_API_ADMIN_USERNAME below is
-      # also str and also raises, via its own min_length=1.
       EYENED_API_AUTH_PASSWORD_ENABLED: ${EYENED_API_AUTH_PASSWORD_ENABLED:-true}
-      # Names the account 'eorm init-admin' bootstraps on first run AND the
-      # account the dev-auth bypass (server/services/current_user.py) resolves
-      # -- the two must agree, or the bypass silently creates a second
-      # account. Has to reach the container the same way
-      # EYENED_API_AUTH_PASSWORD_ENABLED above does: 'server' has no
-      # env_file, and compose reads .env for INTERPOLATION only. Restated as
-      # 'admin' and NOT written `${X:-}`: same outcome as that variable --
-      # crashes the server at startup on the default, unset case --
-      # but for a different reason: this is a str field, and pydantic normally
-      # accepts an empty string for str; here it is this field's own
-      # min_length=1 constraint (server/config.py) that rejects the empty
-      # string with a ValidationError instead.
-      EYENED_API_ADMIN_USERNAME: ${EYENED_API_ADMIN_USERNAME:-admin}
-      # Always /storage inside the container; what backs it is decided below.
       EYENED_STORAGE_ROOT: /storage
-      # Operator-set, never derived. The bundled Keycloak (compose.oidc.yaml)
-      # and an external IdP are configured the same way: all three by hand in
-      # .env, which ships them commented out with bundled-realm values ready
-      # to uncomment.
-      #
-      # They must move TOGETHER. A metadata URL at an external IdP with a
-      # redirect URL still pointing at this stack, or an iss= still naming the
-      # dev realm, fails token validation with nothing in the log to say why.
-      #
-      # `${X:-}` sets the EMPTY STRING rather than leaving X unset, which is
-      # safe here and only here: server/config.py defaults all three to "".
-      # Do NOT extend this form to EYENED_OIDC_PROVIDER_NAME below, whose
-      # pydantic default is "OpenID Connect" — an empty string would blank the
-      # provider label on the login page of every stack that never set it.
-      EYENED_OIDC_METADATA_URL: ${EYENED_OIDC_METADATA_URL:-}
-      EYENED_OIDC_REDIRECT_URL: ${EYENED_OIDC_REDIRECT_URL:-}
-      EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS: ${EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS:-}
-      # The switch the three URLs above are inert without. Unlike them these
-      # carry no derivation — they are the operator's own values — and they
-      # must be named HERE: `server` has no env_file (see the note above this
-      # block), and compose reads .env for INTERPOLATION only, so a name that
-      # exists only in .env reaches no container. Without these five lines the
-      # compose.oidc.yaml layer starts a working Keycloak behind a switch
-      # wired to nothing, and nothing is logged to say so.
+      # Empty keeps local mode off; see compose.storage.example.yaml.
+      EYENED_STORAGE_MOUNTS: ${EYENED_STORAGE_MOUNTS:-}
+      # OIDC. The three URLs must change together; see keycloak/README.md.
       EYENED_API_AUTH_OIDC_ENABLED: ${EYENED_API_AUTH_OIDC_ENABLED:-false}
       EYENED_OIDC_CLIENT_ID: ${EYENED_OIDC_CLIENT_ID:-}
       EYENED_OIDC_CLIENT_SECRET: ${EYENED_OIDC_CLIENT_SECRET:-}
-      # NOT `:-`, and do not "tidy" it to match the four around it: `X: ${X:-}`
-      # sets X to the EMPTY STRING in the container, it does not leave X unset.
-      # For the two above (str, server/config.py defaults both to "") that
-      # empty string is harmless -- pydantic accepts it and it matches their
-      # own default. It is NOT harmless for the two booleans around it
-      # (AUTH_OIDC_ENABLED above, CREATE_NEW_ACCOUNTS below): pydantic rejects
-      # an empty string for a bool with a ValidationError, crashing the
-      # server at startup -- which is why both are already written restated,
-      # not bare, same as here. provider_name itself defaults to "OpenID
-      # Connect", not "", and /auth/options hands it straight to the login
-      # page — so `:-` would blank the provider label on every stack that
-      # never set it. Restating the default here is the same convention
-      # EYENED_API_PUBLIC_AUTH_DISABLED and EYENED_API_DEBUG already follow.
+      EYENED_OIDC_METADATA_URL: ${EYENED_OIDC_METADATA_URL:-}
+      EYENED_OIDC_REDIRECT_URL: ${EYENED_OIDC_REDIRECT_URL:-}
+      EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS: ${EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS:-}
+      # Restated: an empty string would blank the login page's provider label.
       EYENED_OIDC_PROVIDER_NAME: "${EYENED_OIDC_PROVIDER_NAME:-OpenID Connect}"
       EYENED_OIDC_CREATE_NEW_ACCOUNTS: ${EYENED_OIDC_CREATE_NEW_ACCOUNTS:-false}
     volumes:
-      # Unset PLATFORM_STORAGE_PATH -> the named volume below (a clean clone
-      # writes nothing outside its own stack). Set to an absolute host path ->
-      # a bind mount onto shared or production platform storage.
+      # Unset = this stack's own volume; an absolute path attaches shared storage.
       - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
     depends_on:
       redis:
         condition: service_healthy
-      # `required: false` is the whole external-database toggle. With the
-      # local-db profile ON, the server waits for MySQL to report healthy (no
-      # first-boot crash-loop). With it OFF, `database` does not exist and
-      # compose starts the server anyway instead of refusing.
-      #
-      # This is why there is no compose.local-db.yaml and why "use the bundled
-      # database" is ONE setting rather than a profile and a layer that must
-      # agree. It needs compose >= 2.24 to work at all; the 2.26 floor also
-      # makes the mistake of omitting `required: false` a loud error rather
-      # than a silent first-boot crash-loop. See Global Constraints.
-      database:
-        condition: service_healthy
-        required: false
+      init:
+        condition: service_completed_successfully
     healthcheck:
-      # 127.0.0.1, not localhost: the oidc layer (compose.oidc.yaml) adds an
-      # extra_hosts entry that can alias `localhost` itself to the docker
-      # gateway (so the server can reach a host-published Keycloak). An IP
-      # literal bypasses /etc/hosts entirely and can never be shadowed by
-      # that alias, now or later — do not "tidy" this back to localhost.
+      # 127.0.0.1, not localhost: the oidc layer can alias localhost to the host gateway.
       test:
         - CMD
         - python
@@ -261,36 +160,21 @@ services:
       retries: 5
       start_period: 20s
 
-  # There is no `client` service here. In development the dev layer adds one
-  # (vite, hot reload); in production the frontend is a static SPA baked into
-  # the fileserver image by Dockerfile.fileserver, so no client container and
-  # no proxy hop exist at all.
-
   fileserver:
     image: nginx:1.27-alpine
     logging: *default-logging
     restart: *default-restart
-    # Deliberately NO `env_file: .env`. nginx has no use for
-    # MYSQL_ROOT_PASSWORD, EYENED_API_SECRET_KEY or the redis password, and
-    # anything in a container's environment is one `docker inspect` away from
-    # being read. Nothing in the template needs a variable any more either —
-    # CLIENT_UPSTREAM_PORT went away with the client.d/ split.
+    # No env_file, for the same reason as `server`; the template needs no variables.
     ports:
       - "${HTTP_PORT:-8080}:80"
     volumes:
       - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
-      # Always mounted: an empty directory is valid, and the include globs in
-      # the template tolerate matching nothing.
-      - ./nginx/storage.d:/etc/nginx/storage.d:ro
       # Thumbnails are served straight off platform storage.
       - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage:ro
     depends_on:
       server:
         condition: service_healthy
-    # The `location /` include (client.d/client.conf) is mounted by whichever
-    # layer is in play — the dev override or compose.prod.yaml. The base alone
-    # serves the API and thumbnails but has no frontend route, which is fine:
-    # it is never run without a layer.
+    # `location /` (client.d/) is mounted by the dev or prod layer.
 
 volumes:
   db_data:
