@@ -38,20 +38,35 @@ def seeded(session):
     return ids
 
 
-def test_an_empty_scope_is_refused(client_scoped):
+# One gate in AdminService.__init__ covers all three routes; parametrising pins
+# that instead of leaving it to review. The unknown id is deliberate -- the gate
+# fires before the id is resolved, so a refused caller cannot tell a real user
+# from a missing one.
+ADMIN_PATHS = ["/admin/users", "/admin/users/1/memberships", "/admin/projects"]
+
+
+@pytest.mark.parametrize("path", ADMIN_PATHS)
+def test_an_empty_scope_is_refused(client_scoped, path):
     """The scope most likely to pass by vacuity: no memberships at all."""
     client, set_scope = client_scoped
     set_scope(scope_for())
 
-    assert client.get("/admin/users").status_code == 403
+    assert client.get(path).status_code == 403
 
 
-def test_a_project_admin_is_not_a_platform_admin(client_scoped, seeded):
+@pytest.mark.parametrize("path", ADMIN_PATHS)
+def test_a_project_admin_is_not_a_platform_admin(client_scoped, seeded, path):
     """Without this, the test above is satisfied by any membership check."""
     client, set_scope = client_scoped
     set_scope(scope_for(seeded["graded"], role=ProjectRole.project_admin))
 
-    assert client.get("/admin/users").status_code == 403
+    assert client.get(path).status_code == 403
+
+
+def test_an_unauthenticated_caller_is_refused(client_anonymous):
+    """`client` and `client_scoped` are both authenticated, so nothing else here
+    reaches the 401."""
+    assert client_anonymous.get("/admin/users").status_code == 401
 
 
 def test_the_user_list_reports_per_row_state(client, seeded):
