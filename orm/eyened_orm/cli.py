@@ -24,6 +24,7 @@ The following commands are available:
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
 - update-hashes: Update FileChecksum and DataHash for ImageInstances where they are NULL.
 - load-dump: Load a database dump file, replacing the entire database.
+- bootstrap: Migrate, seed and create the first administrator as needed (idempotent).
 - init-admin: Create or promote the administrator account (idempotent).
 - grant: Grant or change a project role for a user.
 - revoke: Remove a user's membership from a project, or from every project with --all.
@@ -100,6 +101,15 @@ def _register_integrity_commands():
 
 
 _register_integrity_commands()
+
+
+def _register_bootstrap_command():
+    from .commands.bootstrap import bootstrap
+
+    eorm.add_command(bootstrap)
+
+
+_register_bootstrap_command()
 
 
 @eorm.command()
