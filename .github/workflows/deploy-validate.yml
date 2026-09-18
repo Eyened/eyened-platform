@@ -5,28 +5,23 @@ on:
     branches: [main, development]
     paths:
       - 'deploy/**'
-      # compose.workers.yaml builds from worker/Dockerfile.*, so a change to
-      # one of those has to run this job.
+      # The images build from these, and init runs the ORM's migrations.
+      - 'orm/**'
+      - 'server/**'
+      - 'client/**'
       - 'worker/**'
-      - 'eyened'
       - '.dockerignore'
       - '.github/workflows/deploy-validate.yml'
-      # The published quick start tells people to clone and run './eyened install'.
-      # A step below checks that whatever ref it pins actually carries that
-      # installer, so an edit to the quick start alone has to run this job —
-      # otherwise that check never sees the change it exists to catch.
-      - 'docs/src/content/docs/getting_started.mdx'
   push:
     branches: [main, development]
     paths:
       - 'deploy/**'
-      # compose.workers.yaml builds from worker/Dockerfile.*, so a change to
-      # one of those has to run this job.
+      - 'orm/**'
+      - 'server/**'
+      - 'client/**'
       - 'worker/**'
-      - 'eyened'
       - '.dockerignore'
       - '.github/workflows/deploy-validate.yml'
-      - 'docs/src/content/docs/getting_started.mdx'
 
 permissions:
   contents: read
@@ -36,631 +31,71 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
+  config:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: deploy
     steps:
       - uses: actions/checkout@v7
 
-      # The floor this design depends on. GitHub's runners are well above it,
-      # but asserting it here means a runner image downgrade shows up as a
-      # clear failure rather than as `required: false` quietly not working.
-      - name: Assert the compose version floor
+      - name: Write .env from the example
         run: |
-          version=$(docker compose version --short | tr -d 'v ')
-          echo "compose $version"
-          major=${version%%.*}; rest=${version#*.}; minor=${rest%%.*}
-          # Fail CLOSED on a version that is not a pair of numbers. Without
-          # this the `-lt` tests below abort with "integer expression
-          # expected" — and because they sit in an `if` CONDITION, `set -e`
-          # is suppressed there, so the `if` simply evaluates false and the
-          # step goes GREEN. An empty string (a failed `docker compose
-          # version`, whose status this pipeline discards to `tr`), a
-          # `2.x.y`, or any non-numeric build string all took that path.
-          # Same guard, same shape as deploy/scripts/doctor.sh, which is the
-          # other copy of this rule.
-          case "$major$minor" in
-            ''|*[!0-9]*)
-              echo "::error::could not read a compose version from 'docker compose version --short' (got '$version')"
-              exit 1 ;;
-          esac
-          if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 26 ]; }; then
-            echo "::error::compose $version is below the required 2.26"
-            exit 1
-          fi
-
-      - name: Shell syntax
-        run: |
-          set -e
-          # Every shell script that ships, FOUND rather than listed. A glob of
-          # deploy/scripts/*.sh silently excluded deploy/entrypoint-client.sh
-          # and deploy/keycloak/entrypoint.sh — both container ENTRYPOINTS,
-          # where a syntax error is invisible until the container crash-loops
-          # with no useful message.
-          #
-          # The interpreter is chosen from the SHEBANG, not from the file
-          # name. Keying it on a list of names means the next bash script
-          # added here is parsed as POSIX sh and its bashisms are reported as
-          # syntax errors, and — worse — a POSIX sh script whose name happens
-          # to match is parsed by bash, where its bashisms are NOT reported at
-          # all. deploy/scripts/lib.sh is sourced and carries no shebang; it
-          # is POSIX sh, which is the default branch here.
-          checked=0
-          for f in eyened $(find deploy -name '*.sh' | sort); do
-            case "$(head -n 1 "$f")" in
-              '#!'*bash*) echo "bash -n $f"; bash -n "$f" ;;
-              *)          echo "sh   -n $f"; sh -n "$f" ;;
-            esac
-            checked=$((checked + 1))
+          cp .env.example .env
+          for key in EYENED_API_SECRET_KEY EYENED_REDIS_PASSWORD MYSQL_ROOT_PASSWORD EYENED_DATABASE_PASSWORD EYENED_API_ADMIN_PASSWORD; do
+            sed -i "s/^$key=\$/$key=$(openssl rand -hex 32)/" .env
           done
-          # An empty file list is a broken check, not a clean bill of health:
-          # move or rename deploy/ and the `find` above matches nothing, the
-          # loop runs once for eyened, and this step goes green having
-          # parsed almost nothing.
-          if [ "$checked" -le 1 ]; then
-            echo "::error::found $checked shell script(s) — the find above matched nothing under deploy/, so this step validated almost nothing"
-            exit 1
-          fi
-          echo "ok: $checked shell script(s) parse"
+          echo "KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -hex 32)" >> .env
+          cp compose.storage.example.yaml compose.storage.yaml
 
-      # What the deleted Makefile step was actually buying: proof that the
-      # published command list and the dispatcher have not drifted apart.
-      # Both directions, because they fail differently — an undocumented
-      # command is invisible, a documented one that cannot dispatch is a
-      # broken instruction in the help text itself.
-      - name: The CLI's help and its dispatch agree
+      - name: Every documented layer combination resolves
         run: |
-          set -e
-          set -o pipefail
-          # Every `|| true` below is load-bearing, not defensive. Both
-          # extractions end in a grep, and a grep that matches nothing exits
-          # 1; under `set -e` + `set -o pipefail` that status comes straight
-          # out of the assignment and kills this step THERE. Measured, on a
-          # copy with the `case` line reindented so the sed anchor no longer
-          # matches: the step went red having printed nothing whatsoever, and
-          # the empty-extraction guard below — the one part of this step whose
-          # whole job is to say so — was never reached. A step that fails
-          # without naming the reason is only half a guard, so the status is
-          # discarded here and the assertions are made on the CONTENT instead.
-          #
-          # Every command the dispatcher accepts, minus the help aliases and
-          # the catch-all.
-          dispatched=$(sed -n '/^case "\$cmd" in$/,/^esac$/p' eyened \
-            | command grep -oE '^    [a-z][a-z|-]*\)' \
-            | tr -d ' )' | tr '|' '\n' \
-            | command grep -vxE 'help|-h|--help' | sort -u || true)
-          # Every command the help text documents: the two-space-indented
-          # words in its command sections.
-          documented=$(./eyened help \
-            | command grep -oE '^  [a-z][a-z-]+ ' | tr -d ' ' | sort -u || true)
+          check() { echo "--- $1 ($2)"; COMPOSE_FILE="$1" COMPOSE_PROFILES="$2" docker compose config -q; }
+          check compose.yaml:compose.dev.yaml local-db
+          check compose.yaml:compose.prod.yaml local-db
+          check compose.yaml:compose.prod.yaml ""
+          check compose.yaml:compose.prod.yaml:compose.storage.yaml:compose.oidc.yaml:compose.workers.yaml:compose.host-ports.yaml \
+                local-db,backup,gpu-inference,gpu-cfi-amd,gpu-layer-segmentation
+          # A GPU host loads the workers layer alone.
+          COMPOSE_FILE=compose.workers.yaml docker compose config -q
 
-          # An extraction that finds nothing is a broken check, not a clean
-          # bill of health — the same trap the Makefile step it replaces had
-          # to guard against twice. Both sides are counted, because they break
-          # independently: the dispatcher's shape and the help text's are two
-          # different things to stop matching.
-          n=$(printf '%s\n' "$dispatched" | command grep -c . || true)
-          m=$(printf '%s\n' "$documented" | command grep -c . || true)
-          [ "$n" -ge 10 ] || { echo "::error::extracted only $n dispatched command(s) from ./eyened — the sed/grep above stopped matching, so this step would validate nothing"; exit 1; }
-          [ "$m" -ge 10 ] || { echo "::error::extracted only $m documented command(s) from './eyened help' — its output or the grep above changed shape, so this step would validate nothing"; exit 1; }
-
-          missing=$(comm -23 <(printf '%s\n' "$dispatched") <(printf '%s\n' "$documented"))
-          extra=$(comm -13 <(printf '%s\n' "$dispatched") <(printf '%s\n' "$documented"))
-          [ -z "$missing" ] || { echo "::error::./eyened dispatches command(s) its help does not document:$(echo $missing)"; exit 1; }
-          [ -z "$extra" ]   || { echo "::error::./eyened help documents command(s) it cannot dispatch:$(echo $extra)"; exit 1; }
-          echo "ok: $n commands, help and dispatch agree"
-
-      # The published quick start is the first thing a new operator runs, so
-      # a `--branch <ref>` in it must not point at a ref that predates the
-      # installer: v2026.07.0, the tag it pinned until this branch, contains
-      # neither the eyened CLI nor deploy/, so the very next line of the quick
-      # start (`./eyened install`) could not work from it. Pinning nothing — the
-      # quick start following the default branch — is a pass.
-      - name: The quick start does not pin a ref without the installer
-        run: |
-          set -e
-          doc=docs/src/content/docs/getting_started.mdx
-          # Both anchors, because "found no --branch" is only good news if
-          # this file exists and still contains the clone command at all.
-          [ -f "$doc" ] || { echo "::error::$doc not found — this guard is no longer reading the published quick start"; exit 1; }
-          command grep -q 'git clone' "$doc" \
-            || { echo "::error::$doc has no 'git clone' line — the quick start moved or changed shape, so this guard is reading the wrong thing"; exit 1; }
-
-          refs=$(command grep -oE -e '--branch[= ][^ ]+' "$doc" | command sed 's/^--branch[= ]//' | sort -u)
-          if [ -z "$refs" ]; then
-            echo "ok: the quick start pins no --branch, so it follows the default branch"
-            exit 0
-          fi
-
-          for ref in $refs; do
-            echo "--- quick start pins --branch $ref ---"
-            # actions/checkout defaults to fetch-depth 1 and fetches no tags,
-            # so without this the ls-tree below fails for the WRONG reason.
-            # A ref that genuinely does not exist fails both fetches and is
-            # then caught by rev-parse with an accurate message.
-            git fetch --no-tags --depth=1 origin "+refs/tags/$ref:refs/tags/$ref" 2>/dev/null \
-              || git fetch --no-tags --depth=1 origin "+refs/heads/$ref:refs/remotes/origin/$ref" 2>/dev/null \
-              || true
-            git rev-parse --verify --quiet "$ref^{commit}" >/dev/null \
-              || { echo "::error::$doc pins --branch $ref, which does not resolve in this repository"; exit 1; }
-            git ls-tree -r --name-only "$ref" | command grep -qx 'eyened' \
-              || { echo "::error::$doc pins --branch $ref, which does not contain the eyened CLI — the quick start's own './eyened install' cannot work from that ref"; exit 1; }
-            echo "ok: $ref resolves and carries the eyened CLI"
-          done
-
-      - name: Generate the storage layer
-        run: |
-          set -e
-          cp deploy/.env.example deploy/.env
-          # .env.example ships the five secrets ABSENT on purpose (see D7): the
-          # installer appends them, and a hand-copied .env is meant to fail
-          # loudly on compose.yaml's ${...:?} rather than boot on a published
-          # password. A plain `cp` is exactly that hand copy, so this fixture
-          # has to append them itself. Config-only validation never starts the
-          # stack, so fixed placeholders are correct and keep the run
-          # deterministic.
-          #
-          # Appended, not sed-ed in, for the same reason the installer appends:
-          # compose reads the LAST assignment. Note this leaves exactly ONE
-          # `^COMPOSE_FILE=` line in the fixture — the template's — which the
-          # `sed -i 's|^COMPOSE_FILE=.*|...|'` in the next step depends on.
-          cat >> deploy/.env <<'ENVEOF'
-          EYENED_API_SECRET_KEY=ci-config-validation-only-not-a-secret
-          EYENED_REDIS_PASSWORD=ci-config-validation-only-not-a-secret
-          MYSQL_ROOT_PASSWORD=ci-config-validation-only-not-a-secret
-          EYENED_DATABASE_PASSWORD=ci-config-validation-only-not-a-secret
-          KEYCLOAK_ADMIN_PASSWORD=ci-config-validation-only-not-a-secret
-          ENVEOF
-          # storage-mounts.conf.example is COMMENT-ONLY by design, so copying
-          # it alone makes gen-storage.sh take its no-mounts branch: a
-          # storage.conf of two header lines and a compose.storage.yaml of
-          # `services: {}`. Every check downstream — the layer combinations,
-          # the invariants, and `nginx -t` — would then only ever exercise
-          # the EMPTY branch, and the `location`/`alias` blocks and the
-          # PATH:PATH:ro bind overlay this design's whole data path rests on
-          # would never be parsed by anything. Add two real mounts.
-          mkdir -p /tmp/eyened-ci-storage-a /tmp/eyened-ci-storage-b
-          cp deploy/storage-mounts.conf.example deploy/storage-mounts.conf
-          printf '%s\n' 'ci_a /tmp/eyened-ci-storage-a' 'ci_b /tmp/eyened-ci-storage-b' \
-            >> deploy/storage-mounts.conf
-          deploy/scripts/gen-storage.sh
-
-          # …and the fixture must be visible in BOTH generated artifacts, or
-          # a change to the generator could silently put us back on the empty
-          # branch with every check below still green.
-          n=$(command grep -c '^location /' deploy/nginx/storage.d/storage.conf || true)
-          [ "$n" = "2" ] || { echo "::error::storage.d/storage.conf has $n 'location /' block(s), want 2 — the storage fixture did not reach nginx, so nginx -t below would validate nothing storage-related"; exit 1; }
-          n=$(command grep -c ':/tmp/eyened-ci-storage-[ab]:ro$' deploy/compose.storage.yaml || true)
-          [ "$n" = "4" ] || { echo "::error::compose.storage.yaml has $n storage bind mount(s), want 4 (server + fileserver x 2) — the storage fixture did not reach compose"; exit 1; }
-          # .env.example's COMPOSE_FILE does NOT name compose.workers.yaml, so
-          # this run must emit NO worker sections. That is the silent-green
-          # direction of the next step's check: emit them unconditionally and
-          # every layer combination below that lacks the workers layer breaks
-          # with "has neither an image nor a build context".
-          n=$(command grep -c '^  worker-' deploy/compose.storage.yaml || true)
-          [ "$n" = "0" ] || { echo "::error::compose.storage.yaml has $n worker section(s) with compose.workers.yaml absent from COMPOSE_FILE, want 0 — every combination without the workers layer is now unresolvable"; exit 1; }
-          echo "ok: storage fixture generated 2 nginx locations, 4 bind mounts and 0 worker sections"
-
-      # D7's whole design rests on compose taking the LAST assignment when a
-      # key is duplicated: write_env (deploy/scripts/lib.sh) writes deploy/.env
-      # as .env.example PLUS one appended block, so COMPOSE_FILE appears
-      # TWICE and an operator's own appended layer only survives because of
-      # that behaviour. Nothing above exercises it — the fixture step above
-      # appends only the five secrets, never a second COMPOSE_FILE= line, so
-      # the two-assignment file write_env actually produces has had no CI
-      # coverage at all. This runs the REAL write_env, in its own scratch
-      # copy so the shared deploy/.env fixture below (and the ONE
-      # ^COMPOSE_FILE= line the next step's sed depends on) is untouched.
-      #
-      # 'client', deliberately, not 'dev'. write_env dev appends a line that
-      # is BYTE-IDENTICAL to the template's own COMPOSE_FILE line, so nothing
-      # downstream can tell the two apart — and a write_env that emitted its
-      # block BEFORE the template instead of after (D7 broken outright: the
-      # template's dev layer list wins, so a client install silently builds
-      # the dev stack) passed this step green. The client layer list differs
-      # from the template's dev one, which is what makes the assertion below
-      # able to fail at all.
-      #
-      # Run through /bin/sh — dash on the runner — and not the step's own bash.
-      # The `sh -n` step above proves write_env PARSES as POSIX sh; it does not
-      # prove it RUNS as POSIX sh, and those are not the same check: measured
-      # here, `dash -n` accepts `[[ ]]`, `local` and `${x^^}` without a word
-      # (it rejects an array literal, which is how that gap goes unnoticed),
-      # and a bash subshell here would not mind any of the three either
-      # — it would RUN them. `./eyened help` above is the one step that
-      # does source lib.sh under a `#!/bin/sh` shebang, and it only ever
-      # reaches the file's TOP LEVEL — never a line inside this function.
-      #
-      # write_env runs with COMPOSE_PROJECT_NAME and HTTP_PORT exported, and the
-      # render below runs WITHOUT them: an exported identity must be recorded in
-      # the file, or a later run without the export silently starts as the
-      # template's 'eyened' on 8080 — on a shared host, someone else's stack.
-      - name: write_env's last-assignment-wins is real, not assumed
-        run: |
-          set -e
-          scratch=$(mktemp -d)
-          # On EXIT, not at the end: every check below exits non-zero on
-          # failure, and a trailing rm would then never run — leaving the five
-          # freshly generated secrets in $scratch/deploy/.env sitting on the
-          # runner for the rest of the job.
-          trap 'rm -rf "$scratch"' EXIT
-          cp -a deploy "$scratch/deploy"
-          # The checkout itself never carries a deploy/.env (gitignored), but
-          # an EARLIER job step might have created one by the time this step
-          # runs — copied straight into the scratch tree by the line above.
-          # Remove it explicitly so write_env's own "exists, left alone" path
-          # can never fire here and turn this into a check of nothing.
-          rm -f "$scratch/deploy/.env"
-
-          COMPOSE_PROJECT_NAME=ciwriteenv HTTP_PORT=18080 \
-            /bin/sh -c 'REPO_ROOT=$1; . "$1/deploy/scripts/lib.sh"; write_env client' sh "$scratch" \
-            || { echo "::error::'write_env client' failed under /bin/sh — its own output is above"; exit 1; }
-          env="$scratch/deploy/.env"
-          [ -f "$env" ] || { echo "::error::write_env did not create $env"; exit 1; }
-
-          # 600, because this file holds five secrets. write_env restricts the
-          # temp file BEFORE anything goes into it and lets `mv` carry the mode
-          # onto the target, so a regression here is silent: the .env is
-          # correct in every other respect and readable by everyone on the box.
-          mode=$(stat -c '%a' "$env")
-          [ "$mode" = "600" ] || { echo "::error::$env is mode $mode, want 600 — the file holding this deployment's five generated secrets is readable beyond its owner"; exit 1; }
-
-          n=$(command grep -c '^COMPOSE_FILE=' "$env" || true)
-          [ "$n" = "2" ] || { echo "::error::$env has $n '^COMPOSE_FILE=' line(s), want 2 (the template's and write_env's appended one) — write_env no longer produces the two-assignment file the whole mechanism depends on"; exit 1; }
-
-          # WHICH of the two is last, not merely that there are two. This is
-          # the assertion that moves: it reads write_env's client layer list
-          # when the appended block really is appended, and the template's dev
-          # list the moment it is not — which is the whole of D7, and is not
-          # observable from the port check below (that one only shows compose
-          # reading the last line, whoever wrote it).
-          want='COMPOSE_FILE=compose.yaml:compose.storage.yaml:compose.prod.yaml'
-          last_line=$(command grep '^COMPOSE_FILE=' "$env" | tail -n 1)
-          [ "$last_line" = "$want" ] || { echo "::error::the LAST '^COMPOSE_FILE=' line of a .env written by 'write_env client' is '$last_line', want '$want' — write_env's appended block is not the last assignment in the file, so compose reads the TEMPLATE's layer list and a client install builds the wrong stack"; exit 1; }
-
-          # Append an operator layer onto the LAST COMPOSE_FILE= line only —
-          # the one write_env itself wrote — exactly as an operator
-          # hand-editing deploy/.env would. compose.host-ports.yaml's
-          # 'database' service publishes 127.0.0.1:13306 by default, so that
-          # string MOVES between the two states this checks, unlike a
-          # substring that is present either way (a service NAME, or a key
-          # that is set regardless of which layer resolved).
-          last=$(command grep -n '^COMPOSE_FILE=' "$env" | tail -n 1 | cut -d: -f1)
-          [ -n "$last" ] || { echo "::error::could not find a COMPOSE_FILE line in $env to edit"; exit 1; }
-          command sed -i "${last}s/\$/:compose.host-ports.yaml/" "$env"
-
-          rendered=$( cd "$scratch/deploy" && docker compose config ) \
-            || { echo "::error::docker compose config failed against the generated .env"; exit 1; }
-          n=$(printf '%s\n' "$rendered" | command grep -c 'published: "13306"' || true)
-          [ "$n" = "1" ] || { echo "::error::deploy/.env with compose.host-ports.yaml appended to the LAST COMPOSE_FILE line rendered 'published: \"13306\"' $n time(s), want 1 — compose is not reading the last assignment, or write_env's appended block is not actually the last COMPOSE_FILE line"; exit 1; }
-          echo "ok: write_env's appended COMPOSE_FILE line is the one compose reads (last-assignment-wins, on the real generated file)"
-
-          # Rendered without the exports (this step's shell never had them), so
-          # both values can only have come from the file.
-          printf '%s\n' "$rendered" | command grep -qx 'name: ciwriteenv' \
-            || { echo "::error::a .env written by 'write_env client' with COMPOSE_PROJECT_NAME=ciwriteenv exported does not render as project ciwriteenv — write_env did not record the exported project name, so a later run without the export starts as the template's project"; exit 1; }
-          n=$(printf '%s\n' "$rendered" | command grep -c 'published: "18080"' || true)
-          [ "$n" = "1" ] || { echo "::error::a .env written by 'write_env client' with HTTP_PORT=18080 exported rendered 'published: \"18080\"' $n time(s), want 1 — write_env did not record the exported HTTP_PORT"; exit 1; }
-          echo "ok: write_env records an exported COMPOSE_PROJECT_NAME and HTTP_PORT in the .env it writes"
-
-      # `true >`, not `: >`, in write_env (deploy/scripts/lib.sh). The two look
-      # interchangeable and are not: `:` is a POSIX SPECIAL built-in, and a
-      # redirection error on one of those exits a non-interactive shell
-      # outright — so the `|| die` written after it never runs and the operator
-      # is left with a bare "cannot create ...: Permission denied" naming no
-      # fix. bash catches BOTH forms, which is precisely why this cannot be
-      # checked from a step running under GitHub's default `bash -e {0}`:
-      # measured on the ': >' spelling, `bash -c` gave rc 1 and the die's own
-      # message — indistinguishable from correct — while `/bin/sh -c` gave
-      # rc 2 and no die at all.
-      #
-      # Its own step rather than another assertion in the one above: this one
-      # needs deploy/ at mode 555, and a scratch tree in that state is not
-      # something to leave lying around a step that has other work to do.
-      - name: write_env names the fix when deploy/ is not writable
-        run: |
-          set -e
-          # Everything that separates `true >` from `: >` below is the fact
-          # that /bin/sh is a shell where `:` is a SPECIAL built-in: dash
-          # aborts on the redirection error, bash does not. Measured: rewrite
-          # the `/bin/sh -c` below as `/bin/bash -c` and this step goes green
-          # on the `: >` spelling too — a guard that cannot fail. GitHub's
-          # runners ship dash as /bin/sh, but asserting it here means a runner
-          # image change — or this job moving to a container or a self-hosted
-          # image where /bin/sh is bash — shows up as a clear failure rather
-          # than as this step quietly pinning nothing. Step 6's `/bin/sh -c`,
-          # whose whole point is that bash would RUN the bashisms dash rejects,
-          # rests on a DIFFERENT dash property — rejecting bash-only syntax,
-          # not aborting on a redirection error against `:` — so this control
-          # does not strictly prove it. Both held together on this runner
-          # (the mutation matrix confirmed it), which is why step 6's coverage
-          # is inferred from this control rather than asserted a second time.
-          if /bin/sh -c ': > /nonexistent-dir-xyz/f || echo REACHED' 2>/dev/null | command grep -q REACHED; then
-            echo "::error::/bin/sh on this runner does not abort on a redirection error against the ':' special built-in (it is bash, or a shell that behaves like it), so this step cannot tell 'true >' from ': >' and pins nothing"; exit 1
-          fi
-
-          scratch=$(mktemp -d)
-          # chmod before rm: this step leaves deploy/ at mode 555, and rm -rf
-          # cannot recurse into a directory it may not write.
-          trap 'chmod -R u+rwX "$scratch" 2>/dev/null || true; rm -rf "$scratch"' EXIT
-          cp -a deploy "$scratch/deploy"
-          # write_env returns early — and SUCCESSFULLY — when .env is already
-          # there, which would make this a check of nothing.
-          rm -f "$scratch/deploy/.env"
-          chmod 555 "$scratch/deploy"
-
-          set +e
-          out=$(/bin/sh -c 'REPO_ROOT=$1; . "$1/deploy/scripts/lib.sh"; write_env client' sh "$scratch" 2>&1)
-          rc=$?
-          set -e
-          chmod u+w "$scratch/deploy"
-          printf '%s\n' "$out"
-
-          # WHICH failure, not merely that it failed: 1 is die's status, and a
-          # shell aborting on the redirection itself gives 2. Both are
-          # non-zero, so "it failed" would not tell the fixed and broken
-          # spellings apart.
-          #
-          # Split by status rather than one message for every non-1 rc. The
-          # `: >` regression is rc 2 specifically — and it is not the only way
-          # to reach rc 2 (measured: a `Bad substitution` bashism in lib.sh
-          # aborts dash the same way), so even that arm names it as the
-          # regression this pins and points at the output above rather than
-          # asserting a cause this step has not established.
-          case "$rc" in
-            1) ;;
-            2) echo "::error::write_env against an unwritable deploy/ exited 2, want 1 (die's own status): /bin/sh aborted instead of reaching the '|| die' after the redirection. The regression this pins is ': >' in place of 'true >', where a redirection error on a special built-in exits the shell outright — but any other abort of the '/bin/sh -c' above lands here too, so read write_env's own output printed above"; exit 1 ;;
-            0) echo "::error::write_env against an unwritable deploy/ SUCCEEDED, so this step tested nothing. A job running as root lands here, since root ignores the directory mode"; exit 1 ;;
-            *) echo "::error::write_env against an unwritable deploy/ exited $rc, want 1 (die's own status) — its own output is above"; exit 1 ;;
-          esac
-          case "$out" in
-            *"could not create"*) ;;
-            *) echo "::error::write_env against an unwritable deploy/ never printed its own 'could not create ...' message, so the shell aborted on the redirection instead and the operator gets a bare 'cannot create ...: Permission denied' with no fix in it"; exit 1 ;;
-          esac
-          echo "ok: write_env reaches its own die under /bin/sh when deploy/ is unwritable"
-
-      # doctor.sh had no executable coverage of any kind: it appears in the
-      # shell-syntax loop above and nowhere else, so CI proved it PARSES and
-      # nothing proved that a single check inside it can fail. D7 is what makes
-      # that expensive. .env.example no longer ASSIGNS 'change_me' to anything,
-      # so compose.yaml's ${...:?} — which rejects a variable that is ABSENT or
-      # EMPTY, never one that is SET to the published default — can no longer
-      # catch a deploy/.env hand-copied from a PRE-D7 template, and doctor's
-      # sweep is the only thing left between that file and a stack booting on a
-      # database root password published in this repository's history.
-      #
-      # Both directions, against ONE .env that differs by exactly one line. The
-      # pass is not decoration: without it "doctor exited 1" below would be
-      # satisfied by a doctor that fails for any reason at all, and several of
-      # its checks answer for the RUNNER rather than for the .env — the docker
-      # daemon, the compose floor, a free HTTP_PORT, 10 GiB of free disk.
-      #
-      # The default is QUOTED — MYSQL_ROOT_PASSWORD="change_me" — because
-      # compose's dotenv parser unwraps quotes and lib.sh's env_get does not.
-      # doctor's own unquote() is the only thing closing that gap, and every
-      # comparison in the sweep is an exact-match `case`, so an unquote that
-      # stops unwrapping reads a DIFFERENT string, reports the passwords fine
-      # and exits 0.
-      - name: doctor refuses a .env on the published default password
-        run: |
-          set -e
-          scratch=$(mktemp -d)
-          # On EXIT, not at the end: the assertions below exit non-zero on
-          # failure, and the .env generated here holds five real secrets.
-          trap 'rm -rf "$scratch"' EXIT
-          cp -a deploy "$scratch/deploy"
-          # The fixture .env an earlier step wrote is copied straight in by the
-          # line above. Remove it so write_env's "exists, left alone" path
-          # cannot fire and hand doctor a file this step did not produce.
-          rm -f "$scratch/deploy/.env"
-          /bin/sh -c 'REPO_ROOT=$1; . "$1/deploy/scripts/lib.sh"; write_env dev' sh "$scratch" \
-            || { echo "::error::'write_env dev' failed under /bin/sh — its own output is above"; exit 1; }
-          env="$scratch/deploy/.env"
-          # Without this the whole step could pass having read nothing: a
-          # write_env that created no file leaves doctor on its "no deploy/.env
-          # yet" branch, which exits 0, and the append below would then create
-          # the file from scratch and still trip the sweep.
-          [ -f "$env" ] || { echo "::error::write_env did not create $env, so neither run below would be reading a generated .env at all"; exit 1; }
-
-          set +e
-          out=$("$scratch/deploy/scripts/doctor.sh" dev 2>&1); rc=$?
-          set -e
-          printf '%s\n' "$out"
-          [ "$rc" = "0" ] || { echo "::error::doctor.sh dev exited $rc against a .env freshly written by write_env — the report above names the check that failed"; exit 1; }
-
-          # ONE appended line onto the file that just passed. Compose's dotenv
-          # parser and env_get both take the LAST assignment, so this is
-          # exactly the shape of the pre-D7 hand copy.
-          printf '%s\n' 'MYSQL_ROOT_PASSWORD="change_me"' >> "$env"
-          set +e
-          out=$("$scratch/deploy/scripts/doctor.sh" dev 2>&1); rc=$?
-          set -e
-          printf '%s\n' "$out"
-          [ "$rc" = "1" ] || { echo "::error::doctor.sh dev exited $rc on a deploy/.env whose MYSQL_ROOT_PASSWORD is the published default 'change_me', want 1 — with .env.example no longer shipping that value, nothing else stops such a stack from booting"; exit 1; }
-          # Named, not merely reported: doctor failing for one of its dozen
-          # other reasons would satisfy the status check above while leaving
-          # the published-default sweep exactly as unproven as it was.
-          case "$out" in
-            *"MYSQL_ROOT_PASSWORD"*) ;;
-            *) echo "::error::doctor.sh dev did fail on the published-default .env, but never named MYSQL_ROOT_PASSWORD — so it failed for some other reason and the published-default sweep is still unproven"; exit 1 ;;
-          esac
-          echo "ok: doctor passes a write_env-generated .env and refuses the same file with a quoted 'change_me' root password"
-
-      # Pre-flight: the layer combinations below merge compose.workers.yaml
-      # against the storage overlay generated ABOVE, which has no worker
-      # sections in it — so on their own they would pass whether or not
-      # gen-storage.sh's COMPOSE_FILE condition works at all. This step is
-      # where that condition is actually observed, in both directions, by
-      # regenerating with the workers layer named in deploy/.env.
-      - name: The storage layer follows COMPOSE_FILE
-        run: |
-          set -e
-          base=$(command grep '^COMPOSE_FILE=' deploy/.env)
-          restore() { command sed -i "s|^COMPOSE_FILE=.*|$base|" deploy/.env; deploy/scripts/gen-storage.sh >/dev/null; }
-
-          # --- co-located: compose.yaml AND compose.workers.yaml ---
-          command sed -i 's|^COMPOSE_FILE=.*|COMPOSE_FILE=compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.workers.yaml|' deploy/.env
-          deploy/scripts/gen-storage.sh
-          n=$(command grep -c '^  worker-' deploy/compose.storage.yaml || true)
-          [ "$n" = "4" ] || { restore; echo "::error::compose.storage.yaml has $n worker section(s) with compose.workers.yaml in COMPOSE_FILE, want 4 — the workers would run with no image dataset mounts and silently read nothing"; exit 1; }
-          n=$(command grep -c 'EYENED_STORAGE_MOUNTS' deploy/compose.storage.yaml || true)
-          [ "$n" = "5" ] || { restore; echo "::error::compose.storage.yaml sets EYENED_STORAGE_MOUNTS $n time(s), want 5 (server + 4 workers, not the fileserver)"; exit 1; }
-
-          # It resolves WITH the layer...
-          ( cd deploy && COMPOSE_FILE="compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.workers.yaml" \
-              COMPOSE_PROFILES=local-db,gpu-inference,gpu-cfi-amd,gpu-layer-segmentation docker compose config -q ) \
-            || { restore; echo "::error::the workers layer does not resolve against a storage overlay that names the workers"; exit 1; }
-          # ...and the mounts genuinely reach a worker in the RENDERED project,
-          # not just the generated file. Counted, not grep -q: with the ROI
-          # worker in play the ci_a source appears 3 times (server, fileserver,
-          # worker-cfi-roi) and the mount map twice (server, worker-cfi-roi);
-          # with the worker sections missing it is 2 and 1, which a presence
-          # test could not tell apart. `docker compose config` renders volumes
-          # in long form, so match `source:`, never `PATH:PATH:ro`.
-          ( cd deploy && COMPOSE_FILE="compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.workers.yaml" \
-              COMPOSE_PROFILES=local-db docker compose config ) > /tmp/workers-config.yaml \
-            || { restore; echo "::error::could not render the co-located workers config"; exit 1; }
-          n=$(command grep -c 'source: /tmp/eyened-ci-storage-a$' /tmp/workers-config.yaml || true)
-          [ "$n" = "3" ] || { restore; echo "::error::the rendered project binds ci_a $n time(s), want 3 (server + fileserver + worker-cfi-roi) — the generated worker sections did not survive the merge"; exit 1; }
-          n=$(command grep -c 'EYENED_STORAGE_MOUNTS' /tmp/workers-config.yaml || true)
-          [ "$n" = "2" ] || { restore; echo "::error::the rendered project sets EYENED_STORAGE_MOUNTS $n time(s), want 2 (server + worker-cfi-roi) — the worker cannot resolve image paths without it"; exit 1; }
-
-          # ...and the SAME overlay must NOT resolve without the layer. This is
-          # the direction that makes the condition load-bearing rather than
-          # cosmetic: a service that exists only in the storage overlay has
-          # neither an image nor a build context.
-          if ( cd deploy && COMPOSE_FILE="compose.yaml:compose.dev.yaml:compose.storage.yaml" \
-                 COMPOSE_PROFILES=local-db docker compose config -q ) 2>/dev/null; then
-            restore
-            echo "::error::a storage overlay naming the workers still resolved in the DEFAULT stack — compose no longer rejects an image-less service, so gen-storage.sh's COMPOSE_FILE condition is no longer proven by this step and its comment is stale"
-            exit 1
-          fi
-
-          # --- remote: compose.workers.yaml and NO compose.yaml ---
-          command sed -i 's|^COMPOSE_FILE=.*|COMPOSE_FILE=compose.workers.yaml:compose.storage.yaml|' deploy/.env
-          deploy/scripts/gen-storage.sh
-          n=$(command grep -c '^  server:\|^  fileserver:' deploy/compose.storage.yaml || true)
-          [ "$n" = "0" ] || { restore; echo "::error::compose.storage.yaml names server/fileserver ($n section(s)) with compose.yaml absent from COMPOSE_FILE — the remote GPU host cannot load this overlay at all"; exit 1; }
-          ( cd deploy && PLATFORM_STORAGE_PATH=/tmp/eyened-ci-storage-b docker compose \
-              -f compose.workers.yaml -f compose.storage.yaml config -q ) \
-            || { restore; echo "::error::the remote invocation (workers + storage, no compose.yaml) does not resolve"; exit 1; }
-
-          restore
-          n=$(command grep -c '^  worker-' deploy/compose.storage.yaml || true)
-          [ "$n" = "0" ] || { echo "::error::restoring COMPOSE_FILE left $n worker section(s) behind; every later step in this job is now testing the wrong fixture"; exit 1; }
-          echo "ok: gen-storage.sh follows COMPOSE_FILE in both directions, and both directions were observed"
-
-      - name: Every layer combination resolves
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
         working-directory: deploy
-        run: |
-          set -e
-          fail=0
-          check() {
-            echo "--- $1 ($2) ---"
-            if ! COMPOSE_FILE="$1" COMPOSE_PROFILES="$2" docker compose config -q; then
-              echo "::error::layer combination failed: COMPOSE_FILE=$1 COMPOSE_PROFILES=$2"
-              fail=1
-            fi
-          }
-          check "compose.yaml:compose.dev.yaml:compose.storage.yaml" "local-db"
-          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db"
-          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     ""
-          check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.host-ports.yaml" "local-db"
-          check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.oidc.yaml" "local-db"
-          check "compose.yaml:compose.storage.yaml:compose.prod.yaml"     "local-db,backup"
-          check "compose.yaml:compose.dev.yaml:compose.storage.yaml:compose.workers.yaml" "local-db"
-          check "compose.yaml:compose.storage.yaml:compose.prod.yaml:compose.workers.yaml" "local-db,gpu-inference,gpu-cfi-amd,gpu-layer-segmentation"
-          exit $fail
+    steps:
+      - uses: actions/checkout@v7
 
-      # The two invariants that are cheap to check and expensive to discover.
-      - name: Invariants
-        working-directory: deploy
+      - name: Write .env from the example
         run: |
-          set -e
-          # pipefail, because every assertion below reads a `docker compose
-          # config` through a pipe. Without it the pipeline's status is the
-          # LAST stage's — `tr` and `sort` succeed happily on no input — so a
-          # failing `config` left `$svc` empty, `set -e` never fired, and the
-          # `case` patterns simply did not match: two invariants that passed
-          # precisely when they could not be evaluated. Today that is masked
-          # only because an earlier step happens to resolve the same combos,
-          # an accident of ordering with nothing enforcing it.
-          set -o pipefail
-          dev="compose.yaml:compose.dev.yaml:compose.storage.yaml"
-          prod="compose.yaml:compose.storage.yaml:compose.prod.yaml"
-
-          # Exactly one `location /` snippet reaches nginx in each mode.
-          for mode in "$dev" "$prod"; do
-            n=$(COMPOSE_FILE=$mode COMPOSE_PROFILES=local-db docker compose config \
-                  | command grep -c 'client.d/client.conf' || true)
-            [ "$n" = "1" ] || { echo "::error::$mode mounts $n client.d snippets, want 1"; exit 1; }
+          cp .env.example .env
+          for key in EYENED_API_SECRET_KEY EYENED_REDIS_PASSWORD MYSQL_ROOT_PASSWORD EYENED_DATABASE_PASSWORD EYENED_API_ADMIN_PASSWORD; do
+            sed -i "s/^$key=\$/$key=$(openssl rand -hex 32)/" .env
           done
 
-          # The prod fileserver build must not be tagged as the official nginx.
-          # `grep -c … >/dev/null` rather than `grep -q`: -q exits on the
-          # first match, which under pipefail turns the producer's SIGPIPE
-          # into a rc of 141 and a false RED once the config outgrows the
-          # pipe buffer. -c drains its input, so the pipeline status is the
-          # config's when it fails and the grep's when it does not.
-          COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config \
-            | command grep -c 'eyened-fileserver:local' >/dev/null \
-            || { echo "::error::prod fileserver is not tagged eyened-fileserver:local"; exit 1; }
+      - name: Build and start the production stack
+        run: docker compose up -d --build --wait
 
-          # An external-database stack must resolve with no database service.
-          svc=$(COMPOSE_FILE=$prod COMPOSE_PROFILES= docker compose config --services | sort | tr '\n' ' ')
-          echo "external-db services: $svc"
-          case "$svc" in *database*) echo "::error::database present with no local-db profile"; exit 1 ;; esac
-
-          # No container but `database` may be handed the MySQL root password.
-          # This is what dropping env_file: bought; without a check it silently
-          # comes back the first time someone adds `env_file: .env` to a service.
-          # One sanctioned exception: db-backup.sh hands it to its one-shot
-          # `xtrabackup` run with `run -e`, which `compose config` never shows.
-          # Only `local-db` is rendered, so the `backup` profile's service
-          # definitions are not checked here either.
-          n=$(COMPOSE_FILE=$prod COMPOSE_PROFILES=local-db docker compose config \
-                | command grep -c 'MYSQL_ROOT_PASSWORD' || true)
-          if [ "$n" = "1" ]; then
-            echo "ok: MYSQL_ROOT_PASSWORD appears once"
-          else
-            echo "::error::MYSQL_ROOT_PASSWORD appears $n times, want 1 (database only)"; exit 1
-          fi
-
-          # The workers layer must resolve on its own, with no compose.yaml
-          # beside it — that is the remote-GPU-host path, and the failure mode
-          # is a `depends_on` someone adds for tidiness, which breaks ONLY
-          # that path. `required: false` does not rescue it: the flag covers
-          # a service that is declared and profile-disabled, not one that is
-          # not declared at all.
-          docker compose -f compose.workers.yaml config -q \
-            || { echo "::error::compose.workers.yaml does not resolve standalone — the remote GPU host path is broken, most likely by a depends_on"; exit 1; }
-          # ...and it must bring exactly the slim ROI worker with no profile,
-          # so a stock co-located install always has a `default` consumer.
-          svc=$(docker compose -f compose.workers.yaml config --services | sort | tr '\n' ' ')
-          [ "$svc" = "worker-cfi-roi " ] \
-            || { echo "::error::compose.workers.yaml with no profile brings '$svc', want 'worker-cfi-roi ' — the thumbnail queue would have no consumer"; exit 1; }
-          echo "ok: compose.workers.yaml resolves standalone and brings only worker-cfi-roi"
-
-      - name: nginx config is valid in both modes
+      # Assert on data: healthy containers alone once hid an empty schema.
+      - name: init succeeded and the schema is at head
         run: |
-          set -e
-          # Assert the inputs FIRST. `docker run -v <host path>:…` creates an
-          # empty directory at a source that does not exist, it does not
-          # fail: move or rename deploy/nginx/ and the entrypoint finds no
-          # template, so nginx validates the base image's own stock
-          # /etc/nginx/conf.d/default.conf and reports "syntax is ok" having
-          # read nothing from this repository. Nothing else here would notice.
-          for variant in dev prod; do
-            [ -f deploy/nginx/default.conf.template ] \
-              && [ -f "deploy/nginx/client.d/$variant.conf" ] \
-              && [ -d deploy/nginx/storage.d ] \
-              || { echo "::error::missing nginx input for '$variant' — expected deploy/nginx/default.conf.template, deploy/nginx/client.d/$variant.conf and deploy/nginx/storage.d/; docker would silently mount empty directories and validate the base image's stock config instead"; exit 1; }
-          done
+          test "$(docker compose ps -a --format '{{.ExitCode}}' init)" = 0
+          head=$(docker compose exec -T server python -c 'from eyened_orm.utils.alembic_utils import get_head_revision; print(get_head_revision())')
+          current=$(docker compose exec -T database sh -c 'mysql -N -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "SELECT version_num FROM alembic_version"' 2>/dev/null)
+          echo "current=$current head=$head"
+          test -n "$head" && test "$current" = "$head"
 
-          for variant in dev prod; do
-            docker run --rm \
-              -v "$PWD/deploy/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro" \
-              -v "$PWD/deploy/nginx/client.d/$variant.conf:/etc/nginx/client.d/client.conf:ro" \
-              -v "$PWD/deploy/nginx/storage.d:/etc/nginx/storage.d:ro" \
-              nginx:1.27-alpine nginx -t
-          done
+      - name: The administrator can log in, and a wrong password cannot
+        run: |
+          pw=$(grep '^EYENED_API_ADMIN_PASSWORD=' .env | cut -d= -f2-)
+          login() { curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/api/auth/login \
+                      -H 'Content-Type: application/json' -d "{\"username\":\"admin\",\"password\":\"$1\"}"; }
+          test "$(login "$pw")" = 200
+          test "$(login wrong)" = 401
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color
