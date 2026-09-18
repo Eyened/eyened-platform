@@ -21,11 +21,12 @@ while the system is still open, and the flip lands with everyone already
 granted. Every step before the last is invisible to users except one tag-delete
 status code, noted at step 1.
 
-`eorm` and `alembic` both ship inside the server image, so every command below
-runs after `docker compose exec -it server bash` from `docker/`. `-e` /
-`--env-file` is a **group** option on `eorm`: it goes *before* the subcommand,
-and with no `-e` the CLI uses the ambient environment rather than searching for
-a file.
+This assumes the `deploy/` stack (run with `docker compose`, see `deploy/README.md`) that
+replaced `docker/`, `dev/` and `database/`. `eorm` and `alembic` both ship
+inside the server image, so every command below runs after `docker compose
+exec -it server bash` from `deploy/`. `-e` / `--env-file` is a **group**
+option on `eorm`: it goes *before* the subcommand, and with no `-e` the CLI
+uses the ambient environment rather than searching for a file.
 
 ### 1. Deploy the two migrations, alone
 
@@ -101,7 +102,7 @@ GROUP BY c.CreatorID ORDER BY c.DateInserted DESC;
 ### 5. Deploy the enforcing server
 
 ```bash
-cd docker && docker compose up -d --build
+cd deploy && docker compose up -d --build
 ```
 
 **Rollback is redeploying the previous server.** The membership rows stay and
@@ -159,11 +160,13 @@ prunes needs the intended membership list from the consortium, not a query.
   and 404, so drive a dedicated account instead. Scope resolves per request, so
   every change below lands on a refresh -- no re-login, no fixture seed. See
   "The test_user loop" below.
-- **Named-account login:** with `PUBLIC_AUTH_DISABLED=false` you authenticate
+- **Named-account login:** with `EYENED_API_PUBLIC_AUTH_DISABLED=false` you authenticate
   as a specific `Creator` and see exactly what its `IsAdmin` flag and
   memberships grant. This path does **not** auto-promote, which is also the
   cheapest way to reproduce a new joiner's view.
-- **The joiner flow, for free:** the bundled Keycloak (`dev/keycloak/`) with
+- **The joiner flow, for free:** the bundled Keycloak (`deploy/keycloak/`,
+  enabled by appending `:compose.oidc.yaml` to `COMPOSE_FILE` in
+  `deploy/.env` -- see `deploy/README.md`) with
   `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` auto-provisions a fresh login as a
   zero-access user.
 - **Testing containment:** a production dump has task 70, which touches several
@@ -201,9 +204,12 @@ For scenario 5, a production dump has task 70, which touches several projects.
 
 ## New-dev checklist
 
-clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
-`eorm load-dump` -> `eorm init-admin` with a username matching
-`EYENED_API_ADMIN_USERNAME` -> `PUBLIC_AUTH_DISABLED=true` for feature work,
+clone -> `cp deploy/.env.example deploy/.env`, fill the secrets, `docker compose up -d --build`
+from `deploy/` (the `init` service creates the schema and the administrator on a fresh
+database) -> to work against a
+production dump instead, `eorm load-dump` then `eorm init-admin` with a
+username matching `EYENED_API_ADMIN_USERNAME` (the loaded dump has no active
+administrator) -> `EYENED_API_PUBLIC_AUTH_DISABLED=true` for feature work,
 `=false` plus the test_user loop below for RBAC work.
 
 ## Commands

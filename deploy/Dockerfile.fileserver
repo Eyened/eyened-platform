@@ -1,0 +1,44 @@
+# Production fileserver: builds the client and serves it directly.
+#
+# client/svelte.config.js uses @sveltejs/adapter-static, so `npm run build`
+# produces a static SPA in build/. Serving it from the nginx that already
+# fronts the stack removes a Node process, a container and a proxy hop that
+# the old docker/ stack carried. The artifact lives in the image, so rolling
+# back to a previous tag rolls back the frontend with it.
+FROM node:24-slim AS build
+WORKDIR /app/client
+
+# Manifests before source, so a frontend edit re-runs only `npm run build` and
+# not the much slower `npm ci`. The source COPY below cannot clobber the
+# installed tree: .dockerignore excludes **/node_modules, so the host's copy
+# never enters the build context.
+#
+# .npmrc is part of the manifest set, not source, and it must stay on this line.
+# It carries engine-strict=true against the engines constraint in package.json;
+# letting it arrive with the source COPY below instead would run THIS npm ci
+# without it, since that COPY lands after the install. Two reasons it belongs
+# here: the install then matches the dev image's runtime install, which reads
+# the same .npmrc off the bind mount, so a lockfile resolved in one is valid in
+# the other; and .npmrc joins the manifest set that keys this layer's cache,
+# where a change to it correctly forces a reinstall.
+#
+# Note the engine check cannot surface later for THIS image: the final stage is
+# nginx with no node in it, so there is no second chance at container boot the
+# way there is for the dev client. Here the build is the only place it can fire.
+#
+# Plain `npm ci` — NOT `npm ci --only=production`. vite and svelte are
+# devDependencies, and this stage runs `npm run build`.
+COPY client/package.json client/package-lock.json client/.npmrc ./
+RUN npm ci
+
+COPY client /app/client
+# Depends on client/package.json's `prepare` script tolerating failure
+# (`svelte-kit sync || echo ''`): with the manifests split out above, npm ci
+# runs `prepare` before svelte.config.js exists, so the sync fails and is
+# swallowed. Harmless — SvelteKit's Vite plugin re-runs sync during the build
+# below — but tightening that script to a bare `svelte-kit sync` would break
+# this stage and the dev client image with it.
+RUN npm run build
+
+FROM nginx:1.27-alpine
+COPY --from=build /app/client/build /usr/share/nginx/html

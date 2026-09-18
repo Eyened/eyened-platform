@@ -1,0 +1,39 @@
+# Bundled Keycloak for development and testing; not a production identity
+# provider. See keycloak/README.md.
+
+services:
+
+  # The server fetches Keycloak's metadata at the browser-facing URL, so
+  # PUBLIC_HOST must resolve to the Docker host from inside the container.
+  server:
+    extra_hosts:
+      - "${PUBLIC_HOST:-localhost}:host-gateway"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    # Anchors do not cross files, so the base's log cap is restated.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+    # No depends_on either way: the server is also defined without this layer.
+    entrypoint: ["/bin/bash", "/opt/keycloak/entrypoint.sh"]
+    environment:
+      # An absolute URL pins scheme, host and port, which the exact-match
+      # issuer check in EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS relies on.
+      KC_HOSTNAME: http://${PUBLIC_HOST:-localhost}:${KEYCLOAK_PORT:-8180}
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in deploy/.env}
+      # Read by entrypoint.sh, which exits without them.
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+      HTTP_PORT: ${HTTP_PORT:-8080}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+    # Every interface by default: the server reaches this port through the
+    # host, so a loopback bind breaks login. The admin password guards the console.
+    ports:
+      - "${KEYCLOAK_BIND:-0.0.0.0}:${KEYCLOAK_PORT:-8180}:8080"
+    volumes:
+      - ./keycloak/entrypoint.sh:/opt/keycloak/entrypoint.sh:ro
+      - ./keycloak/realm-eyened-dev.json.template:/opt/keycloak/import-template/realm-eyened-dev.json:ro

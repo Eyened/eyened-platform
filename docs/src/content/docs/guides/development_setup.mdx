@@ -3,138 +3,142 @@ title: Development Setup
 description: Set up your development environment for the Eyened platform
 ---
 
-The `dev/` stack runs the viewer, API, nginx, and Redis in Docker with source mounted for hot reload. MySQL is a **separate** compose stack — start it first, then point the dev server at it via `EYENED_DATABASE_*` in `.env`.
+The whole platform — viewer, API, nginx, Redis, **and** MySQL — runs from one Docker stack in
+`deploy/`, with `server/`, `orm/`, and `client/` bind-mounted for hot reload. There is no separate
+database stack to start first.
 
 ## Prerequisites
 
-- [Docker](https://www.docker.com/) and Docker Compose
+- [Docker](https://www.docker.com/), with **Compose 2.26 or newer** (`docker compose version`).
 - [Git](https://git-scm.com/)
 
-To run `eorm` or `pytest` on the host (outside containers), install the ORM — see **[ORM setup](/eyened-platform/orm/getting_started)**.
+To run `eorm` or `pytest` on the host, install the ORM — see
+**[ORM setup](/eyened-platform/orm/getting_started)**.
 
 ## First-time setup
 
-1. Clone the repository:
+```bash
+git clone https://github.com/Eyened/eyened-platform.git
+cd eyened-platform/deploy
+cp .env.example .env
+```
 
-    ```bash
-    git clone https://github.com/Eyened/eyened-platform.git
-    cd eyened-platform
-    ```
+In `.env`, switch to the development lines (`COMPOSE_FILE=compose.yaml:compose.dev.yaml`) and
+fill the five secrets with `openssl rand -hex 32`. Then:
 
-2. Start MySQL (if you do not already have one):
+```bash
+docker compose up -d --build
+```
 
-    ```bash
-    cd database
-    cp .env.example .env   # set MYSQL_* and EYENED_DATABASE_* passwords
-    docker compose up -d
-    cd ../dev
-    ```
+The `init` service creates the schema, seeds the builtin form schemas and creates the
+administrator (`EYENED_API_ADMIN_USERNAME`, password `EYENED_API_ADMIN_PASSWORD`).
 
-3. Configure the dev environment:
+### On a machine shared with other developers
 
-    ```bash
-    cp sample.env .env
-    ```
+Set `COMPOSE_PROJECT_NAME` and `HTTP_PORT` in `deploy/.env` to values nobody else is using:
 
-    Set at minimum:
+| Variable | Purpose |
+| --- | --- |
+| `COMPOSE_PROJECT_NAME` | Prefix for containers and volumes — makes your stack independent |
+| `HTTP_PORT` | The port you open in a browser |
 
-    | Variable | Purpose |
-    | --- | --- |
-    | `EYENED_API_SECRET_KEY` | Session signing key |
-    | `EYENED_REDIS_PASSWORD` | Redis auth (required by compose) |
-    | `EYENED_STORAGE_ROOT` | Writable path for `segmentations.zarr` (mounted into the server container) |
-    | `EYENED_DATABASE_HOST` | Database hostname (`host.docker.internal` when MySQL runs on the Docker host) |
-    | `EYENED_DATABASE_PORT` | Host port MySQL listens on (e.g. `3306`) |
-    | `EYENED_DATABASE_USER` | Database user |
-    | `EYENED_DATABASE_PASSWORD` | Database password |
-    | `EYENED_DATABASE_DATABASE` | Database name (default `eyened_database`) |
-    | `DEV_NGINX_PORT` | Port for the app in your browser (e.g. `8080`) |
+The bundled MySQL and Redis publish **no** host ports by default, which removes the commonest
+source of collisions. For a MySQL shell with no port exposed at all, use
+`docker compose exec database sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'`.
+If you need a host port instead — DBeaver, or a host-side alembic — append
+`:compose.host-ports.yaml` to `COMPOSE_FILE` in `deploy/.env` and set `DB_PUBLISH_PORT`.
 
-4. Configure nginx and storage mounts in `docker-compose.yml` and `nginx.conf`:
-    - Add read-only volume mounts on **fileserver** for thumbnail and image dataset paths.
-    - Add matching `location /{storage_backend_key}/` blocks in `nginx.conf` (see [Platform Design](/eyened-platform/platform_design#storage)).
-    - Mount `EYENED_STORAGE_ROOT` into the **server** container if segmentations should persist.
+## Accounts and access
 
-5. Build and start:
+`eorm create-user` is **not** enough to get a working login. Access comes from project
+memberships, so a `create-user` account signs in and sees an empty platform. See
+**[Access control](/eyened-platform/guides/access_control)**.
 
-    ```bash
-    docker compose up -d --build
-    ```
+Choose how you authenticate while developing, with `EYENED_API_PUBLIC_AUTH_DISABLED` in
+`deploy/.env`:
 
-6. Initialize a fresh database (once):
+| Setting | Effect |
+|---------|--------|
+| `true` | Skips login and runs as the `EYENED_API_ADMIN_USERNAME` account, promoting it to administrator if it is not one. Convenient for feature work; it hides every 403 and 404 |
+| `false` (default) | Normal login as a specific account, with exactly the access its flag and memberships grant. Use this whenever you touch permissions |
 
-    ```bash
-    docker compose exec server bash
-    eorm initialize-database
-    eorm seed-form-schemas
-    eorm init-admin --username <EYENED_API_ADMIN_USERNAME>
-    ```
+Keep it `false` in production.
 
-    Or run the same commands on the host with `dev/.env` loaded if `eyened_orm` is installed locally.
+To exercise enforcement, drive a second account from the CLI and watch the viewer — scope
+resolves per request, so each change lands on a refresh with no re-login:
 
-    :::caution
-    `eorm create-user` is **not** enough to get a working login. Access comes from project memberships, so a `create-user` account signs in and sees an empty platform. `init-admin` is the bootstrap. See **[Access control](/eyened-platform/guides/access_control)**.
-    :::
+```bash
+cd deploy
+docker compose exec server eorm create-user --username test_user --password test-pw   # empty platform
+docker compose exec server eorm grant --user test_user --project P --role read_only   # P's data appears
+docker compose exec server eorm grant --user test_user --project P --role grader      # writes now succeed
+docker compose exec server eorm set-admin --user test_user --on                       # restrictions vanish
+docker compose exec server eorm revoke --user test_user --all                         # back to empty
+```
 
-7. Choose how you authenticate while developing:
-
-    | Setting | Effect |
-    |---------|--------|
-    | `EYENED_API_PUBLIC_AUTH_DISABLED=true` | Skips login and runs as the `EYENED_API_ADMIN_USERNAME` account, promoting it to administrator if it is not one. Convenient for feature work; it hides every 403 and 404 |
-    | `EYENED_API_PUBLIC_AUTH_DISABLED=false` | Normal login as a specific account, with exactly the access its flag and memberships grant. Use this whenever you touch permissions |
-
-    Keep it `false` in production.
-
-    To exercise enforcement, drive a second account from the CLI and watch the viewer — scope resolves per request, so each change lands on a refresh with no re-login:
-
-    ```bash
-    eorm create-user --username test_user --password test-pw   # empty platform
-    eorm grant --user test_user --project P --role read_only   # P's data appears
-    eorm grant --user test_user --project P --role grader      # writes now succeed
-    eorm set-admin --user test_user --on                       # restrictions vanish
-    eorm revoke --user test_user --all                         # back to empty
-    ```
-
-    A `Creator` row cannot be deleted — `eorm deactivate` is the way to retire an account, and `eorm set-password` recovers a forgotten one.
+A `Creator` row cannot be deleted — `eorm deactivate` is the way to retire an account, and
+`eorm set-password` recovers a forgotten one.
 
 ## Daily use
 
-From `dev/`:
-
 ```bash
-docker compose up -d        # start
-docker compose logs -f      # follow logs
-docker compose down         # stop
+docker compose up -d     # start; add --build after pulling
+docker compose logs -f   # follow logs
+docker compose down      # stop
 ```
 
-Open `http://<hostname>:<DEV_NGINX_PORT>/`. The **client** container runs Vite with hot reload; the **server** container runs uvicorn with `--reload` on mounted `server/` and `orm/` sources.
+The **client** container runs Vite with hot reload; the **server** container runs uvicorn with
+`--reload` over the mounted `server/` and `orm/` sources.
 
 :::caution
 WebGL state in the viewer can go stale after heavy client edits — refresh the page if overlays look wrong. Server reload usually picks up Python changes automatically; restart the server container if it does not.
 :::
 
-## Optional: OIDC login
+## Storage
 
-The base stack uses password auth only. To test OpenID Connect locally, layer the Keycloak override — see `dev/keycloak/README.md`:
+Platform storage (thumbnails, `segmentations.zarr`) lives at `/storage` inside the container,
+backed by this stack's own named volume — a clean clone never writes into shared or production
+storage. To attach to shared storage instead, set `PLATFORM_STORAGE_PATH` in `deploy/.env`.
+
+Image datasets are mounted by `deploy/compose.storage.yaml`, at `/data/<key>`, and listed in
+`EYENED_STORAGE_MOUNTS`; see `deploy/README.md`.
+
+## Migrations
+
+The `init` service applies pending migrations on every `docker compose up`, using the mounted
+`orm/`, so a new migration applies without a rebuild. To re-run it without restarting the
+stack:
 
 ```bash
-docker compose -f docker-compose.yml -f keycloak/docker-compose.keycloak.yml up -d
+docker compose run --rm init
 ```
 
-Set `DEV_PUBLIC_HOST`, `EYENED_API_AUTH_OIDC_ENABLED=true`, and the `EYENED_OIDC_*` vars in `.env`. Full options: [Authentication](/eyened-platform/guides/authentication).
+## Client types
+
+```bash
+npm run gen:types    # from client/, after changing an API route
+```
+
+Regenerates the tracked `client/src/types/openapi.json` and `openapi.ts` from the FastAPI app's
+OpenAPI schema, so the client's request and response types stay in sync with the server. It needs
+the server's settings available — `deploy/.env` from a stack you have brought up covers the
+default case; see `server/scripts/generate_openapi.py --help` for pointing at another one.
+
+## Optional: OIDC login
+
+The base stack uses password auth only. To test OpenID Connect locally, append
+`:compose.oidc.yaml` to `COMPOSE_FILE` in `deploy/.env` and set `PUBLIC_HOST`, then
+`docker compose up -d` — see `deploy/keycloak/README.md`.
+
+Set `EYENED_API_AUTH_OIDC_ENABLED=true` and the `EYENED_OIDC_*` vars in `deploy/.env`. Full options: [Authentication](/eyened-platform/guides/authentication).
 
 ## Optional: existing data
 
-Load a dump:
+See `deploy/README.md`, "Backup and restore", for XtraBackup and `mysqldump`, and "Moving an
+existing database into this stack". After loading a dump, apply pending migrations:
 
 ```bash
-eorm load-dump -p /path/to/dump.sql
-```
-
-Apply pending migrations from `orm/migrations/`:
-
-```bash
-alembic -x env_file=../../dev/.env upgrade head
+docker compose run --rm -e EYENED_AUTO_MIGRATE=true init
 ```
 
 ## Tests
@@ -154,5 +158,5 @@ pytest
 Never commit secrets — keep them in `.env` only.
 
 :::tip
-More detail and edge cases: `dev/README.md` in the repository.
+More detail and edge cases: `deploy/README.md` in the repository.
 :::

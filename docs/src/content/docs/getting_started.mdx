@@ -17,124 +17,114 @@ The Eyened platform is a modern web platform for visualization and annotation of
 
 ## Quick Setup
 
-The easiest way to get started with the Eyened platform is by configuring and running Docker Compose. 
-The platform will then be accessible from any machine within your network.
+Everything the platform needs — viewer, API, database, Redis, and file server — runs from one
+Docker stack.
 
-With this setup you will be able to:
-- Run the client / viewer, initially on an empty database.
-- Import images and associated metadata via the [Import API](/eyened-platform/importing_data) or Python ORM.
+**Prerequisite: Docker, with Compose 2.26 or newer.** That is the whole list — a current Docker
+Desktop or Docker Engine install already satisfies it; older Compose rejects the stack's
+`depends_on: required: false`. Supported platforms are Linux and macOS natively, and Windows via WSL2.
 
-**Prerequisite:** Ensure Docker and Docker Compose are installed.
-
-1. Clone the repository:
+1. Clone the repository. Images are built from your checkout, so the checkout *is* the version:
 
     ```bash
     git clone https://github.com/Eyened/eyened-platform.git
+    cd eyened-platform
     ```
 
-2. Navigate to the docker directory:
+2. Create the configuration and start the stack:
 
     ```bash
-    cd eyened-platform/docker
-    ```
-
-3. Configure a MySQL database.
-    If you already have one, set the `EYENED_DATABASE_*` variables in `docker/.env` (see step 4).
-    To start a new MySQL server from the repository:
-
-    ```bash
-    cd ../database
-    cp .env.example .env   # set MYSQL_* and EYENED_DATABASE_* passwords
-    docker compose up -d
-    cd ../docker
-    ```
-
-4. Create `docker/.env` from the example and adjust values:
-
-    ```bash
+    cd deploy
     cp .env.example .env
-    ```
-
-    | Variable | Description |
-    | --- | --- |
-    | PORT | Port the app will be served on |
-    | EYENED_API_SECRET_KEY | A random string |
-    | EYENED_DATABASE_HOST | Database hostname (`host.docker.internal` for a host-run MySQL container) |
-    | EYENED_DATABASE_PORT | Port to access the database |
-    | EYENED_DATABASE_USER | Username for database access |
-    | EYENED_DATABASE_PASSWORD | Password for database access |
-    | EYENED_DATABASE_DATABASE | Database name (default `eyened_database`) |
-    | EYENED_REDIS_PASSWORD | Password for the Redis service |
-    | EYENED_STORAGE_ROOT | Writable host path for thumbnails and segmentations (default `/storage`) |
-
-5. Configure storage.
-    Ensure `EYENED_STORAGE_ROOT` points to a writable host directory. The server uses `{EYENED_STORAGE_ROOT}/segmentations.zarr` and `{EYENED_STORAGE_ROOT}/thumbnails`.
-
-6. Configure the fileserver (optional for image datasets).
-    Routing of files is handled by nginx.
-    Update `nginx.conf` by adding locations for every folder where images are stored.
-    Each `location` path must match a `StorageBackend.Key` value used at import time (`storage_backend_key` in import rows).
-    Add matching read-only mounts under `fileserver.volumes` in `docker-compose.yaml`.
-
-7. Build and start the platform:
-
-    ```bash
+    # fill the five secrets in .env, each with: openssl rand -hex 32
     docker compose up -d --build
     ```
 
-8. Initialize the database.
-    On first setup, create the schema and seed the builtin form schemas:
+    On the first start the `init` service creates the schema, seeds the builtin form schemas,
+    and creates the administrator `admin` (or `EYENED_API_ADMIN_USERNAME`) with the password you
+    put in `EYENED_API_ADMIN_PASSWORD`.
+
+3. Open `http://localhost:8080` (or your `HTTP_PORT`) and sign in as that administrator.
+
+4. Add the remaining users, and grant each one access. Access comes from project memberships, so
+   an account made with `eorm create-user` — or through self-registration in the user interface —
+   logs in and sees **nothing** until it is granted a role in an **existing** project. There is no
+   command to create an empty one; a `Project` row is created as a side effect of importing data
+   into it — see **[Importing data](/eyened-platform/importing_data)**. Assuming a project named
+   `AMD-Study` already exists:
 
     ```bash
-    docker compose exec -it server bash
+    cd deploy
+    docker compose exec server eorm create-user --username alice --password '...'
+    docker compose exec server eorm grant --user alice --project "AMD-Study" --role grader
     ```
 
-    ```bash
-    eorm initialize-database
-    eorm seed-form-schemas
-    ```
+    Roles are `read_only`, `grader`, and `project_admin`. Grants take effect on the user's next
+    request — no re-login. Another administrator needs `eorm set-admin --user <username> --on`
+    instead — `create-user` cannot make one. `init-admin` also promotes an existing account, but
+    it prompts for (and may overwrite) that account's password, which is why `set-admin` is the
+    right tool for one that already has the login it should keep. See **[Access
+    control](/eyened-platform/guides/access_control)** for the model and **[CLI
+    reference](/eyened-platform/orm/cli#users-and-access)** for every command.
 
-    This runs the Alembic migration trail to head. You will be prompted to confirm the target database.
+### Day-to-day
 
-    The `seed-form-schemas` command inserts builtin viewer FormSchemas (ETDRS grid, registration). See **[Form schemas](/eyened-platform/orm/form_schemas)**, **[Registration](/eyened-platform/orm/registration)**, and the **[ETDRS panel](/eyened-platform/client/panels/etdrs)**.
+Run these from the `deploy/` directory; `.env` records which layers the stack uses:
 
-9. Create the administrator account.
+```bash
+cd deploy
+docker compose logs -f      # follow logs
+docker compose down         # stop
+docker compose up -d        # start
+```
 
-    ```bash
-    EYENED_API_ADMIN_PASSWORD='...' eorm init-admin --username <EYENED_API_ADMIN_USERNAME>
-    ```
+### Upgrading and rolling back
 
-    :::caution
-    Use `init-admin`, not `create-user`. Access is enforced from project memberships and there is no feature flag, so an account made with `eorm create-user` — or through self-registration in the user interface — logs in successfully and then sees **nothing**: no projects, no patients, no tasks. `init-admin` is the only command that bootstraps an account with access.
-    :::
+Images are built from your checkout, so an upgrade is a checkout plus a rebuild. The `init`
+service applies pending migrations on start, and MySQL cannot roll back a migration, so back up
+first. Record where you are, since that is what a rollback returns to:
 
-    Omitting the password stores an unusable hash, leaving an administrator that cannot log in. The command is idempotent, and re-running it without a password leaves an existing one alone.
+```bash
+git rev-parse --short HEAD
+cd deploy
+docker compose run --rm xtrabackup 'xtrabackup --backup --host=database --user=root --password="$MYSQL_ROOT_PASSWORD" --target-dir=/backup/before-upgrade && xtrabackup --prepare --target-dir=/backup/before-upgrade'
+git pull
+docker compose up -d --build
+docker compose logs init    # "Migrating <old> -> <new>." then the summary line
+```
 
-10. Add the remaining users, and grant each one access.
+To roll back, check out the recorded commit, restore the backup (`deploy/README.md`, "Backup and
+restore"), then `docker compose up -d --build`. A site that sets `EYENED_AUTO_MIGRATE=false`
+migrates by hand with `docker compose run --rm -e EYENED_AUTO_MIGRATE=true init`.
 
-    ```bash
-    eorm create-user --username alice --password '...'
-    eorm grant --user alice --project "AMD-Study" --role grader
-    ```
+Upgrading from a version that predates `deploy/`: read the **Deployment** section of the
+[release notes](/eyened-platform/release_notes) first.
 
-    Roles are `read_only`, `grader`, and `project_admin`. Grants take effect on the user's next request — no re-login. See **[Access control](/eyened-platform/guides/access_control)** for the model and **[CLI reference](/eyened-platform/orm/cli#users-and-access)** for every command.
+### Adding your first dataset
+
+A fresh install has an empty database, therefore no storage backends and no images — a correct
+but blank viewer. To point the platform at a directory of images:
+
+1. Mount the dataset: `cp deploy/compose.storage.example.yaml deploy/compose.storage.yaml`,
+   list it as `- /data/my-dataset:/data/my-dataset:ro` (host path, then `/data/<key>`), and
+   append `:compose.storage.yaml` to `COMPOSE_FILE` in `deploy/.env`.
+
+2. Set `EYENED_STORAGE_MOUNTS={"my-dataset":"/data/my-dataset"}` in `deploy/.env`, then
+   `docker compose up -d`.
+
+3. Import images with `storage_backend_key: "my-dataset"` — see
+   [Importing Data](/eyened-platform/importing_data). The storage backend record is created
+   automatically on first import, so there is no separate registration step.
 
 :::note
-For local development, see [Development Setup](/eyened-platform/guides/development_setup).
+For local development with hot reload, see
+[Development Setup](/eyened-platform/guides/development_setup).
 :::
 
-## Accessing the Platform
-
-Once the platform is running the viewer will be available at `http://<HOSTNAME>:<PORT>` from within your network
-
-To manage the platform:
-
-- To view logs: `docker compose logs -f`
-- To stop the platform: `docker compose down`
-- To start the platform: `docker compose up -d`
-
 :::caution
-Make sure to set up regular back ups for both the MySQL database and storage folders.
+Set up regular backups for both the database and the storage directories.
+
+See `deploy/README.md`, "Backup and restore": XtraBackup for a hot backup of the bundled database, and `mysqldump` for a portable one.
 :::
 
 :::tip

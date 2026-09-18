@@ -32,3 +32,6 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [The segmentation zarr store has no write lock](2026-08-24-zarr-storage-write-lock.md)
 - [API pool sizing assumes one connection per thread; a request takes several](2026-08-24-api-pool-sizing-multi-hop-checkout.md)
 - [Cross-project data cleaning has no safe path, and the ORM actively misleads](2026-08-25-cross-project-data-cleaning-has-no-safe-path.md)
+- [Packaging follow-ups from PR #202: `pyproject.toml` and the GPU worker installs](2026-09-15-pr202-packaging-followups.md)
+- [Session tokens outlive reset and restore](2026-09-15-session-tokens-outlive-reset-and-restore.md)
+- [Deploy slim-down: final-review findings not yet fixed](2026-09-18-deploy-slimdown-review-findings.md)

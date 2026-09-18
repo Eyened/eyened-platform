@@ -1,0 +1,24 @@
+# Image datasets. Copy to compose.storage.yaml (gitignored), append
+# :compose.storage.yaml to COMPOSE_FILE, and set the matching map in .env:
+#   EYENED_STORAGE_MOUNTS={"my-dataset":"/data/my-dataset"}
+# Each key must equal a StorageBackend.Key; the container path is always /data/<key>.
+
+x-datasets: &datasets
+  - /srv/datasets/my-dataset:/data/my-dataset:ro
+
+services:
+  server:
+    volumes: *datasets
+  fileserver:
+    volumes: *datasets
+  # Uncomment only with compose.workers.yaml in COMPOSE_FILE: compose rejects a
+  # layer that names a service no other file defines. A GPU host that loads the
+  # workers layer alone keeps these and deletes server and fileserver.
+  # worker-cfi-roi:
+  #   volumes: *datasets
+  # worker-inference:
+  #   volumes: *datasets
+  # worker-cfi-amd:
+  #   volumes: *datasets
+  # worker-layersegmentation:
+  #   volumes: *datasets

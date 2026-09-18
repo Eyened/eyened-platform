@@ -103,9 +103,9 @@ def test_oidc_missing_required_metadata(metadata_key):
 
 
 def test_the_admin_settings_carry_the_env_prefix(monkeypatch):
-    """EYENED_API_ADMIN_USERNAME / _PASSWORD, matching dev/sample.env.
+    """EYENED_API_ADMIN_USERNAME / _PASSWORD, matching deploy/.env.example.
 
-    A prefix that does not match the one documented in sample.env leaves the
+    A prefix that does not match the one documented in deploy/.env.example leaves the
     admin account silently unconfigured -- the default "admin" wins and nobody
     finds out until the bootstrapped account is the wrong one.
     """

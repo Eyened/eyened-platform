@@ -1,0 +1,121 @@
+# RQ workers, beside the platform or on a separate GPU host (README.md, "Workers").
+#
+# Never add a `depends_on`: a GPU host loads this file alone, and compose
+# rejects a dependency on a service it does not define. RQ retries its
+# connection, so start order does not matter. For the same reason the file
+# declares the platform_storage volume again at the bottom.
+
+x-worker-env: &worker-env
+  # Service names beside the platform; override in .env on a GPU host.
+  EYENED_REDIS_HOST: ${EYENED_REDIS_HOST:-redis}
+  EYENED_REDIS_PORT: ${EYENED_REDIS_PORT:-6379}
+  EYENED_REDIS_DB: ${EYENED_REDIS_DB:-0}
+  EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?set EYENED_REDIS_PASSWORD in deploy/.env}
+  EYENED_DATABASE_HOST: ${EYENED_DATABASE_HOST:-database}
+  EYENED_DATABASE_PORT: ${EYENED_DATABASE_PORT:-3306}
+  EYENED_DATABASE_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
+  EYENED_DATABASE_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
+  EYENED_DATABASE_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
+  EYENED_STORAGE_ROOT: /storage
+  EYENED_STORAGE_MOUNTS: ${EYENED_STORAGE_MOUNTS:-}
+
+# Anchors do not cross files, so the base's log cap is restated.
+x-worker-logging: &worker-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  # CPU-only and profile-free: it consumes `default`, the thumbnail queue.
+  worker-cfi-roi:
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.cfi-roi
+    environment:
+      <<: *worker-env
+      EYENED_RQ_WORKER_QUEUES: ${EYENED_RQ_QUEUES_CFI_ROI:-cfi-roi,default}
+    volumes:
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
+    logging: *worker-logging
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Also consumes `default` and `cfi-roi` unless EYENED_RQ_QUEUES_INFERENCE
+  # narrows it, so beside worker-cfi-roi those jobs have two consumers.
+  worker-inference:
+    profiles: ["gpu-inference"]
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.inference
+    environment:
+      <<: *worker-env
+      EYENED_RQ_WORKER_QUEUES: ${EYENED_RQ_QUEUES_INFERENCE:-default,cfi-roi,cfi-keypoints,cfi-odfd,cfi-quality}
+    volumes:
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
+    logging: *worker-logging
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # deploy.resources, not `gpus: all`, which older compose rejects for the whole file.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  worker-cfi-amd:
+    profiles: ["gpu-cfi-amd"]
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.cfi-amd
+    environment:
+      <<: *worker-env
+      EYENED_RQ_WORKER_QUEUES: cfi-amd
+      CFI_AMD_MODELS_DIR: /models/cfi-amd
+    volumes:
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
+    logging: *worker-logging
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  worker-layersegmentation:
+    profiles: ["gpu-layer-segmentation"]
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile.layersegmentation
+    environment:
+      <<: *worker-env
+      EYENED_RQ_WORKER_QUEUES: layer-segmentation
+      NNUNET_RESULTS: /nnUNet_results
+      nnUNet_results: /nnUNet_results
+      nnUNet_raw: /nnUNet_results
+      nnUNet_preprocessed: /nnUNet_results
+    volumes:
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
+    logging: *worker-logging
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  platform_storage:

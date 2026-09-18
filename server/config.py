@@ -128,7 +128,7 @@ class Settings(BaseSettings):
     public_auth_disabled: bool = False
     # Names the account the dev-auth bypass logs in as, and the account
     # `eorm init-admin` bootstraps. Two places naming the same account that
-    # disagree is the failure dev/sample.env's note exists to prevent. The
+    # disagree is the failure deploy/.env.example's note exists to prevent. The
     # account's password is not configured here: the dev bypass never posts
     # credentials, so the server has no use for it. `eorm init-admin` reads
     # it directly from EYENED_API_ADMIN_PASSWORD instead.

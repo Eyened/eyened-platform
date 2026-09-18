@@ -1,0 +1,67 @@
+# The scheme the client used: https behind a TLS-terminating proxy.
+map $http_x_forwarded_proto $client_scheme {
+    default $scheme;
+    https   https;
+    http    http;
+}
+
+server {
+    listen 80;
+    # Docker's DNS. With the variables below nginx re-resolves `server` on each
+    # request, so a recreated server container does not leave a stale IP.
+    resolver 127.0.0.11 valid=10s;
+    client_max_body_size 120M;
+    sendfile on;
+
+    # API responses and, in production, the SPA's assets. Both javascript
+    # spellings, because nginx versions differ on which one .js gets.
+    gzip on;
+    gzip_types text/plain application/json application/octet-stream
+               text/css application/javascript text/javascript
+               image/svg+xml application/manifest+json;
+    gzip_min_length 1024;
+    # The default (`off`) disables compression behind any proxy that adds Via.
+    gzip_proxied any;
+    gzip_vary on;
+    gunzip on;
+
+    # The only log of SPA, thumbnail and image-data requests.
+    access_log /var/log/nginx/access.log main;
+
+    location /api/ {
+        set $api_upstream server;
+        proxy_pass http://$api_upstream:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $client_scheme;
+    }
+
+    # /health lives on the outer app, not under /api. Without this block the
+    # SPA would answer it with 200 while the API is down.
+    location = /health {
+        set $api_upstream server;
+        proxy_pass http://$api_upstream:8000/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $client_scheme;
+    }
+
+    # `location /`: client.d/dev.conf or prod.conf, mounted by the layer.
+    include /etc/nginx/client.d/*.conf;
+
+    # The API sends X-Accel-Redirect: /thumbnails/<path>.
+    location /thumbnails/ {
+        internal;
+        # the trailing slash on alias matters
+        alias /storage/thumbnails/;
+    }
+
+    # Image datasets, mounted at /data/<key> by compose.storage.yaml. The API
+    # sends X-Accel-Redirect: /data/<key>/<path>.
+    location /data/ {
+        internal;
+        alias /data/;
+    }
+}

@@ -1,0 +1,181 @@
+# Base stack. deploy/.env picks the layers (COMPOSE_FILE) and whether the
+# bundled database runs (COMPOSE_PROFILES=local-db). See README.md.
+
+# Several stacks share hosts and client installs run unattended: cap every log.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Come back after a reboot; a deliberate `docker compose stop` stays stopped.
+x-restart: &default-restart unless-stopped
+
+# Shared by `init` and `server` so the two cannot disagree about the database.
+x-app-env: &app-env
+  EYENED_DATABASE_HOST: ${EYENED_DATABASE_HOST:-database}
+  EYENED_DATABASE_PORT: ${EYENED_DATABASE_PORT:-3306}
+  EYENED_DATABASE_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
+  EYENED_DATABASE_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
+  EYENED_DATABASE_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
+  # The account init creates and the dev-auth bypass acts as. Restated, not
+  # `:-`: the server rejects an empty name.
+  EYENED_API_ADMIN_USERNAME: ${EYENED_API_ADMIN_USERNAME:-admin}
+
+services:
+
+  database:
+    profiles: ["local-db"]
+    # Moves together with the xtrabackup pin: XtraBackup must match MySQL's major version.
+    image: mysql:8.4.11
+    logging: *default-logging
+    restart: *default-restart
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in deploy/.env}
+      MYSQL_DATABASE: ${EYENED_DATABASE_DATABASE:-eyened_database}
+      MYSQL_USER: ${EYENED_DATABASE_USER:?set EYENED_DATABASE_USER in deploy/.env}
+      MYSQL_PASSWORD: ${EYENED_DATABASE_PASSWORD:?set EYENED_DATABASE_PASSWORD in deploy/.env}
+    command:
+      - --innodb-buffer-pool-size=${EYENED_DATABASE_BUFFER_POOL_SIZE:-2G}
+    volumes:
+      # An absolute DB_DATA_PATH keeps the database outside Docker's volumes.
+      - ${DB_DATA_PATH:-db_data}:/var/lib/mysql
+    # mysqladmin ping needs no credentials, so no password shows up in `ps`.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      # Long because the first boot on a copied 8.0 datadir upgrades it before
+      # the port opens. A healthy probe ends the start period early.
+      start_period: 600s
+
+  # One-shot backup tool; see README.md "Backup and restore".
+  xtrabackup:
+    profiles: ["backup"]
+    image: percona/percona-xtrabackup:8.4.0-6.1
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in deploy/.env}
+    volumes:
+      # Same source as `database`, or a DB_DATA_PATH site would back up an empty volume.
+      - ${DB_DATA_PATH:-db_data}:/var/lib/mysql
+      - ${BACKUP_PATH:-./backups}:/backup
+
+  redis:
+    image: redis:7-alpine
+    logging: *default-logging
+    restart: *default-restart
+    environment:
+      REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?set EYENED_REDIS_PASSWORD in deploy/.env}
+    command: >
+      sh -c 'exec redis-server --requirepass "$$REDIS_PASSWORD"'
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Migrates, seeds and creates the first administrator, then exits; the
+  # server starts only after it succeeds. `docker compose logs init` shows what it did.
+  init:
+    # Built by `server` below.
+    image: ${COMPOSE_PROJECT_NAME:-eyened}-server:local
+    command: ["eorm", "bootstrap"]
+    logging: *default-logging
+    restart: "no"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      <<: *app-env
+      EYENED_AUTO_MIGRATE: ${EYENED_AUTO_MIGRATE:-true}
+      EYENED_API_ADMIN_PASSWORD: ${EYENED_API_ADMIN_PASSWORD:-}
+    depends_on:
+      # `required: false`: with the local-db profile off (an external
+      # database) there is no `database` service and init starts anyway.
+      database:
+        condition: service_healthy
+        required: false
+
+  server:
+    image: ${COMPOSE_PROJECT_NAME:-eyened}-server:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    logging: *default-logging
+    restart: *default-restart
+    # Lets EYENED_DATABASE_HOST / EYENED_REDIS_HOST name the Docker host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # No env_file: .env also holds MYSQL_ROOT_PASSWORD, and `docker inspect`
+    # shows a container's environment. Bool and int defaults are restated
+    # rather than written `:-`, because pydantic rejects an empty string for them.
+    environment:
+      <<: *app-env
+      EYENED_REDIS_HOST: ${EYENED_REDIS_HOST:-redis}
+      EYENED_REDIS_PORT: ${EYENED_REDIS_PORT:-6379}
+      EYENED_REDIS_PASSWORD: ${EYENED_REDIS_PASSWORD:?set EYENED_REDIS_PASSWORD in deploy/.env}
+      EYENED_API_SECRET_KEY: ${EYENED_API_SECRET_KEY:?set EYENED_API_SECRET_KEY in deploy/.env}
+      EYENED_API_PUBLIC_AUTH_DISABLED: ${EYENED_API_PUBLIC_AUTH_DISABLED:-false}
+      EYENED_API_DEBUG: ${EYENED_API_DEBUG:-false}
+      # Read by the image's gunicorn CMD, not by the app.
+      WORKERS: ${WORKERS:-4}
+      EYENED_API_THREADPOOL_LIMIT: ${EYENED_API_THREADPOOL_LIMIT:-16}
+      EYENED_API_POOL_SIZE: ${EYENED_API_POOL_SIZE:-16}
+      EYENED_API_MAX_OVERFLOW: ${EYENED_API_MAX_OVERFLOW:-4}
+      EYENED_API_POOL_TIMEOUT: ${EYENED_API_POOL_TIMEOUT:-5}
+      EYENED_API_PASSWORD_HASH_CONCURRENCY: ${EYENED_API_PASSWORD_HASH_CONCURRENCY:-4}
+      EYENED_API_AUTH_PASSWORD_ENABLED: ${EYENED_API_AUTH_PASSWORD_ENABLED:-true}
+      EYENED_STORAGE_ROOT: /storage
+      # Empty keeps local mode off; see compose.storage.example.yaml.
+      EYENED_STORAGE_MOUNTS: ${EYENED_STORAGE_MOUNTS:-}
+      # OIDC. The three URLs must change together; see keycloak/README.md.
+      EYENED_API_AUTH_OIDC_ENABLED: ${EYENED_API_AUTH_OIDC_ENABLED:-false}
+      EYENED_OIDC_CLIENT_ID: ${EYENED_OIDC_CLIENT_ID:-}
+      EYENED_OIDC_CLIENT_SECRET: ${EYENED_OIDC_CLIENT_SECRET:-}
+      EYENED_OIDC_METADATA_URL: ${EYENED_OIDC_METADATA_URL:-}
+      EYENED_OIDC_REDIRECT_URL: ${EYENED_OIDC_REDIRECT_URL:-}
+      EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS: ${EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS:-}
+      # Restated: an empty string would blank the login page's provider label.
+      EYENED_OIDC_PROVIDER_NAME: "${EYENED_OIDC_PROVIDER_NAME:-OpenID Connect}"
+      EYENED_OIDC_CREATE_NEW_ACCOUNTS: ${EYENED_OIDC_CREATE_NEW_ACCOUNTS:-false}
+    volumes:
+      # Unset = this stack's own volume; an absolute path attaches shared storage.
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage
+    depends_on:
+      redis:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      # 127.0.0.1, not localhost: the oidc layer can alias localhost to the host gateway.
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  fileserver:
+    image: nginx:1.27-alpine
+    logging: *default-logging
+    restart: *default-restart
+    # No env_file, for the same reason as `server`; the template needs no variables.
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      # Thumbnails are served straight off platform storage.
+      - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    # `location /` (client.d/) is mounted by the dev or prod layer.
+
+volumes:
+  db_data:
+  platform_storage:
