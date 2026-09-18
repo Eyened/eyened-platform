@@ -63,10 +63,10 @@ database.
 - **Breaking: the `Makefile` is gone.** Its three targets — `gen-openapi`, `gen-types`,
   `gen-client-types` — are now the single command `npm run gen:types` in `client/`. `make` is not a
   prerequisite.
-- **Breaking: Docker Compose 2.26 or newer is now required.** The server's dependency on the
-  bundled database uses `depends_on: required: false`, which is what lets the same stack run
+- **Breaking: Docker Compose 2.26 or newer is now required.** The `init` service's dependency on
+  the bundled database uses `depends_on: required: false`, which is what lets the same stack run
   with a bundled or an external database. Older Compose either rejects it or silently drops the
-  dependency, which makes the server race MySQL and crash-loop on first boot.
+  dependency, which makes `init` race MySQL and fail on first boot.
 - **Breaking: MySQL and Redis no longer publish host ports.** Both used to be published on every
   interface — MySQL by the `database` stack, Redis by `dev/` and `docker/`. Neither is published
   by default now: append `:compose.host-ports.yaml` to `COMPOSE_FILE` in `deploy/.env` and set
