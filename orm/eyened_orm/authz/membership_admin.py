@@ -1,22 +1,21 @@
 """Membership administration: grants, revocations, and the task-grant plan.
 
-The Click commands in ``commands/rbac.py`` are thin shells over this class. The
-admin API's reads are not: ``memberships_of`` is keyed on username where the URL
-carries an id, and this class requires a fourth repository (``TaskRepository``)
-that a membership read never touches. Its write endpoints do come back here. It
-holds repositories and never a ``Session``, which is what will let it serve both.
+Two callers: the Click commands in ``commands/rbac.py`` and the admin API's
+membership writes. The id-keyed methods hold the logic; each ``*_by_name`` twin
+resolves names for the CLI and delegates, writing nothing itself. The class
+holds repositories and never a ``Session``.
 
 v0.3 places the CLI outside RBAC enforcement as a trusted path, so nothing here
 authorizes its operator. Everything here **attributes**: each state change
 writes an ``AuditLog`` row naming the ``Actor`` this instance was constructed
 with. What changes nothing writes nothing -- an idempotent grant, an
 already-revoked membership -- and the read-only methods
-(``memberships_of``, ``plan_grant_for_tasks``) write no row at all.
+(``memberships_of``, ``plan_grant_for_tasks`` and its twin) write no row at all.
 ``grant_all`` is the one exception: it always writes a single summary row,
 even when zero memberships were written -- see its docstring.
 
 Split from account lifecycle (``account_admin.py``) along the dependency seam:
-these seven methods use four repositories between them, the lifecycle methods
+these methods use four repositories between them, the lifecycle methods
 use one. Membership changes for RBAC-policy reasons; credentials change for
 identity reasons.
 """
@@ -67,12 +66,11 @@ class TaskGrantPlan:
     written, in ``already_held`` it is the role the user already has (which is
     at or above the requested one, which is why it is not being written).
 
-    ``username`` is part of the plan, not a separate argument to
-    ``apply_grant_plan``: the diff is only meaningful for the user it was
-    computed against, and applying it to anyone else silently under-grants.
+    ``creator_id`` is part of the plan, not an argument to ``apply_grant_plan``:
+    the diff is only meaningful for the user it was computed against.
     """
 
-    username: str
+    creator_id: int
     task_ids: tuple[int, ...]
     to_grant: tuple[tuple[int, str, ProjectRole], ...]
     already_held: tuple[tuple[int, str, ProjectRole], ...]
@@ -139,21 +137,37 @@ class MembershipAdministration:
             )
         return project
 
+    def _creator_by_id(self, creator_id: int) -> Creator:
+        creator = self._creators.get_by_id(creator_id)
+        if creator is None:
+            raise AdminEntityNotFound(
+                f"no creator with id {creator_id}", entity="Creator"
+            )
+        return creator
+
+    def _project_by_id(self, project_id: int) -> Project:
+        project = self._projects.get_by_id(project_id)
+        if project is None:
+            raise AdminEntityNotFound(
+                f"no project with id {project_id}", entity="Project"
+            )
+        return project
+
     # --- membership -------------------------------------------------------
 
     def grant(
-        self, *, username: str, project_name: str, role: ProjectRole
+        self, *, creator_id: int, project_id: int, role: ProjectRole
     ) -> GrantResult:
         """Grant or change a role. Idempotent: an unchanged grant writes no audit row."""
-        creator = self._creator(username)
-        project = self._project(project_name)
+        creator = self._creator_by_id(creator_id)
+        project = self._project_by_id(project_id)
 
         existing = self._members.get(creator.CreatorID, project.ProjectID)
         if existing is not None and existing.Role is role:
             return GrantResult(
                 creator_id=creator.CreatorID,
                 project_id=project.ProjectID,
-                project_name=project_name,
+                project_name=project.ProjectName,
                 previous=role,
                 role=role,
                 changed=False,
@@ -166,13 +180,12 @@ class MembershipAdministration:
             actor=self._actor,
             action="INSERT" if previous is None else "UPDATE",
             entity="ProjectMember",
-            # `audit_trusted` dropped this and buried the id in Changes instead.
             project_id=project.ProjectID,
             changes={
                 "creator_id": creator.CreatorID,
-                "username": username,
+                "username": creator.CreatorName,
                 "project_id": project.ProjectID,
-                "project_name": project_name,
+                "project_name": project.ProjectName,
                 "role": role.name
                 if previous is None
                 else {"old": previous.name, "new": role.name},
@@ -181,16 +194,26 @@ class MembershipAdministration:
         return GrantResult(
             creator_id=creator.CreatorID,
             project_id=project.ProjectID,
-            project_name=project_name,
+            project_name=project.ProjectName,
             previous=previous,
             role=role,
             changed=True,
         )
 
-    def revoke(self, *, username: str, project_name: str) -> bool:
-        """Remove a membership. Returns False when there was nothing to remove."""
+    def grant_by_name(
+        self, *, username: str, project_name: str, role: ProjectRole
+    ) -> GrantResult:
+        """`grant`, keyed by name."""
         creator = self._creator(username)
         project = self._project(project_name)
+        return self.grant(
+            creator_id=creator.CreatorID, project_id=project.ProjectID, role=role
+        )
+
+    def revoke(self, *, creator_id: int, project_id: int) -> bool:
+        """Remove a membership. Returns False when there was nothing to remove."""
+        creator = self._creator_by_id(creator_id)
+        project = self._project_by_id(project_id)
 
         member = self._members.get(creator.CreatorID, project.ProjectID)
         if member is None:
@@ -204,13 +227,19 @@ class MembershipAdministration:
             project_id=project.ProjectID,
             changes={
                 "creator_id": creator.CreatorID,
-                "username": username,
+                "username": creator.CreatorName,
                 "project_id": project.ProjectID,
-                "project_name": project_name,
+                "project_name": project.ProjectName,
                 "role": previous.name,
             },
         )
         return True
+
+    def revoke_by_name(self, *, username: str, project_name: str) -> bool:
+        """`revoke`, keyed by name."""
+        creator = self._creator(username)
+        project = self._project(project_name)
+        return self.revoke(creator_id=creator.CreatorID, project_id=project.ProjectID)
 
     def grant_all(self, *, role: ProjectRole = ProjectRole.grader) -> tuple[int, int, int]:
         """Grant ``role`` in every project to every creator that can authenticate.
@@ -273,7 +302,7 @@ class MembershipAdministration:
     # --- task-driven grants -----------------------------------------------
 
     def plan_grant_for_tasks(
-        self, *, username: str, task_ids: Sequence[int], role: ProjectRole
+        self, *, creator_id: int, task_ids: Sequence[int], role: ProjectRole
     ) -> TaskGrantPlan:
         """Resolve the projects the tasks touch and diff them against what is held.
 
@@ -292,7 +321,7 @@ class MembershipAdministration:
         if not task_ids:
             raise ValueError("'task_ids' must not be empty")
 
-        creator = self._creator(username)
+        creator = self._creator_by_id(creator_id)
         held = self._members.roles_for(creator.CreatorID)
 
         found = self._tasks.existing_ids(task_ids)
@@ -318,10 +347,18 @@ class MembershipAdministration:
             else:
                 to_grant.append((project_id, names[project_id], role))
         return TaskGrantPlan(
-            username=username,
+            creator_id=creator.CreatorID,
             task_ids=tuple(task_ids),
             to_grant=tuple(to_grant),
             already_held=tuple(already_held),
+        )
+
+    def plan_grant_for_tasks_by_name(
+        self, *, username: str, task_ids: Sequence[int], role: ProjectRole
+    ) -> TaskGrantPlan:
+        """`plan_grant_for_tasks`, keyed by name."""
+        return self.plan_grant_for_tasks(
+            creator_id=self._creator(username).CreatorID, task_ids=task_ids, role=role
         )
 
     def apply_grant_plan(self, *, plan: TaskGrantPlan) -> list[GrantResult]:
@@ -329,16 +366,12 @@ class MembershipAdministration:
         revoked the same way, and carrying the same access to that project's data
         outside the task.
 
-        Aborts on the first failure rather than reporting per-item outcomes,
-        which is the existing behavior and is safe here: every name in
-        ``to_grant`` was resolved out of the database inside this transaction by
-        ``plan_grant_for_tasks``, so ``grant`` has nothing left to fail to find.
-        The parent spec's per-item rule is about the HTTP surface, where the
-        caller supplies the ids -- it lands with the write endpoints in step 3.
+        CLI-only. Aborts on the first failure: every id in ``to_grant`` was
+        resolved by ``plan_grant_for_tasks`` in this transaction.
         """
         return [
-            self.grant(username=plan.username, project_name=name, role=role)
-            for _, name, role in plan.to_grant
+            self.grant(creator_id=plan.creator_id, project_id=project_id, role=role)
+            for project_id, _, role in plan.to_grant
         ]
 
     def apply_revoke_all(
@@ -360,5 +393,6 @@ class MembershipAdministration:
         Aborts on the first failure, for the same reason `apply_grant_plan`
         does: ``held`` came from ``memberships_of`` in this transaction.
         """
-        for _, project_name, _ in held:
-            self.revoke(username=username, project_name=project_name)
+        creator_id = self._creator(username).CreatorID
+        for project_id, _, _ in held:
+            self.revoke(creator_id=creator_id, project_id=project_id)

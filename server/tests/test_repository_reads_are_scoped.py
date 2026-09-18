@@ -141,7 +141,8 @@ _WRITE_PREFIXES = ("add", "save", "delete", "upsert", "remove", "replace", "clai
 # every other. CreatorRepository.list_humans, added in the same change, is not
 # among these two: CreatorRepository is in _UNSCOPED_REPOSITORIES and the walk
 # `continue`s on the class before inspecting a method.
-_EXPECTED_SCANNED_READS = 45
+# 45 -> 46 for ProjectRepository.get_by_id, scoped like get_by_name.
+_EXPECTED_SCANNED_READS = 46
 
 # Read methods allowed to scope themselves by consuming ``self._scope`` instead
 # of calling ``apply_scope``/``scoped_one``. Set equality, like every other

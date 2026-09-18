@@ -148,7 +148,7 @@ def grant_cmd(username: str, project_name: str, role: str):
     database = get_database()
     with database.get_session() as session:
         try:
-            result = _membership(session, TrustedPath("eorm grant")).grant(
+            result = _membership(session, TrustedPath("eorm grant")).grant_by_name(
                 username=username, project_name=project_name, role=parsed
             )
         except AdminEntityNotFound as exc:
@@ -187,7 +187,7 @@ def revoke_cmd(
         admin = _membership(session, TrustedPath("eorm revoke"))
         if not all_projects:
             try:
-                removed = admin.revoke(username=username, project_name=project_name)
+                removed = admin.revoke_by_name(username=username, project_name=project_name)
             except AdminEntityNotFound as exc:
                 raise click.ClickException(str(exc)) from exc
             session.commit()
@@ -233,7 +233,7 @@ def grant_for_task_cmd(
     with database.get_session() as session:
         admin = _membership(session, TrustedPath("eorm grant-for-task"))
         try:
-            plan = admin.plan_grant_for_tasks(
+            plan = admin.plan_grant_for_tasks_by_name(
                 username=username, task_ids=task_ids, role=parsed
             )
         except AdminEntityNotFound as exc:

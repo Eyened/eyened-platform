@@ -31,10 +31,6 @@ class ProjectRepository:
     ``scoped_one`` is not used for the single-row read: it has no
     ``SAFE_UNFILTERED_ENTITIES`` fallback and raises unconditionally, so it
     would reject an admin scope too.
-
-    No ``get_by_id``: none of step 2's endpoints needs one, and it lands with
-    P3's first id-keyed project URL. Shipping it now would be an untested
-    public method, which the repo's 80% patch-coverage gate would also flag.
     """
 
     def __init__(self, session: Session, *, scope: AccessScope) -> None:
@@ -45,6 +41,15 @@ class ProjectRepository:
         return self._session.scalars(
             apply_scope(
                 select(Project).where(Project.ProjectName == name),
+                Project,
+                self._scope,
+            )
+        ).first()
+
+    def get_by_id(self, project_id: int) -> Project | None:
+        return self._session.scalars(
+            apply_scope(
+                select(Project).where(Project.ProjectID == project_id),
                 Project,
                 self._scope,
             )

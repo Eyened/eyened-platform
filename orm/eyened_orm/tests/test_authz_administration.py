@@ -43,7 +43,7 @@ def test_grant_creates_a_membership_and_audits_it(session, membership):
     make_project(session, "A")
     session.commit()
 
-    result = membership("grant").grant(
+    result = membership("grant").grant_by_name(
         username="alice", project_name="A", role=ProjectRole.grader
     )
     session.commit()
@@ -65,10 +65,10 @@ def test_grant_creates_a_membership_and_audits_it(session, membership):
 def test_an_unchanged_grant_writes_no_audit_row(session, membership):
     make_creator(session, "alice")
     make_project(session, "A")
-    membership("grant").grant(username="alice", project_name="A", role=ProjectRole.grader)
+    membership("grant").grant_by_name(username="alice", project_name="A", role=ProjectRole.grader)
     session.commit()
 
-    result = membership("grant").grant(
+    result = membership("grant").grant_by_name(
         username="alice", project_name="A", role=ProjectRole.grader
     )
     session.commit()
@@ -80,12 +80,12 @@ def test_an_unchanged_grant_writes_no_audit_row(session, membership):
 def test_changing_a_role_records_old_and_new(session, membership):
     make_creator(session, "alice")
     make_project(session, "A")
-    membership("grant").grant(
+    membership("grant").grant_by_name(
         username="alice", project_name="A", role=ProjectRole.read_only
     )
     session.commit()
 
-    result = membership("grant").grant(
+    result = membership("grant").grant_by_name(
         username="alice", project_name="A", role=ProjectRole.grader
     )
     session.commit()
@@ -99,11 +99,11 @@ def test_changing_a_role_records_old_and_new(session, membership):
 def test_revoke_removes_the_membership_and_audits_it(session, membership):
     alice = make_creator(session, "alice")
     project = make_project(session, "A")
-    membership("grant").grant(username="alice", project_name="A", role=ProjectRole.grader)
+    membership("grant").grant_by_name(username="alice", project_name="A", role=ProjectRole.grader)
     session.commit()
     project_id = project.ProjectID  # captured before expiry
 
-    assert membership("revoke").revoke(username="alice", project_name="A") is True
+    assert membership("revoke").revoke_by_name(username="alice", project_name="A") is True
     session.commit()
     assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
     session.expunge_all()
@@ -128,14 +128,14 @@ def test_revoking_a_membership_that_does_not_exist_is_a_no_op(session, membershi
     make_creator(session, "alice")
     make_project(session, "A")
     session.commit()
-    assert membership("revoke").revoke(username="alice", project_name="A") is False
+    assert membership("revoke").revoke_by_name(username="alice", project_name="A") is False
 
 
 def test_an_unknown_username_names_itself(session, membership):
     make_project(session, "A")
     session.commit()
     with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
-        membership("grant").grant(
+        membership("grant").grant_by_name(
             username="nosuchuser", project_name="A", role=ProjectRole.grader
         )
 
@@ -145,7 +145,7 @@ def test_an_unknown_project_names_itself(session, membership):
     make_creator(session, "alice")
     session.commit()
     with pytest.raises(AdminEntityNotFound, match="nosuchproject"):
-        membership("grant").grant(
+        membership("grant").grant_by_name(
             username="alice", project_name="nosuchproject", role=ProjectRole.grader
         )
 
@@ -166,8 +166,8 @@ def test_memberships_of_lists_every_membership_ordered_by_project_name(
     session.commit()
 
     admin = membership("list")
-    admin.grant(username="alice", project_name="Zebra", role=ProjectRole.grader)
-    admin.grant(username="alice", project_name="Apple", role=ProjectRole.project_admin)
+    admin.grant_by_name(username="alice", project_name="Zebra", role=ProjectRole.grader)
+    admin.grant_by_name(username="alice", project_name="Apple", role=ProjectRole.project_admin)
     session.commit()
 
     assert admin.memberships_of(username="alice") == [
@@ -187,8 +187,8 @@ def test_apply_revoke_all_removes_every_membership_and_audits_each(session, memb
     session.commit()
 
     admin = membership("revoke")
-    admin.grant(username="alice", project_name="A", role=ProjectRole.grader)
-    admin.grant(username="alice", project_name="B", role=ProjectRole.read_only)
+    admin.grant_by_name(username="alice", project_name="A", role=ProjectRole.grader)
+    admin.grant_by_name(username="alice", project_name="B", role=ProjectRole.read_only)
     session.commit()
 
     held = admin.memberships_of(username="alice")
@@ -214,10 +214,10 @@ def test_a_plan_lists_what_will_be_granted_and_what_is_already_held(
     permanently, until revoked. An administrator who reads the command name and
     not the effect will over-grant."""
     make_creator(session, "alice")
-    membership("grant").grant(username="alice", project_name="A", role=ProjectRole.grader)
+    membership("grant").grant_by_name(username="alice", project_name="A", role=ProjectRole.grader)
     session.commit()
 
-    plan = membership("grant-for-task").plan_grant_for_tasks(
+    plan = membership("grant-for-task").plan_grant_for_tasks_by_name(
         username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     assert [name for _, name, _ in plan.to_grant] == ["B"]
@@ -231,7 +231,7 @@ def test_a_plan_writes_nothing(session, spanning, membership):
 
     alice = make_creator(session, "alice")
     session.commit()
-    membership("grant-for-task").plan_grant_for_tasks(
+    membership("grant-for-task").plan_grant_for_tasks_by_name(
         username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {}
@@ -244,13 +244,13 @@ def test_applying_a_plan_never_lowers_an_existing_role(session, spanning, member
     )
 
     alice = make_creator(session, "alice")
-    membership("grant").grant(
+    membership("grant").grant_by_name(
         username="alice", project_name="A", role=ProjectRole.project_admin
     )
     session.commit()
 
     admin = membership("grant-for-task")
-    plan = admin.plan_grant_for_tasks(
+    plan = admin.plan_grant_for_tasks_by_name(
         username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     admin.apply_grant_plan(plan=plan)
@@ -268,12 +268,12 @@ def test_a_lower_existing_role_is_upgraded_not_reported_as_already_held(
     only 'has a membership' silently refuses the upgrade, and the administrator
     reads 'already holds read_only in A' as success."""
     make_creator(session, "alice")
-    membership("grant").grant(
+    membership("grant").grant_by_name(
         username="alice", project_name="A", role=ProjectRole.read_only
     )
     session.commit()
 
-    plan = membership("grant-for-task").plan_grant_for_tasks(
+    plan = membership("grant-for-task").plan_grant_for_tasks_by_name(
         username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     assert [name for _, name, _ in plan.to_grant] == ["A", "B"]
@@ -285,7 +285,7 @@ def test_a_task_touching_no_projects_grants_nothing(session, spanning, membershi
     everyone can already see."""
     make_creator(session, "alice")
     session.commit()
-    plan = membership("grant-for-task").plan_grant_for_tasks(
+    plan = membership("grant-for-task").plan_grant_for_tasks_by_name(
         username="alice", task_ids=[spanning["empty"]], role=ProjectRole.grader
     )
     assert plan.to_grant == () and plan.already_held == ()
@@ -303,7 +303,7 @@ def test_an_unknown_task_id_among_valid_ones_is_an_error_not_a_silent_drop(
     make_creator(session, "alice")
     session.commit()
     with pytest.raises(AdminEntityNotFound) as excinfo:
-        membership("grant-for-task").plan_grant_for_tasks(
+        membership("grant-for-task").plan_grant_for_tasks_by_name(
             username="alice",
             task_ids=[spanning["task"], 999999],
             role=ProjectRole.grader,
@@ -320,7 +320,7 @@ def test_the_plan_uses_the_same_definition_enforcement_uses(session, spanning, m
 
     make_creator(session, "alice")
     session.commit()
-    plan = membership("grant-for-task").plan_grant_for_tasks(
+    plan = membership("grant-for-task").plan_grant_for_tasks_by_name(
         username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     assert {pid for pid, _, _ in plan.to_grant} == projects_of(
@@ -336,7 +336,7 @@ def test_applying_a_plan_audits_every_grant(session, spanning, membership):
     make_creator(session, "alice")
     session.commit()
     admin = membership("grant-for-task")
-    plan = admin.plan_grant_for_tasks(
+    plan = admin.plan_grant_for_tasks_by_name(
         username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     admin.apply_grant_plan(plan=plan)
@@ -482,10 +482,10 @@ def test_grant_all_never_changes_a_role_already_held(session, membership):
     for name in ("A", "B", "C"):
         make_project(session, name)
     session.commit()
-    membership("grant").grant(
+    membership("grant").grant_by_name(
         username="alice", project_name="A", role=ProjectRole.project_admin
     )
-    membership("grant").grant(
+    membership("grant").grant_by_name(
         username="alice", project_name="B", role=ProjectRole.read_only
     )
     session.commit()
@@ -509,7 +509,7 @@ def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(
     it to be rebuilt from memory."""
     alice = make_creator(session, "alice")
     make_project(session, "A")
-    membership("grant").grant(username="alice", project_name="A", role=ProjectRole.grader)
+    membership("grant").grant_by_name(username="alice", project_name="A", role=ProjectRole.grader)
     session.commit()
     creator_id = alice.CreatorID
 
@@ -781,7 +781,7 @@ def test_a_grant_row_now_carries_the_project_it_named(session, membership):
     session.commit()
     project_id = project.ProjectID  # captured before expiry
 
-    membership("grant").grant(
+    membership("grant").grant_by_name(
         username="alice", project_name="A", role=ProjectRole.grader
     )
     session.commit()

@@ -6,8 +6,8 @@ covers this: a method can accept a perfectly good actor and simply forget to
 write the row. That is invisible to any signature check and is exactly the
 failure this whole change exists to prevent, so it is checked behaviorally.
 
-Parametrized over the nine mutating methods, not a sample of them; the two
-read-only methods each get their own dedicated test below instead. A tenth
+Parametrized over the eleven mutating methods, not a sample of them; the two
+read-only methods each get their own dedicated test below instead. A twelfth
 mutating method added without a row must fail here, and adding it to the table
 is how the author is made to think about it.
 """
@@ -36,16 +36,16 @@ from eyened_orm.utils.factories import admin_scope, make_creator, make_project
 @pytest.fixture()
 def seeded(session):
     """One creator, one project, and both administration classes over them."""
-    make_creator(session, "alice")
+    alice = make_creator(session, "alice")
     project = make_project(session, "A")
     session.commit()
-    project_id = project.ProjectID  # captured before the fixture returns
+    ids = {"creator": alice.CreatorID, "project": project.ProjectID}
 
     scope = admin_scope()
     audit = AuditWriter(session)
     actor = TrustedPath("eorm test")
     return {
-        "project_id": project_id,
+        "ids": ids,
         "membership": MembershipAdministration(
             CreatorRepository(session, scope=scope),
             ProjectRepository(session, scope=scope),
@@ -60,24 +60,23 @@ def seeded(session):
     }
 
 
-def _one_project_plan(project_id: int) -> TaskGrantPlan:
-    """A plan built directly rather than through `plan_grant_for_tasks`.
-
-    What is under test here is that *applying* a plan writes rows. Building one
-    the normal way needs the `spanning` task fixture, and a guard that dragged
-    it in could fail for reasons that have nothing to do with the property.
-    """
+def _one_project_plan(ids: dict[str, int]) -> TaskGrantPlan:
+    """A plan built directly, so this guard does not depend on the task fixture."""
     return TaskGrantPlan(
-        username="alice",
+        creator_id=ids["creator"],
         task_ids=(),
-        to_grant=((project_id, "A", ProjectRole.grader),),
+        to_grant=((ids["project"], "A", ProjectRole.grader),),
         already_held=(),
     )
 
 
+def _grant_alice(a, ids):
+    a.grant_by_name(username="alice", project_name="A", role=ProjectRole.grader)
+
+
 # (label, which class, arrange, act) for every state-changing method.
 #
-# Arrange and act are SEPARATE on purpose. Three of these methods need existing
+# Arrange and act are SEPARATE on purpose. Four of these methods need existing
 # state to change -- you cannot revoke what was never granted -- and the arrange
 # step writes audit rows of its own. A guard that only asserted "some row
 # exists" after running both would pass for `revoke`, `reactivate` and
@@ -85,33 +84,40 @@ def _one_project_plan(project_id: int) -> TaskGrantPlan:
 # rows satisfy it. The count is taken between the two.
 _MUTATING = [
     ("grant", "membership",
-     lambda a, pid: None,
-     lambda a, pid: a.grant(username="alice", project_name="A", role=ProjectRole.grader)),
+     lambda a, ids: None,
+     lambda a, ids: a.grant(
+         creator_id=ids["creator"], project_id=ids["project"], role=ProjectRole.grader)),
+    ("grant_by_name", "membership",
+     lambda a, ids: None,
+     _grant_alice),
     ("revoke", "membership",
-     lambda a, pid: a.grant(username="alice", project_name="A", role=ProjectRole.grader),
-     lambda a, pid: a.revoke(username="alice", project_name="A")),
+     _grant_alice,
+     lambda a, ids: a.revoke(creator_id=ids["creator"], project_id=ids["project"])),
+    ("revoke_by_name", "membership",
+     _grant_alice,
+     lambda a, ids: a.revoke_by_name(username="alice", project_name="A")),
     ("grant_all", "membership",
-     lambda a, pid: None,
-     lambda a, pid: a.grant_all()),
+     lambda a, ids: None,
+     lambda a, ids: a.grant_all()),
     ("apply_grant_plan", "membership",
-     lambda a, pid: None,
-     lambda a, pid: a.apply_grant_plan(plan=_one_project_plan(pid))),
+     lambda a, ids: None,
+     lambda a, ids: a.apply_grant_plan(plan=_one_project_plan(ids))),
     ("apply_revoke_all", "membership",
-     lambda a, pid: a.grant(username="alice", project_name="A", role=ProjectRole.grader),
-     lambda a, pid: a.apply_revoke_all(
+     _grant_alice,
+     lambda a, ids: a.apply_revoke_all(
          username="alice", held=a.memberships_of(username="alice"))),
     ("deactivate", "account",
-     lambda a, pid: None,
-     lambda a, pid: a.deactivate(username="alice")),
+     lambda a, ids: None,
+     lambda a, ids: a.deactivate(username="alice")),
     ("reactivate", "account",
-     lambda a, pid: a.deactivate(username="alice"),
-     lambda a, pid: a.reactivate(username="alice")),
+     lambda a, ids: a.deactivate(username="alice"),
+     lambda a, ids: a.reactivate(username="alice")),
     ("set_admin", "account",
-     lambda a, pid: None,
-     lambda a, pid: a.set_admin(username="alice", is_admin=True)),
+     lambda a, ids: None,
+     lambda a, ids: a.set_admin(username="alice", is_admin=True)),
     ("set_password", "account",
-     lambda a, pid: None,
-     lambda a, pid: a.set_password(username="alice", password="pw")),
+     lambda a, ids: None,
+     lambda a, ids: a.set_password(username="alice", password="pw")),
 ]
 
 
@@ -143,6 +149,7 @@ def test_the_administration_classes_have_no_unclassified_public_method():
         *(label for label, which, _, _ in _MUTATING if which == "membership"),
         "memberships_of",
         "plan_grant_for_tasks",
+        "plan_grant_for_tasks_by_name",
     }
     assert _public_method_names(AccountAdministration) == {
         label for label, which, _, _ in _MUTATING if which == "account"
@@ -155,19 +162,19 @@ def test_the_administration_classes_have_no_unclassified_public_method():
 def test_every_mutating_method_writes_an_audit_row(
     session, seeded, label, which, arrange, act
 ):
-    """Nine methods, no sample. Accepting an Actor and then not writing the row
+    """Eleven methods, no sample. Accepting an Actor and then not writing the row
     passes every signature check there is, and the constructor cannot see it.
 
     The assertion is on the *delta*, not on "a row exists": the arrange step
     writes rows for the three methods that need existing state, and an absolute
     check would be satisfied by those alone.
     """
-    admin, project_id = seeded[which], seeded["project_id"]
-    arrange(admin, project_id)
+    admin, ids = seeded[which], seeded["ids"]
+    arrange(admin, ids)
     session.flush()
     before = _audit_count(session)
 
-    act(admin, project_id)
+    act(admin, ids)
     session.flush()
 
     assert _audit_count(session) > before, f"{label} wrote no audit row"
@@ -215,7 +222,7 @@ def test_plan_grant_for_tasks_writes_nothing(session, spanning):
     )
 
     before = _audit_count(session)
-    plan = admin.plan_grant_for_tasks(
+    plan = admin.plan_grant_for_tasks_by_name(
         username="alice", task_ids=[spanning["task"]], role=ProjectRole.grader
     )
     session.flush()
@@ -224,3 +231,18 @@ def test_plan_grant_for_tasks_writes_nothing(session, spanning):
         "plan resolved no projects -- success path not reached"
     )
     assert _audit_count(session) == before
+
+
+@pytest.mark.parametrize("label", ["grant_by_name", "revoke_by_name"])
+def test_a_by_name_wrapper_writes_exactly_one_row(session, seeded, label):
+    """The wrappers delegate; one that also wrote its own row would double every CLI change."""
+    _, _, arrange, act = next(m for m in _MUTATING if m[0] == label)
+    admin, ids = seeded["membership"], seeded["ids"]
+    arrange(admin, ids)
+    session.flush()
+    before = _audit_count(session)
+
+    act(admin, ids)
+    session.flush()
+
+    assert _audit_count(session) == before + 1
