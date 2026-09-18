@@ -60,6 +60,17 @@ jobs:
           # A GPU host loads the workers layer alone.
           COMPOSE_FILE=compose.workers.yaml docker compose config -q
 
+      # The entrypoint scripts run in neither job's containers, and a syntax error
+      # in one only shows as a crash loop. The shebang picks the parser.
+      - name: Shell syntax
+        run: |
+          for f in $(find . -name '*.sh'); do
+            case "$(head -n 1 "$f")" in
+              '#!'*bash*) echo "bash -n $f"; bash -n "$f" ;;
+              *)          echo "sh -n $f"; sh -n "$f" ;;
+            esac
+          done
+
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 30
