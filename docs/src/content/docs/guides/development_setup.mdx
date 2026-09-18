@@ -10,7 +10,6 @@ database stack to start first.
 ## Prerequisites
 
 - [Docker](https://www.docker.com/), with **Compose 2.26 or newer** (`docker compose version`).
-  `./eyened doctor` checks this and explains why if it fails.
 - [Git](https://git-scm.com/)
 
 To run `eorm` or `pytest` on the host, install the ORM — see
@@ -20,23 +19,23 @@ To run `eorm` or `pytest` on the host, install the ORM — see
 
 ```bash
 git clone https://github.com/Eyened/eyened-platform.git
-cd eyened-platform
-./eyened up
+cd eyened-platform/deploy
+cp .env.example .env
 ```
 
-That is the whole thing. `./eyened up` runs preflight checks, creates `deploy/.env` from the template
-with generated secrets, builds the images, starts the stack, and — because the database is empty
-on a fresh clone — creates the schema, seeds the builtin form schemas, and creates an
-administrator account (`admin` by default; see `EYENED_API_ADMIN_USERNAME` in
-`deploy/.env.example`) whose password it prints once.
+In `.env`, switch to the development lines (`COMPOSE_FILE=compose.yaml:compose.dev.yaml`) and
+fill the five secrets with `openssl rand -hex 32`. Then:
+
+```bash
+docker compose up -d --build
+```
+
+The `init` service creates the schema, seeds the builtin form schemas and creates the
+administrator (`EYENED_API_ADMIN_USERNAME`, password `EYENED_API_ADMIN_PASSWORD`).
 
 ### On a machine shared with other developers
 
-Export `COMPOSE_PROJECT_NAME` and `HTTP_PORT` to values nobody else is using **before**
-the first `./eyened up` — `deploy/.env` does not exist yet on a clean clone, so these
-cannot be set there beforehand, but `./eyened up` records whatever you exported into the
-`deploy/.env` it creates, so a later run without the export still uses the same project
-and port:
+Set `COMPOSE_PROJECT_NAME` and `HTTP_PORT` in `deploy/.env` to values nobody else is using:
 
 | Variable | Purpose |
 | --- | --- |
@@ -44,8 +43,9 @@ and port:
 | `HTTP_PORT` | The port you open in a browser |
 
 The bundled MySQL and Redis publish **no** host ports by default, which removes the commonest
-source of collisions. For a MySQL shell with no port exposed at all, use `./eyened db-shell`. If
-you need a host port instead — DBeaver, or a host-side alembic — append
+source of collisions. For a MySQL shell with no port exposed at all, use
+`docker compose exec database sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'`.
+If you need a host port instead — DBeaver, or a host-side alembic — append
 `:compose.host-ports.yaml` to `COMPOSE_FILE` in `deploy/.env` and set `DB_PUBLISH_PORT`.
 
 ## Accounts and access
@@ -82,10 +82,9 @@ A `Creator` row cannot be deleted — `eorm deactivate` is the way to retire an 
 ## Daily use
 
 ```bash
-./eyened up          # start (also rebuilds; bootstrap never migrates or re-seeds an existing database; safe to repeat)
-./eyened logs        # follow logs
-./eyened down        # stop
-./eyened doctor      # preflight checks on their own
+docker compose up -d     # start; add --build after pulling
+docker compose logs -f   # follow logs
+docker compose down      # stop
 ```
 
 The **client** container runs Vite with hot reload; the **server** container runs uvicorn with
@@ -101,22 +100,17 @@ Platform storage (thumbnails, `segmentations.zarr`) lives at `/storage` inside t
 backed by this stack's own named volume — a clean clone never writes into shared or production
 storage. To attach to shared storage instead, set `PLATFORM_STORAGE_PATH` in `deploy/.env`.
 
-Image datasets are configured in `deploy/storage-mounts.conf` alone; re-running `./eyened up`
-regenerates the container mounts, the nginx routes, and `EYENED_STORAGE_MOUNTS` from it. Full
-detail in `deploy/README.md`.
+Image datasets are mounted by `deploy/compose.storage.yaml`, at `/data/<key>`, and listed in
+`EYENED_STORAGE_MOUNTS`; see `deploy/README.md`.
 
 ## Migrations
 
-```bash
-./eyened migrate     # alembic upgrade head, inside the server container
-```
-
-It stays interactive on purpose: alembic prompts before touching a populated database. Back up
-first — MySQL commits DDL per statement, so a half-applied migration cannot be reliably undone:
+The `init` service applies pending migrations on every `docker compose up`, using the mounted
+`orm/`, so a new migration applies without a rebuild. To re-run it without restarting the
+stack:
 
 ```bash
-./eyened backup backups/before-migration    # hot backup, does not stop the database
-./eyened restore backups/before-migration   # if something goes wrong
+docker compose run --rm init
 ```
 
 ## Client types
@@ -133,32 +127,19 @@ default case; see `server/scripts/generate_openapi.py --help` for pointing at an
 ## Optional: OIDC login
 
 The base stack uses password auth only. To test OpenID Connect locally, append
-`:compose.oidc.yaml` to `COMPOSE_FILE` in `deploy/.env` and set `PUBLIC_HOST`, then `./eyened up`
-— see `deploy/keycloak/README.md`.
+`:compose.oidc.yaml` to `COMPOSE_FILE` in `deploy/.env` and set `PUBLIC_HOST`, then
+`docker compose up -d` — see `deploy/keycloak/README.md`.
 
 Set `EYENED_API_AUTH_OIDC_ENABLED=true` and the `EYENED_OIDC_*` vars in `deploy/.env`. Full options: [Authentication](/eyened-platform/guides/authentication).
 
 ## Optional: existing data
 
-| Case | Tool |
-|---|---|
-| The bundled database — live, fast, byte-exact | `./eyened backup <dir>` / `./eyened restore <dir>` |
-| Any database including an external one; portable across MySQL versions | `eorm save-dump` / `eorm load-dump` (a HOST tool — needs `mysqlsh` for the default path) |
-
-Load a prepared dump with `eorm load-dump` when moving data between machines. See
-`deploy/README.md`'s **Backup and rollback** section for both mechanisms in full, including
-flags.
-
-Apply pending migrations from `orm/migrations/`:
+See `deploy/README.md`, "Backup and restore", for XtraBackup and `mysqldump`, and "Moving an
+existing database into this stack". After loading a dump, apply pending migrations:
 
 ```bash
-./eyened migrate
+docker compose run --rm -e EYENED_AUTO_MIGRATE=true init
 ```
-
-A dump taken before the migration squash is the exception: its `alembic_version` row holds a
-revision id the squash removed from the map, so `./eyened migrate` cannot resolve it and fails.
-`./eyened up` reports that state and names the recovery instead of guessing — see
-`deploy/README.md`'s **Migrations** section.
 
 ## Tests
 

@@ -5,7 +5,7 @@
   deliberately left out of that landing because neither can be verified without a running
   stack.
 - **Files:** `deploy/compose.yaml` (keycloak service, `EYENED_OIDC_METADATA_URL`),
-  `deploy/compose.oidc.yaml` (`extra_hosts`), `deploy/scripts/doctor.sh`.
+  `deploy/compose.oidc.yaml` (`extra_hosts`), `deploy/keycloak/README.md`.
 
 ---
 
@@ -26,11 +26,11 @@ byte-identical to the one the browser was redirected to, and
 **Consequences today:**
 
 - `KEYCLOAK_BIND` cannot be set to a loopback address. It looks like a hardening knob, and
-  setting it leaves every container healthy while token exchange fails. `doctor.sh` now
-  refuses that combination, which closes the trap but does not remove the constraint.
+  setting it leaves every container healthy while token exchange fails. Nothing refuses it;
+  `deploy/keycloak/README.md` documents it.
 - The bundled Keycloak has to be published on `0.0.0.0` — on a shared host, that is an
   admin console for the realm the platform trusts, exposed to the network. The mitigation
-  in place is the generated `KEYCLOAK_ADMIN_PASSWORD`, not the bind address.
+  in place is the required `KEYCLOAK_ADMIN_PASSWORD`, not the bind address.
 - `compose.oidc.yaml` carries an `extra_hosts` entry that exists only for this.
 
 **Proposed fix** (needs a running stack to verify, which is why it is here):
@@ -57,17 +57,12 @@ issuer.
 
 ---
 
-## 2. Nothing gates the `oidc` layer against `./eyened prod`
+## 2. Nothing gates the `oidc` layer against the prod layer
 
 **Status:** open — mechanism updated, gap unchanged
 
-Phase 2 of the `deploy/` consolidation replaced `COMPOSE_PROFILES=oidc` with the
-`:compose.oidc.yaml` layer on `COMPOSE_FILE`, and `make prod` / `stack.sh` with `./eyened prod`
-(`deploy/scripts/doctor.sh` and `lib.sh`). The gap this item describes moved with it rather
-than closing: `:compose.oidc.yaml` can still be appended to `COMPOSE_FILE` alongside
-`:compose.prod.yaml`, and nothing in `compose.prod.yaml` or `deploy/scripts/doctor.sh` refuses
-that combination — checked against `doctor.sh`'s current oidc block, which only tests
-`KEYCLOAK_ADMIN_PASSWORD`, not which other layers are present.
+`:compose.oidc.yaml` can be appended to `COMPOSE_FILE` alongside `:compose.prod.yaml`, and
+nothing refuses that combination.
 
 The bundled Keycloak runs `kc.sh start-dev` with no volume: embedded H2, no HTTPS
 enforcement, all state discarded on every container recreate. Keycloak's own documentation
@@ -82,7 +77,7 @@ now, added whenever that layer is in `COMPOSE_FILE` rather than only under
 identity-provider concern above (dev-mode Keycloak, no volume, no HTTPS enforcement) is
 unaffected and remains the actual open item.
 
-**Proposed fix:** have `doctor.sh` refuse `:compose.oidc.yaml` together with the prod layer,
-pointing the operator at an external IdP — the configuration the `EYENED_OIDC_*` settings
-already support. Decide first whether the combination is genuinely unsupported or merely
-unwise; the refusal should match.
+**Proposed fix:** document, or have the CI config matrix reject, `:compose.oidc.yaml` together
+with the prod layer, pointing the operator at an external IdP — the configuration the
+`EYENED_OIDC_*` settings already support. Decide first whether the combination is genuinely
+unsupported or merely unwise; the refusal should match.

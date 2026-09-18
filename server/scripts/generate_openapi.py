@@ -59,9 +59,8 @@ def load_fastapi_app(env_file: Path) -> FastAPI:
             f"error: no env file at {env_file}, and the environment does not\n"
             "       already carry the server's settings (EYENED_DATABASE_USER\n"
             "       and EYENED_DATABASE_PASSWORD, at minimum).\n"
-            "       Fix: cp deploy/.env.example deploy/.env and edit it, or run\n"
-            "            './eyened up' to create and bootstrap deploy/.env for\n"
-            "            you, or pass --env-file <path> to point at another one."
+            "       Fix: cp deploy/.env.example deploy/.env and edit it,\n"
+            "            or pass --env-file <path> to point at another one."
         )
     root = project_root()
     if str(root) not in sys.path:

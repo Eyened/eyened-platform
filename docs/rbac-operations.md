@@ -21,7 +21,7 @@ while the system is still open, and the flip lands with everyone already
 granted. Every step before the last is invisible to users except one tag-delete
 status code, noted at step 1.
 
-This assumes the `deploy/` stack (`./eyened`, see `deploy/README.md`) that
+This assumes the `deploy/` stack (run with `docker compose`, see `deploy/README.md`) that
 replaced `docker/`, `dev/` and `database/`. `eorm` and `alembic` both ship
 inside the server image, so every command below runs after `docker compose
 exec -it server bash` from `deploy/`. `-e` / `--env-file` is a **group**
@@ -204,9 +204,9 @@ For scenario 5, a production dump has task 70, which touches several projects.
 
 ## New-dev checklist
 
-clone -> `./eyened up` (Docker is the only prerequisite; this writes
-`deploy/.env`, builds and starts the dev stack, and -- on a fresh database --
-creates the schema and prints a one-time administrator) -> to work against a
+clone -> `cp deploy/.env.example deploy/.env`, fill the secrets, `docker compose up -d --build`
+from `deploy/` (the `init` service creates the schema and the administrator on a fresh
+database) -> to work against a
 production dump instead, `eorm load-dump` then `eorm init-admin` with a
 username matching `EYENED_API_ADMIN_USERNAME` (the loaded dump has no active
 administrator) -> `EYENED_API_PUBLIC_AUTH_DISABLED=true` for feature work,

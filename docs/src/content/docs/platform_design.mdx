@@ -37,8 +37,7 @@ MySQL stores all structured data: projects, patients, studies, images, annotatio
 - `EYENED_DATABASE_PASSWORD`
 - `EYENED_DATABASE_DATABASE`
 
-For a MySQL shell in the bundled database, `./eyened db-shell` needs no published port and no
-separate database browser container — it does not apply once `local-db` is removed.
+For a MySQL shell in the bundled database, use `docker compose exec database sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'` from `deploy/`; it needs no published port.
 
 See [Getting Started](/eyened-platform/getting_started) for setup.
 
@@ -87,7 +86,7 @@ To shrink the footprint, lower `EYENED_API_POOL_SIZE` and `EYENED_API_THREADPOOL
 
 Two distinct layers:
 
-**Image datasets** — original DICOM, PNG, etc. Files stay on disk (or object storage mounted into the container). Each file is registered in the database with a `storage_backend_key` and `object_key` (import/API fields; `StorageBackend.Key` and `ImageStorage.ObjectKey` in the database). Add the key and its path to `deploy/storage-mounts.conf` and re-run the entry point (`./eyened install` or `./eyened up`) — the fileserver mount, the nginx `location`, and `EYENED_STORAGE_MOUNTS` are all generated from that one file.
+**Image datasets** — original DICOM, PNG, etc. Files stay on disk (or object storage mounted into the container). Each file is registered in the database with a `storage_backend_key` and `object_key` (import/API fields; `StorageBackend.Key` and `ImageStorage.ObjectKey` in the database). Mount the dataset at `/data/<key>` in `deploy/compose.storage.yaml` and list it in `EYENED_STORAGE_MOUNTS`; nginx serves every dataset from one internal `/data/` location.
 
 The API itself does **not** read image bytes from disk: `GET /api/images/{image_id}/data` in `server/routes/instances.py` resolves a `StorageRef` and returns an nginx internal redirect (`X-Accel-Redirect`) — nginx reads the file, not the server process. `EYENED_STORAGE_MOUNTS` matters for **ORM-side processes** — GPU workers, notebooks, the thumbnail CLI — that read source pixels directly instead of going through the API.
 
