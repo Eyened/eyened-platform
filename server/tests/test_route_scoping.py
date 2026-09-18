@@ -109,7 +109,7 @@ def test_pixels_outside_the_scope_are_404_at_the_route(
     ok_thumb = client.get(f"/images/{visible}/thumbnail")
 
     assert ok_data.status_code == 200
-    assert ok_data.headers["X-Accel-Redirect"] == "/test-backend/obj-img-A"
+    assert ok_data.headers["X-Accel-Redirect"] == "/data/test-backend/obj-img-A"
     assert ok_thumb.status_code == 200
     assert ok_thumb.headers["X-Accel-Redirect"] == "/thumbnails/thumb-A_144.jpg"
 
