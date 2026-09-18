@@ -79,8 +79,8 @@ def _grant_alice(a, ids):
 # Arrange and act are SEPARATE on purpose. Four of these methods need existing
 # state to change -- you cannot revoke what was never granted -- and the arrange
 # step writes audit rows of its own. A guard that only asserted "some row
-# exists" after running both would pass for `revoke`, `reactivate` and
-# `apply_revoke_all` even with their audit writes deleted, because the setup's
+# exists" after running both would pass for `revoke`, `revoke_by_name`, `reactivate`
+# and `apply_revoke_all` even with their audit writes deleted, because the setup's
 # rows satisfy it. The count is taken between the two.
 _MUTATING = [
     ("grant", "membership",
@@ -166,7 +166,7 @@ def test_every_mutating_method_writes_an_audit_row(
     passes every signature check there is, and the constructor cannot see it.
 
     The assertion is on the *delta*, not on "a row exists": the arrange step
-    writes rows for the three methods that need existing state, and an absolute
+    writes rows for the four methods that need existing state, and an absolute
     check would be satisfied by those alone.
     """
     admin, ids = seeded[which], seeded["ids"]

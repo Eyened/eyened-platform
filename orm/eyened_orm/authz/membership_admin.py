@@ -117,9 +117,10 @@ class MembershipAdministration:
 
     # --- resolution -------------------------------------------------------
     #
-    # Two helpers rather than a None check repeated at every entry point. The
-    # message text is read by operators -- the CLI prints it verbatim through
-    # ClickException(str(exc)) -- so it is preserved exactly, ``!r`` included.
+    # Four helpers rather than a None check repeated at every entry point. The
+    # message text is read by operators -- the CLI prints the by-name ones through
+    # ClickException(str(exc)), the API returns the by-id ones as the 404 detail
+    # -- so the by-name text is preserved exactly, ``!r`` included.
 
     def _creator(self, username: str) -> Creator:
         creator = self._creators.get_by_name(username)
