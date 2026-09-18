@@ -109,8 +109,9 @@ database.
   regeneration, inference, reports) fail while the viewer still worked.
 - **No placeholder secrets.** `docker/.env.example` and `database/.env.example` shipped
   `change_me` values that kept working if you never changed them. `deploy/.env.example` ships
-  none: first run generates them into `deploy/.env`, and a hand-copied `.env` fails at `docker
-  compose up` until real values are set. That is deliberate, not a regression.
+  them empty, to be filled with `openssl rand -hex 32`, and `docker compose up` refuses to start
+  until they are set (the admin password is checked by `init`, on an empty database). That is
+  deliberate, not a regression.
 - **Container logs are capped** at 10 MB × 3 files per service, so a long-running install cannot
   fill the disk.
 - **`eorm` confirmation prompts on database state.** `initialize-database` and `load-dump` ask
