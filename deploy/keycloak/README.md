@@ -6,11 +6,7 @@ image is never pulled — until you ask for it.
 
 ## Start
 
-`deploy/.env` does not exist on a clean clone. Create it first by running the stack once:
-
-```bash
-./eyened up
-```
+Create `deploy/.env` first (`deploy/README.md`, "First run").
 
 Then, in `deploy/.env`:
 
@@ -18,9 +14,10 @@ Then, in `deploy/.env`:
 - set `PUBLIC_HOST` to the hostname or LAN IP you type in the browser — **not `localhost`**,
   which is what `.env.example` ships. It must be the same hostname you use inside the three
   `EYENED_OIDC_*` values below — nothing checks this for you.
-- leave `KEYCLOAK_BIND` at its default (`0.0.0.0`) rather than a loopback address. With this
-  layer enabled, `doctor.sh` refuses to build over a loopback `KEYCLOAK_BIND` (see
-  [Troubleshooting](../README.md#troubleshooting) in `deploy/README.md`).
+- leave `KEYCLOAK_BIND` at its default (`0.0.0.0`). A loopback bind leaves OIDC login failing
+  while every container reports healthy.
+- set `KEYCLOAK_ADMIN_PASSWORD` (`openssl rand -hex 32`). Compose refuses to start this layer
+  without it.
 - set `EYENED_API_AUTH_OIDC_ENABLED=true`
 - set `EYENED_OIDC_CLIENT_ID=eyened-platform`
 - set `EYENED_OIDC_CLIENT_SECRET=eyened-dev-secret`
@@ -32,11 +29,6 @@ Then, in `deploy/.env`:
   Nothing derives these any more: the bundled Keycloak and an external
   provider are configured identically, by hand, and all three must move
   together — see `deploy/compose.yaml` and `deploy/compose.oidc.yaml`.
-
-`KEYCLOAK_ADMIN_PASSWORD` is **not** in that list: `./eyened install` or `./eyened up`
-generates it into `deploy/.env` on first run, alongside the database passwords and the API
-signing key. Read it out of that file when you need the admin console. It is on the list
-only if you wrote `deploy/.env` by hand or your copy predates that behaviour — see below.
 
 The `EYENED_OIDC_CLIENT_*` lines ship **commented out** in `deploy/.env.example`, and
 `server/config.py` defaults both to the empty string with no validation error. Leave them
@@ -55,15 +47,12 @@ between fails Keycloak's exact-match check.)
 Keycloak is published on **every interface** (`KEYCLOAK_BIND`, default `0.0.0.0`), and it
 has to be. The server container fetches the metadata document *through the host* rather
 than over the compose network, so a loopback-only bind leaves OIDC login failing at the
-metadata fetch while every container reports healthy — `doctor.sh` refuses that combination
-for exactly that reason. The port being reachable is the point, which is why the credential
-is what has to carry the weight: that console administers the realm the platform trusts for
-logins.
+metadata fetch while every container reports healthy. The port being reachable is the point,
+which is why the credential is what has to carry the weight: that console administers the
+realm the platform trusts for logins.
 
-So `./eyened install` or `./eyened up` generates the password rather than shipping one, and
-`doctor.sh` refuses to build with `compose.oidc.yaml` in `COMPOSE_FILE` while it is absent,
-empty, `admin` or `change_me` — the backstop for a hand-written `deploy/.env`, or one
-created before generation existed.
+So `KEYCLOAK_ADMIN_PASSWORD` has no default: compose refuses to start this layer while it is
+unset.
 
 ## It is a development provider, and its state is disposable
 
@@ -90,8 +79,7 @@ One setting is genuinely optional:
   `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS` in `deploy/.env` to match — nothing derives
   them from it any more.
 
-With `deploy/.env` edited, re-run `./eyened up` — the same command that created it — to
-pick up your changes.
+With `deploy/.env` edited, run `docker compose up -d` from `deploy/`.
 
 Open `http://<PUBLIC_HOST>:<HTTP_PORT>/users/login` and sign in with **`testuser` / `testuser`**.
 
