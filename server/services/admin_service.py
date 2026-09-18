@@ -1,22 +1,43 @@
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from eyened_orm import Creator, Project
+from eyened_orm.audit_writer import AuditWriter
+from eyened_orm.authz.actor import ActingAdmin
+from eyened_orm.authz.errors import AdminEntityNotFound
+from eyened_orm.authz.membership_admin import (
+    GrantResult,
+    MembershipAdministration,
+    TaskGrantPlan,
+)
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.repositories.creator_repository import CreatorRepository
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
 from eyened_orm.repositories.project_repository import ProjectRepository
+from eyened_orm.repositories.task_repository import TaskRepository
 
 from ..db import get_db
 from .access_scope import get_access_scope
 from .exceptions import NotFoundError
 
 
+@contextmanager
+def _not_found_as_404() -> Iterator[None]:
+    """``AdminEntityNotFound`` is in no status map; untranslated, it is a 500."""
+    try:
+        yield
+    except AdminEntityNotFound as exc:
+        raise NotFoundError(str(exc)) from exc
+
+
 class AdminService:
-    """Read-only administration: users, one user's memberships, projects.
+    """Administration: users, memberships and projects, and membership writes.
 
     The gate is the first line of ``__init__`` and it is load-bearing, not
     defensive: ``ProjectRepository`` routes every read through ``apply_scope``
@@ -32,6 +53,7 @@ class AdminService:
         creators: CreatorRepository,
         projects: ProjectRepository,
         members: ProjectMemberRepository,
+        memberships: MembershipAdministration,
         *,
         scope: AccessScope,
     ) -> None:
@@ -39,6 +61,7 @@ class AdminService:
         self.creators = creators
         self.projects = projects
         self.members = members
+        self.memberships = memberships
         self.scope = scope
 
     def list_users(self) -> list[Creator]:
@@ -79,15 +102,44 @@ class AdminService:
             for project in self.projects.list_all()
         ]
 
+    def grant_membership(
+        self, user_id: int, project_id: int, role: ProjectRole
+    ) -> GrantResult:
+        """Grant or change ``role``. Raises NotFoundError for an unknown user or project."""
+        with _not_found_as_404():
+            return self.memberships.grant(
+                creator_id=user_id, project_id=project_id, role=role
+            )
+
+    def revoke_membership(self, user_id: int, project_id: int) -> bool:
+        """Remove the membership. Raises NotFoundError for an unknown user or project."""
+        with _not_found_as_404():
+            return self.memberships.revoke(creator_id=user_id, project_id=project_id)
+
+    def preview_task_grant(
+        self, user_id: int, task_ids: Sequence[int], role: ProjectRole
+    ) -> TaskGrantPlan:
+        """Plan a task grant; writes nothing. Raises NotFoundError for an unknown user or task."""
+        with _not_found_as_404():
+            return self.memberships.plan_grant_for_tasks(
+                creator_id=user_id, task_ids=task_ids, role=role
+            )
+
 
 def get_admin_service(
     db: Session = Depends(get_db),
     scope: AccessScope = Depends(get_access_scope),
 ) -> AdminService:
     """Default AdminService wiring for FastAPI ``Depends()``."""
-    return AdminService(
-        CreatorRepository(db, scope=scope),
-        ProjectRepository(db, scope=scope),
-        ProjectMemberRepository(db),
-        scope=scope,
+    creators = CreatorRepository(db, scope=scope)
+    projects = ProjectRepository(db, scope=scope)
+    members = ProjectMemberRepository(db)
+    memberships = MembershipAdministration(
+        creators,
+        projects,
+        members,
+        TaskRepository(db, scope=scope),
+        audit=AuditWriter(db),
+        actor=ActingAdmin(creator_id=scope.actor_id),
     )
+    return AdminService(creators, projects, members, memberships, scope=scope)

@@ -8,21 +8,31 @@ from __future__ import annotations
 
 import pytest
 
+from eyened_orm.audit_writer import AuditWriter
+from eyened_orm.authz.actor import ActingAdmin
 from eyened_orm.authz.errors import PermissionDeniedError
+from eyened_orm.authz.membership_admin import MembershipAdministration
 from eyened_orm.repositories.creator_repository import CreatorRepository
 from eyened_orm.repositories.project_member_repository import ProjectMemberRepository
 from eyened_orm.repositories.project_repository import ProjectRepository
+from eyened_orm.repositories.task_repository import TaskRepository
 from eyened_orm.utils.factories import admin_scope, scope_for
 from server.services.admin_service import AdminService
 
 
 def _build(session, scope):
-    return AdminService(
-        CreatorRepository(session, scope=scope),
-        ProjectRepository(session, scope=scope),
-        ProjectMemberRepository(session),
-        scope=scope,
+    creators = CreatorRepository(session, scope=scope)
+    projects = ProjectRepository(session, scope=scope)
+    members = ProjectMemberRepository(session)
+    memberships = MembershipAdministration(
+        creators,
+        projects,
+        members,
+        TaskRepository(session, scope=scope),
+        audit=AuditWriter(session),
+        actor=ActingAdmin(creator_id=scope.actor_id),
     )
+    return AdminService(creators, projects, members, memberships, scope=scope)
 
 
 def test_a_non_admin_scope_is_refused_at_construction(session):
@@ -30,7 +40,7 @@ def test_a_non_admin_scope_is_refused_at_construction(session):
         _build(session, scope_for())
 
     # entity="Admin", not an ORM entity name: one constructor call covers all
-    # three endpoints, so any ORM name contradicts the path logged beside it.
+    # six endpoints, so any ORM name contradicts the path logged beside it.
     assert excinfo.value.entity == "Admin"
 
 
