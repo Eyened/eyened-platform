@@ -1,8 +1,8 @@
 """The authoritative AuditLog row writer.
 
 One writer, because the same administration code is driven from two callers on
-opposite sides of a package boundary: the ``eorm`` CLI (ORM) and, from step 2,
-an authenticated admin API (server). ``server/services/audit_service.py`` held
+opposite sides of a package boundary: the ``eorm`` CLI (ORM) and the admin
+API's membership writes (server). ``server/services/audit_service.py`` held
 the only complete writer, and ``orm`` cannot import from ``server`` -- so the
 row write lives here and ``AuditService`` delegates to it, keeping the
 server-side half: the ``enabled`` kill switch, the buffered stdout mirror and

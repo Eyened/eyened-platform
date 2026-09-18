@@ -1271,6 +1271,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/projects/{project_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Grant Membership
+         * @description Grant a user a role in a project, or change the one held.
+         */
+        put: operations["grant_membership_admin_projects__project_id__members__user_id__put"];
+        post?: never;
+        /**
+         * Revoke Membership
+         * @description Remove a membership; 204 whether or not one existed.
+         */
+        delete: operations["revoke_membership_admin_projects__project_id__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}/grant-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Task Grant
+         * @description Which projects granting ``role`` for these tasks would add, and which are held.
+         */
+        get: operations["preview_task_grant_admin_users__user_id__grant_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1538,6 +1582,34 @@ export interface components {
             entity_type?: components["schemas"]["EntityType"] | null;
             /** Id */
             id: number;
+        };
+        /**
+         * GrantPreviewResponse
+         * @description ``to_grant`` roles would be written; ``already_held`` roles are held, at or above ``role``.
+         */
+        GrantPreviewResponse: {
+            /** User Id */
+            user_id: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "read_only" | "grader" | "project_admin";
+            /** To Grant */
+            to_grant: components["schemas"]["MembershipResponse"][];
+            /** Already Held */
+            already_held: components["schemas"]["MembershipResponse"][];
+        };
+        /**
+         * GrantRequest
+         * @description The role to hold; user and project are in the path.
+         */
+        GrantRequest: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "read_only" | "grader" | "project_admin";
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1925,8 +1997,27 @@ export interface components {
          */
         Laterality: "L" | "R";
         /**
+         * MemberGrantResponse
+         * @description The membership after a grant; ``changed`` is False if the role was already held.
+         */
+        MemberGrantResponse: {
+            /** Project Id */
+            project_id: number;
+            /** Project Name */
+            project_name: string;
+            /** User Id */
+            user_id: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "read_only" | "grader" | "project_admin";
+            /** Changed */
+            changed: boolean;
+        };
+        /**
          * MembershipResponse
-         * @description One membership. ``role`` is the enum's name, not its int.
+         * @description One membership.
          */
         MembershipResponse: {
             /** Project Id */
@@ -5805,6 +5896,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminProjectResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_membership_admin_projects__project_id__members__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                project_id: number;
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberGrantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_membership_admin_projects__project_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                project_id: number;
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_task_grant_admin_users__user_id__grant_preview_get: {
+        parameters: {
+            query: {
+                task_id: number[];
+                role: "read_only" | "grader" | "project_admin";
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantPreviewResponse"];
                 };
             };
             /** @description Validation Error */

@@ -5775,6 +5775,253 @@
           }
         }
       }
+    },
+    "/admin/projects/{project_id}/members/{user_id}": {
+      "put": {
+        "summary": "Grant Membership",
+        "description": "Grant a user a role in a project, or change the one held.",
+        "operationId": "grant_membership_admin_projects__project_id__members__user_id__put",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberGrantResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Revoke Membership",
+        "description": "Remove a membership; 204 whether or not one existed.",
+        "operationId": "revoke_membership_admin_projects__project_id__members__user_id__delete",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{user_id}/grant-preview": {
+      "get": {
+        "summary": "Preview Task Grant",
+        "description": "Which projects granting ``role`` for these tasks would add, and which are held.",
+        "operationId": "preview_task_grant_admin_users__user_id__grant_preview_get",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "minItems": 1,
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "read_only",
+                "grader",
+                "project_admin"
+              ],
+              "type": "string",
+              "title": "Role"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6641,6 +6888,65 @@
           "id"
         ],
         "title": "FormSchemaGET"
+      },
+      "GrantPreviewResponse": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "grader",
+              "project_admin"
+            ],
+            "title": "Role"
+          },
+          "to_grant": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipResponse"
+            },
+            "type": "array",
+            "title": "To Grant"
+          },
+          "already_held": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipResponse"
+            },
+            "type": "array",
+            "title": "Already Held"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "role",
+          "to_grant",
+          "already_held"
+        ],
+        "title": "GrantPreviewResponse",
+        "description": "``to_grant`` roles would be written; ``already_held`` roles are held, at or above ``role``."
+      },
+      "GrantRequest": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "grader",
+              "project_admin"
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "GrantRequest",
+        "description": "The role to hold; user and project are in the path."
       },
       "HTTPValidationError": {
         "properties": {
@@ -7927,6 +8233,45 @@
         ],
         "title": "Laterality"
       },
+      "MemberGrantResponse": {
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "grader",
+              "project_admin"
+            ],
+            "title": "Role"
+          },
+          "changed": {
+            "type": "boolean",
+            "title": "Changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "user_id",
+          "role",
+          "changed"
+        ],
+        "title": "MemberGrantResponse",
+        "description": "The membership after a grant; ``changed`` is False if the role was already held."
+      },
       "MembershipResponse": {
         "properties": {
           "project_id": {
@@ -7954,7 +8299,7 @@
           "role"
         ],
         "title": "MembershipResponse",
-        "description": "One membership. ``role`` is the enum's name, not its int."
+        "description": "One membership."
       },
       "Modality": {
         "type": "string",
