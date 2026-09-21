@@ -105,12 +105,12 @@ Image datasets are mounted by `deploy/compose.storage.yaml`, at `/data/<key>`, a
 
 ## Migrations
 
-The `init` service applies pending migrations on every `docker compose up`, using the mounted
-`orm/`, so a new migration applies without a rebuild. To re-run it without restarting the
-stack:
+Starting the stack does not migrate an existing schema: `init` reports what is pending and leaves
+it alone. Apply a new migration with the command below, which uses the mounted `orm/`, so no
+rebuild is needed:
 
 ```bash
-docker compose run --rm init
+docker compose run --rm -e EYENED_AUTO_MIGRATE=true init
 ```
 
 ## Client types

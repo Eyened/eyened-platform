@@ -51,10 +51,10 @@ docker run --rm -v <db_volume>:/from -v <backup_dir>:/to alpine \
 
 **3. Start the database.** Plain restart is fine, and the chain will take about as long as the table above says.
 
-*Optional, and untimed:* the compose file passes MySQL one flag, `--innodb-buffer-pool-size`; everything else is `mysql:8.0.46` default (`deploy/compose.yaml:31`). Since MySQL 8.0.30, redo log sizing is controlled by `innodb_redo_log_capacity`, not the deprecated `innodb_log_file_size` / `innodb_log_files_in_group` pair; its default, when none of the three is set, is 104,857,600 bytes (100 MB) — still small enough for these rebuilds to overrun continuously. The deprecated flag below still works: MySQL computes `innodb_redo_log_capacity` from it and `innodb_log_files_in_group` (default 2) when the newer variable is not set directly, per the MySQL 8.0 Reference Manual — but confirm the resulting capacity against your own server before relying on it. For this window only, and only because step 2's copy exists and no user is connected:
+*Optional, and untimed:* the compose file passes MySQL one flag, `--innodb-buffer-pool-size`; everything else is `mysql:8.4.11` default (`deploy/compose.yaml:30`). Redo log sizing is controlled by `innodb_redo_log_capacity`; its default, when unset, is 104,857,600 bytes (100 MB) — still small enough for these rebuilds to overrun continuously. Do not reach for the older `innodb_log_file_size` / `innodb_log_files_in_group` pair: MySQL 8.4 removed both, and passing either stops the server from starting. For this window only, and only because step 2's copy exists and no user is connected:
 
 ```
---innodb-log-file-size=2G
+--innodb-redo-log-capacity=2G
 --innodb-buffer-pool-size=<as much as the host will give>
 --innodb-flush-log-at-trx-commit=2
 --sync-binlog=0

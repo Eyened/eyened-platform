@@ -77,8 +77,9 @@ services:
       timeout: 3s
       retries: 5
 
-  # Migrates, seeds and creates the first administrator, then exits; the
-  # server starts only after it succeeds. `docker compose logs init` shows what it did.
+  # Seeds and creates the first administrator, then exits; the server starts
+  # only after it succeeds. It migrates an empty database, and reports -- but
+  # does not apply -- migrations pending on an existing one. `docker compose logs init` shows what it did.
   init:
     # Built by `server` below.
     image: ${COMPOSE_PROJECT_NAME:-eyened}-server:local

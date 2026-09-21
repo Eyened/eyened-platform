@@ -24,7 +24,7 @@ from .shared import get_database
 @click.command("bootstrap")
 @click.option(
     "--auto-migrate/--no-auto-migrate",
-    default=True,
+    default=False,
     show_default=True,
     envvar="EYENED_AUTO_MIGRATE",
     help="Apply pending migrations to an existing schema. Reads EYENED_AUTO_MIGRATE.",

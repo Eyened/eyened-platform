@@ -37,7 +37,7 @@ It never changes an existing account. `docker compose logs init` shows what it d
 | Production, external database | `compose.yaml:compose.prod.yaml` | *(empty)* |
 
 For an external database, also set `EYENED_DATABASE_HOST`, `_PORT`, `_USER`, `_PASSWORD` and
-`_DATABASE`. The account needs DDL rights, because `init` runs the migrations.
+`_DATABASE`. The account needs DDL rights, because migrations run as this account.
 
 Optional layers are appended to `COMPOSE_FILE`:
 
@@ -181,7 +181,8 @@ This is an outage: the old database stays down until the new stack serves.
    `MYSQL_PASSWORD` as `EYENED_DATABASE_PASSWORD`; `MYSQL_DATABASE` as
    `EYENED_DATABASE_DATABASE`.
 4. `docker compose up -d --build`. MySQL upgrades the datadir to 8.4, which 8.0 cannot open
-   again, and `init` migrates the schema.
-5. Sign in as an account from the old database and check your data. If `docker compose logs
+   again. `up` does not migrate the schema; `docker compose logs init` reports what is pending.
+5. Apply them: `docker compose run --rm -e EYENED_AUTO_MIGRATE=true init`.
+6. Sign in as an account from the old database and check your data. If `docker compose logs
    init` says `Empty database`, the copy did not land: stop, and recheck steps 2 and 3. Keep the
    old volume until this step passes.

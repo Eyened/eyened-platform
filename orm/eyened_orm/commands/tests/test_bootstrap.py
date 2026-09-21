@@ -97,19 +97,19 @@ def test_a_schema_behind_head_is_migrated_but_not_reseeded(session, db):
     ensure_admin(session, "admin", "pw")
     session.commit()
 
-    result = _run()
+    result = _run(EYENED_AUTO_MIGRATE="true")
 
     assert result.exit_code == 0, result.output
     assert calls == ["migrate"]
 
 
-def test_an_opted_out_site_reports_pending_migrations_and_exits_zero(session, db):
+def test_by_default_a_schema_behind_head_is_reported_and_left_alone(session, db):
     state, calls = db
     state["current"] = "older_rev"
     ensure_admin(session, "admin", "pw")
     session.commit()
 
-    result = _run(EYENED_AUTO_MIGRATE="false")
+    result = _run()
 
     assert result.exit_code == 0, result.output
     assert calls == []

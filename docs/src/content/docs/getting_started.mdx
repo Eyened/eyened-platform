@@ -80,9 +80,9 @@ docker compose up -d        # start
 
 ### Upgrading and rolling back
 
-Images are built from your checkout, so an upgrade is a checkout plus a rebuild. The `init`
-service applies pending migrations on start, and MySQL cannot roll back a migration, so back up
-first. Record where you are, since that is what a rollback returns to:
+Images are built from your checkout, so an upgrade is a checkout plus a rebuild. Starting the
+stack leaves an existing schema alone; you apply pending migrations yourself, and MySQL cannot
+roll back a migration, so back up first. Record where you are, since that is what a rollback returns to:
 
 ```bash
 git rev-parse --short HEAD

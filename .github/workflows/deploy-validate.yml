@@ -5,7 +5,7 @@ on:
     branches: [main, development]
     paths:
       - 'deploy/**'
-      # The images build from these, and init runs the ORM's migrations.
+      # The images build from these, and migrations come from the ORM.
       - 'orm/**'
       - 'server/**'
       - 'client/**'
