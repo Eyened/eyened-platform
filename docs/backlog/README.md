@@ -35,3 +35,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [Packaging follow-ups from PR #202: `pyproject.toml` and the GPU worker installs](2026-09-15-pr202-packaging-followups.md)
 - [Session tokens outlive reset and restore](2026-09-15-session-tokens-outlive-reset-and-restore.md)
 - [Deploy slim-down: final-review findings not yet fixed](2026-09-18-deploy-slimdown-review-findings.md)
+- [`init` exits 0 on a schema behind head, so the stack serves against the old one](2026-09-21-init-exits-zero-on-a-schema-behind-head.md)
