@@ -50,9 +50,12 @@ implicitly. The new docs lose them without saying so. All three are doc fixes.
 
 ## Minor
 
-- `deploy/.env.example:21-22`: "Compose refuses to start while one is empty" is false for
+- ~~`deploy/.env.example:21-22`: "Compose refuses to start while one is empty" is false for
   `EYENED_API_ADMIN_PASSWORD`. Compose leaves it optional, and `init` fails instead, only on an
-  empty database.
+  empty database.~~ **FIXED 2026-09-21**: the sentence is now scoped to the four `:?` variables,
+  and `EYENED_API_ADMIN_PASSWORD` carries its own note. Six variables are `:?` in total; the
+  fourth-and-sixth gap is `EYENED_DATABASE_USER` (not a secret) and `KEYCLOAK_ADMIN_PASSWORD`
+  (OIDC layer only).
 - `release_notes.mdx` (`eorm` confirmation-prompts bullet): "which is what makes an unattended
   first-run bootstrap possible" is stale. `eorm bootstrap` calls `upgrade_to_head` directly. Drop
   the clause.
