@@ -3,10 +3,13 @@
 services:
 
   server:
+    # 0 is unlimited. A cpus above the host's core count is refused at container
+    # create time, so a committed literal would not start everywhere; memory is
+    # never validated, so that one stays a literal.
     deploy:
       resources:
         limits:
-          cpus: "8.0"
+          cpus: ${EYENED_SERVER_CPUS:-0}
           memory: 16G
 
   fileserver:
