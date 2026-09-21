@@ -17,7 +17,7 @@ v2026.09.0 — `dev/` plus `database/` for developers, `docker/` for site deploy
 
 **The bundled database starts empty**, and following this section does not bring existing data
 across. Moving an existing database into `deploy/` is a separate procedure, documented in
-`deploy/README.md` under **Moving an existing database into this stack**. It is an **outage**: the
+[Moving an existing database into this stack](/eyened-platform/deployment/operations#moving-an-existing-database-into-this-stack). It is an **outage**: the
 old database is stopped cold for the copy and stays down until the new stack serves, so plan a
 window. A site running against an external database is the exception — it keeps using that
 database.
@@ -44,7 +44,7 @@ database.
   empty database and the first administrator before the server starts. It reports pending
   migrations on an existing database but does not apply them. Docker is the only prerequisite. The
   database is part of the stack rather than a second compose project to start first. Full
-  reference: `deploy/README.md`.
+  reference: [/eyened-platform/deployment](/eyened-platform/deployment).
 - **One env file.** `deploy/.env`, copied from `deploy/.env.example`, with the secrets filled by
   hand. `dev/.env`, `docker/.env`, `database/.env` and `worker/.env` are not read.
 - **Breaking: environment variables renamed.** `DEV_NGINX_PORT` → `HTTP_PORT`, the `docker/`
@@ -77,7 +77,7 @@ database.
   the same way.
 - **Adminer is gone.** It used to start automatically with the `database` stack, on
   `EYENED_ADMINER_PORT` (default `8080`); nothing in `deploy/` starts it. For a MySQL shell, see
-  `deploy/README.md`, "Day-to-day". For a GUI, append `:compose.host-ports.yaml` to `COMPOSE_FILE`
+  [Day-to-day](/eyened-platform/deployment/operations#day-to-day). For a GUI, append `:compose.host-ports.yaml` to `COMPOSE_FILE`
   in `deploy/.env` to publish MySQL on a loopback host port, then point a locally installed client
   (DBeaver, TablePlus, etc.) at it.
 - **Keycloak is part of the stack.** `dev/keycloak/` moved to `deploy/keycloak/` and the
@@ -86,8 +86,8 @@ database.
   also rename `DEV_KEYCLOAK_PORT` to `KEYCLOAK_PORT` — see the renames above — and set the
   `EYENED_OIDC_*` client settings, which `deploy/.env.example` now carries.
 - **`database/save_dump.sh` and `load_dump.sh` are gone.** The bundled database is backed up with
-  XtraBackup or `mysqldump` through `docker compose`; see `deploy/README.md`, "Backup and
-  restore". `eorm save-dump` / `eorm load-dump` are unchanged.
+  XtraBackup or `mysqldump` through `docker compose`; see [Backup and
+  restore](/eyened-platform/deployment/operations#backup-and-restore). `eorm save-dump` / `eorm load-dump` are unchanged.
 - **`worker/`'s compose files and `.env` are gone.** The four `worker/docker-compose.*.yml` files
   and `worker/.env*` are replaced by `deploy/compose.workers.yaml`, which reads `deploy/.env` —
   there is no separate worker env file any more. `EYENED_WORKER_DIR` is renamed

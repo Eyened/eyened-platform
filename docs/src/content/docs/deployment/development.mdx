@@ -11,6 +11,9 @@ database stack to start first.
 
 - [Docker](https://www.docker.com/), with **Compose 2.26 or newer** (`docker compose version`).
 - [Git](https://git-scm.com/)
+- [Node.js](https://nodejs.org/) and a host `python3` — only for `npm run gen:types`, which runs
+  `python3 ../server/scripts/generate_openapi.py` and then `openapi-typescript`. Run
+  `npm install` in `client/` once, or that second command is missing.
 
 To run `eorm` or `pytest` on the host, install the ORM — see
 **[ORM setup](/eyened-platform/orm/getting_started)**.
@@ -20,7 +23,7 @@ To run `eorm` or `pytest` on the host, install the ORM — see
 ```bash
 git clone https://github.com/Eyened/eyened-platform.git
 cd eyened-platform/deploy
-cp .env.example .env
+cp .env.example .env && chmod 600 .env
 ```
 
 ### Configure `deploy/.env`
@@ -131,12 +134,15 @@ WebGL state in the viewer can go stale after heavy client edits — refresh the 
 
 ## Storage
 
-Platform storage (thumbnails, `segmentations.zarr`) lives at `/storage` inside the container,
-backed by this stack's own named volume — a clean clone never writes into shared or production
-storage. To attach to shared storage instead, set `PLATFORM_STORAGE_PATH` in `deploy/.env`.
+Two different things, often confused:
 
-Image datasets are mounted by `deploy/compose.storage.yaml`, at `/data/<key>`, and listed in
-`EYENED_STORAGE_MOUNTS`; see `deploy/README.md`.
+**Platform storage** — thumbnails and `segmentations.zarr`. Always at `/storage` inside the
+containers, backed by this stack's own named volume, so a clean clone never writes into shared or
+production storage. Set `PLATFORM_STORAGE_PATH` to attach to storage you control instead.
+
+**Image datasets** — the source images themselves, mounted read-only at `/data/<key>` and listed
+in `EYENED_STORAGE_MOUNTS`. Configured identically in every stack: see
+[Image datasets](/eyened-platform/deployment/production#image-datasets).
 
 ## Migrations
 
@@ -169,8 +175,8 @@ Set `EYENED_API_AUTH_OIDC_ENABLED=true` and the `EYENED_OIDC_*` vars in `deploy/
 
 ## Optional: existing data
 
-See `deploy/README.md`, "Backup and restore", for XtraBackup and `mysqldump`, and "Moving an
-existing database into this stack". After loading a dump, apply pending migrations:
+See [Moving an existing database](/eyened-platform/deployment/operations#moving-an-existing-database-into-this-stack)
+for XtraBackup and `mysqldump`, and how to load a dump into this stack. After loading a dump, apply pending migrations:
 
 ```bash
 docker compose run --rm -e EYENED_AUTO_MIGRATE=true init
@@ -193,5 +199,5 @@ pytest
 Never commit secrets — keep them in `.env` only.
 
 :::tip
-More detail and edge cases: `deploy/README.md` in the repository.
+More detail and edge cases: [Operations](/eyened-platform/deployment/operations).
 :::

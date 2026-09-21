@@ -24,6 +24,10 @@ Docker stack.
 Desktop or Docker Engine install already satisfies it; older Compose rejects the stack's
 `depends_on: required: false`. Supported platforms are Linux and macOS natively, and Windows via WSL2.
 
+These steps install the **production stack with a bundled database** — the configuration
+`.env.example` ships with. For a hot-reload development stack, or for the differences between
+them, see [Choosing a stack](/eyened-platform/deployment).
+
 1. Clone the repository. Images are built from your checkout, so the checkout *is* the version:
 
     ```bash
@@ -35,8 +39,9 @@ Desktop or Docker Engine install already satisfies it; older Compose rejects the
 
     ```bash
     cd deploy
-    cp .env.example .env
-    # fill the five secrets in .env, each with: openssl rand -hex 32
+    cp .env.example .env && chmod 600 .env
+    # four secrets with: openssl rand -hex 32
+    # plus EYENED_API_ADMIN_PASSWORD -- the password you will log in with
     docker compose up -d --build
     ```
 
@@ -98,8 +103,9 @@ Starting the stack never migrates an existing schema, so the new code runs again
 until you run that second command. A site that sets `EYENED_AUTO_MIGRATE=true` in `.env` migrates
 on every `up` instead.
 
-To roll back, check out the recorded commit, restore the backup (`deploy/README.md`, "Backup and
-restore"), then `docker compose up -d --build`.
+To roll back, check out the recorded commit,
+[restore the backup](/eyened-platform/deployment/operations#backup-and-restore), then
+`docker compose up -d --build`.
 
 Upgrading from a version that predates `deploy/`: read the **Deployment** section of the
 [release notes](/eyened-platform/release_notes) first.
@@ -110,7 +116,7 @@ A fresh install has an empty database, therefore no storage backends and no imag
 but blank viewer. To point the platform at a directory of images:
 
 1. Mount the dataset: `cp deploy/compose.storage.example.yaml deploy/compose.storage.yaml`,
-   list it as `- /data/my-dataset:/data/my-dataset:ro` (host path, then `/data/<key>`), and
+   list it as `- /srv/datasets/my-dataset:/data/my-dataset:ro` (host path, then `/data/<key>`), and
    append `:compose.storage.yaml` to `COMPOSE_FILE` in `deploy/.env`.
 
 2. Set `EYENED_STORAGE_MOUNTS={"my-dataset":"/data/my-dataset"}` in `deploy/.env`, then
@@ -120,6 +126,9 @@ but blank viewer. To point the platform at a directory of images:
    [Importing Data](/eyened-platform/importing_data). The storage backend record is created
    automatically on first import, so there is no separate registration step.
 
+Thumbnails need a running worker — without one, imported images show no thumbnails and nothing
+reports an error. See [Workers](/eyened-platform/deployment/production#workers).
+
 :::note
 For local development with hot reload, see
 [Development](/eyened-platform/deployment/development).
@@ -128,7 +137,8 @@ For local development with hot reload, see
 :::caution
 Set up regular backups for both the database and the storage directories.
 
-See `deploy/README.md`, "Backup and restore": XtraBackup for a hot backup of the bundled database, and `mysqldump` for a portable one.
+See [Routine backups](/eyened-platform/deployment/operations#routine-backups): what to back up,
+XtraBackup for a hot backup of the bundled database, and `mysqldump` for a portable one.
 :::
 
 :::tip

@@ -204,7 +204,8 @@ For scenario 5, a production dump has task 70, which touches several projects.
 
 ## New-dev checklist
 
-clone -> `cp deploy/.env.example deploy/.env`, fill the secrets, `docker compose up -d --build`
+clone -> `cp deploy/.env.example deploy/.env && chmod 600 deploy/.env`, switch `COMPOSE_FILE` to
+`compose.yaml:compose.dev.yaml`, fill the secrets, `docker compose up -d --build`
 from `deploy/` (the `init` service creates the schema and the administrator on a fresh
 database) -> to work against a
 production dump instead, `eorm load-dump` then `eorm init-admin` with a
