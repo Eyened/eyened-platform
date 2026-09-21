@@ -3,12 +3,59 @@ title: Choosing a stack
 description: What the deploy/.env stack selection means and how the stacks differ
 ---
 
-## What a stack is
+Everything the platform needs — viewer, API, database, Redis and file server — runs as one
+`docker compose` project from the `deploy/` directory. There is no second stack to start and no
+orchestration layer. Which services you get, and how they behave, is decided by two variables in
+`deploy/.env`: `COMPOSE_FILE` and `COMPOSE_PROFILES`.
+
+Docker with **Compose 2.26 or newer** is the only prerequisite (`docker compose version`). Older
+versions reject or silently ignore `depends_on: required: false`, which the stack relies on.
 
 ## The three stacks
 
+| Stack | `COMPOSE_FILE` | `COMPOSE_PROFILES` |
+|---|---|---|
+| Production, bundled database | `compose.yaml:compose.prod.yaml` | `local-db` |
+| Development (hot reload, source mounted) | `compose.yaml:compose.dev.yaml` | `local-db` |
+| Production, external database | `compose.yaml:compose.prod.yaml` | *(empty)* |
+
+`deploy/.env.example` ships with the first of these uncommented, so a copied `.env` gives you a
+production stack unless you change it.
+
 ## How they differ
+
+The table above is the mechanism. What actually changes:
+
+| | Development | Production |
+|---|---|---|
+| Viewer | a `client` container runs vite; nginx proxies `/` to it | the built SPA is baked into the fileserver image and served off disk — no client container |
+| Sources | `server/`, `orm/` and `client/` are bind-mounted; uvicorn runs with `--reload` | code is copied into the image; a change needs `--build` |
+| Login | `EYENED_API_PUBLIC_AUTH_DISABLED=true` is a reasonable choice | must stay `false` |
+| Secrets | throwaway, per developer | generated per deployment, never copied between stacks |
+| Database ports | published only if you add `compose.host-ports.yaml` | same |
+
+Neither stack migrates an existing schema on `up` — see
+[Operations](/eyened-platform/deployment/operations). For how requests actually flow through
+nginx in each case, see [Platform design](/eyened-platform/platform_design).
 
 ## Optional layers
 
+Appended to `COMPOSE_FILE`:
+
+| Layer | Adds |
+|---|---|
+| `compose.storage.yaml` | image datasets — see [Image datasets](/eyened-platform/deployment/production#image-datasets) |
+| `compose.workers.yaml` | RQ workers — see [Workers](/eyened-platform/deployment/production#workers) |
+| `compose.oidc.yaml` | bundled Keycloak (`deploy/keycloak/README.md`) |
+| `compose.host-ports.yaml` | MySQL and Redis on `127.0.0.1` (`DB_PUBLISH_PORT`, `REDIS_PUBLISH_PORT`) |
+
 ## On a host shared with other stacks
+
+Give each stack its own `COMPOSE_PROJECT_NAME` and `HTTP_PORT`. The bundled MySQL and Redis
+publish no host ports by default, which removes the commonest source of collisions.
+
+## Next
+
+- [Development](/eyened-platform/deployment/development) — run it locally with hot reload
+- [Production](/eyened-platform/deployment/production) — stand it up on a server
+- [Operations](/eyened-platform/deployment/operations) — upgrade, migrate, back up, restore
