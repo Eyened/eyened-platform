@@ -89,7 +89,10 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       <<: *app-env
-      EYENED_AUTO_MIGRATE: ${EYENED_AUTO_MIGRATE:-true}
+      # Off by default: starting the stack must not change an existing schema.
+      # An empty database is still created and seeded -- bootstrap does not
+      # consult this flag on that path.
+      EYENED_AUTO_MIGRATE: ${EYENED_AUTO_MIGRATE:-false}
       EYENED_API_ADMIN_PASSWORD: ${EYENED_API_ADMIN_PASSWORD:-}
     depends_on:
       # `required: false`: with the local-db profile off (an external

@@ -90,12 +90,16 @@ cd deploy
 docker compose run --rm xtrabackup 'xtrabackup --backup --host=database --user=root --password="$MYSQL_ROOT_PASSWORD" --target-dir=/backup/before-upgrade && xtrabackup --prepare --target-dir=/backup/before-upgrade'
 git pull
 docker compose up -d --build
-docker compose logs init    # "Migrating <old> -> <new>." then the summary line
+docker compose logs init    # "Pending migrations not applied ...: <old> -> <new>."
+docker compose run --rm -e EYENED_AUTO_MIGRATE=true init    # apply them
 ```
 
+Starting the stack never migrates an existing schema, so the new code runs against the old one
+until you run that second command. A site that sets `EYENED_AUTO_MIGRATE=true` in `.env` migrates
+on every `up` instead.
+
 To roll back, check out the recorded commit, restore the backup (`deploy/README.md`, "Backup and
-restore"), then `docker compose up -d --build`. A site that sets `EYENED_AUTO_MIGRATE=false`
-migrates by hand with `docker compose run --rm -e EYENED_AUTO_MIGRATE=true init`.
+restore"), then `docker compose up -d --build`.
 
 Upgrading from a version that predates `deploy/`: read the **Deployment** section of the
 [release notes](/eyened-platform/release_notes) first.

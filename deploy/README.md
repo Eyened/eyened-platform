@@ -21,7 +21,8 @@ Open `http://localhost:8080` and sign in as `admin` with `EYENED_API_ADMIN_PASSW
 On every `up`, the one-shot `init` service runs `eorm bootstrap` before the server starts:
 
 - empty database: create the schema and seed the builtin form schemas;
-- schema behind the code: apply the migrations (`EYENED_AUTO_MIGRATE=false` only reports them);
+- schema behind the code: report the pending migrations and carry on, leaving the schema alone.
+  `EYENED_AUTO_MIGRATE=true` applies them instead, on every `up`;
 - no accounts at all: create `EYENED_API_ADMIN_USERNAME` as administrator with
   `EYENED_API_ADMIN_PASSWORD`.
 
@@ -60,13 +61,15 @@ Run from `deploy/`.
 | Follow logs | `docker compose logs -f` |
 | Stop | `docker compose down` |
 | Upgrade | `git pull && docker compose up -d --build` |
-| Migrate by hand (`EYENED_AUTO_MIGRATE=false`) | `docker compose run --rm -e EYENED_AUTO_MIGRATE=true init` |
+| Migrate (`up` does not) | `docker compose run --rm -e EYENED_AUTO_MIGRATE=true init` |
 | Run an `eorm` command | `docker compose exec server eorm <command>` |
 | MySQL shell | `docker compose exec database sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'` |
 | Delete the stack **with its database and platform storage** | `docker compose down -v` |
 
-Back up before an upgrade: migrations run on `up`, and MySQL cannot roll back DDL. To roll back,
-check out the previous commit, restore the backup, then `docker compose up -d --build`.
+Back up before migrating: MySQL cannot roll back DDL. An upgrade is `git pull && docker compose
+up -d --build`, which leaves the schema alone, then the migrate command above once you are ready.
+Until it runs, the new code is talking to the old schema. To roll back, check out the previous
+commit, restore the backup, then `docker compose up -d --build`.
 
 A database from before the August 2026 migration squash carries a revision alembic cannot
 find, and `init` fails on it. Follow `docs/runbooks/2026-08-20-alembic-squash-cutover.md`.
