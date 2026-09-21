@@ -21,7 +21,8 @@ while the system is still open, and the flip lands with everyone already
 granted. Every step before the last is invisible to users except one tag-delete
 status code, noted at step 1.
 
-This assumes the `deploy/` stack (run with `docker compose`, see `deploy/README.md`) that
+This assumes the `deploy/` stack (run with `docker compose`, see
+https://eyened.github.io/eyened-platform/deployment/) that
 replaced `docker/`, `dev/` and `database/`. `eorm` and `alembic` both ship
 inside the server image, so every command below runs after `docker compose
 exec -it server bash` from `deploy/`. `-e` / `--env-file` is a **group**
@@ -166,7 +167,7 @@ prunes needs the intended membership list from the consortium, not a query.
   cheapest way to reproduce a new joiner's view.
 - **The joiner flow, for free:** the bundled Keycloak (`deploy/keycloak/`,
   enabled by appending `:compose.oidc.yaml` to `COMPOSE_FILE` in
-  `deploy/.env` -- see `deploy/README.md`) with
+  `deploy/.env` -- see https://eyened.github.io/eyened-platform/deployment/) with
   `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` auto-provisions a fresh login as a
   zero-access user.
 - **Testing containment:** a production dump has task 70, which touches several

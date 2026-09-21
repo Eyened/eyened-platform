@@ -22,8 +22,9 @@ permissions, which are world-readable.
 Fill four of them with `openssl rand -hex 32`: `EYENED_API_SECRET_KEY`, `EYENED_REDIS_PASSWORD`,
 `MYSQL_ROOT_PASSWORD` and `EYENED_DATABASE_PASSWORD`. Compose refuses to start while any of the
 four is empty. The fifth, `EYENED_API_ADMIN_PASSWORD`, is a password you will type at the login
-screen — compose starts without it, and `init` fails on an empty database, where it creates the
-first administrator.
+screen — compose starts without it, and `init` (see [what happens on every
+`up`](/eyened-platform/deployment/operations#what-happens-on-every-up)) fails on an empty
+database, where it creates the first administrator.
 
 Set `HTTP_PORT` to the port you want to serve on, then:
 
@@ -117,7 +118,7 @@ narrows it. With image datasets, uncomment the worker entries in `compose.storag
 
 On a separate GPU host:
 
-1. Clone the repository and `cp .env.example .env` in `deploy/`.
+1. Clone the repository and `cp .env.example .env && chmod 600 .env` in `deploy/`.
 2. In that `.env`, set `COMPOSE_FILE=compose.workers.yaml` (add `:compose.storage.yaml` for
    datasets, keeping only the worker entries), the GPU profiles, `EYENED_REDIS_HOST`, `_PORT`
    and `_PASSWORD`, `EYENED_DATABASE_HOST`, `_PORT` and `_PASSWORD`, `EYENED_STORAGE_MOUNTS`,

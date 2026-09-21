@@ -21,10 +21,11 @@ implicitly. The new docs lose them without saying so. All three are doc fixes.
    in `deploy/README.md` (First run and GPU host), `getting_started.mdx`,
    `development_setup.mdx` and `docs/rbac-operations.md`.
 
-   **Status: DONE.** `chmod 600 .env` is now documented unconditionally at all four copy sites
+   **Status: DONE.** `chmod 600 .env` is now documented unconditionally at all five copy sites
    (`deploy/README.md`, `getting_started.mdx`, `deployment/development.mdx`,
-   `docs/rbac-operations.md`). The unconditional-versus-shared-host question is settled as
-   unconditional: the file holds five secrets and a conditional instruction is one a reader skips.
+   `deployment/production.mdx` (both First run and the GPU host), and `docs/rbac-operations.md`).
+   The unconditional-versus-shared-host question is settled as unconditional: the file holds five
+   secrets and a conditional instruction is one a reader skips.
 2. **Workers on the platform host lose their dataset mounts.** `gen-storage.sh` added every worker
    service to the mounts whenever `compose.workers.yaml` was loaded. Now those entries ship
    commented out in `compose.storage.example.yaml`. But the workers still receive

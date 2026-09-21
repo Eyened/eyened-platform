@@ -44,7 +44,7 @@ database.
   empty database and the first administrator before the server starts. It reports pending
   migrations on an existing database but does not apply them. Docker is the only prerequisite. The
   database is part of the stack rather than a second compose project to start first. Full
-  reference: [/eyened-platform/deployment](/eyened-platform/deployment).
+  reference: [Deployment](/eyened-platform/deployment).
 - **One env file.** `deploy/.env`, copied from `deploy/.env.example`, with the secrets filled by
   hand. `dev/.env`, `docker/.env`, `database/.env` and `worker/.env` are not read.
 - **Breaking: environment variables renamed.** `DEV_NGINX_PORT` → `HTTP_PORT`, the `docker/`

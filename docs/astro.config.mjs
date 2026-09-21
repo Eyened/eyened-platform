@@ -91,7 +91,7 @@ export default defineConfig({
         }),
     ],
     redirects: {
-        '/guides/development_setup': '/deployment/development',
+        '/guides/development_setup': '/eyened-platform/deployment/development',
     },
     vite: {
         server: {
