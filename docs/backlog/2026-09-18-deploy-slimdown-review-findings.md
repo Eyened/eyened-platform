@@ -20,6 +20,18 @@ implicitly. The new docs lose them without saying so. All three are doc fixes.
    `EYENED_API_SECRET_KEY` can forge an admin JWT. Fix: `cp .env.example .env && chmod 600 .env`
    in `deploy/README.md` (First run and GPU host), `getting_started.mdx`,
    `development_setup.mdx` and `docs/rbac-operations.md`.
+
+   **Status 2026-09-21: ACCEPTED RISK, deliberately left open.** Measured while triaging, so the
+   next person need not re-derive it:
+   - `.env.example` is committed at 664 and `cp` preserves it, so a fresh copy is world-readable.
+     Git stores only the executable bit, so shipping the example pre-restricted is NOT possible —
+     any fix has to act after the copy.
+   - On the shared development host the directories above it are already traversable (`/home/kdatta`
+     755, `.../workspace` 775), so the exposure is real there rather than theoretical.
+   - The `deploy/.env` on that host is 600 only because the deleted `./eyened` wrote it that way.
+     Nobody following the current docs gets that.
+   - Undecided by design: whether the docs should make `chmod 600` unconditional at all four copy
+     sites, or name it as a shared-host step. Unconditional was the leaning, not a decision.
 2. **Workers on the platform host lose their dataset mounts.** `gen-storage.sh` added every worker
    service to the mounts whenever `compose.workers.yaml` was loaded. Now those entries ship
    commented out in `compose.storage.example.yaml`. But the workers still receive
