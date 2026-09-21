@@ -11,9 +11,11 @@ services:
     volumes: *datasets
   fileserver:
     volumes: *datasets
-  # Uncomment only with compose.workers.yaml in COMPOSE_FILE: compose rejects a
-  # layer that names a service no other file defines. A GPU host that loads the
-  # workers layer alone keeps these and deletes server and fileserver.
+  # With compose.workers.yaml in COMPOSE_FILE, uncomment these: workers read the
+  # datasets directly, and one without its mounts refuses to start. Only then —
+  # compose rejects a layer that names a service no other file defines. A GPU
+  # host that loads the workers layer alone keeps these and deletes server and
+  # fileserver.
   # worker-cfi-roi:
   #   volumes: *datasets
   # worker-inference:

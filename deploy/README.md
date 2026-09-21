@@ -77,9 +77,12 @@ Each dataset is mounted read-only at `/data/<key>`, where `<key>` is its `Storag
 
 1. `cp compose.storage.example.yaml compose.storage.yaml`, and list each dataset as
    `- /host/path:/data/<key>:ro`.
-2. In `.env`, append `:compose.storage.yaml` to `COMPOSE_FILE` and set
+2. With `:compose.workers.yaml` also in `COMPOSE_FILE`, uncomment the worker entries in
+   `compose.storage.yaml`. Workers read the datasets directly, so without their mounts every
+   thumbnail and inference job fails; a worker now refuses to start rather than fail silently.
+3. In `.env`, append `:compose.storage.yaml` to `COMPOSE_FILE` and set
    `EYENED_STORAGE_MOUNTS={"<key>":"/data/<key>"}`, one entry per dataset.
-3. `docker compose up -d`.
+4. `docker compose up -d`.
 
 Platform storage (thumbnails, segmentations) is a Docker volume unless `PLATFORM_STORAGE_PATH`
 names a host path.
@@ -90,7 +93,8 @@ Append `:compose.workers.yaml` to `COMPOSE_FILE`. The CPU worker `worker-cfi-roi
 the layer and consumes `default`, the thumbnail queue. GPU workers also need a profile in
 `COMPOSE_PROFILES`: `gpu-inference`, `gpu-cfi-amd` or `gpu-layer-segmentation`.
 `worker-inference` also consumes `default` and `cfi-roi` unless `EYENED_RQ_QUEUES_INFERENCE`
-narrows it.
+narrows it. With image datasets, uncomment the worker entries in `compose.storage.yaml` — see
+"Image datasets" above.
 
 On a separate GPU host:
 
