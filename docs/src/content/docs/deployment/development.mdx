@@ -175,8 +175,9 @@ Set `EYENED_API_AUTH_OIDC_ENABLED=true` and the `EYENED_OIDC_*` vars in `deploy/
 
 ## Optional: existing data
 
-See [Moving an existing database](/eyened-platform/deployment/operations#moving-an-existing-database-into-this-stack)
-for XtraBackup and `mysqldump`, and how to load a dump into this stack. After loading a dump, apply pending migrations:
+See [Backup and restore](/eyened-platform/deployment/operations#backup-and-restore) for XtraBackup
+and `mysqldump`, and [Moving an existing database](/eyened-platform/deployment/operations#moving-an-existing-database-into-this-stack)
+for loading a dump into this stack. After loading a dump, apply pending migrations:
 
 ```bash
 docker compose run --rm -e EYENED_AUTO_MIGRATE=true init
