@@ -23,19 +23,31 @@ cd eyened-platform/deploy
 cp .env.example .env
 ```
 
-In `.env`, switch to the development lines (`COMPOSE_FILE=compose.yaml:compose.dev.yaml`) and
-fill the five secrets with `openssl rand -hex 32`. Then:
+### Configure `deploy/.env`
 
-```bash
-docker compose up -d --build
-```
+Everything below is read at `up`, so set what applies before you start the stack.
 
-The `init` service creates the schema, seeds the builtin form schemas and creates the
-administrator (`EYENED_API_ADMIN_USERNAME`, password `EYENED_API_ADMIN_PASSWORD`).
+**Required**
 
-### On a machine shared with other developers
+Switch to the development lines (`COMPOSE_FILE=compose.yaml:compose.dev.yaml` and
+`COMPOSE_PROFILES=local-db`), then fill the secrets. Compose refuses to start while any of the
+first four is empty:
 
-Set `COMPOSE_PROJECT_NAME` and `HTTP_PORT` in `deploy/.env` to values nobody else is using:
+| Variable | Value |
+| --- | --- |
+| `EYENED_API_SECRET_KEY` | `openssl rand -hex 32` |
+| `EYENED_REDIS_PASSWORD` | `openssl rand -hex 32` |
+| `MYSQL_ROOT_PASSWORD` | `openssl rand -hex 32` |
+| `EYENED_DATABASE_PASSWORD` | `openssl rand -hex 32` |
+| `EYENED_API_ADMIN_PASSWORD` | A password you will type — this is your login, with `EYENED_API_ADMIN_USERNAME` (default `admin`) |
+
+Compose does start with `EYENED_API_ADMIN_PASSWORD` empty; `init` is what fails, and only on an
+empty database, where it creates that first administrator. Generate the four random ones per
+deployment — never copy them between stacks — and keep them in `.env`, which is gitignored.
+
+**On a machine shared with other developers**
+
+Set these to values nobody else is using:
 
 | Variable | Purpose |
 | --- | --- |
@@ -46,7 +58,30 @@ The bundled MySQL and Redis publish **no** host ports by default, which removes 
 source of collisions. For a MySQL shell with no port exposed at all, use
 `docker compose exec database sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'`.
 If you need a host port instead — DBeaver, or a host-side alembic — append
-`:compose.host-ports.yaml` to `COMPOSE_FILE` in `deploy/.env` and set `DB_PUBLISH_PORT`.
+`:compose.host-ports.yaml` to `COMPOSE_FILE` and set `DB_PUBLISH_PORT`.
+
+**Optional, but cheaper to decide now than later**
+
+| If you want | Set | Details |
+| --- | --- | --- |
+| To skip the login screen while developing | `EYENED_API_PUBLIC_AUTH_DISABLED` | [Accounts and access](#accounts-and-access) |
+| Shared or existing platform storage | `PLATFORM_STORAGE_PATH` | [Storage](#storage) |
+| Image datasets mounted into the stack | `EYENED_STORAGE_MOUNTS` | [Storage](#storage) |
+| OIDC login instead of passwords only | `:compose.oidc.yaml` in `COMPOSE_FILE` | [Optional: OIDC login](#optional-oidc-login) |
+| To start from an existing database rather than an empty one | — | [Optional: existing data](#optional-existing-data) |
+
+### Start the stack
+
+```bash
+docker compose up -d --build
+```
+
+The `init` service creates the schema, seeds the builtin form schemas and creates the
+administrator (`EYENED_API_ADMIN_USERNAME`, password `EYENED_API_ADMIN_PASSWORD`).
+
+Changing any of the variables above later is just an edit plus `docker compose up -d`; only
+`PLATFORM_STORAGE_PATH` is awkward after the fact, because the first stack already has a volume
+with data in it.
 
 ## Accounts and access
 
