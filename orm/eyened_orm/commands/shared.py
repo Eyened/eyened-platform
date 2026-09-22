@@ -5,13 +5,12 @@ import string
 
 import click
 from eyened_orm import Database
-from eyened_orm.authz.scope import AccessScope
-from sqlalchemy.orm import Session
-
 from eyened_orm.audit_writer import AuditWriter
 from eyened_orm.authz.account_admin import AccountAdministration
 from eyened_orm.authz.actor import TrustedPath
+from eyened_orm.authz.scope import AccessScope
 from eyened_orm.repositories import CreatorRepository
+from sqlalchemy.orm import Session
 
 
 def get_database(*, confirmation: bool = False) -> Database:
