@@ -36,3 +36,7 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [Session tokens outlive reset and restore](2026-09-15-session-tokens-outlive-reset-and-restore.md)
 - [Deploy slim-down: final-review findings not yet fixed](2026-09-18-deploy-slimdown-review-findings.md)
 - [`init` exits 0 on a schema behind head, so the stack serves against the old one](2026-09-21-init-exits-zero-on-a-schema-behind-head.md)
+- [Documentation that readers cannot reach: the publish boundary is in the wrong place](2026-09-21-docs-publish-boundary-stranded-material.md)
+- [Documentation claims that are wrong against the code](2026-09-21-docs-factual-defects-triage.md)
+- [The documentation has no tutorial, and most pages carry two or three modes](2026-09-21-docs-no-tutorial-and-mode-mixing.md)
+- [`POST /api/auth/login` with `api_client: true` returns 500](2026-09-21-api-client-login-returns-500.md)
