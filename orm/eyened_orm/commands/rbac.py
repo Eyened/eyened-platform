@@ -17,6 +17,7 @@ from ..authz.account_admin import AccountAdministration
 from ..authz.actor import TrustedPath
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
 from ..authz.errors import AdminEntityNotFound
+from ..utils.db_users import WeakPasswordError
 from ..authz.membership_admin import MembershipAdministration
 from ..authz.roles import ProjectRole, parse_role
 from ..repositories import (
@@ -49,7 +50,13 @@ def init_admin(username: str, password: str) -> None:
     """Create or promote the platform administrator (idempotent)."""
     database = get_database()
     with database.get_session() as session:
-        creator, outcome = ensure_admin(session, username, password)
+        try:
+            creator, outcome = ensure_admin(session, username, password)
+        except WeakPasswordError as exc:
+            # Names the source: in a deploy script the password comes from the env var.
+            raise click.ClickException(
+                f"--password / EYENED_API_ADMIN_PASSWORD: {exc}"
+            ) from exc
         # None means "nothing happened, so nothing to audit" -- keeping that in the
         # match keeps the audit condition from being written twice and drifting.
         #

@@ -39,3 +39,5 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [Cookie attributes on the auth responses are unpinned](2026-09-17-auth-cookie-attributes-unpinned.md)
 - [The session guards cannot detect a stale allow-list entry](2026-09-17-session-guard-allowlist-cannot-detect-stale-entries.md)
 - [The cutover grant skipped every legacy-credential human](2026-09-17-cutover-skipped-legacy-credential-humans.md)
+- [A password change ends no session, and a session never expires](2026-09-18-password-change-does-not-end-sessions.md)
+- [New passwords are not checked against a breached or common password list](2026-09-18-password-breach-list-check.md)
