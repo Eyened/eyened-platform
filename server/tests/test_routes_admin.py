@@ -9,6 +9,7 @@ from sqlalchemy import select
 from eyened_orm import AuditLog, ProjectMember
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.repositories import ProjectMemberRepository
+from eyened_orm.utils.db_users import create_user
 from eyened_orm.utils.factories import admin_scope, make_creator, make_project, scope_for
 
 
@@ -103,6 +104,16 @@ def test_the_user_list_reports_per_row_state(client, seeded):
         "has_credential": True,
         "employee_identifier": "E-1",
     }
+
+
+def test_an_oidc_provisioned_account_has_no_credential(client, session):
+    """Production writes passlib's disabled-password hash, not NULL, when there is no password."""
+    create_user(session, username="oidc-user", password=None, employee_identifier="oidc:sub:x")
+    session.commit()
+    session.expunge_all()
+
+    rows = {row["username"]: row for row in client.get("/admin/users").json()}
+    assert rows["oidc-user"]["has_credential"] is False
 
 
 def test_a_legacy_password_only_row_has_a_credential(client, session):

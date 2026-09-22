@@ -19,6 +19,16 @@ def disable_password(stored_hash: str|None) -> str:
     return pwd_context.disable(stored_hash)
 
 
+def has_password(creator: Creator) -> bool:
+    """Whether ``creator.PasswordHash`` can authenticate a password.
+
+    An account without a password carries the hash ``disable_password`` writes,
+    not NULL, so an emptiness check answers ``True`` for every such account.
+    """
+    stored = creator.PasswordHash
+    return bool(stored) and pwd_context.identify(stored) != "unix_disabled"
+
+
 class WeakPasswordError(Exception):
     """A password being set fails the policy. Not ``ValueError``: ``create_user`` raises that for a taken name."""
 

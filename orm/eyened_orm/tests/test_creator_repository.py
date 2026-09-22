@@ -27,6 +27,8 @@ def test_list_humans_keeps_the_rows_list_authenticatable_drops(session):
     deactivated.PasswordHash = "$argon2id$v=19$m=65536,t=3,p=4$placeholder"
     deactivated.Inactive = True
     legacy = make_creator(session, "carol")
+    # Pre-migration rows hold only the legacy Password column.
+    legacy.PasswordHash = None
     legacy.Password = b"0" * 32
     session.commit()
 

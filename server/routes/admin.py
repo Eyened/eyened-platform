@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from eyened_orm import Creator
 from eyened_orm.authz.roles import ProjectRole
+from eyened_orm.utils.db_users import has_password
 
 from ..services.admin_service import AdminService, get_admin_service
 from .auth import CurrentUser, get_current_user
@@ -92,8 +93,7 @@ def _user_response(creator: Creator) -> AdminUserResponse:
         username=creator.CreatorName,
         is_admin=creator.IsAdmin,
         active=not creator.Inactive,
-        has_credential=creator.PasswordHash is not None
-        or creator.Password is not None,
+        has_credential=has_password(creator) or creator.Password is not None,
         employee_identifier=creator.EmployeeIdentifier,
     )
 

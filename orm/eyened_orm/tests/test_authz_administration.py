@@ -361,6 +361,10 @@ def test_grant_all_skips_creators_that_cannot_authenticate(session, membership):
     human = create_user(session, "alice", "pw")
     model = make_creator(session, "cfi-quality-v3", is_human=False)
     attribution_only = make_creator(session, "Consensus")
+    # Neither was ever created as an account, so neither carries a PasswordHash
+    # at all -- the state list_authenticatable keys on to skip them.
+    model.PasswordHash = None
+    attribution_only.PasswordHash = None
     make_project(session, "A")
     make_project(session, "B")
     session.commit()

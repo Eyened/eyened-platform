@@ -187,7 +187,7 @@ def _memberships(session):
 
 def _seed_grant_all(session):
     """A creator with a real password hash -- unlike the `alice` fixture above,
-    whose `make_creator` leaves PasswordHash NULL, which `grant_all` would skip."""
+    which carries the disabled-password hash."""
     create_user(session, "alice", "pw")
     make_project(session, "A")
     make_project(session, "B")
