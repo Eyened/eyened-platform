@@ -1224,7 +1224,11 @@ export interface paths {
          */
         get: operations["list_users_admin_users_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create User
+         * @description Create a human password account.
+         */
+        post: operations["create_user_admin_users_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1315,6 +1319,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/users/{user_id}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set User Active
+         * @description Deactivate or reactivate a user; repeating the current state changes nothing.
+         */
+        put: operations["set_user_active_admin_users__user_id__active_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set User Password
+         * @description Replace a user's password.
+         */
+        put: operations["set_user_password_admin_users__user_id__password_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1388,6 +1432,16 @@ export interface components {
             old_password: string;
             /** New Password */
             new_password: string;
+        };
+        /**
+         * CreateUserRequest
+         * @description A human password account; the password must pass the policy.
+         */
+        CreateUserRequest: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
         };
         /** CreatorMeta */
         CreatorMeta: {
@@ -2343,6 +2397,22 @@ export interface components {
         SeriesMeta: {
             /** Id */
             id: number;
+        };
+        /**
+         * SetActiveRequest
+         * @description ``false`` deactivates; ``true`` reactivates.
+         */
+        SetActiveRequest: {
+            /** Active */
+            active: boolean;
+        };
+        /**
+         * SetPasswordRequest
+         * @description The new password; it must pass the policy.
+         */
+        SetPasswordRequest: {
+            /** Password */
+            password: string;
         };
         /**
          * SexEnum
@@ -5839,6 +5909,44 @@ export interface operations {
             };
         };
     };
+    create_user_admin_users_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_user_memberships_admin_users__user_id__memberships_get: {
         parameters: {
             query?: never;
@@ -6012,6 +6120,84 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GrantPreviewResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_user_active_admin_users__user_id__active_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetActiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_user_password_admin_users__user_id__password_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
