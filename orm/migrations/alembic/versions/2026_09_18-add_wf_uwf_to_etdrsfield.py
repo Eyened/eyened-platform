@@ -1,7 +1,7 @@
 """add_wf_uwf_to_etdrsfield
 
 Revision ID: 18200354d862
-Revises: 2db0e63195db
+Revises: 5f1c2a9d7e30
 Create Date: 2026-09-18 11:22:39.382686
 
 Autogenerate does not emit this. Alembic's MySQL type compare
@@ -23,7 +23,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '18200354d862'
-down_revision: Union[str, None] = '2db0e63195db'
+down_revision: Union[str, None] = '5f1c2a9d7e30'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
