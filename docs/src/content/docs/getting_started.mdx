@@ -17,16 +17,20 @@ The Eyened platform is a modern web platform for visualization and annotation of
 
 ## Quick Setup
 
-Everything the platform needs — viewer, API, database, Redis, and file server — runs from one
-Docker stack.
+These steps install the platform **on your own machine, to try it out**. Everything it needs —
+viewer, API, database, Redis and file server — runs from one Docker stack, on the configuration
+`.env.example` ships with: the production stack with a bundled database.
+
+To stand the platform up on a server, use
+[Production](/eyened-platform/deployment/production) instead. That page is the authoritative
+install procedure, and this one does not repeat it.
 
 **Prerequisite: Docker, with Compose 2.26 or newer.** That is the whole list — a current Docker
 Desktop or Docker Engine install already satisfies it; older Compose rejects the stack's
 `depends_on: required: false`. Supported platforms are Linux and macOS natively, and Windows via WSL2.
 
-These steps install the **production stack with a bundled database** — the configuration
-`.env.example` ships with. For a hot-reload development stack, or for the differences between
-them, see [Choosing a stack](/eyened-platform/deployment).
+For a hot-reload development stack, or for the differences between the stacks, see
+[Choosing a stack](/eyened-platform/deployment).
 
 1. Clone the repository. Images are built from your checkout, so the checkout *is* the version:
 
@@ -35,23 +39,34 @@ them, see [Choosing a stack](/eyened-platform/deployment).
     cd eyened-platform
     ```
 
-2. Create the configuration and start the stack:
+2. Create the configuration:
 
     ```bash
     cd deploy
     cp .env.example .env && chmod 600 .env
-    # four secrets with: openssl rand -hex 32
-    # plus EYENED_API_ADMIN_PASSWORD -- the password you will log in with
+    ```
+
+    `cp` preserves the example file's permissions, which are world-readable, so restrict `.env`
+    before you fill it. Fill four secrets with `openssl rand -hex 32`:
+    `EYENED_API_SECRET_KEY`, `EYENED_REDIS_PASSWORD`, `MYSQL_ROOT_PASSWORD` and
+    `EYENED_DATABASE_PASSWORD`. Compose refuses to start while any of the four is empty. Set
+    `EYENED_API_ADMIN_PASSWORD` as well — it is the password you will type at the login screen.
+
+3. Start the stack:
+
+    ```bash
     docker compose up -d --build
     ```
 
     On the first start the `init` service creates the schema, seeds the builtin form schemas,
     and creates the administrator `admin` (or `EYENED_API_ADMIN_USERNAME`) with the password you
-    put in `EYENED_API_ADMIN_PASSWORD`.
+    put in `EYENED_API_ADMIN_PASSWORD` — see [what happens on every
+    `up`](/eyened-platform/deployment/operations#what-happens-on-every-up).
 
-3. Open `http://localhost:8080` (or your `HTTP_PORT`) and sign in as that administrator.
+4. Open `http://localhost:8080` and sign in as that administrator. `.env.example` ships
+   `HTTP_PORT=8080`; if you changed it, use your port.
 
-4. Add the remaining users, and grant each one access. Access comes from project memberships, so
+5. Add the remaining users, and grant each one access. Access comes from project memberships, so
    an account made with `eorm create-user` — or through self-registration in the user interface —
    logs in and sees **nothing** until it is granted a role in an **existing** project. There is no
    command to create an empty one; a `Project` row is created as a side effect of importing data
@@ -72,67 +87,29 @@ them, see [Choosing a stack](/eyened-platform/deployment).
     control](/eyened-platform/guides/access_control)** for the model and **[CLI
     reference](/eyened-platform/orm/cli#users-and-access)** for every command.
 
-### Day-to-day
+### Where to go next
 
-Run these from the `deploy/` directory; `.env` records which layers the stack uses:
-
-```bash
-cd deploy
-docker compose logs -f      # follow logs
-docker compose down         # stop
-docker compose up -d        # start
-```
-
-### Upgrading and rolling back
-
-Images are built from your checkout, so an upgrade is a checkout plus a rebuild. Starting the
-stack leaves an existing schema alone; you apply pending migrations yourself, and MySQL cannot
-roll back a migration, so back up first. Record where you are, since that is what a rollback returns to:
-
-```bash
-git rev-parse --short HEAD
-cd deploy
-docker compose run --rm xtrabackup 'xtrabackup --backup --host=database --user=root --password="$MYSQL_ROOT_PASSWORD" --target-dir=/backup/before-upgrade && xtrabackup --prepare --target-dir=/backup/before-upgrade'
-git pull
-docker compose up -d --build
-docker compose logs init    # "Pending migrations not applied ...: <old> -> <new>."
-docker compose run --rm -e EYENED_AUTO_MIGRATE=true init    # apply them
-```
-
-Starting the stack never migrates an existing schema, so the new code runs against the old one
-until you run that second command. A site that sets `EYENED_AUTO_MIGRATE=true` in `.env` migrates
-on every `up` instead.
-
-To roll back, check out the recorded commit,
-[restore the backup](/eyened-platform/deployment/operations#backup-and-restore), then
-`docker compose up -d --build`.
-
-Upgrading from a version that predates `deploy/`: read the **Deployment** section of the
-[release notes](/eyened-platform/release_notes) first.
-
-### Adding your first dataset
-
-A fresh install has an empty database, therefore no storage backends and no images — a correct
-but blank viewer. To point the platform at a directory of images:
-
-1. Mount the dataset: `cp deploy/compose.storage.example.yaml deploy/compose.storage.yaml`,
-   list it as `- /srv/datasets/my-dataset:/data/my-dataset:ro` (host path, then `/data/<key>`), and
-   append `:compose.storage.yaml` to `COMPOSE_FILE` in `deploy/.env`.
-
-2. Set `EYENED_STORAGE_MOUNTS={"my-dataset":"/data/my-dataset"}` in `deploy/.env`, then
-   `docker compose up -d`.
-
-3. Import images with `storage_backend_key: "my-dataset"` — see
-   [Importing Data](/eyened-platform/importing_data). The storage backend record is created
-   automatically on first import, so there is no separate registration step.
-
-Thumbnails need a running worker — without one, imported images show no thumbnails and nothing
-reports an error. See [Workers](/eyened-platform/deployment/production#workers).
-
-:::note
-For local development with hot reload, see
-[Development](/eyened-platform/deployment/development).
-:::
+- **Running the stack day to day** — start, stop, follow logs, apply migrations, open a MySQL
+  shell: [Operations](/eyened-platform/deployment/operations#day-to-day). Run everything from the
+  `deploy/` directory; `.env` records which layers the stack uses.
+- **Upgrading and rolling back** — images are built from your checkout, so an upgrade is a
+  checkout plus a rebuild, and starting the stack never migrates an existing schema: [Upgrading
+  and rolling back](/eyened-platform/deployment/operations#upgrading-and-rolling-back). Upgrading
+  from a version that predates `deploy/`: read the **Deployment** section of the [release
+  notes](/eyened-platform/release_notes) first.
+- **Your first dataset** — a fresh install has an empty database, therefore no storage backends
+  and no images: a correct but blank viewer. Mounting a directory of images is four steps, one of
+  which is easy to miss if you also run workers: [Image
+  datasets](/eyened-platform/deployment/production#image-datasets). Then import with
+  `storage_backend_key: "<key>"` — see [Importing data](/eyened-platform/importing_data). The
+  storage backend record is created automatically on first import, so there is no separate
+  registration step.
+- **Thumbnails** need a running worker. Without one, imported images show no thumbnails and
+  nothing reports an error — see [Workers](/eyened-platform/deployment/production#workers).
+- **On a server** — [Production](/eyened-platform/deployment/production) covers TLS termination,
+  an external database, sizing, and what to check before you go live.
+- **Local development with hot reload** —
+  [Development](/eyened-platform/deployment/development).
 
 :::caution
 Set up regular backups for both the database and the storage directories.

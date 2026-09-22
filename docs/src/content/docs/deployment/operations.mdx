@@ -35,10 +35,28 @@ Run from `deploy/`.
 
 ## Upgrading and rolling back
 
-Back up before migrating: MySQL cannot roll back DDL. An upgrade is `git pull && docker compose
-up -d --build`, which leaves the schema alone, then the migrate command above once you are ready.
-Until it runs, the new code is talking to the old schema. To roll back, check out the previous
-commit, restore the backup, then `docker compose up -d --build`.
+Images are built from your checkout, so an upgrade is a checkout plus a rebuild. Starting the
+stack leaves an existing schema alone, and MySQL cannot roll back a migration, so back up first.
+Record where you are, since that is what a rollback returns to:
+
+```bash
+git rev-parse --short HEAD
+cd deploy
+docker compose run --rm xtrabackup 'xtrabackup --backup --host=database --user=root --password="$MYSQL_ROOT_PASSWORD" --target-dir=/backup/before-upgrade && xtrabackup --prepare --target-dir=/backup/before-upgrade'
+git pull
+docker compose up -d --build
+docker compose logs init    # "Pending migrations not applied ...: <old> -> <new>."
+docker compose run --rm -e EYENED_AUTO_MIGRATE=true init    # apply them
+```
+
+Until that last command runs, the new code is talking to the old schema. A site that sets
+`EYENED_AUTO_MIGRATE=true` in `.env` migrates on every `up` instead.
+
+To roll back, check out the recorded commit, [restore the backup](#backup-and-restore), then
+`docker compose up -d --build`.
+
+Upgrading from a version that predates `deploy/`: read the **Deployment** section of the
+[release notes](/eyened-platform/release_notes) first.
 
 ## Applying migrations
 

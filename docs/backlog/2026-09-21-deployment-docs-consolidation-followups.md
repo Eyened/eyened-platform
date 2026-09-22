@@ -13,16 +13,24 @@
 
 ## Important
 
-- **I5 — two competing production install procedures.** `getting_started.mdx` and
-  `deployment/production.mdx` each document a full production install and disagree: `HTTP_PORT` is
-  absent from one and required in the other, the browse URL differs (`localhost:8080` vs
-  `<host>:<HTTP_PORT>`), and secret naming differs between the two. Neither page is marked
-  authoritative, so a reader who lands on either has no signal that a second, divergent procedure
-  exists. Separately, the better upgrade procedure (`git rev-parse` pinning plus the inline
-  xtrabackup commands) sits on the `getting_started.mdx` tutorial rather than on
-  `operations.mdx`, where an operator upgrading a running stack would look. Deferred because a real
-  fix means restructuring `getting_started.mdx` into a single-source tutorial that defers to
-  `deployment/` for reference material, which the consolidation plan explicitly put out of scope.
+- **I5 — two competing production install procedures. RESOLVED 2026-09-22.** `getting_started.mdx`
+  and `deployment/production.mdx` each documented a full production install and disagreed on
+  `HTTP_PORT`, the browse URL, and secret naming; neither was marked authoritative. Fixed by
+  giving each page a distinct reader rather than merging them: `getting_started.mdx` §Quick Setup
+  is now explicitly the local try-it-out install and says `production.mdx` is authoritative for a
+  server; its secret list and `chmod 600` rationale were brought into line with `production.mdx`,
+  and `localhost:8080` is now justified by the shipped `HTTP_PORT=8080` default.
+  `production.mdx` §Before you start declares its reader and links back. The duplicated
+  §Day-to-day, §Upgrading and rolling back and §Adding your first dataset sections were replaced
+  by a §Where to go next link list — which also removes a real contradiction, since the quick
+  start's three-step dataset recipe omitted the worker-mount step that
+  `production.mdx#image-datasets` requires. The better upgrade procedure (`git rev-parse` pinning
+  plus the inline xtrabackup commands) moved to `operations.mdx#upgrading-and-rolling-back`,
+  replacing the thinner paragraph there.
+
+  Not done, deliberately: `getting_started.mdx` is still not a Diátaxis tutorial — the feature
+  list, the ORM install tip and §Next Steps are untouched. That restructuring is
+  `2026-09-21-docs-no-tutorial-and-mode-mixing.md`.
 
 ## Out of scope (do not fix without a separate decision)
 
