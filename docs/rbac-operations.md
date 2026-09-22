@@ -64,7 +64,10 @@ EYENED_API_ADMIN_PASSWORD='...' eorm init-admin --username <the EYENED_API_ADMIN
 nothing -- and the result is an administrator that cannot log in. Without the
 env var the command prompts for the username, then the password twice without
 echo. Idempotent: re-running it without a password leaves an existing one alone
-rather than clearing it.
+rather than clearing it. A password being set must be 15-128 characters and must
+not contain `eyened` or the username; an existing deployment re-running this
+command with an unchanged password is unaffected, since the policy only applies
+when a password would actually be set.
 
 ### 3. Grant everyone
 

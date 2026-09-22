@@ -94,6 +94,10 @@ def ensure_admin(
     if password_reset and password:  # `and password` narrows str | None for mypy
         check_new_password(password, username=username)
         creator.PasswordHash = hash_password(password)
+        # AuthService.authenticate falls through to this legacy pbkdf2 column when PasswordHash
+        # misses. Leaving it set would let the password this reset is rotating away from keep
+        # authenticating -- a reset that doesn't reset.
+        creator.Password = None
 
     # Tracked as two booleans and collapsed here, rather than one variable
     # overwritten twice: the two events are independent, and the previous

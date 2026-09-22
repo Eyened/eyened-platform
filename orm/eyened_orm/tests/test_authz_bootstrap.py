@@ -98,6 +98,21 @@ def test_reactivate_is_opt_in(session):
     assert creator.Inactive is False
 
 
+def test_a_password_reset_revokes_the_legacy_password_column(session):
+    """AuthService falls through to the legacy Password column when PasswordHash
+    misses; leaving it set after a reset would let the old credential keep
+    authenticating."""
+    root = make_creator(session, "root")
+    root.IsAdmin = True
+    root.PasswordHash = hash_password("s3cret")
+    root.Password = b"0" * 32
+    session.flush()
+
+    _, outcome = ensure_admin(session, "root", "correct horse battery staple")
+    assert outcome is BootstrapOutcome.password_reset
+    assert root.Password is None
+
+
 def test_count_admins_ignores_deactivated_administrators(session):
     """The last-admin guard must not count someone who cannot make requests."""
     _, _ = ensure_admin(session, "root", None)
