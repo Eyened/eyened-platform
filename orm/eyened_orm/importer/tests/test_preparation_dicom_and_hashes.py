@@ -94,6 +94,10 @@ def test_dicom_header_modality_op_red_and_af():
     for image_type, expected in (
         (["ORIGINAL", "PRIMARY", "", "RED"], Modality.InfraredReflectance),
         (["ORIGINAL", "PRIMARY", "", "AF"], Modality.Autofluorescence),
+        (["ORIGINAL", "PRIMARY", "INFRARED"], Modality.InfraredReflectance),
+        (["ORIGINAL", "PRIMARY", "AUTOFLUORESCENCE"], Modality.Autofluorescence),
+        (["ORIGINAL", "PRIMARY", "REDFREE"], Modality.RedFreeFundus),
+        (["ORIGINAL", "PRIMARY", "RED FREE"], Modality.RedFreeFundus),
     ):
         ds = _base_file_dataset(sop_instance_uid=f"1.2.3.{image_type[-1]}")
         ds.Modality = "OP"

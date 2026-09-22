@@ -104,7 +104,8 @@ def _warn_modality_heuristics(states: list[dict[str, Any]]) -> None:
     if op_without_viewer_modality:
         logger.warning(
             "Left viewer modality unset for %d DICOM OP image(s) without a recognized "
-            "ImageType subtype (RED→InfraredReflectance, AF→Autofluorescence). "
+            "ImageType subtype (RED/INFRARED→InfraredReflectance, "
+            "AF/AUTOFLUORESCENCE→Autofluorescence, REDFREE/RED FREE→RedFreeFundus). "
             "Set modality explicitly if needed.",
             op_without_viewer_modality,
         )
