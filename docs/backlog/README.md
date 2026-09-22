@@ -42,3 +42,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [A password change ends no session, and a session never expires](2026-09-18-password-change-does-not-end-sessions.md)
 - [New passwords are not checked against a breached or common password list](2026-09-18-password-breach-list-check.md)
 - [Admin account writes reach non-human `Creator` rows](2026-09-22-admin-account-writes-reach-non-human-creators.md)
+- [Three PR #247 review fixes are parked behind PR #202](2026-09-22-rbac-admin-review-fixes-parked-behind-pr202.md)
