@@ -17,7 +17,6 @@ from ..authz.account_admin import AccountAdministration
 from ..authz.actor import TrustedPath
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
 from ..authz.errors import AdminEntityNotFound
-from ..utils.db_users import WeakPasswordError
 from ..authz.membership_admin import MembershipAdministration
 from ..authz.roles import ProjectRole, parse_role
 from ..repositories import (
@@ -26,6 +25,7 @@ from ..repositories import (
     ProjectRepository,
     TaskRepository,
 )
+from ..utils.db_users import WeakPasswordError
 from .shared import admin_scope_for_cli, get_database
 
 
