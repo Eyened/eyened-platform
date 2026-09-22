@@ -25,7 +25,7 @@ from eyened_orm import Creator
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.repositories.creator_repository import CreatorRepository
 from eyened_orm.repositories.tag_repository import TagRepository
-from eyened_orm.utils.db_users import disable_password, hash_password, verify_password
+from eyened_orm.utils.db_users import build_user, check_new_password, hash_password, verify_password
 
 from ..db import get_db
 from .acting_user import ActingUser
@@ -113,6 +113,7 @@ class AuthService:
 
         Raises:
             ConflictError: If the username is taken.
+            WeakPasswordError: If the password fails the policy (after the name check).
         """
         if self._creators.get_by_name(username) is not None:
             # Uncaught, a taken name reached main.py's blanket handler as a 500,
@@ -123,9 +124,9 @@ class AuthService:
             # client branches on it, so it is kept rather than reshaped.
             raise ConflictError("An account with this username already exists.")
 
+        check_new_password(password, username=username)
         with password_hash_capacity():
-            password_hash = hash_password(password) if password else disable_password(None)
-        creator = Creator(CreatorName=username, PasswordHash=password_hash, IsHuman=True)
+            creator = build_user(username, password)
         self._creators.add(creator)
 
         self._audit.record(
@@ -150,8 +151,11 @@ class AuthService:
         Raises:
             UnauthenticatedError: If ``username`` and ``old_password`` do not
                 authenticate.
+            WeakPasswordError: If the new password fails the policy.
         """
         creator = self.authenticate(username, old_password)
+
+        check_new_password(new_password, username=creator.CreatorName)
 
         with password_hash_capacity():
             creator.PasswordHash = hash_password(new_password)

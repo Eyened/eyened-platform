@@ -2,9 +2,9 @@
 
 Every write path to Creator.IsAdmin is an escalation path: making the column
 load-bearing turns any endpoint that can set it into a way to become an
-administrator. It is clean by construction today -- neither create_user (OIDC
-auto-provision) nor AuthService.register (/auth/register) sets it, so both land
-at the False default -- but that list is only exhaustive if it stays that way, and it is
+administrator. It is clean by construction today -- build_user, behind OIDC
+auto-provision, /auth/register and the admin create, never sets it, so all three
+land at the False default -- but that list is only exhaustive if it stays that way, and it is
 what keeps the deferred registration modes from opening a hole when they land.
 
 The second power, an unbounded AccessScope, has two doors: AccessScope.trusted()
@@ -225,7 +225,7 @@ def test_only_the_allow_listed_files_decide_a_scopes_admin_flag():
 
 
 def test_create_user_cannot_make_an_administrator():
-    """OIDC auto-provision goes through it; /auth/register is AuthService.register, which the IsAdmin writer guard scans."""
+    """OIDC auto-provision and /auth/register both build through build_user, which the IsAdmin writer guard scans."""
     import inspect
 
     from eyened_orm.utils.db_users import create_user

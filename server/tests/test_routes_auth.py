@@ -138,7 +138,7 @@ def test_change_password_persists_new_password_and_invalidates_old(
 
     response = client.post(
         "/auth/change-password",
-        json={"old_password": "old-password", "new_password": "new-password"},
+        json={"old_password": "old-password", "new_password": "correct horse battery staple"},
     )
     assert response.status_code == 200, response.text
 
@@ -148,7 +148,7 @@ def test_change_password_persists_new_password_and_invalidates_old(
     assert old_login.status_code == 401
 
     new_login = client.post(
-        "/auth/login", json={"username": "tester", "password": "new-password"}
+        "/auth/login", json={"username": "tester", "password": "correct horse battery staple"}
     )
     assert new_login.status_code == 200
 
@@ -389,7 +389,7 @@ def test_a_deactivated_account_cannot_authenticate(
     assert client_anonymous.get("/auth/me", headers=bearer).status_code == 200
     assert client_anonymous.post(
         "/auth/change-password",
-        json={"old_password": "pw0", "new_password": "pw1"},
+        json={"old_password": "pw0", "new_password": "correct horse battery staple"},
         headers=bearer,
     ).status_code == 200
     assert client_anonymous.post("/auth/refresh").status_code == 200
@@ -400,15 +400,15 @@ def test_a_deactivated_account_cannot_authenticate(
     # --- deactivated --------------------------------------------------------
     assert client_anonymous.get(f"/patients/{patient_id}", headers=bearer).status_code == 401
     assert client_anonymous.post(
-        "/auth/login", json={"username": "revoked", "password": "pw1"}
+        "/auth/login", json={"username": "revoked", "password": "correct horse battery staple"}
     ).status_code == 401
     assert client_anonymous.post(
-        "/auth/token", json={"username": "revoked", "password": "pw1"}
+        "/auth/token", json={"username": "revoked", "password": "correct horse battery staple"}
     ).status_code == 401
     assert client_anonymous.get("/auth/me", headers=bearer).status_code == 200
     assert client_anonymous.post(
         "/auth/change-password",
-        json={"old_password": "pw1", "new_password": "pw2"},
+        json={"old_password": "correct horse battery staple", "new_password": "pw2"},
         headers=bearer,
     ).status_code == 401
     assert client_anonymous.post("/auth/refresh").status_code == 401
@@ -417,7 +417,7 @@ def test_a_deactivated_account_cannot_authenticate(
     # deactivated call tried to set must not be the one on the row.
     from eyened_orm.utils.db_users import verify_password
 
-    assert verify_password("pw1", session.get(Creator, creator_id).PasswordHash)
+    assert verify_password("correct horse battery staple", session.get(Creator, creator_id).PasswordHash)
 
 
 def test_a_deactivated_account_cannot_authenticate_through_oidc(session):
@@ -468,7 +468,7 @@ def test_registering_a_taken_username_is_a_409_not_a_500(client, session):
     "registration is broken".
     """
     first = client.post(
-        "/auth/register", json={"username": "newcomer", "password": "pw"}
+        "/auth/register", json={"username": "newcomer", "password": "correct horse battery staple"}
     )
     assert first.status_code == 200, first.text
 
@@ -630,7 +630,7 @@ def test_change_password_writes_one_audit_row_attributed_to_the_caller(
 
     response = client_anonymous.post(
         "/auth/change-password",
-        json={"old_password": "old", "new_password": "new"},
+        json={"old_password": "old", "new_password": "correct horse battery staple"},
         headers=_bearer(creator_id, "changer"),
     )
 
@@ -642,6 +642,37 @@ def test_change_password_writes_one_audit_row_attributed_to_the_caller(
     assert row.Changes == {"password_hash": "updated"}
 
 
+def test_register_refuses_a_weak_password(client_anonymous, session):
+    """400 with a stable code and the failed rule, and no account."""
+    response = client_anonymous.post(
+        "/auth/register", json={"username": "newcomer", "password": "short"}
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json() == {
+        "detail": {
+            "code": "weak_password",
+            "message": "password must be at least 15 characters",
+        }
+    }
+    assert session.query(Creator).filter_by(CreatorName="newcomer").count() == 0
+
+
+def test_change_password_refuses_a_weak_password(
+    client_anonymous, session, signed_jwts
+):
+    creator_id = _seed_user(session, "changer")
+
+    response = client_anonymous.post(
+        "/auth/change-password",
+        json={"old_password": "pw0", "new_password": "short"},
+        headers=_bearer(creator_id, "changer"),
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"]["code"] == "weak_password"
+
+
 def test_register_writes_one_audit_row_on_the_auth_register_trusted_path(
     client_anonymous, session
 ):
@@ -649,7 +680,7 @@ def test_register_writes_one_audit_row_on_the_auth_register_trusted_path(
     before = _audit_ids(session)
 
     response = client_anonymous.post(
-        "/auth/register", json={"username": "newcomer", "password": "pw"}
+        "/auth/register", json={"username": "newcomer", "password": "correct horse battery staple"}
     )
 
     assert response.status_code == 200, response.text
@@ -669,12 +700,12 @@ def test_registering_then_authenticating_with_the_same_password_succeeds(
 ):
     """A password set by /auth/register authenticates through /auth/token."""
     register = client_anonymous.post(
-        "/auth/register", json={"username": "fresh-account", "password": "pw0"}
+        "/auth/register", json={"username": "fresh-account", "password": "correct horse battery staple"}
     )
     assert register.status_code == 200, register.text
 
     right = client_anonymous.post(
-        "/auth/token", json={"username": "fresh-account", "password": "pw0"}
+        "/auth/token", json={"username": "fresh-account", "password": "correct horse battery staple"}
     )
     assert right.status_code == 200, right.text
 

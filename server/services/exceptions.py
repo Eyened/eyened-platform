@@ -19,6 +19,7 @@ from eyened_orm.authz.errors import (
     NotVisibleError,
     PermissionDeniedError,
 )
+from eyened_orm.utils.db_users import WeakPasswordError
 
 
 class ServiceError(Exception):
@@ -103,6 +104,16 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(ServiceError)
     async def _handle_service_error(request: Request, exc: ServiceError) -> JSONResponse:
         return service_error_to_response(exc)
+
+    @app.exception_handler(WeakPasswordError)
+    async def _handle_weak_password(
+        request: Request, exc: WeakPasswordError
+    ) -> JSONResponse:
+        """400 with a stable code; the message names the rule that failed."""
+        return JSONResponse(
+            status_code=400,
+            content={"detail": {"code": "weak_password", "message": str(exc)}},
+        )
 
     @app.exception_handler(AuthorizationError)
     async def _handle_authorization_error(
