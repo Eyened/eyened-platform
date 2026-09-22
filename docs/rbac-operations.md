@@ -130,7 +130,7 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
 - **`grant-all` grants every project to self-registered accounts.**
   `POST /auth/register` needs no authentication, and grant-all's population
   filter is `IsHuman AND NOT Inactive AND PasswordHash IS NOT NULL` -- which a
-  self-registered row matches exactly. Anyone who registers before cutover
+  self-registered row matches exactly. Anyone who registers before the upgrade
   receives `grader` in all 44 projects. Accepted by decision on 2026-08-13; no
   code change. The confirmation prompt discloses nothing to decide on: it is a
   bare yes/no question that names no creator and does not so much as count
@@ -138,8 +138,20 @@ clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
   M creator(s) across P project(s)`) print after the commit -- after the rows
   exist. So the grant cannot be reviewed through the CLI *before* it is
   written, and there is nothing at the prompt that would tell you that one of
-  the creators is a stranger. **The mitigation is the `member` review in step 6 of
-  the upgrade guide, after the write: look for accounts nobody recognises.**
+  the creators is a stranger. **The mitigation is a query after the write, run
+  before users return -- step 6 of
+  [Upgrading to v2026.09.0](https://eyened.github.io/eyened-platform/guides/upgrading_to_v2026_09_0/).**
+  Newest first, because an account that self-registered before the upgrade sorts
+  to the top:
+
+  ```sql
+  SELECT c.CreatorID, c.CreatorName, c.IsAdmin, c.DateInserted, COUNT(pm.ProjectID) AS projects
+  FROM Creator c LEFT JOIN ProjectMember pm ON pm.CreatorID = c.CreatorID
+  WHERE c.IsHuman = 1 AND c.Inactive = 0 AND c.PasswordHash IS NOT NULL
+  GROUP BY c.CreatorID ORDER BY c.DateInserted DESC;
+  ```
+
+  `eorm revoke --user <U> --all` removes anyone who should not be there.
 - **Deactivation revokes access, it does not black out the account.** A
   deactivated user cannot log in, cannot refresh a token, and cannot change
   their password; `get_access_scope` refuses them with a 401, so every route
