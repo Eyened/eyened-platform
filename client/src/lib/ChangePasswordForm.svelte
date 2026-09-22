@@ -23,8 +23,8 @@
             setTimeout(() => {
                 changed = false;
             }, 5000);
-        } catch (_e) {
-            alert("Error changing password");
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Error changing password");
         }
     }
 </script>
@@ -72,8 +72,12 @@
                 placeholder="Enter your new password"
                 bind:value={newPassword1}
                 class:invalid={!passwordsMatch}
+                aria-describedby="password-hint"
             />
         </div>
+        <p id="password-hint" class="hint">
+            At least 15 characters. Must not contain your username or "eyened".
+        </p>
         <div>
             <label for="new_password_2">Repeat New Password:</label>
             <input
@@ -169,5 +173,11 @@
         color: #007bff;
         font-weight: bold;
         margin-top: 1em;
+    }
+
+    .hint {
+        margin: 0 0 1em;
+        font-size: 0.85em;
+        color: #555;
     }
 </style>

@@ -20,8 +20,8 @@
         try {
             await userManager.signup(username, password);
             status = "done";
-        } catch (_error) {
-            alert("Failed to create user");
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Failed to create user");
             status = "not started";
             return;
         }
@@ -48,8 +48,12 @@
                     id="password"
                     placeholder="Enter your password"
                     bind:value={password}
+                    aria-describedby="password-hint"
                 />
             </div>
+            <p id="password-hint" class="hint">
+                At least 15 characters. Must not contain your username or "eyened".
+            </p>
             <div>
                 <button type="submit" disabled={!username || !password}
                     >Create</button
@@ -115,5 +119,11 @@
 
     button:hover {
         background-color: #0056b3;
+    }
+
+    .hint {
+        margin: 0 0 1em;
+        font-size: 0.85em;
+        color: #555;
     }
 </style>
