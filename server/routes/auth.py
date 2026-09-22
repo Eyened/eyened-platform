@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from ..config import get_oidc_metadata, settings
 from ..db import get_db
 from ..services.acting_user import ActingUser
+from ..services.audit_service import get_audit_service
 from ..services.auth_service import AuthService, get_auth_service
 
 # Re-exported, not redefined. These moved to server/services/current_user.py to
@@ -584,6 +585,13 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="An account with this username already exists but is not linked to your OIDC login. Ask an administrator to link your account.",
                 ) from err
+            get_audit_service(session).record(
+                action="INSERT",
+                entity="Creator",
+                trusted_path="auth:oidc-provision",
+                entity_id=creator.CreatorID,
+                changes={"username": creator.CreatorName, "employee_identifier": identifier},
+            )
             logger.info(f"Created new account '{username}' for OIDC authenticated session, {identifier=}")
         else:
             logger.warning(f"Denied access to authenticated OIDC session, no existing account found and not creating a new one. Received claims: {id_claims}")

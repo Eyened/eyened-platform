@@ -176,6 +176,30 @@ def test_check_oidc_login_creates_new_account_but_does_not_commit(session, monke
     assert session.query(Creator).filter_by(CreatorName="new-oidc-user").count() == 0
 
 
+def test_oidc_auto_provisioning_records_an_audit_row(session, monkeypatch):
+    """Auto-provisioning attributes the new account to its own trusted path."""
+    import server.routes.auth as auth_module
+    from server.routes.auth import check_oidc_login
+
+    monkeypatch.setattr(
+        auth_module,
+        "settings",
+        SimpleNamespace(oidc=SimpleNamespace(create_new_accounts=True)),
+    )
+
+    creator = check_oidc_login(
+        {"sub": "def456", "preferred_username": "audited-oidc-user"}, session
+    )
+
+    [row] = session.scalars(select(AuditLog).where(AuditLog.Entity == "Creator")).all()
+    assert (row.Action, row.ActorID, row.TrustedPath, row.EntityID) == (
+        "INSERT",
+        None,
+        "auth:oidc-provision",
+        str(creator.CreatorID),
+    )
+
+
 def test_check_oidc_login_migrates_non_subject_identifier_but_does_not_commit(session):
     """check_oidc_login replaces a non-Subject OIDC identifier with the
     Subject-claim identifier, but only flushes -- same request-boundary-owns-
