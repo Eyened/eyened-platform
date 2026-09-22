@@ -31,6 +31,7 @@ export default defineConfig({
                         { slug: 'guides/development_setup' },
                         { slug: 'guides/authentication' },
                         { slug: 'guides/access_control' },
+                        { slug: 'guides/upgrading_to_v2026_09_0' },
                     ],
                 },
                 {

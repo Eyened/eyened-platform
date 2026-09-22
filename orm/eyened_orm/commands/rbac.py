@@ -245,7 +245,7 @@ def grant_for_task_cmd(
 @click.command("grant-all")
 @click.option("--yes", is_flag=True, default=False, help="Skip the confirmation.")
 def grant_all_cmd(yes: bool):
-    """Cutover step 3: grant grader in every project to every real user."""
+    """Once, during the v2026.09.0 upgrade: grant grader in every project to every real user."""
     database = get_database()
     with database.get_session() as session:
         if not yes:
