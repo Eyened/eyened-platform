@@ -13,7 +13,7 @@ reaches no reader. Four bodies of material are stranded, and published pages poi
 
 | Stranded | Size | Pointed at from |
 |---|---|---|
-| `docs/runbooks/2026-08-20-alembic-squash-cutover.md`, `docs/runbooks/2026-08-25-task-project-declaration-cutover.md`, and the cutover half of `docs/rbac-operations.md` — the whole upgrade procedure for the current release | 3 files | `release_notes.mdx:237-239` ("read all three before you start"), `:281`, `orm/development.mdx:160` |
+| ~~the two `docs/runbooks/` cutover files and the cutover half of `docs/rbac-operations.md` — the whole upgrade procedure for the current release~~ **resolved** on `development` (PR #243): all three are replaced by the published `guides/upgrading_to_v2026_09_0.mdx`, and the runbooks are deleted | — | — |
 | `orm/eyened_orm/README.md:195-737` — per-class column, constraint and relationship reference | 737 lines | nothing. Written in Starlight directives (`:::note`) and site-absolute links, so GitHub renders the directives literally and the links 404 |
 | `docs/point-widget-schema-examples.md` — `x-eyened-widget: keypoint` reference, 7 worked examples | 282 lines | `orm/form_schemas.mdx:125`, via `../../../point-widget-schema-examples.md`, which is wrong by one level *and* unservable (`.md` outside the content collection) |
 | `docs/rbac-operations.md:137-151, 230-316` — "RBAC ships inert" + the accepted-risk register | ~85 lines | `guides/access_control.mdx:10`, `orm/cli.mdx:83` — the latter makes reading it a precondition for a destructive `grant-all` |
@@ -37,9 +37,9 @@ Link hygiene *inside* the published tree is perfect — **74 of 74** internal li
 including four deep anchors. **Every** broken reference in the corpus crosses the publish
 boundary. This is not neglected documentation; it is documentation on the wrong side of a line.
 
-The sharpest cost is the sysadmin's: the upgrade procedure for the current release is a 45-minute
-outage (`release_notes.mdx:127-128`) whose steps exist only in the git repo, while the site tells
-the reader to go read them. Second sharpest is the ORM's: the site has no column-level reference
+The sharpest instance — the upgrade procedure for the current release, an outage whose steps existed
+only in the git repo while the site told the reader to go read them — is now fixed. The rest stand.
+The sharpest remaining is the ORM's: the site has no column-level reference
 for `Project`, `Patient`, `Study`, `Series` at all, and the 737 lines that would supply it sit in
 a Python package.
 
@@ -48,10 +48,10 @@ close it into this one when this is picked up.
 
 ## Notes for whoever takes it
 
-`docs/rbac-operations.md` is three documents, not two: the one-time cutover (`:16-135`), the
-permanent accepted-risk register (`:137-151`, `:230-316`), and contributor how-to (`:153-213`).
-They have three different destinations. Its Commands table (`:215-228`) already moved to
-`orm/cli.mdx#users-and-access` and should just be deleted.
+`docs/rbac-operations.md` is now two documents, not three — the one-time cutover is gone. What is
+left is the permanent accepted-risk register and the contributor how-to, and they have two different
+destinations. Its Commands table already moved to `orm/cli.mdx#users-and-access` and should just be
+deleted.
 
 `docs/README.md:31-36`'s release checklist covers the site only and never mentions `docs/runbooks/`
 or `docs/rbac-operations.md` — part of why they drifted. Whatever is decided, put it there.

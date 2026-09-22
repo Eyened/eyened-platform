@@ -110,5 +110,5 @@ jobs:
         env:
           EYENED_REQUIRE_MYSQL_TESTS: "1"
         # addopts now deselects `mysql`-marked tests by default; without
-        # -m mysql this collects 0, deselects 2, and exits 5.
+        # -m mysql this collects 0, deselects 3, and exits 5.
         run: pytest orm/eyened_orm/tests/test_schema_gates_mysql.py -v -m mysql

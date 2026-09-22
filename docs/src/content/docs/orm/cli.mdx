@@ -80,7 +80,7 @@ Idempotent, and it promotes an existing account as readily as it creates one. Om
 | `eorm revoke --user U --project P` | Remove one membership |
 | `eorm revoke --user U --all [--yes]` | Remove every membership the user holds; confirms unless `--yes` |
 | `eorm grant-for-task --user U --task N [--task M] --role R [--yes]` | Grant every project the given tasks **declare**. A convenience over `grant`, not a different kind of grant — a declaration may be a strict superset of where the images sit |
-| `eorm grant-all [--yes]` | Cutover only: `grader` in every project for every real account. See the accepted risks in `docs/rbac-operations.md` before running it |
+| `eorm grant-all [--yes]` | Once, during the [v2026.09.0 upgrade](/eyened-platform/guides/upgrading_to_v2026_09_0/): `grader` in every project for every real account. See the accepted risks in `docs/rbac-operations.md` before running it |
 
 Grants and revocations take effect on the user's **next request** — no re-login. A `Creator` row cannot be deleted; `deactivate` exists for that reason.
 
