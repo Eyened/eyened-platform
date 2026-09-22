@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 
 from eyened_orm.audit_writer import AuditWriter
+from eyened_orm.authz.account_admin import AccountAdministration
 from eyened_orm.authz.actor import ActingAdmin
 from eyened_orm.authz.errors import PermissionDeniedError
 from eyened_orm.authz.membership_admin import MembershipAdministration
@@ -24,15 +25,18 @@ def _build(session, scope):
     creators = CreatorRepository(session, scope=scope)
     projects = ProjectRepository(session, scope=scope)
     members = ProjectMemberRepository(session)
+    audit = AuditWriter(session)
+    actor = ActingAdmin(creator_id=scope.actor_id)
     memberships = MembershipAdministration(
         creators,
         projects,
         members,
         TaskRepository(session, scope=scope),
-        audit=AuditWriter(session),
-        actor=ActingAdmin(creator_id=scope.actor_id),
+        audit=audit,
+        actor=actor,
     )
-    return AdminService(creators, projects, members, memberships, scope=scope)
+    accounts = AccountAdministration(creators, audit=audit, actor=actor)
+    return AdminService(creators, projects, members, memberships, accounts, scope=scope)
 
 
 def test_a_non_admin_scope_is_refused_at_construction(session):
@@ -40,7 +44,7 @@ def test_a_non_admin_scope_is_refused_at_construction(session):
         _build(session, scope_for())
 
     # entity="Admin", not an ORM entity name: one constructor call covers all
-    # six endpoints, so any ORM name contradicts the path logged beside it.
+    # nine endpoints, so any ORM name contradicts the path logged beside it.
     assert excinfo.value.entity == "Admin"
 
 

@@ -2,8 +2,9 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from eyened_orm import Creator
 from eyened_orm.authz.roles import ProjectRole
 
 from ..services.admin_service import AdminService, get_admin_service
@@ -66,24 +67,44 @@ class GrantPreviewResponse(BaseModel):
     already_held: list[MembershipResponse]
 
 
+class CreateUserRequest(BaseModel):
+    """A human password account; the password must pass the policy."""
+
+    username: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+
+
+class SetActiveRequest(BaseModel):
+    """``false`` deactivates; ``true`` reactivates."""
+
+    active: bool
+
+
+class SetPasswordRequest(BaseModel):
+    """The new password; it must pass the policy."""
+
+    password: str = Field(min_length=1)
+
+
+def _user_response(creator: Creator) -> AdminUserResponse:
+    return AdminUserResponse(
+        id=creator.CreatorID,
+        username=creator.CreatorName,
+        is_admin=creator.IsAdmin,
+        active=not creator.Inactive,
+        has_credential=creator.PasswordHash is not None
+        or creator.Password is not None,
+        employee_identifier=creator.EmployeeIdentifier,
+    )
+
+
 @router.get("/admin/users", response_model=list[AdminUserResponse])
 def list_users(
     service: AdminService = Depends(get_admin_service),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Return every human account, name-ordered, with per-row state."""
-    return [
-        AdminUserResponse(
-            id=creator.CreatorID,
-            username=creator.CreatorName,
-            is_admin=creator.IsAdmin,
-            active=not creator.Inactive,
-            has_credential=creator.PasswordHash is not None
-            or creator.Password is not None,
-            employee_identifier=creator.EmployeeIdentifier,
-        )
-        for creator in service.list_users()
-    ]
+    return [_user_response(creator) for creator in service.list_users()]
 
 
 @router.get(
@@ -172,3 +193,35 @@ def preview_task_grant(
             for pid, name, r in plan.already_held
         ],
     )
+
+
+@router.post("/admin/users", response_model=AdminUserResponse, status_code=201)
+def create_user(
+    body: CreateUserRequest,
+    service: AdminService = Depends(get_admin_service),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Create a human password account."""
+    return _user_response(service.create_user(body.username, body.password))
+
+
+@router.put("/admin/users/{user_id}/active", response_model=AdminUserResponse)
+def set_user_active(
+    user_id: int,
+    body: SetActiveRequest,
+    service: AdminService = Depends(get_admin_service),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Deactivate or reactivate a user; repeating the current state changes nothing."""
+    return _user_response(service.set_active(user_id, body.active))
+
+
+@router.put("/admin/users/{user_id}/password", status_code=204)
+def set_user_password(
+    user_id: int,
+    body: SetPasswordRequest,
+    service: AdminService = Depends(get_admin_service),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> None:
+    """Replace a user's password."""
+    service.set_password(user_id, body.password)

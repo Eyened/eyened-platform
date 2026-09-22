@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from typing import cast
 
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from eyened_orm import Creator, Project
 from eyened_orm.audit_writer import AuditWriter
+from eyened_orm.authz.account_admin import AccountAdministration
 from eyened_orm.authz.actor import ActingAdmin
-from eyened_orm.authz.errors import AdminEntityNotFound
+from eyened_orm.authz.errors import AdminEntityExists, AdminEntityNotFound
 from eyened_orm.authz.membership_admin import (
     GrantResult,
     MembershipAdministration,
@@ -24,20 +26,23 @@ from eyened_orm.repositories.task_repository import TaskRepository
 
 from ..db import get_db
 from .access_scope import get_access_scope
-from .exceptions import NotFoundError
+from .exceptions import ConflictError, NotFoundError
+from .password_hashing import password_hash_capacity
 
 
 @contextmanager
-def _not_found_as_404() -> Iterator[None]:
-    """``AdminEntityNotFound`` is in no status map; untranslated, it is a 500."""
+def _admin_errors() -> Iterator[None]:
+    """The administration classes' errors are in no status map; untranslated, each is a 500."""
     try:
         yield
     except AdminEntityNotFound as exc:
         raise NotFoundError(str(exc)) from exc
+    except AdminEntityExists as exc:
+        raise ConflictError({"code": "username_taken", "message": str(exc)}) from exc
 
 
 class AdminService:
-    """Administration: users, memberships and projects, and membership writes.
+    """Administration: users, memberships, projects, membership writes and account lifecycle.
 
     The gate is the first line of ``__init__`` and it is load-bearing, not
     defensive: ``ProjectRepository`` routes every read through ``apply_scope``
@@ -54,6 +59,7 @@ class AdminService:
         projects: ProjectRepository,
         members: ProjectMemberRepository,
         memberships: MembershipAdministration,
+        accounts: AccountAdministration,
         *,
         scope: AccessScope,
     ) -> None:
@@ -62,6 +68,7 @@ class AdminService:
         self.projects = projects
         self.members = members
         self.memberships = memberships
+        self.accounts = accounts
         self.scope = scope
 
     def list_users(self) -> list[Creator]:
@@ -106,24 +113,44 @@ class AdminService:
         self, user_id: int, project_id: int, role: ProjectRole
     ) -> GrantResult:
         """Grant or change ``role``. Raises NotFoundError for an unknown user or project."""
-        with _not_found_as_404():
+        with _admin_errors():
             return self.memberships.grant(
                 creator_id=user_id, project_id=project_id, role=role
             )
 
     def revoke_membership(self, user_id: int, project_id: int) -> bool:
         """Remove the membership. Raises NotFoundError for an unknown user or project."""
-        with _not_found_as_404():
+        with _admin_errors():
             return self.memberships.revoke(creator_id=user_id, project_id=project_id)
 
     def preview_task_grant(
         self, user_id: int, task_ids: Sequence[int], role: ProjectRole
     ) -> TaskGrantPlan:
         """Plan a task grant; writes nothing. Raises NotFoundError for an unknown user or task."""
-        with _not_found_as_404():
+        with _admin_errors():
             return self.memberships.plan_grant_for_tasks(
                 creator_id=user_id, task_ids=task_ids, role=role
             )
+
+    def create_user(self, username: str, password: str) -> Creator:
+        """Create a human password account. Raises ConflictError if the name is taken."""
+        with _admin_errors(), password_hash_capacity():
+            return self.accounts.create(username=username, password=password)
+
+    def set_active(self, user_id: int, active: bool) -> Creator:
+        """Deactivate or reactivate, then return the row. Raises NotFoundError for an unknown user."""
+        with _admin_errors():
+            if active:
+                self.accounts.reactivate(creator_id=user_id)
+            else:
+                self.accounts.deactivate(creator_id=user_id)
+        # Resolved by the call above, so an identity-map hit, never None.
+        return cast(Creator, self.creators.get_by_id(user_id))
+
+    def set_password(self, user_id: int, password: str) -> None:
+        """Replace the password. Raises NotFoundError for an unknown user."""
+        with _admin_errors(), password_hash_capacity():
+            self.accounts.set_password(creator_id=user_id, password=password)
 
 
 def get_admin_service(
@@ -134,12 +161,15 @@ def get_admin_service(
     creators = CreatorRepository(db, scope=scope)
     projects = ProjectRepository(db, scope=scope)
     members = ProjectMemberRepository(db)
+    audit = AuditWriter(db)
+    actor = ActingAdmin(creator_id=scope.actor_id)
     memberships = MembershipAdministration(
         creators,
         projects,
         members,
         TaskRepository(db, scope=scope),
-        audit=AuditWriter(db),
-        actor=ActingAdmin(creator_id=scope.actor_id),
+        audit=audit,
+        actor=actor,
     )
-    return AdminService(creators, projects, members, memberships, scope=scope)
+    accounts = AccountAdministration(creators, audit=audit, actor=actor)
+    return AdminService(creators, projects, members, memberships, accounts, scope=scope)

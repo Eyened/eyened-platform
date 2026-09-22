@@ -41,40 +41,45 @@ def seeded(session):
     return ids
 
 
-# One gate in AdminService.__init__ covers all six routes. The gate fires
+_PASSWORD = "correct horse battery staple"
+
+# One gate in AdminService.__init__ covers all nine routes. The gate fires
 # before any id is resolved, so the ids are arbitrary.
 ADMIN_ROUTES = [
-    ("GET", "/admin/users"),
-    ("GET", "/admin/users/1/memberships"),
-    ("GET", "/admin/projects"),
-    ("PUT", "/admin/projects/1/members/1"),
-    ("DELETE", "/admin/projects/1/members/1"),
-    ("GET", "/admin/users/1/grant-preview?task_id=1&role=grader"),
+    ("GET", "/admin/users", None),
+    ("GET", "/admin/users/1/memberships", None),
+    ("GET", "/admin/projects", None),
+    ("PUT", "/admin/projects/1/members/1", {"role": "grader"}),
+    ("DELETE", "/admin/projects/1/members/1", None),
+    ("GET", "/admin/users/1/grant-preview?task_id=1&role=grader", None),
+    ("POST", "/admin/users", {"username": "erin", "password": _PASSWORD}),
+    ("PUT", "/admin/users/1/active", {"active": False}),
+    ("PUT", "/admin/users/1/password", {"password": _PASSWORD}),
 ]
 
 
-def _send(client, method, path):
-    return client.request(
-        method, path, json={"role": "grader"} if method == "PUT" else None
-    )
+def _send(client, method, path, body=None):
+    return client.request(method, path, json=body)
 
 
-@pytest.mark.parametrize("method,path", ADMIN_ROUTES)
-def test_an_empty_scope_is_refused(client_scoped, method, path):
+@pytest.mark.parametrize("method,path,body", ADMIN_ROUTES)
+def test_an_empty_scope_is_refused(client_scoped, method, path, body):
     """The scope most likely to pass by vacuity: no memberships at all."""
     client, set_scope = client_scoped
     set_scope(scope_for())
 
-    assert _send(client, method, path).status_code == 403
+    assert _send(client, method, path, body).status_code == 403
 
 
-@pytest.mark.parametrize("method,path", ADMIN_ROUTES)
-def test_a_project_admin_is_not_a_platform_admin(client_scoped, seeded, method, path):
+@pytest.mark.parametrize("method,path,body", ADMIN_ROUTES)
+def test_a_project_admin_is_not_a_platform_admin(
+    client_scoped, seeded, method, path, body
+):
     """Without this, the test above is satisfied by any membership check."""
     client, set_scope = client_scoped
     set_scope(scope_for(seeded["graded"], role=ProjectRole.project_admin))
 
-    assert _send(client, method, path).status_code == 403
+    assert _send(client, method, path, body).status_code == 403
 
 
 def test_an_unauthenticated_caller_is_refused(client_anonymous):
@@ -209,18 +214,24 @@ def test_revoking_an_absent_membership_is_still_204(client, seeded):
 
 
 @pytest.mark.parametrize(
-    "method,path,detail",
+    "method,path,body,detail",
     [
-        ("PUT", "/admin/projects/{graded}/members/999999", "no creator with id 999999"),
-        ("DELETE", "/admin/projects/999999/members/{alice}", "no project with id 999999"),
-        ("GET", "/admin/users/{alice}/grant-preview?task_id=999999&role=grader",
+        ("PUT", "/admin/projects/{graded}/members/999999", {"role": "grader"},
+         "no creator with id 999999"),
+        ("DELETE", "/admin/projects/999999/members/{alice}", None,
+         "no project with id 999999"),
+        ("GET", "/admin/users/{alice}/grant-preview?task_id=999999&role=grader", None,
          "no task with id 999999"),
+        ("PUT", "/admin/users/999999/active", {"active": False},
+         "no creator with id 999999"),
+        ("PUT", "/admin/users/999999/password", {"password": _PASSWORD},
+         "no creator with id 999999"),
     ],
-    ids=["grant-user", "revoke-project", "preview-task"],
+    ids=["grant-user", "revoke-project", "preview-task", "active", "password"],
 )
-def test_an_unknown_id_is_404_naming_it(client, seeded, method, path, detail):
+def test_an_unknown_id_is_404_naming_it(client, seeded, method, path, body, detail):
     """One case per service method and per resolver: each untranslated one is a 500."""
-    response = _send(client, method, path.format(**seeded))
+    response = _send(client, method, path.format(**seeded), body)
 
     assert response.status_code == 404
     assert response.json()["detail"] == detail
@@ -256,3 +267,88 @@ def test_the_preview_splits_what_would_be_granted_from_what_is_held(
             {"project_id": spanning["projects"]["A"], "project_name": "A", "role": "grader"}
         ],
     }
+
+
+def _creator_audit_rows(session):
+    return session.scalars(
+        select(AuditLog)
+        .where(AuditLog.Entity == "Creator")
+        .order_by(AuditLog.AuditLogID)
+    ).all()
+
+
+def test_creating_a_user_is_201_and_attributed_to_the_calling_admin(
+    client_scoped, session
+):
+    """4242 is not admin_scope's default actor, so a hardcoded id fails."""
+    client, set_scope = client_scoped
+    set_scope(admin_scope(actor_id=4242))
+
+    response = client.post(
+        "/admin/users", json={"username": "erin", "password": _PASSWORD}
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body == {
+        "id": body["id"],
+        "username": "erin",
+        "is_admin": False,
+        "active": True,
+        "has_credential": True,
+        "employee_identifier": None,
+    }
+    [row] = _creator_audit_rows(session)
+    assert (row.Action, row.ActorID, row.TrustedPath, row.EntityID) == (
+        "INSERT", 4242, None, str(body["id"])
+    )
+
+
+def test_a_taken_username_is_409(client, seeded):
+    response = client.post(
+        "/admin/users", json={"username": "alice", "password": _PASSWORD}
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "username_taken"
+
+
+@pytest.mark.parametrize(
+    "method,path,body",
+    [
+        ("POST", "/admin/users", {"username": "erin", "password": "short"}),
+        ("PUT", "/admin/users/{dave}/password", {"password": "short"}),
+    ],
+    ids=["create", "set-password"],
+)
+def test_a_weak_password_is_400(client, seeded, method, path, body):
+    response = _send(client, method, path.format(**seeded), body)
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "weak_password"
+
+
+def test_deactivation_is_idempotent_and_reactivation_restores(client, session, seeded):
+    """A repeat writes no row, so two changes leave exactly two rows."""
+    url = f"/admin/users/{seeded['dave']}/active"
+
+    off = client.put(url, json={"active": False})
+    again = client.put(url, json={"active": False})
+    on = client.put(url, json={"active": True})
+
+    assert [r.status_code for r in (off, again, on)] == [200, 200, 200]
+    assert [r.json()["active"] for r in (off, again, on)] == [False, False, True]
+    assert len(_creator_audit_rows(session)) == 2
+
+
+def test_a_set_password_is_204_and_the_new_one_logs_in(
+    client, session, seeded, signed_jwts
+):
+    response = client.put(
+        f"/admin/users/{seeded['dave']}/password", json={"password": _PASSWORD}
+    )
+
+    assert response.status_code == 204
+    [_] = _creator_audit_rows(session)
+    login = client.post("/auth/login", json={"username": "dave", "password": _PASSWORD})
+    assert login.status_code == 200, login.text
