@@ -579,7 +579,7 @@ def test_set_password_replaces_the_hash_so_only_the_new_password_verifies(
     session.commit()
 
     result = CliRunner().invoke(
-        set_password_cmd, ["--user", "alice", "--password", "new-pw"]
+        set_password_cmd, ["--user", "alice", "--password", "correct horse battery staple"]
     )
     assert result.exit_code == 0, result.output
     assert "alice: password set" in result.output
@@ -587,7 +587,7 @@ def test_set_password_replaces_the_hash_so_only_the_new_password_verifies(
     stored = session.scalars(
         select(Creator).where(Creator.CreatorName == "alice")
     ).one()
-    assert verify_password("new-pw", stored.PasswordHash) is True
+    assert verify_password("correct horse battery staple", stored.PasswordHash) is True
     assert verify_password("old-pw", stored.PasswordHash) is False
 
 
@@ -607,7 +607,7 @@ def test_set_password_clears_the_legacy_hash_so_the_old_password_stops_working(
     session.commit()
 
     result = CliRunner().invoke(
-        set_password_cmd, ["--user", "alice", "--password", "new-pw"]
+        set_password_cmd, ["--user", "alice", "--password", "correct horse battery staple"]
     )
     assert result.exit_code == 0, result.output
 
@@ -636,6 +636,24 @@ def test_set_password_refuses_an_empty_password(session, stub_database):
         select(Creator).where(Creator.CreatorName == "alice")
     ).one()
     assert verify_password("old-pw", stored.PasswordHash) is True
+
+
+def test_set_password_refuses_a_weak_password(session, stub_database, alice):
+    """The policy error is a ClickException naming the rule."""
+    result = CliRunner().invoke(
+        set_password_cmd, ["--user", "alice", "--password", "short"]
+    )
+    assert result.exit_code == 1
+    assert "at least 15" in result.output
+
+
+def test_init_admin_refuses_a_weak_password(session, stub_database):
+    """The WeakPasswordError branch Task 1 added to init_admin, naming both the
+    rule and the source the password came from."""
+    result = _init_admin("root", "short")
+    assert result.exit_code == 1
+    assert "at least 15" in result.output
+    assert "EYENED_API_ADMIN_PASSWORD" in result.output
 
 
 def test_the_deleted_administration_module_is_gone(session):

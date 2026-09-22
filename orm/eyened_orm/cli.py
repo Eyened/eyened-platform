@@ -174,31 +174,22 @@ def seed_form_schemas_cmd(update: bool):
 def create_user(username: str, password: str, is_human: bool, description: str | None):
     """Create a new user with the given credentials."""
 
-    from eyened_orm.audit_writer import AuditWriter
     from eyened_orm.authz.actor import TrustedPath
-    from eyened_orm.utils.db_users import create_user
+    from eyened_orm.authz.errors import AdminEntityExists
+    from eyened_orm.utils.db_users import WeakPasswordError
 
+    from .commands.shared import account_admin
+
+    # --is-human defaults to True and has no off switch, so it is always True;
+    # create() only makes human accounts.
     database = get_database()
     with database.get_session() as session:
         try:
-            created = create_user(
-                session,
-                username,
-                password,
-                is_human=is_human,
-                description=description,
+            account_admin(session, TrustedPath("eorm create-user")).create(
+                username=username, password=password, description=description
             )
-        except ValueError as e:
+        except (AdminEntityExists, WeakPasswordError) as e:
             raise click.ClickException(str(e)) from e
-        # After the create, not before: a rejected duplicate created nothing, so
-        # a row claiming it did would be worse than the missing row this fixes.
-        AuditWriter(session).write(
-            actor=TrustedPath("eorm create-user"),
-            action="INSERT",
-            entity="Creator",
-            entity_id=created.CreatorID,
-            changes={"username": username, "is_human": created.IsHuman},
-        )
         session.commit()
     click.echo("User created successfully")
 

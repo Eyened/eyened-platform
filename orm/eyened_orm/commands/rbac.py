@@ -13,7 +13,6 @@ import click
 from sqlalchemy.orm import Session
 
 from ..audit_writer import AuditWriter
-from ..authz.account_admin import AccountAdministration
 from ..authz.actor import TrustedPath
 from ..authz.bootstrap import BootstrapOutcome, ensure_admin
 from ..authz.errors import AdminEntityNotFound
@@ -26,7 +25,7 @@ from ..repositories import (
     TaskRepository,
 )
 from ..utils.db_users import WeakPasswordError
-from .shared import admin_scope_for_cli, get_database
+from .shared import account_admin, admin_scope_for_cli, get_database
 
 
 @click.command("init-admin")
@@ -131,15 +130,6 @@ def _membership(session: Session, actor: TrustedPath) -> MembershipAdministratio
         ProjectRepository(session, scope=scope),
         ProjectMemberRepository(session),
         TaskRepository(session, scope=scope),
-        audit=AuditWriter(session),
-        actor=actor,
-    )
-
-
-def _account(session: Session, actor: TrustedPath) -> AccountAdministration:
-    """Build the account administration this command is attributed to."""
-    return AccountAdministration(
-        CreatorRepository(session, scope=admin_scope_for_cli()),
         audit=AuditWriter(session),
         actor=actor,
     )
@@ -306,7 +296,7 @@ def deactivate_cmd(username: str):
     database = get_database()
     with database.get_session() as session:
         try:
-            changed = _account(session, TrustedPath("eorm deactivate")).deactivate(
+            changed = account_admin(session, TrustedPath("eorm deactivate")).deactivate_by_name(
                 username=username
             )
         except AdminEntityNotFound as exc:
@@ -322,7 +312,7 @@ def reactivate_cmd(username: str):
     database = get_database()
     with database.get_session() as session:
         try:
-            changed = _account(session, TrustedPath("eorm reactivate")).reactivate(
+            changed = account_admin(session, TrustedPath("eorm reactivate")).reactivate_by_name(
                 username=username
             )
         except AdminEntityNotFound as exc:
@@ -348,7 +338,7 @@ def set_admin_cmd(username: str, is_admin: bool):
     database = get_database()
     with database.get_session() as session:
         try:
-            changed = _account(session, TrustedPath("eorm set-admin")).set_admin(
+            changed = account_admin(session, TrustedPath("eorm set-admin")).set_admin(
                 username=username, is_admin=is_admin
             )
         except AdminEntityNotFound as exc:
@@ -392,10 +382,10 @@ def set_password_cmd(username: str, password: str):
     database = get_database()
     with database.get_session() as session:
         try:
-            _account(session, TrustedPath("eorm set-password")).set_password(
+            account_admin(session, TrustedPath("eorm set-password")).set_password_by_name(
                 username=username, password=password
             )
-        except AdminEntityNotFound as exc:
+        except (AdminEntityNotFound, WeakPasswordError) as exc:
             raise click.ClickException(str(exc)) from exc
         session.commit()
     click.echo(f"{username}: password set")

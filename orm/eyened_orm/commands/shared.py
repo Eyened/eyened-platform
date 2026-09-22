@@ -6,6 +6,12 @@ import string
 import click
 from eyened_orm import Database
 from eyened_orm.authz.scope import AccessScope
+from sqlalchemy.orm import Session
+
+from eyened_orm.audit_writer import AuditWriter
+from eyened_orm.authz.account_admin import AccountAdministration
+from eyened_orm.authz.actor import TrustedPath
+from eyened_orm.repositories import CreatorRepository
 
 
 def get_database(*, confirmation: bool = False) -> Database:
@@ -52,3 +58,12 @@ def admin_scope_for_cli() -> AccessScope:
     test scaffolding in the CLI's import graph.
     """
     return AccessScope.trusted(username="eorm")
+
+
+def account_admin(session: Session, actor: TrustedPath) -> AccountAdministration:
+    """Build the account administration a command is attributed to."""
+    return AccountAdministration(
+        CreatorRepository(session, scope=admin_scope_for_cli()),
+        audit=AuditWriter(session),
+        actor=actor,
+    )

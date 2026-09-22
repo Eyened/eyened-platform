@@ -57,7 +57,7 @@ def test_creating_a_user_writes_an_audit_row(session, stub_cli_database):
     from eyened_orm import AuditLog
 
     result = CliRunner().invoke(
-        create_user_cmd, ["--username", "bob", "--password", "pw"]
+        create_user_cmd, ["--username", "bob", "--password", "correct horse battery staple"]
     )
     assert result.exit_code == 0
 
@@ -81,3 +81,12 @@ def test_a_rejected_duplicate_writes_no_audit_row(session, stub_cli_database):
 
     CliRunner().invoke(create_user_cmd, ["--username", "alice", "--password", "pw"])
     assert session.scalars(select(AuditLog)).all() == []
+
+
+def test_a_weak_password_is_a_clean_error(session, stub_cli_database):
+    """The policy error is a ClickException naming the rule."""
+    result = CliRunner().invoke(
+        create_user_cmd, ["--username", "bob", "--password", "short"]
+    )
+    assert result.exit_code == 1
+    assert "at least 15" in result.output

@@ -4,10 +4,11 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from eyened_orm import AuditLog, Project
-from eyened_orm.authz.errors import AdminEntityNotFound
+from eyened_orm import AuditLog, Creator, Project
+from eyened_orm.authz.errors import AdminEntityExists, AdminEntityNotFound
 from eyened_orm.authz.roles import ProjectRole, parse_role
 from eyened_orm.repositories import ProjectMemberRepository
+from eyened_orm.utils.db_users import WeakPasswordError
 from eyened_orm.utils.factories import make_creator, make_project
 
 
@@ -513,7 +514,7 @@ def test_deactivate_sets_the_flag_and_leaves_memberships_in_place(
     session.commit()
     creator_id = alice.CreatorID
 
-    assert account("deactivate").deactivate(username="alice") is True
+    assert account("deactivate").deactivate_by_name(username="alice") is True
     session.commit()
     assert alice.Inactive is True
     assert len(ProjectMemberRepository(session).roles_for(alice.CreatorID)) == 1
@@ -538,7 +539,7 @@ def test_deactivating_the_only_administrator_is_allowed(session, account):
     root, _ = ensure_admin(session, "root", None)
     session.commit()
 
-    assert account("deactivate").deactivate(username="root") is True
+    assert account("deactivate").deactivate_by_name(username="root") is True
     session.commit()
     assert root.Inactive is True
     assert count_admins(session) == 0
@@ -548,10 +549,10 @@ def test_reactivate_clears_the_flag_and_audits(session, account):
     alice = make_creator(session, "alice")
     session.commit()
     creator_id = alice.CreatorID
-    account("deactivate").deactivate(username="alice")
+    account("deactivate").deactivate_by_name(username="alice")
     session.commit()
 
-    assert account("reactivate").reactivate(username="alice") is True
+    assert account("reactivate").reactivate_by_name(username="alice") is True
     session.commit()
     assert alice.Inactive is False
 
@@ -570,9 +571,9 @@ def test_reactivate_clears_the_flag_and_audits(session, account):
 def test_deactivating_an_already_inactive_user_is_a_no_op(session, account):
     make_creator(session, "alice")
     session.commit()
-    account("deactivate").deactivate(username="alice")
+    account("deactivate").deactivate_by_name(username="alice")
     session.commit()
-    assert account("deactivate").deactivate(username="alice") is False
+    assert account("deactivate").deactivate_by_name(username="alice") is False
     assert len(_audit(session, "deactivate")) == 1
 
 
@@ -580,7 +581,7 @@ def test_reactivating_an_already_active_user_is_a_no_op(session, account):
     """The symmetric guard: the plan tests it for `deactivate` only."""
     make_creator(session, "alice")
     session.commit()
-    assert account("reactivate").reactivate(username="alice") is False
+    assert account("reactivate").reactivate_by_name(username="alice") is False
     assert _audit(session, "reactivate") == []
 
 
@@ -591,7 +592,7 @@ def test_an_unknown_username_names_itself_for_deactivate_and_reactivate(
     from eyened_orm.authz.errors import AdminEntityNotFound
 
     with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
-        getattr(account(command), command)(username="nosuchuser")
+        getattr(account(command), f"{command}_by_name")(username="nosuchuser")
 
 
 def test_set_admin_round_trip_persists_and_audits_each_change(session, account):
@@ -645,13 +646,13 @@ def test_set_password_replaces_the_hash_and_clears_the_legacy_column(session, ac
     session.commit()
     creator_id = creator.CreatorID
 
-    account("set-password").set_password(username="alice", password="new-pw")
+    account("set-password").set_password_by_name(username="alice", password="correct horse battery staple")
     session.commit()
 
     stored = session.scalars(
         select(Creator).where(Creator.CreatorName == "alice")
     ).one()
-    assert verify_password("new-pw", stored.PasswordHash) is True
+    assert verify_password("correct horse battery staple", stored.PasswordHash) is True
     assert stored.Password is None
 
     rows = _audit(session, "set-password")
@@ -670,7 +671,64 @@ def test_an_unknown_username_names_itself_for_set_admin_and_set_password(
     with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
         account("set-admin").set_admin(username="nosuchuser", is_admin=True)
     with pytest.raises(AdminEntityNotFound, match="nosuchuser"):
-        account("set-password").set_password(username="nosuchuser", password="pw")
+        account("set-password").set_password_by_name(username="nosuchuser", password="pw")
+
+
+_PASSWORD = "correct horse battery staple"
+
+
+def test_create_writes_one_insert_row_naming_the_actor(session, account):
+    """The admin API and `eorm create-user` both create through here."""
+    created = account("create-user").create(username="bob", password=_PASSWORD)
+    session.commit()
+
+    [row] = _audit(session, "create-user")
+    assert (row.Action, row.Entity, row.EntityID, row.ActorID) == (
+        "INSERT", "Creator", str(created.CreatorID), None
+    )
+    assert row.Changes == {"username": "bob", "is_human": True}
+
+
+@pytest.mark.parametrize(
+    "username,password,error",
+    [("alice", _PASSWORD, AdminEntityExists), ("bob", "short", WeakPasswordError)],
+    ids=["taken", "weak"],
+)
+def test_a_refused_create_writes_nothing(session, account, username, password, error):
+    make_creator(session, "alice")
+    session.commit()
+
+    with pytest.raises(error):
+        account("create-user").create(username=username, password=password)
+    assert _audit(session, "create-user") == []
+    assert session.query(Creator).count() == 1
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda a: a.deactivate(creator_id=999999),
+        lambda a: a.reactivate(creator_id=999999),
+        lambda a: a.set_password(creator_id=999999, password=_PASSWORD),
+    ],
+    ids=["deactivate", "reactivate", "set_password"],
+)
+def test_an_unknown_id_names_itself(account, call):
+    with pytest.raises(AdminEntityNotFound, match="no creator with id 999999"):
+        call(account("test"))
+
+
+def test_a_weak_password_leaves_the_hash_unchanged(session, account):
+    creator = make_creator(session, "alice")
+    creator.PasswordHash = "existing-hash"
+    session.commit()
+
+    with pytest.raises(WeakPasswordError, match="at least 15"):
+        account("set-password").set_password(
+            creator_id=creator.CreatorID, password="short"
+        )
+    assert creator.PasswordHash == "existing-hash"
+    assert _audit(session, "set-password") == []
 
 
 def test_unused_declarations_reports_a_project_no_link_uses(session, spanning):

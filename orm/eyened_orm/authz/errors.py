@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Set as AbstractSet
 
 __all__ = [
+    "AdminEntityExists",
     "AdminEntityNotFound",
     "AuthorizationError",
     "NotVisibleError",
@@ -91,3 +92,11 @@ class AdminEntityNotFound(Exception):
     def __init__(self, message: str, *, entity: str) -> None:
         self.entity = entity
         super().__init__(message)
+
+
+class AdminEntityExists(Exception):
+    """An administration create named a username that is taken.
+
+    Not ``ValueError``, for the reason ``AdminEntityNotFound`` is not
+    ``LookupError``: catching the builtin would also catch unrelated failures.
+    """

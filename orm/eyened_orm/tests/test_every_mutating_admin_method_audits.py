@@ -6,8 +6,8 @@ covers this: a method can accept a perfectly good actor and simply forget to
 write the row. That is invisible to any signature check and is exactly the
 failure this whole change exists to prevent, so it is checked behaviorally.
 
-Parametrized over the eleven mutating methods, not a sample of them; the two
-read-only methods each get their own dedicated test below instead. A twelfth
+Parametrized over the fifteen mutating methods, not a sample of them; the two
+read-only methods each get their own dedicated test below instead. A sixteenth
 mutating method added without a row must fail here, and adding it to the table
 is how the author is made to think about it.
 """
@@ -74,12 +74,19 @@ def _grant_alice(a, ids):
     a.grant_by_name(username="alice", project_name="A", role=ProjectRole.grader)
 
 
+def _deactivate_alice(a, ids):
+    a.deactivate(creator_id=ids["creator"])
+
+
+_PASSWORD = "correct horse battery staple"
+
+
 # (label, which class, arrange, act) for every state-changing method.
 #
-# Arrange and act are SEPARATE on purpose. Four of these methods need existing
+# Arrange and act are SEPARATE on purpose. Five of these methods need existing
 # state to change -- you cannot revoke what was never granted -- and the arrange
 # step writes audit rows of its own. A guard that only asserted "some row
-# exists" after running both would pass for `revoke`, `revoke_by_name`, `reactivate`
+# exists" after running both would pass for `revoke`, `revoke_by_name`, `reactivate`, `reactivate_by_name`
 # and `apply_revoke_all` even with their audit writes deleted, because the setup's
 # rows satisfy it. The count is taken between the two.
 _MUTATING = [
@@ -106,18 +113,30 @@ _MUTATING = [
      _grant_alice,
      lambda a, ids: a.apply_revoke_all(
          username="alice", held=a.memberships_of(username="alice"))),
+    ("create", "account",
+     lambda a, ids: None,
+     lambda a, ids: a.create(username="carol", password=_PASSWORD)),
     ("deactivate", "account",
      lambda a, ids: None,
-     lambda a, ids: a.deactivate(username="alice")),
+     lambda a, ids: a.deactivate(creator_id=ids["creator"])),
+    ("deactivate_by_name", "account",
+     lambda a, ids: None,
+     lambda a, ids: a.deactivate_by_name(username="alice")),
     ("reactivate", "account",
-     lambda a, ids: a.deactivate(username="alice"),
-     lambda a, ids: a.reactivate(username="alice")),
+     _deactivate_alice,
+     lambda a, ids: a.reactivate(creator_id=ids["creator"])),
+    ("reactivate_by_name", "account",
+     _deactivate_alice,
+     lambda a, ids: a.reactivate_by_name(username="alice")),
     ("set_admin", "account",
      lambda a, ids: None,
      lambda a, ids: a.set_admin(username="alice", is_admin=True)),
     ("set_password", "account",
      lambda a, ids: None,
-     lambda a, ids: a.set_password(username="alice", password="pw")),
+     lambda a, ids: a.set_password(creator_id=ids["creator"], password=_PASSWORD)),
+    ("set_password_by_name", "account",
+     lambda a, ids: None,
+     lambda a, ids: a.set_password_by_name(username="alice", password=_PASSWORD)),
 ]
 
 
@@ -162,11 +181,11 @@ def test_the_administration_classes_have_no_unclassified_public_method():
 def test_every_mutating_method_writes_an_audit_row(
     session, seeded, label, which, arrange, act
 ):
-    """Eleven methods, no sample. Accepting an Actor and then not writing the row
+    """Fifteen methods, no sample. Accepting an Actor and then not writing the row
     passes every signature check there is, and the constructor cannot see it.
 
     The assertion is on the *delta*, not on "a row exists": the arrange step
-    writes rows for the four methods that need existing state, and an absolute
+    writes rows for the five methods that need existing state, and an absolute
     check would be satisfied by those alone.
     """
     admin, ids = seeded[which], seeded["ids"]
@@ -233,11 +252,20 @@ def test_plan_grant_for_tasks_writes_nothing(session, spanning):
     assert _audit_count(session) == before
 
 
-@pytest.mark.parametrize("label", ["grant_by_name", "revoke_by_name"])
+@pytest.mark.parametrize(
+    "label",
+    [
+        "grant_by_name",
+        "revoke_by_name",
+        "deactivate_by_name",
+        "reactivate_by_name",
+        "set_password_by_name",
+    ],
+)
 def test_a_by_name_wrapper_writes_exactly_one_row(session, seeded, label):
     """The wrappers delegate; one that also wrote its own row would double every CLI change."""
-    _, _, arrange, act = next(m for m in _MUTATING if m[0] == label)
-    admin, ids = seeded["membership"], seeded["ids"]
+    _, which, arrange, act = next(m for m in _MUTATING if m[0] == label)
+    admin, ids = seeded[which], seeded["ids"]
     arrange(admin, ids)
     session.flush()
     before = _audit_count(session)
