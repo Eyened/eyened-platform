@@ -1,7 +1,8 @@
-name: eyened-platform-database-dev-bart
+name: eyened-platform-database
 
 services:
   database:
+    restart: unless-stopped
     env_file: .env
     image: mysql:8.0.27
     command:
@@ -9,7 +10,7 @@ services:
     ports:
       - "${EYENED_DATABASE_PORT:-3306}:3306"
     volumes:
-      - db_data:/var/lib/mysql
+      - /db/eyened_database:/var/lib/mysql
 
   # optional: adminer for simple database management in the browser
   adminer:
@@ -25,7 +26,4 @@ services:
     image: percona/percona-xtrabackup:8.0
     profiles: ["backup"]
     volumes:
-      - db_data:/var/lib/mysql
-
-volumes:
-  db_data:
+      - /db/eyened_database:/var/lib/mysql
