@@ -102,6 +102,8 @@ class ETDRSField(Enum):
     F5 = "F5"
     F6 = "F6"
     F7 = "F7"
+    WF = "WF"
+    UWF = "UWF"
 
 
 class StorageBackend(Base):
