@@ -53,6 +53,7 @@ jobs:
         run: |
           check() { echo "--- $1 ($2)"; COMPOSE_FILE="$1" COMPOSE_PROFILES="$2" docker compose config -q; }
           check compose.yaml:compose.dev.yaml local-db
+          check compose.yaml:compose.dev.yaml ""
           check compose.yaml:compose.prod.yaml local-db
           check compose.yaml:compose.prod.yaml ""
           check compose.yaml:compose.prod.yaml:compose.storage.yaml:compose.oidc.yaml:compose.workers.yaml:compose.host-ports.yaml \
