@@ -61,6 +61,8 @@ services:
     volumes:
       # Same source as `database`, or a DB_DATA_PATH site would back up an empty volume.
       - ${DB_DATA_PATH:-db_data}:/var/lib/mysql
+      # No SELinux `z`: BACKUP_PATH may be a network share, where the relabel
+      # fails and the container does not start.
       - ${BACKUP_PATH:-./backups}:/backup
 
   redis:
@@ -172,7 +174,9 @@ services:
     ports:
       - "${HTTP_PORT:-8080}:80"
     volumes:
-      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      # `z` relabels repo files for SELinux. Without it nginx cannot read the
+      # template, silently serves its stock config, and every /api/ call 404s.
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro,z
       # Thumbnails are served straight off platform storage.
       - ${PLATFORM_STORAGE_PATH:-platform_storage}:/storage:ro
     depends_on:

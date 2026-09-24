@@ -21,4 +21,4 @@ services:
       dockerfile: deploy/Dockerfile.fileserver
     volumes:
       # One file onto a fixed name, as in compose.dev.yaml.
-      - ./nginx/client.d/prod.conf:/etc/nginx/client.d/client.conf:ro
+      - ./nginx/client.d/prod.conf:/etc/nginx/client.d/client.conf:ro,z

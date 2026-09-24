@@ -5,15 +5,15 @@ services:
   # Runs the mounted ORM, so a new migration applies without a rebuild.
   init:
     volumes:
-      - ../orm:/app/orm
+      - ../orm:/app/orm:z
 
   server:
     command: >
       uvicorn server.main:app --host 0.0.0.0 --port 8000
       --reload --reload-dir /app/server --reload-dir /app/orm
     volumes:
-      - ../server:/app/server
-      - ../orm:/app/orm
+      - ../server:/app/server:z
+      - ../orm:/app/orm:z
     environment:
       EYENED_API_DEBUG: "true"
     # Set EYENED_SERVER_CPUS to keep one developer's stack from starving the
@@ -30,7 +30,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.client
     volumes:
-      - ../client:/app/client
+      - ../client:/app/client:z
       - client_node_modules:/app/client/node_modules
     # Anchors do not cross files, so the base's log cap is restated.
     logging:
@@ -43,7 +43,7 @@ services:
   fileserver:
     volumes:
       # One file onto a fixed name: two client.d files would mean two `location /`.
-      - ./nginx/client.d/dev.conf:/etc/nginx/client.d/client.conf:ro
+      - ./nginx/client.d/dev.conf:/etc/nginx/client.d/client.conf:ro,z
     depends_on:
       client:
         condition: service_started

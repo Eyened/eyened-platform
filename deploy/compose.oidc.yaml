@@ -35,5 +35,5 @@ services:
     ports:
       - "${KEYCLOAK_BIND:-0.0.0.0}:${KEYCLOAK_PORT:-8180}:8080"
     volumes:
-      - ./keycloak/entrypoint.sh:/opt/keycloak/entrypoint.sh:ro
-      - ./keycloak/realm-eyened-dev.json.template:/opt/keycloak/import-template/realm-eyened-dev.json:ro
+      - ./keycloak/entrypoint.sh:/opt/keycloak/entrypoint.sh:ro,z
+      - ./keycloak/realm-eyened-dev.json.template:/opt/keycloak/import-template/realm-eyened-dev.json:ro,z
