@@ -172,3 +172,36 @@ def test_process_returns_none_when_segmentation_has_no_data(session, monkeypatch
     av = _process(session, monkeypatch, ms, image, None)
 
     assert av is None
+
+
+def test_process_intersects_reference_mask(session, monkeypatch):
+    """A reference mask is AND-ed after warping, same as binary_mask."""
+    image = _prepare_image(session)
+    ms = _seed_model_seg(session, image, height=8, width=8)
+
+    class _Reference:
+        binary_mask = np.zeros((8, 8), dtype=bool)
+
+    monkeypatch.setattr(ms, "ReferenceSegmentation", _Reference(), raising=False)
+    av = _process(
+        session, monkeypatch, ms, image, np.full((1, 8, 8), 255, dtype=np.uint8)
+    )
+
+    assert av is not None
+    assert av.ValueJSON.get("total_area", 0) == 0
+
+
+def test_process_ignores_reference_without_mask(session, monkeypatch):
+    image = _prepare_image(session)
+    ms = _seed_model_seg(session, image, height=8, width=8)
+
+    class _Reference:
+        binary_mask = None
+
+    monkeypatch.setattr(ms, "ReferenceSegmentation", _Reference(), raising=False)
+    av = _process(
+        session, monkeypatch, ms, image, np.full((1, 8, 8), 255, dtype=np.uint8)
+    )
+
+    assert av is not None
+    assert av.ValueJSON.get("total_area", 0) > 0

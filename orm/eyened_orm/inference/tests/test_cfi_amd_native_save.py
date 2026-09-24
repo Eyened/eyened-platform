@@ -245,3 +245,56 @@ def test_save_result_upscale_path_omits_projection_matrix(session, monkeypatch):
     assert row.Height == 64
     assert row.Width == 64
     assert row.ImageProjectionMatrix is None
+
+
+def test_save_result_overwrite_upscale_clears_projection_matrix(session, monkeypatch):
+    """Overwrite a native row with the upscale pipeline at the same size.
+
+    Height/Width match, so the dimension guard does not fire. The stored
+    ImageProjectionMatrix must still follow this run (None when upscaling).
+    """
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    _prepare_image(image, height=64, width=64)
+    _seed_cfi_roi(session, image.ImageInstanceID, height=64, width=64)
+    session.refresh(image)
+
+    monkeypatch.setattr(ModelSegmentation, "write_data", lambda *a, **k: 0)
+
+    native = CFI_AMD(
+        session,
+        device=torch.device("cpu"),
+        undo_transform=False,
+        overwrite=True,
+    )
+    native._save_result(
+        image.ImageInstanceID,
+        native.models["drusen"],
+        np.full((64, 64), 0.8, dtype=np.float32),
+    )
+    row = ModelSegmentation.by_column(
+        session,
+        ImageInstanceID=image.ImageInstanceID,
+        ModelID=native.models["drusen"].ModelID,
+    )
+    assert row.ImageProjectionMatrix is not None
+
+    upscale = CFI_AMD(
+        session,
+        device=torch.device("cpu"),
+        undo_transform=True,
+        overwrite=True,
+    )
+    upscale._save_result(
+        image.ImageInstanceID,
+        upscale.models["drusen"],
+        np.full((64, 64), 0.9, dtype=np.float32),
+    )
+    row = ModelSegmentation.by_column(
+        session,
+        ImageInstanceID=image.ImageInstanceID,
+        ModelID=upscale.models["drusen"].ModelID,
+    )
+    assert row.Height == 64
+    assert row.Width == 64
+    assert row.ImageProjectionMatrix is None

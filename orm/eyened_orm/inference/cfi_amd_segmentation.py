@@ -245,6 +245,10 @@ class CFI_AMD(BaseInferencePipeline):
             if not self.save_only_above_threshold or np.any(
                 segmentation_array >= self.threshold
             ):
+                # create_kwargs does not update an existing row. The matrix
+                # is per-run (native crop vs upscaled image space).
+                if existing is not None:
+                    m.ImageProjectionMatrix = image_projection_matrix
                 # Convert float (0-1) to uint8 (0-255) for Datatype.R8
                 data = (255 * segmentation_array).astype(np.uint8)
                 m.write_data(data, axis=0)
