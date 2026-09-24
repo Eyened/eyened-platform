@@ -1,45 +1,52 @@
 # Backlog
 
-Tracks important follow-up work surfaced during reviews, planning, and implementation
-that is intentionally deferred rather than done inline. Each item should capture:
-
-- **Source** — where it came from (PR review, spec, discussion) with a link.
-- **What** — the concrete change.
-- **Why** — the motivation / risk if left undone.
-- **Status** — `open`, `in progress`, or `done`.
-
-Keep entries short. When an item is picked up, link the PR/commit and mark it done.
+Deferred work, grouped by theme. Each item is a `###` title (imperative or defect) followed by `Status` (open | partial, saying what is left), `Source` (PR, commit or review), `Problem` and `Fix` (1–2 lines each, concrete symbols), and an optional one-line `Note` for a decision or number a fixer must know.
+To add: append the item to the fitting file and add a row below. To close: delete the item and its row in the change that fixes it; git is the history.
 
 ## Index
 
-- [PR #145 — RBAC Step 1 service layer](2026-07-16-pr145-rbac-step1-review.md)
-- [Backend Python lint gate (ruff) — follow-up to #118](2026-07-16-backend-ruff-lint-followup.md)
-- [Dependabot vulnerability alerts](2026-07-16-dependabot-vulnerabilities.md)
-- [Follow-ups from Frontend CI Phase 3 — ESLint gate](2026-07-16-frontend-ci-phase3-eslint-followups.md)
-- [Frontend CI Phase 4 — svelte-check triage](2026-07-20-frontend-ci-phase4-svelte-check-triage.md)
-- [Auth service-layer conversion — last unconverted domain](2026-07-27-auth-service-layer-conversion.md)
-- [Task→project map: materialize it, or task listings degrade linearly](2026-08-07-task-project-materialized-map.md)
-- [DTO layer reads the database unscoped, and no guard covers it](2026-08-07-dto-layer-unscoped-reads.md)
-- [Scoped segmentation counts walk four tables per request, and the boot path pays it](2026-08-13-segmentation-project-denormalization.md)
-- [`eorm create-user --is-human` can never be false](2026-08-13-create-user-cli-is-human-flag.md)
-- [`eorm create-user` writes no `AuditLog` row](2026-08-13-create-user-cli-no-audit-row.md)
-- [Phase C — make the coverage gates block a merge](2026-08-14-coverage-gate-enforcement.md)
-- [`form_validation` cannot be imported — `DBManager` does not exist](2026-08-14-form-validation-dbmanager-broken.md)
-- [`alembic upgrade --sql` writes the confirmation prompt into the generated SQL](2026-08-20-alembic-sql-mode-prompt-pollutes-stdout.md)
-- [A large `IN` list makes MySQL abandon the range optimizer](2026-08-20-large-in-list-defeats-range-optimizer.md)
-- [`docs/rbac-operations.md` is two documents in one file](2026-08-21-rbac-operations-doc-has-two-homes.md)
-- [`is_admin` makes `scope.require` vacuous, so an administrator gets 500 where anyone else gets 404](2026-08-21-admin-scope-vacuity-turns-404s-into-500s.md)
-- [The segmentation zarr store has no write lock](2026-08-24-zarr-storage-write-lock.md)
-- [API pool sizing assumes one connection per thread; a request takes several](2026-08-24-api-pool-sizing-multi-hop-checkout.md)
-- [Cross-project data cleaning has no safe path, and the ORM actively misleads](2026-08-25-cross-project-data-cleaning-has-no-safe-path.md)
-- [`POST /auth/login` with `api_client: true` always returns 500](2026-09-14-login-api-client-branch-always-500s.md)
-- [`GET /auth/me` returns 500 when the token's Creator row is gone](2026-09-14-auth-me-500s-for-a-deleted-creator.md)
-- [The suite's warning floor hides a new warning](2026-09-17-test-suite-warning-floor.md)
-- [`change_password`'s `actor` argument is informationally redundant today](2026-09-17-change-password-actor-parameter-redundant.md)
-- [Cookie attributes on the auth responses are unpinned](2026-09-17-auth-cookie-attributes-unpinned.md)
-- [The session guards cannot detect a stale allow-list entry](2026-09-17-session-guard-allowlist-cannot-detect-stale-entries.md)
-- [The cutover grant skipped every legacy-credential human](2026-09-17-cutover-skipped-legacy-credential-humans.md)
-- [A password change ends no session, and a session never expires](2026-09-18-password-change-does-not-end-sessions.md)
-- [New passwords are not checked against a breached or common password list](2026-09-18-password-breach-list-check.md)
-- [Admin account writes reach non-human `Creator` rows](2026-09-22-admin-account-writes-reach-non-human-creators.md)
-- [Three PR #247 review fixes are parked behind PR #202](2026-09-22-rbac-admin-review-fixes-parked-behind-pr202.md) — only the `PUBLIC_AUTH_DISABLED` guardrail is still open; the two documentation findings are done
+| Item | File | Status |
+|---|---|---|
+| Validate usernames at every entry point | [auth-and-sessions](auth-and-sessions.md) | open |
+| Fence `PUBLIC_AUTH_DISABLED` | [auth-and-sessions](auth-and-sessions.md) | open, blocked on PR #202 |
+| End existing sessions on a password change or reset | [auth-and-sessions](auth-and-sessions.md) | open |
+| Make `get_current_user` reject deleted and deactivated accounts | [auth-and-sessions](auth-and-sessions.md) | open |
+| Cap the absolute session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
+| Fix or delete the `api_client` branch of `POST /auth/login` | [auth-and-sessions](auth-and-sessions.md) | open |
+| Check new passwords against a breached/common-password list | [auth-and-sessions](auth-and-sessions.md) | open |
+| Move OIDC login into `AuthService` and pin the auth cookie attributes | [auth-and-sessions](auth-and-sessions.md) | partial |
+| Keep admin HTTP writes and reads off non-human Creators | [rbac-admin](rbac-admin.md) | open |
+| Rename `has_credential` on `AdminUserResponse` | [rbac-admin](rbac-admin.md) | open |
+| Build the audit-log read endpoint `GET /admin/audit` | [rbac-admin](rbac-admin.md) | open |
+| Drop the dead `eorm create-user --is-human` option | [rbac-admin](rbac-admin.md) | open |
+| Decide the 15 legacy-credential humans the cutover skipped | [rbac-admin](rbac-admin.md) | open |
+| Finish trimming `docs/rbac-operations.md` | [rbac-admin](rbac-admin.md) | partial |
+| Scope the registration id → `PublicID` lookup in the DTO layer | [rbac-authz](rbac-authz.md) | open |
+| Stop `scope.require` passing vacuously for an administrator on nonexistent ids | [rbac-authz](rbac-authz.md) | open |
+| Make the session guards fail on stale allow-list entries | [rbac-authz](rbac-authz.md) | open |
+| Decide whether `AuthService.change_password` keeps its `actor` parameter | [rbac-authz](rbac-authz.md) | open |
+| Stop paying scoped segmentation counts on every app load | [performance](performance.md) | open |
+| Check for oversized `IN` lists on `ImageInstance` | [performance](performance.md) | open |
+| Size the API pool for multi-hop connection checkout | [performance](performance.md) | open |
+| Pick one eager-loading convention and drop dead loads | [performance](performance.md) | open |
+| Give the segmentation zarr store a cross-process write lock | [data-integrity](data-integrity.md) | open |
+| Add `eorm move-patient` / `move-images` for cross-project data cleaning | [data-integrity](data-integrity.md) | open |
+| Make the database the only maintainer of `DateModified` | [data-integrity](data-integrity.md) | open |
+| Decide DDL defaults for the `Inactive` columns | [data-integrity](data-integrity.md) | open, low |
+| Bump `python-multipart` | [ci-and-tooling](ci-and-tooling.md) | open |
+| Clear the npm Dependabot alerts in `client/` and `docs/` | [ci-and-tooling](ci-and-tooling.md) | open |
+| Add a backend ruff lint + format gate | [ci-and-tooling](ci-and-tooling.md) | open |
+| Make CI checks required on `main`/`development` (coverage Phase C) | [ci-and-tooling](ci-and-tooling.md) | open |
+| Add a mypy per-module gate over the admin surface | [ci-and-tooling](ci-and-tooling.md) | open |
+| Turn unknown test warnings into errors | [ci-and-tooling](ci-and-tooling.md) | open |
+| Repair or delete `eyened_orm.form_validation` | [ci-and-tooling](ci-and-tooling.md) | open |
+| Sanitize the `{@html}` cells in `DataTable.svelte` | [frontend](frontend.md) | open |
+| Fix Svelte 5 reactivity traps | [frontend](frontend.md) | open |
+| Key the grandfathered `{#each}` blocks | [frontend](frontend.md) | open |
+| Ratchet down `@typescript-eslint/no-explicit-any` | [frontend](frontend.md) | open |
+| Gate svelte-check in CI (Phase 4) | [frontend](frontend.md) | open |
+| Fix the remaining svelte-check error clusters | [frontend](frontend.md) | open |
+| Fix the prop bugs unmasked by the `ui/` prop helpers | [frontend](frontend.md) | open |
+| Remove small dead code | [frontend](frontend.md) | open |
+| Decide `prefer-const` for `.svelte` files | [frontend](frontend.md) | open |
+| Re-audit navigation if `kit.paths.base` is ever set | [frontend](frontend.md) | open, conditional |
