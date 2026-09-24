@@ -27,20 +27,25 @@ def get_current_alembic_revision(engine: Engine) -> str | None:
         return conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
 
 
-def stamp_alembic_head(engine: Engine) -> str:
-    from alembic.runtime.migration import MigrationContext
+def upgrade_to_head(engine: Engine) -> str:
+    """Run the migration trail to head against ``engine``'s database.
 
-    script = _script_directory()
-    head = script.get_current_head()
+    The connection goes through ``config.attributes`` so ``env.py`` skips its
+    confirmation prompt -- the caller has already confirmed the target. A bare
+    ``Config()`` is deliberate: passing ``alembic.ini`` would set
+    ``config_file_name`` and make ``env.py`` reconfigure global logging.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_migrations_dir() / "alembic"))
+
+    with engine.connect() as connection:
+        cfg.attributes["connection"] = connection
+        command.upgrade(cfg, "head")
+
+    head = _script_directory().get_current_head()
     if head is None:
         raise RuntimeError("No Alembic head revision found.")
-
-    current = get_current_alembic_revision(engine)
-    if current == head:
-        return head
-
-    with engine.begin() as connection:
-        context = MigrationContext.configure(connection=connection)
-        context.stamp(script, head)
-
     return head

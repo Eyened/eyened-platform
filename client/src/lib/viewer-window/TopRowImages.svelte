@@ -1,28 +1,22 @@
 <script lang="ts">
     import Spinner from "$lib/components/Spinner.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import { TaskNavigation } from "$lib/tasks/taskUtils.svelte";
+    import TaskPanel from "$lib/tasks/TaskPanel.svelte";
     import { getContext } from "svelte";
     import TopViewer from "./TopViewer.svelte";
     import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     import { Button } from "$lib/components/ui/button";
-    import TaskOverlay from "$lib/tasks/TaskOverlay.svelte";
-    import ChevronLeft from "@lucide/svelte/icons/chevron-left";
-    import ChevronRight from "@lucide/svelte/icons/chevron-right";
     import BrowserOverlay from "./BrowserOverlay.svelte";
     import HelpOverlay from "./HelpOverlay.svelte";
-    import Task from "./icons/Task.svelte";
 
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
     );
     const taskContext = getContext<TaskContext>("taskContext");
-    let selectedPanel: "task" | "browser" | "help" | null = $state(null);
+    let selectedPanel: "browser" | "help" | null = $state(null);
 
-    const navigation = new TaskNavigation(taskContext);
-
-    function selectPanel(panel: "task" | "browser" | "help" | null) {
+    function selectPanel(panel: "browser" | "help" | null) {
         if (selectedPanel == panel) {
             selectedPanel = null;
         } else {
@@ -48,6 +42,9 @@
             {/await}
         {/each}
     </div>
+    {#if taskContext}
+        <TaskPanel {taskContext} />
+    {/if}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div
@@ -73,9 +70,6 @@
             </div>
         {/if}
         <div class="panel-body">
-            {#if selectedPanel == "task"}
-                <TaskOverlay {taskContext} />
-            {/if}
             {#if selectedPanel == "browser"}
                 <BrowserOverlay
                     {viewerWindowContext}
@@ -90,23 +84,6 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div id="panel-selector">
-        {#if taskContext}
-            <div
-                class="icon"
-                class:disabled={navigation.prevDisabled}
-                onclick={() => navigation.prev()}
-            >
-                <ChevronLeft />
-            </div>
-            <div
-                class="icon"
-                class:disabled={navigation.nextDisabled}
-                onclick={() => navigation.next()}
-            >
-                <ChevronRight />
-            </div>
-            <div class="icon" onclick={() => selectPanel("task")}><Task /></div>
-        {/if}
         <div class="icon" onclick={() => selectPanel("help")}>?</div>
         <div class="icon" onclick={() => selectPanel("browser")}>+</div>
     </div>
@@ -192,12 +169,7 @@
         user-select: none;
         cursor: pointer;
     }
-    div.icon:hover:not(.disabled) {
+    div.icon:hover {
         color: rgba(255, 255, 255, 1);
-    }
-    div.icon.disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-        pointer-events: none;
     }
 </style>

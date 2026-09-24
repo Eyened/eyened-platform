@@ -15,7 +15,7 @@ from eyened_orm import (
     AttributesModel,
     ImageInstance,
 )
-from eyened_orm.commands.test_targets import _import_images
+from eyened_orm.commands.tests.test_targets import _import_images
 from eyened_orm.inference.cfi_quality import CFI_Quality
 from eyened_orm.inference.model_inputs import CFI_ROI_INPUT, ModelInputSpec
 

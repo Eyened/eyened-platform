@@ -10,7 +10,7 @@ from eyened_orm import (
     ModelSegmentation,
     SegmentationModel,
 )
-from eyened_orm.commands.test_targets import _import_images
+from eyened_orm.commands.tests.test_targets import _import_images
 from eyened_orm.inference.etdrs_summary import image_ids_with_segmentation_output
 from eyened_orm.reports.etdrs_model import ETDRSModelProcessor
 from eyened_orm.segmentation import DataRepresentation, Datatype

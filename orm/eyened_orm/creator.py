@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar, List, Optional, Set
 
-from sqlalchemy import BINARY, ForeignKey, String, Boolean, func
+from sqlalchemy import BINARY, Boolean, ForeignKey, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -28,12 +28,22 @@ class Creator(Base):
     Description: Mapped[Optional[str]] = mapped_column(String(1000))
     Role: Mapped[Optional[int]]
 
+    # Authorization (see docs: RBAC multi-project tasks, section 5).
+    # `Role` above is legacy: NULL on every row and read by no authorization
+    # decision. It is left alone; these two columns are the load-bearing ones.
+    IsAdmin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("0")
+    )
+    Inactive: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("0")
+    )
+
     # Authentication (private)
     Password: Mapped[Optional[bytes]] = mapped_column(BINARY(32), info={"private": True})
     PasswordHash: Mapped[Optional[str]] = mapped_column(String(255), info={"private": True})
 
     # Timestamps
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     # Relationships
     Annotations: Mapped[List["Annotation"]] = relationship("eyened_orm.annotation.Annotation", back_populates="Creator")

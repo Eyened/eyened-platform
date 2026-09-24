@@ -24,6 +24,17 @@ The following commands are available:
 - defragment-zarr: Defragment the zarr store by copying all segmentations to a new store with sequential indices.
 - update-hashes: Update FileChecksum and DataHash for ImageInstances where they are NULL.
 - load-dump: Load a database dump file, replacing the entire database.
+- init-admin: Create or promote the administrator account (idempotent).
+- grant: Grant or change a project role for a user.
+- revoke: Remove a user's membership from a project, or from every project with --all.
+- grant-for-task: Grant every project a set of tasks touch, after review.
+- grant-all: Once, during the v2026.09.0 upgrade -- grant every authenticating creator a role in every project.
+- set-admin: Set or clear administrator status on an existing account.
+- set-password: Set an existing user's password.
+- deactivate: Revoke all of a user's memberships.
+- reactivate: Restore a deactivated user's memberships.
+- check-declarations: List (task, project) declarations no image link uses.
+- check-dangling-references: Report rows whose parent is missing, before the declaration cutover.
 
 Important: import packages that are not dependencies of the ORM within the function definitions, as they are not installed by default.
 """
@@ -71,8 +82,28 @@ def _register_model_commands():
 _register_model_commands()
 
 
+def _register_rbac_commands():
+    from .commands.rbac import rbac_commands
+
+    for command in rbac_commands:
+        eorm.add_command(command)
+
+
+_register_rbac_commands()
+
+
+def _register_integrity_commands():
+    from .commands.integrity import integrity_commands
+
+    for command in integrity_commands:
+        eorm.add_command(command)
+
+
+_register_integrity_commands()
+
+
 @eorm.command()
-@click.option("--recreate", is_flag=True, default=False, help="Drop and create the database before creating the models")
+@click.option("--recreate", is_flag=True, default=False, help="Drop and recreate the database before running the migrations")
 @click.option(
     "--seed-form-schemas",
     is_flag=True,
@@ -80,9 +111,7 @@ _register_model_commands()
     help="Also insert builtin viewer FormSchema rows after creating tables",
 )
 def initialize_database(recreate: bool, seed_form_schemas: bool):
-    """Initialize an empty database and create ORM tables."""
-    from eyened_orm.base import Base
-
+    """Initialize an empty database by running the migration trail to head."""
     print("Initializing database...")
     database = get_database(confirmation=True)
     db_config = database.database_settings
@@ -92,20 +121,11 @@ def initialize_database(recreate: bool, seed_form_schemas: bool):
         if not drop_create_db(db_config):
             raise click.ClickException("Failed to recreate empty database.")
 
-    print("Creating tables...")
-    Base.metadata.create_all(database.engine)
+    print("Running migrations...")
+    from eyened_orm.utils.alembic_utils import upgrade_to_head
 
-    from eyened_orm.utils.alembic_utils import (
-        get_current_alembic_revision,
-        stamp_alembic_head,
-    )
-
-    current = get_current_alembic_revision(database.engine)
-    head = stamp_alembic_head(database.engine)
-    if current == head:
-        print(f"Alembic already at head ({head}).")
-    else:
-        print(f"Stamped Alembic at head ({head}).")
+    head = upgrade_to_head(database.engine)
+    print(f"Database is at Alembic head ({head}).")
 
     if seed_form_schemas:
         _run_seed_form_schemas(database, update=False)
@@ -166,10 +186,10 @@ def create_user(username: str, password: str, is_human: bool, description: str |
                 is_human=is_human,
                 description=description,
             )
-            session.commit()
-            print(f"User created successfully")
         except ValueError as e:
-            print(f"Error creating user: {e}")
+            raise click.ClickException(str(e)) from e
+        session.commit()
+    click.echo("User created successfully")
 
 
 @eorm.command()

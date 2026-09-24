@@ -73,7 +73,7 @@
         </div>
 
         <div class="row editable" onclick={toggleApplyMask}>
-            {#if mainViewerContext.applyMasking.has(segmentationItem)}
+            {#if mainViewerContext.isMaskingApplied(segmentation)}
                 <Hide size="1.5em" />
                 <span>Showing masked annotation</span>
             {:else}

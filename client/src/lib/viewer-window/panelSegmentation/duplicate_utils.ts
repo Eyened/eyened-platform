@@ -8,6 +8,7 @@ import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { DrawingArray } from "$lib/webgl/mask.svelte";
 import { convert } from "$lib/webgl/segmentationConverter";
+import { segmentationPlaneSize } from "$lib/webgl/segmentationProjection";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type {
     ModelSegmentationGET,
@@ -44,6 +45,17 @@ function createArray(
     return new NPYArray(a, shape, false);
 }
 
+/** Pixel grid of the copied mask. Enface projections stay on the image grid. */
+function copyPlane(
+    segmentation: SegmentationGET | ModelSegmentationGET,
+    image: AbstractImage,
+): { height: number; width: number } {
+    if (image.image_id.endsWith("proj")) {
+        return { height: image.height, width: image.width };
+    }
+    return segmentationPlaneSize(segmentation, image);
+}
+
 function copyMaskData(
     indices: number[],
     segmentationItem: SegmentationItem,
@@ -53,6 +65,8 @@ function copyMaskData(
     image: AbstractImage,
     originalThreshold: number,
 ) {
+    const { height, width } = copyPlane(segmentation, image);
+    const planeSize = height * width;
     for (let i = 0; i < indices.length; i++) {
         const mask = segmentationItem.getMask(indices[i]);
         if (mask) {
@@ -64,7 +78,7 @@ function copyMaskData(
                 dataRepresentation as SimpleDataRepresentation,
                 threshold,
             );
-            array.data.set(dataConverted, i * image.height * image.width);
+            array.data.set(dataConverted, i * planeSize);
         }
     }
 }
@@ -124,10 +138,8 @@ export async function duplicate(
         item.scan_indices = [scanNr];
     }
 
-    const array = createArray(
-        [depth, image.height, image.width],
-        segmentation.data_type,
-    );
+    const { height, width } = copyPlane(segmentation, image);
+    const array = createArray([depth, height, width], segmentation.data_type);
     if (image.image_id.endsWith("proj")) {
         array.shape = [image.height, 1, image.width];
     }

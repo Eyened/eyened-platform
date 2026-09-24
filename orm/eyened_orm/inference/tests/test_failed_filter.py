@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from eyened_orm.commands.test_targets import _import_images
+from eyened_orm.commands.tests.test_targets import _import_images
 from eyened_orm.inference.cfi_roi import CFI_ROI
 
 

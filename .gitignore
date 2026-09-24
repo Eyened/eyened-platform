@@ -3,6 +3,7 @@ docker/.env
 *.zip
 *.pyc
 notebooks/hrfav/**/*
+notebooks/schema.json
 node_modules/**/*
 extensions.ts
 client/src/lib/extensions.ts
@@ -16,6 +17,9 @@ client/src/lib/extensions.ts
 TODO.md
 orm/migrations/transfer-config.yml
 orm/migrations/transfer-config.*.yml
+# Regenerated on demand by orm/migrations/generate_latest_migration_sql.sh;
+# a committed copy goes stale against the revision chain and misleads.
+orm/migrations/sql/
 segmentations.zarr/
 **/.ipynb_checkpoints/**
 .cursor/
@@ -33,3 +37,14 @@ graphify-out/
 .superpowers/
 CLAUDE.md
 docs/superpowers/
+
+# Agent / superpowers working docs (local only)
+.agents/
+
+.coverage
+coverage.xml
+htmlcov/
+client/coverage/
+# diff-cover writes its markdown report to the cwd, not into coverage/.
+diff-cover.md
+client/diff-cover-client.md

@@ -7,7 +7,7 @@
 
 ## How the ratchet works
 
-`npm run lint` (in `client/`) runs `eslint . && prettier --check .`. Every **configured** rule is enforced on new code — including inside files that already carry suppressions. The three rules below are grandfathered in `client/eslint-suppressions.json` as a **count per file**, so the baseline can only shrink.
+`npm run lint` (in `client/`) runs `eslint . && prettier --check .`. Every **configured** rule is enforced on new code — including inside files that already carry suppressions. The three rules below are grandfathered in `client/eslint-suppressions.json` as a **count per file**, so the baseline can only shrink. Counts here are that file as of 2026-08-24: **422 suppressions across 86 files**.
 
 **"I fixed an `any` and CI went red!"** — expected, and the ratchet working. Removing a suppressed violation leaves a stale count and `eslint .` fails with _"There are suppressions left that do not occur anymore."_ Fix: `cd client && npx eslint . --prune-suppressions`, and commit the updated `eslint-suppressions.json` with your change.
 
@@ -19,17 +19,17 @@
 
 ---
 
-## 1. Ratchet down `@typescript-eslint/no-explicit-any` (351)
+## 1. Ratchet down `@typescript-eslint/no-explicit-any` (344)
 
 **Status:** open
 
 **What:** Replace `any` with real types incrementally, running `npx eslint . --prune-suppressions` (in `client/`) after each batch so the baseline can only shrink.
 
-**Why:** Typing debt — `any` erases type safety. Already enforced on new code; the 351 existing sites are tolerated until typed. Largest of the three backlogs; no rush, but it should trend to zero.
+**Why:** Typing debt — `any` erases type safety. Already enforced on new code; the 344 existing sites are tolerated until typed. Largest of the three backlogs; no rush, but it should trend to zero.
 
 ---
 
-## 2. Triage `svelte/require-each-key` (51) — keyed-each reconciliation
+## 2. Triage `svelte/require-each-key` (50) — keyed-each reconciliation
 
 **Status:** open
 
@@ -65,11 +65,11 @@
 
 **Status:** open · **Pre-existing** (not introduced by Phase 3) · _security_
 
-**What:** `client/src/lib/utils/DataTable.svelte:17` renders each cell with `{@html cell}`. Provenance: `DataTable` ← `ExternalData.svelte:13` ← `dataSources.ts:12` `loadDataSource()` → `isAbsoluteUrl(url) ? fetch(url) : fetchApi(url)` → `.json()`. So the rendered HTML is **network-fetched JSON from a possibly-absolute, admin-configured external URL**, injected raw. Options: sanitize (e.g. DOMPurify), render as text where markup isn't needed, or constrain the data-source contract to a trusted origin.
+**What:** `client/src/lib/utils/DataTable.svelte:18` renders each cell with `{@html cell}`. Provenance: `DataTable` ← `ExternalData.svelte:13` ← `dataSources.ts:12` `loadDataSource()` → `isAbsoluteUrl(url) ? fetch(url) : fetchApi(url)` → `.json()`. So the rendered HTML is **network-fetched JSON from a possibly-absolute, admin-configured external URL**, injected raw. Options: sanitize (e.g. DOMPurify), render as text where markup isn't needed, or constrain the data-source contract to a trusted origin.
 
 **Why:** A compromised or malicious configured data source (or anything able to influence its response) achieves script execution in the app. Phase 3 gave this an inline `eslint-disable` to reach a green gate; the disable is now worded to state the risk honestly rather than assert "trusted". **Deferring the fix is deliberate — this is a data-contract/security change, not a lint change — but the disable means the linter will never raise it again, so it lives here instead.**
 
-Note the contrast with the _genuinely_ trusted twin at `PanelRendering.svelte:45`, which renders hardcoded literals (`enface`/`axial`). Both once carried the identical comment "trusted, non-user content"; only one of them was true.
+Note the contrast with the _genuinely_ trusted twin at `panelRendering/PanelRendering.svelte:56`, which renders hardcoded literals (`enface`/`axial`). Both once carried the identical comment "trusted, non-user content"; only one of them was true.
 
 ---
 
@@ -85,9 +85,9 @@ Note the contrast with the _genuinely_ trusted twin at `PanelRendering.svelte:45
 
 ## 7. Small pre-existing defects noticed during the Phase 3 sweep
 
-**Status:** open · all **pre-existing**, none introduced by Phase 3
+**Status:** two of three open · all **pre-existing**, none introduced by Phase 3
 
-- **`PanelRendering.svelte:52`** — the `{:else}` branch iterates `Object.entries(options)` (i.e. `{enface, axial}`), so it renders options named "enface"/"axial" instead of render modes; it should index `options[viewerContext.image.orientation]` like the `{#if}` branch does. Normally unreachable (`radio = true` by default). Flagged because Phase 3 touched that line (removing an unused `label` binding — a correct, behavior-preserving fix).
+- ~~**`PanelRendering.svelte:52`** — the `{:else}` branch iterates `Object.entries(options)`.~~ **DONE** in `81b6a4cb` ("fix(client): gate grayscale render modes and dedupe CLAHE"). The file now lives at `client/src/lib/viewer-window/panelRendering/PanelRendering.svelte` and both branches iterate the same `availableModes` derived value, so the two can no longer disagree.
 - **`AV-Nicking.svelte:3`** — `Props` still declares `stroke?: string`, but the component no longer destructures it and the markup hardcodes `stroke:#000000`. The prop was always inert. The component is also **orphaned (0 callers repo-wide)** — drop the dead member or delete the component.
 - **`+layout.ts` / `users/login/+page.ts`** — `load()` is now an empty no-op (pre-existing dead code; Phase 3 only narrowed the signature). Deleting `load` entirely has SvelteKit route-semantics implications, so it was left alone.
 

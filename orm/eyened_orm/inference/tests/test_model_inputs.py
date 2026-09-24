@@ -13,7 +13,7 @@ from eyened_orm import (
     AttributesModel,
     AttributeValue,
 )
-from eyened_orm.commands.test_targets import _import_images
+from eyened_orm.commands.tests.test_targets import _import_images
 from eyened_orm.inference.model_inputs import (
     ModelInputSpec,
     attribute_value_data,

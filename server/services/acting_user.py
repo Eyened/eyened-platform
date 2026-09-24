@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from eyened_orm.authz.scope import AccessScope
 
 
 @dataclass(frozen=True)
@@ -15,3 +19,14 @@ class ActingUser:
 
     id: int
     username: str
+
+    @classmethod
+    def from_scope(cls, scope: "AccessScope") -> "ActingUser":
+        """Derive the audit identity from the request's scope.
+
+        The Service used ``ActingUser`` for audit logging and now uses
+        ``AccessScope`` for authorization; both name the same actor, so the
+        scope is the single source and this is the projection AuditService
+        wants.
+        """
+        return cls(id=scope.actor_id, username=scope.username)

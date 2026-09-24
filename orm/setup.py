@@ -41,6 +41,8 @@ setup(
         "google_crc32c==1.8.0",
         "simpleitk==2.*",
         "zarr>=2.18.0",
+        "passlib==1.7.4",
+        "argon2-cffi>=25.1.0",
     ],
     python_requires=">=3.10",
 )

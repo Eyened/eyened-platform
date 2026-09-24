@@ -5,6 +5,7 @@ from eyened_orm.repositories.form_schema_repository import FormSchemaRepository
 
 from server.services.exceptions import NotFoundError
 from server.services.form_schema_service import FormSchemaService
+from eyened_orm.utils.factories import admin_scope
 
 
 def test_list_form_schemas_returns_rows_in_order(session):
@@ -12,7 +13,9 @@ def test_list_form_schemas_returns_rows_in_order(session):
     session.add_all([FormSchema(SchemaName="Zeta"), FormSchema(SchemaName="Alpha")])
     session.flush()
 
-    service = FormSchemaService(FormSchemaRepository(session))
+    service = FormSchemaService(
+        FormSchemaRepository(session, scope=admin_scope()), scope=admin_scope()
+    )
     result = service.list_form_schemas()
 
     assert [s.SchemaName for s in result] == ["Alpha", "Zeta"]
@@ -24,7 +27,9 @@ def test_get_form_schema_returns_the_schema(session):
     session.add(schema)
     session.flush()
 
-    service = FormSchemaService(FormSchemaRepository(session))
+    service = FormSchemaService(
+        FormSchemaRepository(session, scope=admin_scope()), scope=admin_scope()
+    )
     result = service.get_form_schema(schema.FormSchemaID)
 
     assert result.SchemaName == "Alpha"
@@ -32,7 +37,9 @@ def test_get_form_schema_returns_the_schema(session):
 
 def test_get_form_schema_unknown_id_raises_not_found(session):
     """A missing schema makes the service raise NotFoundError (-> 404 via handler)."""
-    service = FormSchemaService(FormSchemaRepository(session))
+    service = FormSchemaService(
+        FormSchemaRepository(session, scope=admin_scope()), scope=admin_scope()
+    )
 
     with pytest.raises(NotFoundError):
         service.get_form_schema(999_999)

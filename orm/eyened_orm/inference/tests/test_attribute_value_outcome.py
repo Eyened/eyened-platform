@@ -10,7 +10,7 @@ from eyened_orm import (
     AttributeValue,
     AttributesModel,
 )
-from eyened_orm.commands.test_targets import _import_images
+from eyened_orm.commands.tests.test_targets import _import_images
 from eyened_orm.inference.attribute_value_outcome import (
     AttributeValueOutcome,
     attribute_value_outcome,

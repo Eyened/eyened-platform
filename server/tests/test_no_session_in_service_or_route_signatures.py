@@ -36,10 +36,14 @@ Exemptions, and what would remove them:
   ``(session)`` signature. They are part of the already-declared AuditService
   audit-sink exception: an earlier ``_ALLOWED`` named only
   ``AuditService.__init__``, which was a clerical gap, not a design decision.
-- Five auth.py functions (``get_current_user``, ``check_login``,
+- Five auth resolvers (``get_current_user``, ``check_login``,
   ``check_oidc_login``, ``CurrentUser.get_creator``, ``creator_to_response``)
-  are auth resolvers that legitimately read/write ``Creator`` directly ahead
-  of the request's authorization scope existing.
+  legitimately read/write ``Creator`` directly ahead of the request's
+  authorization scope existing. Three still live in ``routes/auth.py``;
+  ``get_current_user`` and ``CurrentUser.get_creator`` moved to
+  ``services/current_user.py`` to delete the ``services -> routes`` import
+  edge, and their entries below are **re-keyed to that path, not dropped** --
+  the move changed where they live, not that they hold a Session.
 - Seven auth.py route handlers (``login``, ``get_token``,
   ``get_current_user_info``, ``change_password``, ``register_user``,
   ``refresh_token``, ``oidc_authenticate``) hold ``session`` ONLY to forward
@@ -86,10 +90,10 @@ def _is_di_factory(name: str) -> bool:
 # docstring for the full rationale of each group below.
 _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
     # Auth resolvers that read/write Creator directly.
-    ("routes/auth.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
+    ("services/current_user.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
     ("routes/auth.py", "check_login"): "auth resolver -- verifies credentials against Creator",
     ("routes/auth.py", "check_oidc_login"): "auth resolver -- finds/creates Creator from OIDC claims",
-    ("routes/auth.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
+    ("services/current_user.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
     ("routes/auth.py", "creator_to_response"): "read-only response helper with an optional session param",
     # AuditService: audit sink; owns the session for its AuditLog write, like a repository.
     ("services/audit_service.py", "__init__"): "AuditService.__init__ -- audit sink owns its session",
@@ -107,6 +111,11 @@ _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
     # R1: import_api.py is slated for deprecation (see module docstring); only
     # import_single_image holds a Session, for ImportRun.apply().
     ("routes/import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; holds Session for ImportRun.apply()",
+    ("services/access_scope.py", "get_access_scope"): (
+        "scope resolver -- the composition-root dependency that builds the "
+        "request's AccessScope; holds a Session like the get_*_service factories, "
+        "which _is_di_factory exempts by name pattern only"
+    ),
 }
 
 
@@ -167,14 +176,20 @@ _DB_METHODS = {
 # argument and never call a method on it themselves, so they are not
 # offenders here in the first place.
 _DB_ACCESS_ALLOWED: dict[tuple[str, str], str] = {
-    ("routes/auth.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
+    ("services/current_user.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
     ("routes/auth.py", "check_login"): "auth resolver -- verifies credentials against Creator",
     ("routes/auth.py", "check_oidc_login"): "auth resolver -- finds/creates Creator from OIDC claims",
-    ("routes/auth.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
+    ("services/current_user.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
     ("routes/auth.py", "creator_to_response"): "read-only response helper with an optional session param",
     # Human decision: import_api.py is slated for deprecation. Calls
     # session.rollback() on the caught-failure path.
     ("routes/import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; calls session.rollback() on the caught-failure path",
+    ("services/access_scope.py", "get_access_scope"): (
+        "scope resolver -- reads Creator (IsAdmin/Inactive) before any scope "
+        "exists, the same case as the five auth.py resolvers. What would remove "
+        "it: a CreatorRepository read, which would need an unbounded "
+        "AccessScope.trusted() inside the scope resolver -- a worse trade"
+    ),
 }
 
 

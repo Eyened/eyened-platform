@@ -3,6 +3,8 @@
   "type": "object",
   "properties": {
     "fovea": {
+      "x-eyened-widget": "keypoint",
+      "title": "Fovea",
       "type": "object",
       "properties": {
         "x": { "type": "number" },
@@ -12,6 +14,8 @@
       "additionalProperties": false
     },
     "disc_edge": {
+      "x-eyened-widget": "keypoint",
+      "title": "Disc edge",
       "type": "object",
       "properties": {
         "x": { "type": "number" },

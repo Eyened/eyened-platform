@@ -30,7 +30,7 @@ Run once after services are up:
 docker compose exec -it server bash
 ```
 
-Initialize database (creates tables and stamps the current Alembic revision):
+Initialize database (runs the Alembic migration trail to head):
 
 ```bash
 eorm initialize-database

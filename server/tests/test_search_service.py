@@ -1,7 +1,10 @@
 import pytest
 
 from eyened_orm.repositories.search import SearchRepository
-from eyened_orm.utils.factories import seed_search_dataset
+from eyened_orm.utils.factories import (
+    admin_scope,
+    seed_search_dataset,
+)
 from server.services.search import SearchService
 
 
@@ -12,7 +15,7 @@ def data(session):
 
 @pytest.fixture()
 def service(session):
-    return SearchService(SearchRepository(session))
+    return SearchService(SearchRepository(session, scope=admin_scope()), scope=admin_scope())
 
 
 def _search(service, conditions=(), **kw):

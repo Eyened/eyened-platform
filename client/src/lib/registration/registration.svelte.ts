@@ -149,9 +149,7 @@ export class Registration {
         queueMicrotask(() => {
             this.recomputeScheduled = false;
             if (!this.pathsDirty) return;
-            this.pathsDirty = false;
-            this.shortestPaths = allPairsShortestPaths(this.mappings);
-            this.bumpRevision();
+            this.recomputePathsNow();
         });
     }
 
@@ -160,6 +158,11 @@ export class Registration {
         this.pathsDirty = false;
         this.recomputeScheduled = false;
         this.shortestPaths = allPairsShortestPaths(this.mappings);
+        // Mapped cursor positions are invalid once edges/paths change.
+        this.cache.clear();
+        if (this.pointer.image_id) {
+            this.cache.set(this.pointer.image_id, this.pointer.position);
+        }
         this.bumpRevision();
     }
 

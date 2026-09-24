@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { type PointList } from "$lib/viewer/tools/Registration";
+    import { type PointList } from "$lib/forms/pointSchema";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";

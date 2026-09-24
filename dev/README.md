@@ -58,6 +58,8 @@ alembic -x env_file=../../dev/.env upgrade head
 ```
 You will be prompted to confirm the target database before the migration runs.
 
+If you populated the database from a dump in step 3, the dump's `alembic_version` table came with it. A dump already at the legacy head (`b2e2800000b2`) should be stamped, not upgraded — run `alembic -x env_file=../../dev/.env stamp --purge orm_baseline` instead (`--purge` is required to skip resolving the legacy id, which the squash removed from the map). An older dump needs step 4 of [Upgrading to v2026.09.0](https://eyened.github.io/eyened-platform/guides/upgrading_to_v2026_09_0/) first.
+
 ## 4. Start the Development Server & Client
 Working from `dev` 
 ```

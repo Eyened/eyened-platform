@@ -30,6 +30,8 @@ export default defineConfig({
                     items: [
                         { slug: 'guides/development_setup' },
                         { slug: 'guides/authentication' },
+                        { slug: 'guides/access_control' },
+                        { slug: 'guides/upgrading_to_v2026_09_0' },
                     ],
                 },
                 {
@@ -42,6 +44,7 @@ export default defineConfig({
                             autogenerate: { directory: 'orm/data_model' },
                         },
                         { slug: 'orm/importer' },
+                        { slug: 'orm/dicom_export' },
                         { slug: 'orm/cli' },
                         { slug: 'orm/inference' },
                         { slug: 'orm/form_schemas' },

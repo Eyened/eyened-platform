@@ -51,7 +51,7 @@ export type EnfaceProjectionMode = "off" | "binary" | "heatmap";
 
 export type WindowLevel = { min: number; max: number };
 
-export type PanelName =
+export type BuiltinPanelName =
     | "Info"
     | "Rendering"
     | "ETDRS"
@@ -61,12 +61,10 @@ export type PanelName =
     | "Segmentation"
     | "LayerSegmentation";
 
-export type ToolName =
-    | "brush"
-    | "polygon"
-    | "registration"
-    | "ETRDS-grid"
-    | "AV nicking tool";
+/** Builtin names or task-configured custom panel titles (e.g. "Grading"). */
+export type PanelName = BuiltinPanelName | (string & {});
+
+export type ToolName = "brush" | "polygon" | "AV nicking tool" | "point";
 
 export type Dimension2D = { width: number; height: number };
 

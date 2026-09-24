@@ -162,24 +162,33 @@ export class Matrix {
 }
 
 export function getMatrixFromPointSets(
-    source: (Position2D | undefined)[],
-    target: (Position2D | undefined)[],
+    source: (Position2D | null | undefined)[],
+    target: (Position2D | null | undefined)[],
 ): Matrix | undefined {
     const n = Math.min(source.length, target.length);
 
     const A = [];
     const B = [];
     for (let i = 0; i < n; i++) {
-        try {
-            const { x: x0, y: y0 } = source[i];
-            const { x: x1, y: y1 } = target[i];
-            A.push([x0, y0, 1, 0, 0, 0]);
-            A.push([0, 0, 0, x0, y0, 1]);
-            B.push(x1, y1);
-        } catch {
-            // Skip undefined source/target point pairs
+        const s = source[i];
+        const t = target[i];
+        // Index-aligned correspondences: skip holes so pt[i] maps to pt[i].
+        if (
+            !s ||
+            !t ||
+            typeof s.x !== "number" ||
+            typeof s.y !== "number" ||
+            typeof t.x !== "number" ||
+            typeof t.y !== "number"
+        ) {
+            continue;
         }
+        A.push([s.x, s.y, 1, 0, 0, 0]);
+        A.push([0, 0, 0, s.x, s.y, 1]);
+        B.push(t.x, t.y);
     }
+    // Affine needs 3 point pairs (6 equations for 6 unknowns).
+    if (A.length < 6) return undefined;
     try {
         const pseudoInverseA = multiply(
             inv(multiply(transpose(A), A)),

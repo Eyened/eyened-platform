@@ -1,17 +1,26 @@
-# eyened-platform
+# EyeNED Platform
 
-A modern web platform for visualization and annotation of ophthalmic images with features like:
+Open-source web platform for browsing, annotating, and managing ophthalmic imaging
+(enface, OCT, DICOM, and more). Built by the [EyeNED Reading Centre](https://www.eyened.nl)
+and partners in the OS4OD consortium.
+[Documentation](https://eyened.github.io/eyened-platform/) ·
+[Getting started](https://eyened.github.io/eyened-platform/getting_started/) ·
+[Discussions](https://github.com/Eyened/eyened-platform/discussions)
+
+<img src="docs/src/assets/screenshot-eyened-platform.png" alt="EyeNED viewer" width="600">
+
+## Features
 
 - Loading of various image formats including DICOM.
 - Convenient system for browsing loaded studies and images.
 - Task system for managing grading tasks.
-- Drawing tools for 2D image segmentation of enface images and OCT B-scans
-- Images and annotations are rendered in the browser, making it very responsive and easy to set up.
-- Image enhancements such as contrast enhancement and CLAHE can be applied on the fly.
-- Integrated tools for registration of enface images.
-- Automated ETDRS grid placement via AI-based bounds detection and landmark detection (fovea, optic disc) upon insertion of CFI images.
+- Drawing tools for image segmentation of enface images and OCT B-scans
+- Responsive web interface for accurate drawing
+- Image enhancements such as contrast enhancement and CLAHE applied on the fly.
+- Integrated tools for registration of enface images, including enface projections of segmentations across linked images
+- Automated ETDRS grid placement via AI-based bounds detection and landmark detection.
 - Python-based import script for loading images and associated metadata.
-- For advanced use cases, our ORM allows data scientists to more easily work with the database.
+- For advanced use cases, our ORM allows data scientists to query the database directly.
 
 
 See our [Documentation](https://eyened.github.io/eyened-platform/).
@@ -29,3 +38,6 @@ See our [Documentation](https://eyened.github.io/eyened-platform/).
 ***orm:*** SQLAlchemy-based Object-Relational Mapping library for database interactions. Includes migration management with Alembic, data models, and utilities for data scientists to work with the database.
 
 ***server:*** FastAPI-based backend server providing REST API endpoints for image management, user authentication, task management, and database operations.
+
+## License and contact
+AGPL-3.0. Questions and contributions: GitHub Discussions, issues, or eyened@erasmusmc.nl.

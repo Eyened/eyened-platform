@@ -2,29 +2,68 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session, selectinload
 
-from eyened_orm import ModelSegmentation, Segmentation
+from eyened_orm import ModelSegmentation, Segmentation, SubTask
 from eyened_orm.tag import SegmentationTagLink
+from eyened_orm.authz.scope import AccessScope
+from eyened_orm.authz.scoping import projects_of
+from eyened_orm.repositories._scoped import scoped_one
 
 
 class SegmentationRepository:
     """Data access for Segmentation reads, mutations, and its Tag links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
+
+    def project_ids(self, segmentation_id: int) -> set[int]:
+        """The projects this segmentation touches, for a write check to be
+        judged on.
+
+        The repository owns the Session, so the authz resolution runs here
+        rather than a service reaching through for a Session it must not hold.
+        Uses ``projects_of``, the one definition the reads and the CLI share.
+
+        Deliberately unscoped: the returned set is the *input* to
+        ``AccessScope.require``, so filtering it by the caller's scope would
+        remove exactly the projects the check exists to catch and make every
+        floor pass.
+        """
+        return projects_of(self._session, Segmentation, segmentation_id)
 
     def get_by_id(self, segmentation_id: int) -> Segmentation | None:
-        """Return the segmentation by id, or None if absent."""
-        return self._session.get(Segmentation, segmentation_id)
+        """Return the segmentation by id, or None if absent or out of scope."""
+        return scoped_one(
+            self._session,
+            Segmentation,
+            self._scope,
+            Segmentation.SegmentationID == segmentation_id,
+        )
+
+    def get_subtask(self, subtask_id: int) -> SubTask | None:
+        """Return the subtask by id, or None if absent or out of scope.
+
+        Beside its only caller -- the create path's ``SubTaskID`` -- rather
+        than reaching for a ``SubTaskRepository`` this service does not hold.
+        A ``SubTask`` is scoped by its parent task's whole project set, so a
+        ``None`` here means the caller cannot see that task at all.
+        """
+        return scoped_one(
+            self._session, SubTask, self._scope, SubTask.SubTaskID == subtask_id
+        )
 
     def get_with_tag_links(self, segmentation_id: int) -> Segmentation | None:
-        """Return the segmentation with its tag links loaded, or None.
+        """Return the segmentation with its tag links loaded, or None if absent
+        or out of scope.
 
         Mirrors the eager-load graph the ``GET /segmentations/{id}`` handler
         built inline.
         """
-        return self._session.get(
+        return scoped_one(
+            self._session,
             Segmentation,
-            segmentation_id,
+            self._scope,
+            Segmentation.SegmentationID == segmentation_id,
             options=(
                 selectinload(Segmentation.SegmentationTagLinks).selectinload(
                     SegmentationTagLink.Tag
@@ -38,10 +77,14 @@ class SegmentationRepository:
     def get_tag_link(
         self, tag_id: int, segmentation_id: int
     ) -> SegmentationTagLink | None:
-        """Return the link for (tag_id, segmentation_id), or None if absent."""
-        return self._session.get(
+        """Return the link for (tag_id, segmentation_id), or None if absent or
+        out of scope."""
+        return scoped_one(
+            self._session,
             SegmentationTagLink,
-            {"TagID": tag_id, "SegmentationID": segmentation_id},
+            self._scope,
+            SegmentationTagLink.TagID == tag_id,
+            SegmentationTagLink.SegmentationID == segmentation_id,
         )
 
     def add(self, segmentation: Segmentation) -> None:
@@ -81,12 +124,29 @@ class SegmentationRepository:
 class ModelSegmentationRepository:
     """Data access for ModelSegmentation reads and mutations (data endpoints only)."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        self._scope = scope
+
+    def project_ids(self, model_segmentation_id: int) -> set[int]:
+        """The projects this model segmentation touches (authz).
+
+        Deliberately unscoped for the same reason as
+        ``SegmentationRepository.project_ids`` above: the returned set is the
+        *input* to ``AccessScope.require``, so filtering it by the caller's own
+        scope would remove exactly the projects the check exists to catch.
+        """
+        return projects_of(self._session, ModelSegmentation, model_segmentation_id)
 
     def get_by_id(self, model_segmentation_id: int) -> ModelSegmentation | None:
-        """Return the model segmentation by id, or None if absent."""
-        return self._session.get(ModelSegmentation, model_segmentation_id)
+        """Return the model segmentation by id, or None if absent or out of
+        scope."""
+        return scoped_one(
+            self._session,
+            ModelSegmentation,
+            self._scope,
+            ModelSegmentation.ModelSegmentationID == model_segmentation_id,
+        )
 
     def save(self, model_segmentation: ModelSegmentation) -> None:
         """Persist in-place mutations to ``model_segmentation`` (e.g.

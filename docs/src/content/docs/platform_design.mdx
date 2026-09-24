@@ -40,6 +40,47 @@ Optional **Adminer** in the database stack is exposed on `EYENED_ADMINER_PORT` (
 
 See [Getting Started](/eyened-platform/getting_started) for setup.
 
+## API concurrency
+
+Route handlers that touch the database run in a threadpool, not on the event loop. One slow query occupies one thread; unrelated requests keep being served.
+
+Six endpoints deliberately stay on the loop. Five of them are the segmentation-data endpoints in `server/routes/segmentations.py`: the zarr store behind them has no lock, so the single-threaded event loop is the only thing serializing concurrent writes to the same array, and moving them into the threadpool loses annotation data. The sixth is the OIDC login callback, which awaits the identity provider, so its two queries stay on the loop as well.
+
+Five settings size that threadpool and the resources behind it:
+
+| Setting | Default | What it caps |
+|---------|---------|--------------|
+| `EYENED_API_THREADPOOL_LIMIT` | `16` | All sync work offloaded to threads (handlers, dependencies, background tasks), per server process |
+| `EYENED_API_POOL_SIZE` | `16` | Pooled connections held open, per server process |
+| `EYENED_API_MAX_OVERFLOW` | `4` | Extra connections opened under burst, per server process |
+| `EYENED_API_POOL_TIMEOUT` | `5` | Seconds a request waits for a free connection before failing |
+| `EYENED_API_PASSWORD_HASH_CONCURRENCY` | `4` | Argon2 password hashes computed at once, per server process |
+
+`EYENED_API_THREADPOOL_LIMIT` must not exceed `EYENED_API_POOL_SIZE` + `EYENED_API_MAX_OVERFLOW`, and a startup validator makes the **server** refuse to boot if it does — what that catches is a grossly undersized pool, the case where threads sit in `pool.connect()` waiting out the timeout. It does not guarantee a checkout never waits: a request holds its connection across several threadpool hops (each sync dependency, the endpoint, response-model validation), so checkouts can exceed the thread count — 20 against 16 threads, measured.
+
+`EYENED_API_POOL_TIMEOUT` is deliberately outside that validated relation: it changes not how many connections exist but how long a request waits for one, turning pool exhaustion into a fast error rather than the 30-second hang SQLAlchemy defaults to — and which the worker, the CLI and the importer still use.
+
+### Password hashing
+
+Argon2 is memory-hard by design: this deployment's parameters cost 64 MiB and roughly 75 ms per hash. While handlers ran on the event loop that cost was serialized by accident — a process computed one hash at a time. The threadpool removes that accident, and `/auth/login` and `/auth/token` require no credentials to reach, so concurrent hashing is capped separately at `EYENED_API_PASSWORD_HASH_CONCURRENCY`.
+
+At the default of `4` a server process holds at most ~256 MiB of Argon2 state, ~1 GiB across `WORKERS=4`. Raising it raises that ceiling proportionally; a value above `EYENED_API_THREADPOOL_LIMIT` can never be reached. A request waiting for a hashing slot still occupies its thread and, on the login path, its pooled connection — a deliberate trade, since exhausting threads or connections fails fast under `EYENED_API_POOL_TIMEOUT` whereas exhausting memory kills the process.
+
+### Connection budget
+
+Every process has its own pool. Connections open lazily, so the numbers below are ceilings, and at peak the database sees the sum:
+
+| Consumer | Processes | Per process | Total |
+|----------|-----------|-------------|-------|
+| **Server** (`docker/`, gunicorn) | `WORKERS` (default `4`, set in `docker/.env`) | 20 | 80 |
+| **Server** (`dev/`, single uvicorn) | 1 | 20 | 20 |
+| **Worker** (RQ) | one pool per running job | 15 | varies with concurrency |
+| `eorm` CLI / importer | occasional | 15 | varies |
+
+That sum must stay under the database's `max_connections`. MySQL's documented default is `151`, and the `database/` stack does not override it — confirm the value on the target server before raising any of the settings above. Only the server's pool is tuned; the worker, the CLI and the importer all keep the conservative ORM default of 5 + 10.
+
+To shrink the footprint, lower `EYENED_API_POOL_SIZE` and `EYENED_API_THREADPOOL_LIMIT` together — the startup validator rejects a threadpool larger than the pool.
+
 ## Storage
 
 Two distinct layers:

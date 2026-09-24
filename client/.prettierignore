@@ -7,6 +7,14 @@ dist/
 node_modules/
 package-lock.json
 
+# vitest coverage output, written by `npm run test:coverage` -- the command CI
+# and the coverage gate both tell you to run, so any developer who has run it
+# once would otherwise have `npm run lint` permanently red on ~340 generated
+# files. Anchored: `/coverage/` is the tree at the client root only, so a
+# hand-written src/**/coverage/ would still be formatted. CI regenerates this
+# in its own job, from a fresh checkout.
+/coverage/
+
 # Generator output per the Makefile (gen-openapi -> openapi.json, gen-types ->
 # openapi.ts) — reformatting these would re-diverge on the next regen and make
 # the gate flaky. Hand-written files under src/types/ are NOT ignored.

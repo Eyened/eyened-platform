@@ -1,38 +1,18 @@
-# EyeNED Platform v2026.08.0
+# Release notes
 
-Viewer bookmarks and enface overlays, a service/repository layer with an append-only audit log (RBAC prep), a CFI inference rewrite, CI on client and server, and several viewer/ORM reliability fixes.
+Release notes live in the documentation site, not in this file:
 
-## Highlights
+- **Published:** https://eyened.github.io/eyened-platform/release_notes/
+- **Source:** [`docs/src/content/docs/release_notes.mdx`](docs/src/content/docs/release_notes.mdx)
 
-- **Viewer view-state** — open main viewers and frame indices persist in the URL (`v=`) and localStorage, and restore after reload (#198).
-- **Enface overlays on registered images** — GPU registration hops map enface projections onto linked images; photolocator hit-specs cover raster, radial, and circular locators (#177, #194).
-- **Pre-RBAC server architecture** — routes go through repositories and services; mutations write an in-transaction `AuditLog`; session ownership is explicit (#134, #139, #145, #165, #171). Per-request authorization is not enabled yet.
-- **CFI inference rewrite** — `eorm run-cfi-models` with ModelInputSpec, automatic model versions, failure tracking, streaming/chunked targets, and deadlock retry (#158).
-- **CI** — client Vitest/build/Prettier/ESLint and server pytest run on push/PR into `development` and `main`.
-- **CODEOWNERS** — repository-wide review by `@Eyened/platform-core`.
+That page is the only copy. This file used to hold a second one, and the two drifted —
+the v2026.07.0 notes reached the site and never reached here.
 
-## Bug fixes
+## Adding an entry
 
-- Oversized DICOM volumes and enface/OCT stretch (#196 / #173).
-- Patient registration on the task viewer route (#144).
-- CirclePhotoLocator viewer crash (#157).
-- Multiclass erode/dilate (#131).
-- PNG series path resolution defaults to index 0 (#191).
-- Copy image public ID from browser and viewer (#140, #143).
-- Unused `mysql-connector-python` removed (#199).
-- Registration processing exception handling (#147).
+Add it to the `## Unreleased` section of `docs/src/content/docs/release_notes.mdx`, in the
+**same pull request** that changes behaviour. Reconstructing the list at release time is how
+things get missed.
 
-## Upgrade notes
-
-1. **Run database migrations** before starting the new server containers. This release adds `AuditLog`.
-2. **Reinstall `eyened_orm`** after pulling this release.
-3. Prefer **`eorm run-cfi-models`**; legacy CFI inference writers were removed.
-4. Do not depend on **`mysql-connector-python`**.
-5. Authentication (password + optional OIDC) is unchanged from v2026.07.0.
-
-## Documentation
-
-- [Release notes](https://eyened.github.io/eyened-platform/release_notes/)
-- [Getting started](https://eyened.github.io/eyened-platform/getting_started/)
-- [CFI / inference](https://eyened.github.io/eyened-platform/orm/inference/)
-- [Attributes](https://eyened.github.io/eyened-platform/orm/data_model/attributes/)
+When a release is cut, rename `## Unreleased` to the version heading and open a fresh
+`## Unreleased` above it.

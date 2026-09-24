@@ -6,6 +6,7 @@ from .study import *        # Depends on Patient
 from .series import *       # Depends on Study
 from .image_instance import * # Depends on Series
 from .creator import *      # Independent
+from .project_member import *  # Depends on Creator, Project
 from .audit_log import *     # Independent audit sink
 from .form_annotation import * # Depends on Patient, Study, ImageInstance
 from .task import *         # Depends on ImageInstance, Creator
@@ -13,3 +14,9 @@ from .tag import *          # Depends on Annotation, Study, ImageInstance
 from .annotation import *   # Depends on Patient, Study, Series, ImageInstance, Creator~
 from .segmentation import * # Depends on ImageInstance, Feature, Creator, SubTask
 from .attributes import *   # Depends on Model, ImageInstance
+
+# Populate-on-insert for the denormalized ProjectID columns. Imported for its
+# side effect: the listener has to be attached before any Session flushes.
+from .authz.denormalization import register as _register_project_denormalization
+
+_register_project_denormalization()

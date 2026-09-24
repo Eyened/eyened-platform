@@ -98,7 +98,7 @@ class StudySearchResponse(BaseModel):
 @router.post(
     "/instances/search", response_model=SearchResponse, response_model_exclude_none=True
 )
-async def search_instances(
+def search_instances(
     query: SearchQuery,
     current_user: CurrentUser = Depends(get_current_user),
     service: SearchService = Depends(get_search_service),
@@ -126,7 +126,7 @@ async def search_instances(
     response_model=StudySearchResponse,
     response_model_exclude_none=True,
 )
-async def search_studies(
+def search_studies(
     query: StudySearchQuery,
     current_user: CurrentUser = Depends(get_current_user),
     service: SearchService = Depends(get_search_service),
@@ -150,7 +150,7 @@ async def search_studies(
 
 
 @router.get("/instances/search/signature", response_model=list[SignatureField])
-async def instances_signature(
+def instances_signature(
     current_user: CurrentUser = Depends(get_current_user),
     service: SearchService = Depends(get_search_service),
 ):
@@ -159,7 +159,7 @@ async def instances_signature(
 
 
 @router.get("/studies/search/signature", response_model=list[SignatureField])
-async def studies_signature(
+def studies_signature(
     current_user: CurrentUser = Depends(get_current_user),
     service: SearchService = Depends(get_search_service),
 ):

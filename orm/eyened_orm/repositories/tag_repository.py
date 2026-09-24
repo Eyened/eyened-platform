@@ -4,13 +4,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, load_only, noload, selectinload
 
 from eyened_orm import Creator, CreatorTagLink, Tag
+from eyened_orm.tag import TAG_LINK_COLLECTIONS
+from eyened_orm.authz.scope import AccessScope
 
 
 class TagRepository:
     """Data access for Tag rows and their per-user 'star' links."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, scope: AccessScope) -> None:
         self._session = session
+        # Deliberately never read: Tag is application-wide and intentionally
+        # unscoped (it is named in ``SAFE_UNFILTERED_ENTITIES``), so no query
+        # below has a project filter to omit. Kept for uniformity with every
+        # other repository, and because ``get_tag_service`` passes it.
+        self._scope = scope
 
     def add(self, tag: Tag) -> None:
         """Stage a new tag and flush so its PK is assigned."""
@@ -23,8 +30,23 @@ class TagRepository:
         self._session.flush()
 
     def get_by_id(self, tag_id: int) -> Tag | None:
-        """Return the tag with the given id, or None if absent."""
-        return self._session.get(Tag, tag_id)
+        """Return the tag with the given id, or None if absent.
+
+        The six link collections are ``noload``-ed deliberately. ``Tag`` maps
+        them ``lazy="selectin"``, so a plain ``session.get()`` loads all six;
+        the ORM's dependency processor then reacts to a later ``delete()`` by
+        trying to blank out the loaded children's ``TagID`` -- a primary-key
+        column -- and raises ``AssertionError`` before any SQL is emitted.
+        Leaving them unloaded lets the foreign keys decide instead: RESTRICT on
+        the five annotation links, CASCADE on ``CreatorTag``. No caller needs
+        them (``TagGET`` is scalar columns plus ``Creator``, which stays
+        loaded), and it also saves six SELECTs per call.
+        """
+        return self._session.get(
+            Tag,
+            tag_id,
+            options=[noload(attribute) for attribute in TAG_LINK_COLLECTIONS],
+        )
 
     def save(self, tag: Tag) -> None:
         """Persist in-place mutations to ``tag`` within the request transaction.
@@ -52,12 +74,7 @@ class TagRepository:
                 Tag.CreatorID,
                 Tag.DateInserted,
             ),
-            noload(Tag.CreatorTagLinks),
-            noload(Tag.StudyTagLinks),
-            noload(Tag.ImageInstanceTagLinks),
-            noload(Tag.AnnotationTagLinks),
-            noload(Tag.SegmentationTagLinks),
-            noload(Tag.FormAnnotationTagLinks),
+            *[noload(attribute) for attribute in TAG_LINK_COLLECTIONS],
             selectinload(Tag.Creator).load_only(
                 Creator.CreatorID, Creator.CreatorName
             ),

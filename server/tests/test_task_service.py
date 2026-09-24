@@ -5,8 +5,9 @@ from eyened_orm.task import SubTaskState, TaskState
 from eyened_orm.repositories.task_repository import SubTaskRepository, TaskRepository
 
 from server.services.acting_user import ActingUser
-from server.services.exceptions import NotFoundError
+from server.services.exceptions import BadRequestError, NotFoundError
 from server.services.task_service import TaskService
+from eyened_orm.utils.factories import admin_scope, make_project
 
 
 class FakeAudit:
@@ -19,9 +20,14 @@ class FakeAudit:
         self.records.append(kwargs)
 
 
+_actor_seq = 0
+
+
 def _actor(session) -> ActingUser:
     """An ActingUser backed by a real Creator row (Task.CreatorID is a FK)."""
-    creator = Creator(CreatorName="alice", IsHuman=True)
+    global _actor_seq
+    _actor_seq += 1
+    creator = Creator(CreatorName=f"alice-{_actor_seq}", IsHuman=True)
     session.add(creator)
     session.flush()
     return ActingUser(id=creator.CreatorID, username=creator.CreatorName)
@@ -46,17 +52,30 @@ def _make_task(session, td_id: int, creator_id: int, name: str = "T") -> Task:
     return task
 
 
-def _service(session, audit=None) -> TaskService:
-    return TaskService(TaskRepository(session), SubTaskRepository(session), audit=audit)
+def _service(
+    session, actor: ActingUser | None = None, *, audit=None
+) -> TaskService:
+    scope = (
+        admin_scope(actor_id=actor.id, username=actor.username)
+        if actor is not None
+        else admin_scope()
+    )
+    return TaskService(
+        TaskRepository(session, scope=scope),
+        SubTaskRepository(session, scope=scope),
+        scope=scope,
+        audit=audit,
+    )
 
 
 def test_create_task_persists_with_defaults(session):
     """create_task stores the task with the actor as owner and TaskState.NotStarted."""
     actor = _actor(session)
     td = _task_def(session)
+    project = make_project(session, "P")
 
-    task = _service(session).create_task(
-        "New", "desc", None, td.TaskDefinitionID, actor
+    task, declared = _service(session, actor).create_task(
+        "New", "desc", None, td.TaskDefinitionID, [project.ProjectID]
     )
 
     assert task.TaskName == "New"
@@ -65,6 +84,7 @@ def test_create_task_persists_with_defaults(session):
     assert task.TaskDefinitionID == td.TaskDefinitionID
     assert task.CreatorID == actor.id
     assert task.TaskState == TaskState.NotStarted
+    assert declared == [(project.ProjectID, "P")]
 
 
 def test_create_task_logs_insert(session):
@@ -72,12 +92,16 @@ def test_create_task_logs_insert(session):
     actor = _actor(session)
     td = _task_def(session)
     audit = FakeAudit()
+    project = make_project(session, "P")
 
-    _service(session, audit).create_task("New", None, None, td.TaskDefinitionID, actor)
+    _service(session, actor, audit=audit).create_task(
+        "New", None, None, td.TaskDefinitionID, [project.ProjectID]
+    )
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "INSERT"
     assert audit.records[0]["entity"] == "Task"
+    assert audit.records[0]["actor"] == actor
 
 
 def test_list_tasks_returns_tasks_with_counts(session):
@@ -89,7 +113,7 @@ def test_list_tasks_returns_tasks_with_counts(session):
     session.add(SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted))
     session.flush()
 
-    tasks, counts = _service(session).list_tasks()
+    tasks, counts, _projects = _service(session).list_tasks()
 
     assert [t.TaskID for t in tasks] == [task.TaskID]
     assert counts[task.TaskID] == (2, 1)
@@ -103,7 +127,7 @@ def test_get_task_returns_task_and_counts(session):
     session.add(SubTask(TaskID=task.TaskID, TaskState=SubTaskState.Ready))
     session.flush()
 
-    got, counts = _service(session).get_task(task.TaskID)
+    got, counts, _projects = _service(session).get_task(task.TaskID)
 
     assert got.TaskID == task.TaskID
     assert counts == (1, 1)
@@ -121,8 +145,8 @@ def test_update_task_changes_fields(session):
     td = _task_def(session)
     task = _make_task(session, td.TaskDefinitionID, actor.id, "Old")
 
-    updated, _counts = _service(session).update_task(
-        task.TaskID, "New", "newdesc", None, None, TaskState.Busy, actor
+    updated, _counts, _projects = _service(session, actor).update_task(
+        task.TaskID, "New", "newdesc", None, None, TaskState.Busy
     )
 
     assert updated.TaskName == "New"
@@ -134,7 +158,7 @@ def test_update_task_unknown_raises_not_found(session):
     """Updating a missing task is translated to NotFoundError (-> 404)."""
     actor = _actor(session)
     with pytest.raises(NotFoundError):
-        _service(session).update_task(999_999, "x", None, None, None, None, actor)
+        _service(session, actor).update_task(999_999, "x", None, None, None, None)
 
 
 def test_update_task_logs_rename_as_diff(session):
@@ -144,8 +168,8 @@ def test_update_task_logs_rename_as_diff(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id, "Old")
     audit = FakeAudit()
 
-    _service(session, audit).update_task(
-        task.TaskID, "New", None, None, None, None, actor
+    _service(session, actor, audit=audit).update_task(
+        task.TaskID, "New", None, None, None, None
     )
 
     assert len(audit.records) == 1
@@ -162,17 +186,17 @@ def test_delete_task_removes_it_and_cascades_subtasks(session):
     session.add(SubTask(TaskID=task.TaskID, TaskState=SubTaskState.NotStarted))
     session.flush()
 
-    _service(session).delete_task(task.TaskID, actor)
+    _service(session, actor).delete_task(task.TaskID)
 
-    assert TaskRepository(session).get_by_id(task.TaskID) is None
-    assert SubTaskRepository(session).all_ids_for_task(task.TaskID) == []
+    assert TaskRepository(session, scope=admin_scope()).get_by_id(task.TaskID) is None
+    assert SubTaskRepository(session, scope=admin_scope()).all_ids_for_task(task.TaskID) == []
 
 
 def test_delete_task_unknown_raises_not_found(session):
     """Deleting a missing task is translated to NotFoundError (-> 404)."""
     actor = _actor(session)
     with pytest.raises(NotFoundError):
-        _service(session).delete_task(999_999, actor)
+        _service(session, actor).delete_task(999_999)
 
 
 def test_delete_task_logs_delete(session):
@@ -182,7 +206,7 @@ def test_delete_task_logs_delete(session):
     task = _make_task(session, td.TaskDefinitionID, actor.id)
     audit = FakeAudit()
 
-    _service(session, audit).delete_task(task.TaskID, actor)
+    _service(session, actor, audit=audit).delete_task(task.TaskID)
 
     assert len(audit.records) == 1
     assert audit.records[0]["action"] == "DELETE"
@@ -280,3 +304,62 @@ def test_get_task_subtask_out_of_range_raises_not_found(session):
         _service(session).get_task_subtask(
             task.TaskID, 5, with_images=False, with_next=False
         )
+
+
+def test_list_task_subtasks_filters_unassigned(session):
+    """unassigned=True returns only subtasks with CreatorID NULL."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    unassigned = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    assigned = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    assigned.CreatorID = actor.id
+    session.commit()
+
+    rows, count = _service(session).list_task_subtasks(
+        task.TaskID,
+        with_images=False,
+        limit=10,
+        page=0,
+        status=None,
+        unassigned=True,
+    )
+
+    assert count == 1
+    assert [st.SubTaskID for st, _ in rows] == [unassigned.SubTaskID]
+
+
+def test_list_task_subtasks_rejects_unassigned_and_creator_id(session):
+    """Passing both unassigned and creator_id raises BadRequestError."""
+    actor = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, actor.id)
+    session.commit()
+
+    with pytest.raises(BadRequestError):
+        _service(session).list_task_subtasks(
+            task.TaskID,
+            with_images=False,
+            limit=10,
+            page=0,
+            status=None,
+            unassigned=True,
+            creator_id=actor.id,
+        )
+
+
+def test_list_subtask_assignees_returns_distinct_creators(session):
+    """list_subtask_assignees returns creators with at least one claimed subtask."""
+    owner = _actor(session)
+    other = _actor(session)
+    td = _task_def(session)
+    task = _make_task(session, td.TaskDefinitionID, owner.id)
+    _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    a = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    a.CreatorID = owner.id
+    b = _make_subtask(session, task.TaskID, SubTaskState.NotStarted)
+    b.CreatorID = other.id
+    session.commit()
+
+    assignees = _service(session).list_subtask_assignees(task.TaskID)
+    assert {c.CreatorID for c in assignees} == {owner.id, other.id}
