@@ -11,18 +11,19 @@ orchestration layer. Which services you get, and how they behave, is decided by 
 Docker with **Compose 2.26 or newer** is the only prerequisite (`docker compose version`). Older
 versions reject or silently ignore `depends_on: required: false`, which the stack relies on.
 
-## The three stacks
+## Two choices
 
-| Stack | `COMPOSE_FILE` | `COMPOSE_PROFILES` |
+The two variables are independent, so any combination works:
+
+| Choice | Variable | Values |
 |---|---|---|
-| Production, bundled database | `compose.yaml:compose.prod.yaml` | `local-db` |
-| Development (hot reload, source mounted) | `compose.yaml:compose.dev.yaml` | `local-db` |
-| Production, external database | `compose.yaml:compose.prod.yaml` | *(empty)* |
+| Development (hot reload, source mounted) or production | `COMPOSE_FILE` | `compose.yaml:compose.dev.yaml` · `compose.yaml:compose.prod.yaml` |
+| Bundled or external database | `COMPOSE_PROFILES` | `local-db` · *(empty)*, then see [Using an external database](/eyened-platform/deployment/production#using-an-external-database) |
 
-`deploy/.env.example` ships with the first of these uncommented, so a copied `.env` gives you a
-production stack unless you change it.
+`deploy/.env.example` ships production with a bundled database, so a copied `.env` gives you that
+unless you change it.
 
-## How they differ
+## How development and production differ
 
 The table above is the mechanism. What actually changes:
 

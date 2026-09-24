@@ -41,6 +41,10 @@ implicitly. The new docs lose them without saying so. All three are doc fixes.
    Fix: add a "Breaking" bullet to the release notes, and one sentence to the README's
    external-database paragraph and to the development guide: set `EYENED_AUTO_MIGRATE=false` for
    a stack pointed at a shared or production database.
+   **Partly superseded 2026-09-24**: `EYENED_AUTO_MIGRATE` now defaults to `false`, so `up` no
+   longer migrates. The development guide's part is done as a caution under its Migrations
+   command, which is where the mounted `orm/` reaches a shared database now. The release-notes
+   bullet is still open.
 
 ## Minor
 

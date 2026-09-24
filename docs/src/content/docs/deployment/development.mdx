@@ -33,7 +33,8 @@ Everything below is read at `up`, so set what applies before you start the stack
 **Required**
 
 Switch to the development lines (`COMPOSE_FILE=compose.yaml:compose.dev.yaml` and
-`COMPOSE_PROFILES=local-db`), then fill the secrets. Compose refuses to start while any of the
+`COMPOSE_PROFILES=local-db`, unless you use an external database — see below), then fill the
+secrets. Compose refuses to start while any of the
 first four is empty:
 
 | Variable | Value |
@@ -72,6 +73,7 @@ If you need a host port instead — DBeaver, or a host-side alembic — append
 | Image datasets mounted into the stack | `EYENED_STORAGE_MOUNTS` | [Storage](#storage) |
 | OIDC login instead of passwords only | `:compose.oidc.yaml` in `COMPOSE_FILE` | [Optional: OIDC login](#optional-oidc-login) |
 | To start from an existing database rather than an empty one | — | [Optional: existing data](#optional-existing-data) |
+| To use an existing MySQL server instead of the bundled one | An empty `COMPOSE_PROFILES`, and `EYENED_DATABASE_*` | [Using an external database](/eyened-platform/deployment/production#using-an-external-database), and the caution under [Migrations](#migrations) |
 
 ### Start the stack
 
@@ -153,6 +155,11 @@ rebuild is needed:
 ```bash
 docker compose run --rm -e EYENED_AUTO_MIGRATE=true init
 ```
+
+:::caution
+Against an external database, this applies the migrations in your working copy of `orm/`, merged
+or not, and MySQL cannot roll them back. Do not run it against a database other people use.
+:::
 
 ## Client types
 
