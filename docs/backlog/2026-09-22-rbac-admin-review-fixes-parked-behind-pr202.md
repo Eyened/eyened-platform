@@ -1,6 +1,15 @@
 # Three PR #247 review fixes are parked behind PR #202
 
-**Status:** open
+**Status:** partially resolved — finding 1 open, findings 2 and 3 done
+
+Findings 2 and 3 were superseded and executed by the password-policy docs spec
+(2026-09-24): the two broken `create-user` commands now use a compliant password,
+the policy has a canonical statement in the authentication guide with pointers from
+the CLI and API references and the upgrade guide, and the release notes entry landed
+in `release_notes.mdx` rather than `RELEASE_NOTES.md`, which is now a pointer file.
+The line numbers below are those of the pre-merge branch and no longer resolve.
+Finding 1, the `PUBLIC_AUTH_DISABLED` guardrail, remains open and still blocked on
+PR #202.
 
 ## Source
 

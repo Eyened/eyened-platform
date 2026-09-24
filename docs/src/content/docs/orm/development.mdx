@@ -156,8 +156,8 @@ This documentation overlaps with the README: https://github.com/Eyened/eyened-pl
    migration or a database that was never brought to Alembic head before the history was
    squashed to `orm_baseline`. Do not try to fix it by editing `down_revision` — the baseline
    has `down_revision = None`, so there is nothing to point elsewhere, and changing it would
-   corrupt the chain rather than repair it. For a database stuck behind the squash, follow the
-   cutover runbook: `docs/runbooks/2026-08-20-alembic-squash-cutover.md`.
+   corrupt the chain rather than repair it. For a database stuck behind the squash, follow
+   [Upgrading to v2026.09.0](/eyened-platform/guides/upgrading_to_v2026_09_0/).
 
 ### What to Test
 

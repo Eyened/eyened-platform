@@ -1,0 +1,59 @@
+---
+title: Upgrading to v2026.09.0
+description: Install v2026.09.0 fresh, or upgrade a v2026.08.0 site
+---
+
+## Fresh clone
+
+Follow [Getting started](https://eyened.github.io/eyened-platform/getting_started/).
+
+## From v2026.08.0
+
+Not a rolling upgrade: nothing may write to the database from step 2 to step 7.
+
+Run `alembic` from `orm/migrations` with `-x env_file=<env>`, and `eorm` with `-e <env>`. The env file names an account with `ALL PRIVILEGES` on the database.
+
+1. From the v2026.09.0 checkout, with the site still up, confirm there are no orphaned rows (it only reads):
+
+    ```bash
+    eorm check-dangling-references
+    ```
+
+    Expect `No dangling references (5 hops checked).` If it lists rows instead, delete those rows or restore their missing parents, then re-run until clean. Otherwise step 5 fails with `ERROR 1138 Invalid use of NULL value`.
+
+2. Stop the API, the workers, and every job that writes through `eyened_orm`.
+
+3. Back up the database.
+
+4. From a checkout of commit `6c675e5`, finish the legacy migrations:
+
+    ```bash
+    alembic upgrade b2e2800000b2
+    ```
+
+5. From the v2026.09.0 checkout, switch to the squashed history and migrate:
+
+    ```bash
+    alembic stamp --purge orm_baseline
+    alembic upgrade head
+    alembic check
+    ```
+
+    Expect `No new upgrade operations detected.`
+
+6. Bootstrap access control:
+
+    ```bash
+    eorm init-admin --username <EYENED_API_ADMIN_USERNAME>
+    eorm grant-all
+    ```
+
+    `init-admin` takes the password from `EYENED_API_ADMIN_PASSWORD`, or prompts for it. If that password predates the **[password policy](/eyened-platform/guides/authentication#password-policy)** and is under 15 characters, this step can exit 1 — set a compliant one before the outage rather than during it.
+
+    `grant-all` gives every existing account `grader` in every project. Before step 7, review who it granted — the query is in `docs/rbac-operations.md`, under the `grant-all` accepted risk — and remove accounts nobody recognises with `eorm revoke --user <username> --all`.
+
+7. Rebuild every image that contains `eyened_orm`, upgrade `eyened_orm` wherever external jobs run, then start the platform.
+
+## Rollback
+
+Restore the backup from step 3 and redeploy v2026.08.0. Do not use `alembic downgrade`.

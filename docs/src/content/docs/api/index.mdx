@@ -7,6 +7,8 @@ sidebar:
 
 The FastAPI server exposes JSON endpoints under **`/api`**. Almost all routes require authentication.
 
+Every response is also scoped to the caller's project memberships — an object in a project the caller does not hold returns **404**, not 403. See **[Access control](/eyened-platform/guides/access_control)**.
+
 ## Authentication
 
 | Client type | How to authenticate |

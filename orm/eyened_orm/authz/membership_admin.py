@@ -245,12 +245,12 @@ class MembershipAdministration:
     def grant_all(self, *, role: ProjectRole = ProjectRole.grader) -> tuple[int, int, int]:
         """Grant ``role`` in every project to every creator that can authenticate.
 
-        Cutover step 3, and nothing else. `grader` rather than `project_admin`
-        because the two are identical in security terms on day one -- everyone
-        holds every project either way -- but they converge differently: pruning
-        means removing projects from people, not adjusting roles, so
-        `project_admin` everywhere would leave over-privileged survivors and a
-        second cleanup pass that is easy to forget.
+        Once, during the v2026.09.0 upgrade, and nothing else. `grader` rather
+        than `project_admin` because the two are identical in security terms on
+        day one -- everyone holds every project either way -- but they converge
+        differently: pruning means removing projects from people, not adjusting
+        roles, so `project_admin` everywhere would leave over-privileged
+        survivors and a second cleanup pass that is easy to forget.
 
         Writes one summary AuditLog row rather than one per membership: the
         per-row detail is the ProjectMember table itself, and 1,408 audit rows
