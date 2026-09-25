@@ -27,10 +27,9 @@ def _get_device(device: str | None):
         import torch
     except ImportError as exc:
         raise RuntimeError(
-            "This model needs PyTorch, which is not installed in this image. "
-            "Run GPU models (cfi-keypoints, cfi-odfd, cfi-quality, cfi-amd, "
-            "layer-segmentation) in the inference worker "
-            "(worker/docker-compose.inference.yml). cfi-roi does not need torch."
+            "This model needs PyTorch, which is not installed. "
+            "See the inference documentation for how to run models that need it: "
+            "https://eyened.github.io/eyened-platform/orm/inference/#workers-and-images"
         ) from exc
     from eyened_orm.inference.utils import auto_device
 

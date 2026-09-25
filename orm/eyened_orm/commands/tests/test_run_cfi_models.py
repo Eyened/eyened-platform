@@ -257,7 +257,7 @@ def test_run_cfi_models_only_torch_slugs_get_a_device(
         assert by_slug[slug] == "mock-device"
 
 
-def test_get_device_missing_torch_points_at_inference_worker(monkeypatch):
+def test_get_device_missing_torch_points_at_inference_docs(monkeypatch):
     import builtins
 
     from eyened_orm.commands.model_processing import _get_device
@@ -271,7 +271,7 @@ def test_get_device_missing_torch_points_at_inference_worker(monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", blocked)
 
-    with pytest.raises(RuntimeError, match="worker/docker-compose.inference.yml"):
+    with pytest.raises(RuntimeError, match="eyened.github.io/eyened-platform/orm/inference"):
         _get_device(None)
 
 
