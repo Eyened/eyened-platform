@@ -7,8 +7,10 @@ sidebar:
 
 ## Configuration Options
 
-The Eyened ORM is configured through environment variables.
-The following sections describe all available configuration options:
+The Eyened ORM is configured through environment variables. The sections below cover the
+variables the ORM library itself reads. A deployment sets more than these: the server's secret
+key, Redis, OIDC and worker settings are defined in `server/config.py`, and `deploy/.env.example`
+is the reference for them.
 
 ### Database Settings
 
@@ -25,9 +27,13 @@ The following sections describe all available configuration options:
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
-| EYENED_API_URL | Yes | - | Base URL of the Eyened API |
-| EYENED_API_USERNAME | Yes | - | API login username |
-| EYENED_API_PASSWORD | Yes | - | API login password |
+| EYENED_API_URL | With `APIClient` | - | Base URL of the Eyened API |
+| EYENED_API_USERNAME | With `APIClient` | - | API login username |
+| EYENED_API_PASSWORD | With `APIClient` | - | API login password |
+
+These are read lazily, only when an `APIClient` is constructed; `Database()` and the `eorm`
+commands never touch them. They are the ORM's API *client*, unrelated to the server's own
+`EYENED_API_*` settings, which share the prefix and appear in the same `deploy/.env`.
 
 ### Storage Settings
 
@@ -40,7 +46,8 @@ Used by the ORM, workers, and thumbnail generation when reading/writing files lo
 
 ## Creating Environment Files
 
-The most common way to configure the ORM is through `.env` files. Create an environment file (for example `.env.dev`) with the following structure:
+The most common way to configure the ORM is through `.env` files. The `deploy/` stack uses a
+single `deploy/.env`; a standalone checkout can use a file of its own, with this structure:
 
 ```bash
 # Database Settings
@@ -60,8 +67,6 @@ EYENED_API_PASSWORD=mypassword
 EYENED_STORAGE_ROOT=/storage
 EYENED_STORAGE_MOUNTS='{"local":"/path/to/images"}'
 ```
-
-You can maintain multiple environment files for different environments (for example `.env.dev`, `.env.prod`, `.env.test`).
 
 ## Initialization Methods
 

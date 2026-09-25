@@ -57,11 +57,13 @@ prunes needs the intended membership list from the consortium, not a query.
   and 404, so drive a dedicated account instead. Scope resolves per request, so
   every change below lands on a refresh -- no re-login, no fixture seed. See
   "The test_user loop" below.
-- **Named-account login:** with `PUBLIC_AUTH_DISABLED=false` you authenticate
+- **Named-account login:** with `EYENED_API_PUBLIC_AUTH_DISABLED=false` you authenticate
   as a specific `Creator` and see exactly what its `IsAdmin` flag and
   memberships grant. This path does **not** auto-promote, which is also the
   cheapest way to reproduce a new joiner's view.
-- **The joiner flow, for free:** the bundled Keycloak (`dev/keycloak/`) with
+- **The joiner flow, for free:** the bundled Keycloak (`deploy/keycloak/`,
+  enabled by appending `:compose.oidc.yaml` to `COMPOSE_FILE` in
+  `deploy/.env` -- see [Deployment](https://eyened.github.io/eyened-platform/deployment/)) with
   `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` auto-provisions a fresh login as a
   zero-access user.
 - **Testing containment:** a production dump has task 70, which touches several
@@ -99,9 +101,13 @@ For scenario 5, a production dump has task 70, which touches several projects.
 
 ## New-dev checklist
 
-clone -> install deps -> `cp dev/sample.env dev/.env` -> start the DB stack ->
-`eorm load-dump` -> `eorm init-admin` with a username matching
-`EYENED_API_ADMIN_USERNAME` -> `PUBLIC_AUTH_DISABLED=true` for feature work,
+clone -> `cp deploy/.env.example deploy/.env && chmod 600 deploy/.env`, switch `COMPOSE_FILE` to
+`compose.yaml:compose.dev.yaml`, fill the secrets, `docker compose up -d --build`
+from `deploy/` (the `init` service creates the schema and the administrator on a fresh
+database) -> to work against a
+production dump instead, `eorm load-dump` then `eorm init-admin` with a
+username matching `EYENED_API_ADMIN_USERNAME` (the loaded dump has no active
+administrator) -> `EYENED_API_PUBLIC_AUTH_DISABLED=true` for feature work,
 `=false` plus the test_user loop below for RBAC work.
 
 ## Commands

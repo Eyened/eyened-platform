@@ -1,0 +1,59 @@
+# Development layer: hot reload, with server/, orm/ and client/ mounted.
+
+services:
+
+  # Runs the mounted ORM, so a new migration applies without a rebuild.
+  init:
+    volumes:
+      - ../orm:/app/orm:z
+
+  server:
+    command: >
+      uvicorn server.main:app --host 0.0.0.0 --port 8000
+      --reload --reload-dir /app/server --reload-dir /app/orm
+    volumes:
+      - ../server:/app/server:z
+      - ../orm:/app/orm:z
+    environment:
+      EYENED_API_DEBUG: "true"
+    # Set EYENED_SERVER_CPUS to keep one developer's stack from starving the
+    # others on a shared host. 0 is unlimited: a committed literal above the
+    # host's core count would be refused at container create time.
+    deploy:
+      resources:
+        limits:
+          cpus: ${EYENED_SERVER_CPUS:-0}
+          memory: 8G
+
+  client:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.client
+    volumes:
+      - ../client:/app/client:z
+      - client_node_modules:/app/client/node_modules
+    # Anchors do not cross files, so the base's log cap is restated.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  fileserver:
+    volumes:
+      # One file onto a fixed name: two client.d files would mean two `location /`.
+      - ./nginx/client.d/dev.conf:/etc/nginx/client.d/client.conf:ro,z
+    depends_on:
+      client:
+        condition: service_started
+
+  database:
+    deploy:
+      resources:
+        limits:
+          cpus: ${EYENED_DATABASE_CPUS:-0}
+          memory: 4G
+
+volumes:
+  client_node_modules:

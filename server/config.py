@@ -127,11 +127,10 @@ class Settings(BaseSettings):
     debug: bool = False
     public_auth_disabled: bool = False
     # Names the account the dev-auth bypass logs in as, and the account
-    # `eorm init-admin` bootstraps. Two places naming the same account that
-    # disagree is the failure dev/sample.env's note exists to prevent. The
-    # account's password is not configured here: the dev bypass never posts
-    # credentials, so the server has no use for it. `eorm init-admin` reads
-    # it directly from EYENED_API_ADMIN_PASSWORD instead.
+    # `eorm bootstrap` creates on an empty database; compose.yaml passes the
+    # same value to init and server. The password is not configured here: the
+    # dev bypass never posts credentials, so the server has no use for it.
+    # `eorm bootstrap` and `eorm init-admin` read EYENED_API_ADMIN_PASSWORD.
     admin_username: str = Field(default="admin", min_length=1)
     auth_password_enabled: bool = True
     auth_oidc_enabled: bool = False

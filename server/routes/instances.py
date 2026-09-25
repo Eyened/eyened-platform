@@ -89,7 +89,7 @@ def get_public_image_data(
         ref = resolve_image_data_ref(item, index=index, meta=meta)
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
-    return build_storage_redirect_response(ref.nginx_path)
+    return build_storage_redirect_response(f"/data{ref.nginx_path}")
 
 
 @router.get("/images/{image_id}/thumbnail")

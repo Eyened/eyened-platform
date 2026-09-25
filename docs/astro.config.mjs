@@ -16,6 +16,15 @@ export default defineConfig({
                 { slug: 'about' },
                 { slug: 'release_notes' },
                 { slug: 'getting_started' },
+                {
+                    label: 'Deployment',
+                    items: [
+                        { slug: 'deployment' },
+                        { slug: 'deployment/development' },
+                        { slug: 'deployment/production' },
+                        { slug: 'deployment/operations' },
+                    ],
+                },
                 { slug: 'platform_design' },
                 {
                     label: 'Data ingestion',
@@ -28,7 +37,6 @@ export default defineConfig({
                 {
                     label: 'Guides',
                     items: [
-                        { slug: 'guides/development_setup' },
                         { slug: 'guides/authentication' },
                         { slug: 'guides/access_control' },
                         { slug: 'guides/upgrading_to_v2026_09_0' },
@@ -83,6 +91,9 @@ export default defineConfig({
 
         }),
     ],
+    redirects: {
+        '/guides/development_setup': '/eyened-platform/deployment/development',
+    },
     vite: {
         server: {
             allowedHosts: process.env.ALLOWED_HOSTS ? process.env.ALLOWED_HOSTS.split(',') : ['eyened-supergpu', 'localhost'],

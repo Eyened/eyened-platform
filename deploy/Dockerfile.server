@@ -1,0 +1,32 @@
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libxcb1 libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Env var, not --no-cache-dir on each install: PEP 517 build isolation spawns a
+# nested pip that does not inherit command-line flags.
+ENV PIP_NO_CACHE_DIR=1
+
+# One resolution for orm and the server together: two sequential installs let
+# the second break the first one's pins while pip prints ERROR and exits 0.
+# Manifest before source, so a .py edit does not reinstall dependencies.
+COPY orm /app/orm
+COPY server/requirements.txt /app/server/requirements.txt
+RUN pip install -r /app/server/requirements.txt -e /app/orm
+
+COPY server /app/server
+
+EXPOSE 8000
+
+WORKDIR /app
+
+# Production default; the dev compose layer replaces it with `uvicorn --reload`.
+# Shell form so ${WORKERS} is expanded at runtime.
+CMD gunicorn server.main:app \
+    --workers ${WORKERS:-4} \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --bind 0.0.0.0:8000 \
+    --log-level ${LOG_LEVEL:-info} \
+    --access-logfile - \
+    --error-logfile -

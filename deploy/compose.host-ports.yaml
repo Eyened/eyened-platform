@@ -1,0 +1,14 @@
+# Optional: publish MySQL and Redis on the host, for DBeaver or a host-side
+# alembic. Off by default: a published 3306/6379 collides between developers
+# sharing a machine. Enable by appending :compose.host-ports.yaml to
+# COMPOSE_FILE in deploy/.env and picking ports nobody else is using.
+#
+# Bound to 127.0.0.1; change host_ip below for remote access.
+
+services:
+  database:
+    ports:
+      - "127.0.0.1:${DB_PUBLISH_PORT:-13306}:3306"
+  redis:
+    ports:
+      - "127.0.0.1:${REDIS_PUBLISH_PORT:-16379}:6379"

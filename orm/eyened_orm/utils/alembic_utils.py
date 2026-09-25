@@ -45,6 +45,11 @@ def upgrade_to_head(engine: Engine) -> str:
         cfg.attributes["connection"] = connection
         command.upgrade(cfg, "head")
 
+    return get_head_revision()
+
+
+def get_head_revision() -> str:
+    """The head revision of the migration scripts on disk."""
     head = _script_directory().get_current_head()
     if head is None:
         raise RuntimeError("No Alembic head revision found.")

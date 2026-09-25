@@ -86,7 +86,10 @@ Creating an account and granting access are separate steps, and nothing grants a
 
 So the first account on a new deployment must be created with **`eorm init-admin`**, not `create-user`. See **[Getting started](/eyened-platform/getting_started)**.
 
-For every account after that, create it and then grant it:
+For every account after that, create it and then grant it a role in an **existing** project
+— there is no command to create an empty one; a `Project` row is created as a side effect of
+importing data into it (see **[Importing data](/eyened-platform/importing_data)**). Assuming
+a project named `AMD-Study` already exists:
 
 ```bash
 eorm create-user --username alice --password '...'
