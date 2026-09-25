@@ -50,13 +50,25 @@ def process_etdrs_model(
     image = segmentation.ImageInstance
     etdrs_mask = _get_etdrs_mask(segmentation, keypoints_attr, odfd_attr)
     h, w = image.Rows_y, image.Columns_x
-    binary_mask = segmentation.binary_mask
-    if binary_mask is None:
+    data = segmentation.read_data()
+    if data is None:
         return None
 
-    assert binary_mask.shape == (h, w), "Shape mismatch"
+    warped = segmentation.warp_to_image(data)
+    binary_mask = segmentation.data_to_binary_mask(warped)
+    # binary_mask intersects a reference annotation; this path thresholds
+    # after warp_to_image, so re-apply that intersection here.
+    reference = getattr(segmentation, "ReferenceSegmentation", None)
+    if reference is not None:
+        reference_mask = reference.binary_mask
+        if reference_mask is not None:
+            binary_mask = binary_mask & reference_mask
+    if binary_mask.shape != (h, w):
+        raise ValueError(
+            f"Shape mismatch: mask {binary_mask.shape} vs image {(h, w)}"
+        )
 
-    value = etdrs_mask.get_summary(segmentation.binary_mask, ETDRS_masks.all_fields)
+    value = etdrs_mask.get_summary(binary_mask, ETDRS_masks.all_fields)
 
     av = AttributeValue.upsert(
         session,
