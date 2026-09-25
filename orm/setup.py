@@ -22,7 +22,7 @@ setup(
         "pandas==2.*",
         "matplotlib==3.*",
         "opencv-python-headless==4.*",
-        "sqlalchemy==2.*",
+        "sqlalchemy==2.1.*",
         "jsonschema==4.*",
         "tqdm==4.*",
         "alembic==1.13.2",

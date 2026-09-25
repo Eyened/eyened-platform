@@ -12,7 +12,7 @@ from typing import (
     TypeVar,
 )
 
-from sqlalchemy import Column, Index, UniqueConstraint, false, select, tuple_
+from sqlalchemy import Column, Float, Index, UniqueConstraint, false, select, tuple_
 from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute, Session, lazyload
 
 from eyened_orm.display_meta import EyeNedDeclarativeDisplayMeta
@@ -78,6 +78,10 @@ def CompositeUniqueConstraint(name: str, *column_names: str) -> UniqueConstraint
 
 class Base(DeclarativeBase, metaclass=EyeNedDeclarativeDisplayMeta):
     """SQLAlchemy Declarative base with common helpers and utilities."""
+
+    # The schema's float columns are FLOAT; SQLAlchemy 2.1 maps a bare
+    # Mapped[float] to Double by default.
+    type_annotation_map = {float: Float}
 
     _name_column: ClassVar[str | None] = None
 
