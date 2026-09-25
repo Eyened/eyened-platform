@@ -1,0 +1,146 @@
+---
+title: Operations
+description: Run, upgrade, back up and restore an installed platform
+---
+
+## What happens on every `up`
+
+The one-shot `init` service runs `eorm bootstrap` before the server starts:
+
+- **empty database** — creates the schema and seeds the builtin form schemas;
+- **schema behind the code** — reports the pending migrations and carries on, leaving the schema
+  alone. `EYENED_AUTO_MIGRATE=true` applies them instead, on every `up`;
+- **no accounts at all** — creates `EYENED_API_ADMIN_USERNAME` as an administrator with
+  `EYENED_API_ADMIN_PASSWORD`.
+
+It never changes an existing account. `docker compose logs init` shows what it did.
+
+Starting the stack **does not** migrate an existing schema. Until you migrate by hand, the new
+code runs against the old schema, and `docker compose ps` shows the stack healthy while it does.
+
+## Day-to-day
+
+Run from `deploy/`.
+
+| Task | Command |
+|---|---|
+| Start, or apply `.env` changes | `docker compose up -d` |
+| Follow logs | `docker compose logs -f` |
+| Stop | `docker compose down` |
+| Upgrade | `git pull && docker compose up -d --build` |
+| Migrate (`up` does not) | `docker compose run --rm -e EYENED_AUTO_MIGRATE=true init` |
+| Run an `eorm` command | `docker compose exec server eorm <command>` |
+| MySQL shell | `docker compose exec database sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'` |
+| Delete the stack **with its database and platform storage** | `docker compose down -v` |
+
+## Upgrading and rolling back
+
+Images are built from your checkout, so an upgrade is a checkout plus a rebuild. Starting the
+stack leaves an existing schema alone, and MySQL cannot roll back a migration, so back up first.
+Record where you are, since that is what a rollback returns to:
+
+```bash
+git rev-parse --short HEAD
+cd deploy
+docker compose run --rm xtrabackup 'xtrabackup --backup --host=database --user=root --password="$MYSQL_ROOT_PASSWORD" --target-dir=/backup/before-upgrade && xtrabackup --prepare --target-dir=/backup/before-upgrade'
+git pull
+docker compose up -d --build
+docker compose logs init    # "Pending migrations not applied ...: <old> -> <new>."
+docker compose run --rm -e EYENED_AUTO_MIGRATE=true init    # apply them
+```
+
+Until that last command runs, the new code is talking to the old schema. A site that sets
+`EYENED_AUTO_MIGRATE=true` in `.env` migrates on every `up` instead.
+
+To roll back, check out the recorded commit, [restore the backup](#backup-and-restore), then
+`docker compose up -d --build`.
+
+Upgrading from a version that predates `deploy/`: read the **Deployment** section of the
+[release notes](/eyened-platform/release_notes) first.
+
+## Applying migrations
+
+`up` never migrates an existing schema (see [Upgrading and rolling
+back](#upgrading-and-rolling-back)); the command is
+`docker compose run --rm -e EYENED_AUTO_MIGRATE=true init`.
+
+A database from before the August 2026 migration squash carries a revision alembic cannot find,
+and `init` fails on it. The procedure for that case is [Upgrading to
+v2026.09.0](/eyened-platform/guides/upgrading_to_v2026_09_0/).
+
+## Routine backups
+
+Three things need backing up, and a backup missing any of them will not restore:
+
+1. **The database** — see below for the bundled one; an external server uses its own tooling.
+2. **Platform storage** — thumbnails and `segmentations.zarr`, at `PLATFORM_STORAGE_PATH` or in
+   the `platform_storage` volume. Use the site's normal file backup.
+3. **`deploy/.env`** — a restored database does not open without the credentials that created it.
+   Store it wherever you store secrets, not beside the dumps.
+
+Back up before every migration: MySQL cannot roll back DDL.
+
+## Backup and restore
+
+Hot backup of the bundled database with XtraBackup; the database keeps serving. Backups go to
+`BACKUP_PATH` (default `deploy/backups`, gitignored).
+
+```bash
+docker compose run --rm xtrabackup 'xtrabackup --backup --host=database --user=root --password="$MYSQL_ROOT_PASSWORD" --target-dir=/backup/2026-09-18 && xtrabackup --prepare --target-dir=/backup/2026-09-18'
+```
+
+Restore replaces the whole database. There is no undo.
+
+```bash
+docker compose stop server database
+docker compose run --rm xtrabackup 'rm -rf /var/lib/mysql/* && xtrabackup --copy-back --target-dir=/backup/2026-09-18 --datadir=/var/lib/mysql && chown -R 999:999 /var/lib/mysql'
+docker compose up -d
+```
+
+An XtraBackup copy opens only on MySQL 8.4. Restoring on another machine brings the source's
+MySQL accounts, so first copy `MYSQL_ROOT_PASSWORD` and `EYENED_DATABASE_PASSWORD` from the
+source's `.env`.
+
+Portable across MySQL versions:
+
+```bash
+docker compose exec -T database sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction "$MYSQL_DATABASE"' | gzip > eyened.sql.gz
+gunzip -c eyened.sql.gz | docker compose exec -T database sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"'
+```
+
+Back up an external database with that server's own tooling. Back up platform storage
+(`PLATFORM_STORAGE_PATH`, or the `platform_storage` volume) with the site's file backup.
+
+## Moving an existing database into this stack
+
+This is an outage: the old database stays down until the new stack serves.
+
+1. Stop the old stack, keeping its volume:
+
+   ```bash
+   cd /path/to/old-checkout/database
+   docker compose config | grep '^name:'   # the project name
+   docker volume ls | grep db_data         # the exact volume name
+   docker compose down                     # no -v
+   docker compose ps -a                    # must list nothing
+   ```
+
+2. Copy the datadir to a host path:
+
+   ```bash
+   mkdir -p /srv/eyened/db
+   docker volume inspect <old-project>_db_data >/dev/null   # must succeed
+   docker run --rm -v <old-project>_db_data:/from -v /srv/eyened/db:/to \
+     --user 0:0 --entrypoint sh mysql:8.0.27 -c 'cp -a /from/. /to/ && chmod 750 /to'
+   ```
+
+3. In `deploy/.env`, set `DB_DATA_PATH=/srv/eyened/db`, and take these from the old
+   `database/.env`: `MYSQL_ROOT_PASSWORD`; `MYSQL_USER` as `EYENED_DATABASE_USER`;
+   `MYSQL_PASSWORD` as `EYENED_DATABASE_PASSWORD`; `MYSQL_DATABASE` as
+   `EYENED_DATABASE_DATABASE`.
+4. `docker compose up -d --build`. MySQL upgrades the datadir to 8.4, which 8.0 cannot open
+   again. `up` does not migrate the schema; `docker compose logs init` reports what is pending.
+5. Apply them: `docker compose run --rm -e EYENED_AUTO_MIGRATE=true init`.
+6. Sign in as an account from the old database and check your data. If `docker compose logs
+   init` says `Empty database`, the copy did not land: stop, and recheck steps 2 and 3. Keep the
+   old volume until this step passes.

@@ -8,10 +8,10 @@
 - **Note:** OIDC needs its own decision: rejecting an IdP-supplied name locks that user out.
 
 ### Fence `PUBLIC_AUTH_DISABLED`
-- **Status:** open, blocked on PR #202
+- **Status:** open
 - **Source:** PR #247 review, 2026-09-22
 - **Problem:** under the flag `get_current_user` (`server/services/current_user.py`) resolves and `ensure_admin`-promotes `admin_username` for any credential-less request, and `is_authenticated` (`server/routes/auth.py`) returns `True`. That now exposes the roster, `POST /admin/users` and `PUT /admin/users/{id}/active|password` (including the admin's own password); only a `print` in `server/main.py` guards it.
-- **Fix:** re-derive the fence against PR #202's `deploy/` env model once it merges.
+- **Fix:** re-derive the fence against the `deploy/` env model (PR #202).
 - **Note:** a `Settings` validator requiring `debug` breaks the new-dev checklist after #202 (`deploy/.env.example` ships `EYENED_API_DEBUG=false`); skipping `include_router(admin.router)` under the flag was rejected because the admin console is developed in that mode.
 
 ### End existing sessions on a password change or reset
@@ -20,6 +20,13 @@
 - **Problem:** `/auth/refresh` checks only `Inactive`, so a refresh token minted before `eorm set-password`, an admin reset or `/auth/change-password` keeps renewing. Until fixed, deactivation (not a reset) is the way to cut off a compromised account.
 - **Fix:** put a truncated HMAC of `PasswordHash` in both tokens and compare it where the Creator is already loaded (refresh, `get_access_scope`); `/auth/change-password` re-issues the caller's cookies. No migration, no extra query; covers every `PasswordHash` writer. Every user must log in once after deploy.
 - **Note:** "log out everywhere" without a password change, and refresh after reactivation, need a per-user token-version / `notBefore` column (migration) and are not covered.
+
+### Stop a token outliving `docker compose down -v` or a restore
+- **Status:** open
+- **Source:** PR #202 Wave G testing, 2026-09-15
+- **Problem:** `EYENED_API_SECRET_KEY` lives in `deploy/.env`, which neither `docker compose down -v` nor an XtraBackup restore touches, and `get_current_user` (`server/services/current_user.py`) trusts the `CreatorID` in any validly signed token. Measured: `alice`'s cookie (`CreatorID` 2) from before a reset authenticated as a new `bob` on the same id (200); before `bob` existed it was a 500, not 401.
+- **Fix:** bind tokens to something that changes with the account (a truncated HMAC of `PasswordHash`, or a per-account token version) checked on every request, and 401 on a missing Creator. Until then, document rotating `EYENED_API_SECRET_KEY` after a reset or restore.
+- **Note:** same token binding as "End existing sessions on a password change or reset"; fix both together.
 
 ### Make `get_current_user` reject deleted and deactivated accounts
 - **Status:** open
@@ -36,9 +43,9 @@
 
 ### Fix or delete the `api_client` branch of `POST /auth/login`
 - **Status:** open
-- **Source:** RBAC admin P1, reproduced at `30752985`; broken since `10b97913`
-- **Problem:** `login` declares `response_model=UserResponse` but the `api_client` branch returns `{user, access_token, refresh_token, ...}` → `ResponseValidationError`, 500 on every call. Still advertised in `docs/src/content/docs/api/authentication.mdx` and `api/index.mdx`.
-- **Fix:** a response union / separate model, or delete the branch and its docs (`/auth/token` already covers API clients; `eyened_orm.api_client` uses cookie login).
+- **Source:** RBAC admin P1, reproduced at `30752985` + documentation triage, 2026-09-21; broken since `10b97913`
+- **Problem:** `login` declares `response_model=UserResponse` but the `api_client` branch returns `{user, access_token, refresh_token, ...}` → `ResponseValidationError`, 500 on every call; no test covers it. Still advertised in `docs/src/content/docs/api/authentication.mdx` and `api/index.mdx`.
+- **Fix:** a response union / separate model, or delete the branch and its docs (`/auth/token` already covers API clients; `eyened_orm.api_client` uses cookie login). Do not fix the docs to describe a 500.
 
 ### Check new passwords against a breached/common-password list
 - **Status:** open

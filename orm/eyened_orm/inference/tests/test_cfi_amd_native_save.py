@@ -117,6 +117,112 @@ def test_save_result_stores_native_output_and_projection_matrix(session, monkeyp
     assert written[0].dtype == np.uint8
 
 
+def test_save_result_skips_existing_row_when_not_overwriting(session, monkeypatch):
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    _prepare_image(image, height=64, width=64)
+    _seed_cfi_roi(session, image.ImageInstanceID, height=64, width=64)
+    session.refresh(image)
+
+    written = []
+
+    def fake_write_data(self, data, axis=None, slice_index=None):
+        written.append(np.asarray(data))
+        return 0
+
+    monkeypatch.setattr(ModelSegmentation, "write_data", fake_write_data)
+
+    legacy = CFI_AMD(session, device=torch.device("cpu"), undo_transform=True)
+    legacy._save_result(
+        image.ImageInstanceID,
+        legacy.models["drusen"],
+        np.full((64, 64), 0.8, dtype=np.float32),
+    )
+    assert len(written) == 1
+
+    native = CFI_AMD(session, device=torch.device("cpu"), undo_transform=False)
+    native._save_result(
+        image.ImageInstanceID,
+        native.models["drusen"],
+        np.full((32, 32), 0.9, dtype=np.float32),
+    )
+
+    row = ModelSegmentation.by_column(
+        session,
+        ImageInstanceID=image.ImageInstanceID,
+        ModelID=native.models["drusen"].ModelID,
+    )
+    assert row.Height == 64
+    assert row.Width == 64
+    assert row.ImageProjectionMatrix is None
+    assert len(written) == 1
+
+
+def test_save_result_overwrite_rewrites_same_shape(session, monkeypatch):
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    _prepare_image(image, height=256, width=256)
+    _seed_cfi_roi(session, image.ImageInstanceID, height=256, width=256)
+    session.refresh(image)
+
+    written = []
+
+    def fake_write_data(self, data, axis=None, slice_index=None):
+        written.append(np.asarray(data))
+        return 0
+
+    monkeypatch.setattr(ModelSegmentation, "write_data", fake_write_data)
+
+    processor = CFI_AMD(
+        session,
+        device=torch.device("cpu"),
+        undo_transform=False,
+        overwrite=True,
+    )
+    first = np.full((32, 32), 0.8, dtype=np.float32)
+    second = np.full((32, 32), 0.9, dtype=np.float32)
+    processor._save_result(image.ImageInstanceID, processor.models["drusen"], first)
+    processor._save_result(image.ImageInstanceID, processor.models["drusen"], second)
+
+    assert len(written) == 2
+    assert written[1][0, 0] == 229  # 0.9 * 255
+
+
+def test_save_result_overwrite_keeps_existing_dimensions(session, monkeypatch):
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    _prepare_image(image, height=64, width=64)
+    session.commit()
+
+    monkeypatch.setattr(ModelSegmentation, "write_data", lambda *a, **k: 0)
+
+    processor = CFI_AMD(
+        session,
+        device=torch.device("cpu"),
+        undo_transform=True,
+        overwrite=True,
+    )
+    processor._save_result(
+        image.ImageInstanceID,
+        processor.models["drusen"],
+        np.full((64, 64), 0.8, dtype=np.float32),
+    )
+    with pytest.raises(ValueError, match="Cannot modify Height"):
+        processor._save_result(
+            image.ImageInstanceID,
+            processor.models["drusen"],
+            np.full((32, 32), 0.9, dtype=np.float32),
+        )
+
+    row = ModelSegmentation.by_column(
+        session,
+        ImageInstanceID=image.ImageInstanceID,
+        ModelID=processor.models["drusen"].ModelID,
+    )
+    assert row.Height == 64
+    assert row.Width == 64
+
+
 def test_save_result_upscale_path_omits_projection_matrix(session, monkeypatch):
     _proj, images = _import_images(session, count=1)
     image = images[0]
@@ -135,6 +241,59 @@ def test_save_result_upscale_path_omits_projection_matrix(session, monkeypatch):
         session,
         ImageInstanceID=image.ImageInstanceID,
         ModelID=processor.models["drusen"].ModelID,
+    )
+    assert row.Height == 64
+    assert row.Width == 64
+    assert row.ImageProjectionMatrix is None
+
+
+def test_save_result_overwrite_upscale_clears_projection_matrix(session, monkeypatch):
+    """Overwrite a native row with the upscale pipeline at the same size.
+
+    Height/Width match, so the dimension guard does not fire. The stored
+    ImageProjectionMatrix must still follow this run (None when upscaling).
+    """
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    _prepare_image(image, height=64, width=64)
+    _seed_cfi_roi(session, image.ImageInstanceID, height=64, width=64)
+    session.refresh(image)
+
+    monkeypatch.setattr(ModelSegmentation, "write_data", lambda *a, **k: 0)
+
+    native = CFI_AMD(
+        session,
+        device=torch.device("cpu"),
+        undo_transform=False,
+        overwrite=True,
+    )
+    native._save_result(
+        image.ImageInstanceID,
+        native.models["drusen"],
+        np.full((64, 64), 0.8, dtype=np.float32),
+    )
+    row = ModelSegmentation.by_column(
+        session,
+        ImageInstanceID=image.ImageInstanceID,
+        ModelID=native.models["drusen"].ModelID,
+    )
+    assert row.ImageProjectionMatrix is not None
+
+    upscale = CFI_AMD(
+        session,
+        device=torch.device("cpu"),
+        undo_transform=True,
+        overwrite=True,
+    )
+    upscale._save_result(
+        image.ImageInstanceID,
+        upscale.models["drusen"],
+        np.full((64, 64), 0.9, dtype=np.float32),
+    )
+    row = ModelSegmentation.by_column(
+        session,
+        ImageInstanceID=image.ImageInstanceID,
+        ModelID=upscale.models["drusen"].ModelID,
     )
     assert row.Height == 64
     assert row.Width == 64

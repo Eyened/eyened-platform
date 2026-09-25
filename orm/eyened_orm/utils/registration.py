@@ -152,10 +152,11 @@ def are_connected(image_id1, image_id2, graph):
 
 def get_etdrs_field(image):
     if image.ETDRSField:
-        if image.ETDRSField.name == "F1":
-            return "F1"
-        if image.ETDRSField.name == "F2":
-            return "F2"
+        name = image.ETDRSField.name
+        if name in ("F1", "F2"):
+            return name
+        # Explicit non-F1/F2 (WF, UWF, F3–F7): do not infer from keypoints.
+        return None
 
     if image.CFKeypoints and image.CFROI:
         fx, _ = image.CFKeypoints["fovea_xy"]

@@ -8,8 +8,9 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Item | File | Status |
 |---|---|---|
 | Validate usernames at every entry point | [auth-and-sessions](auth-and-sessions.md) | open |
-| Fence `PUBLIC_AUTH_DISABLED` | [auth-and-sessions](auth-and-sessions.md) | open, blocked on PR #202 |
+| Fence `PUBLIC_AUTH_DISABLED` | [auth-and-sessions](auth-and-sessions.md) | open |
 | End existing sessions on a password change or reset | [auth-and-sessions](auth-and-sessions.md) | open |
+| Stop a token outliving `docker compose down -v` or a restore | [auth-and-sessions](auth-and-sessions.md) | open |
 | Make `get_current_user` reject deleted and deactivated accounts | [auth-and-sessions](auth-and-sessions.md) | open |
 | Cap the absolute session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
 | Fix or delete the `api_client` branch of `POST /auth/login` | [auth-and-sessions](auth-and-sessions.md) | open |
@@ -25,6 +26,18 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Stop `scope.require` passing vacuously for an administrator on nonexistent ids | [rbac-authz](rbac-authz.md) | open |
 | Make the session guards fail on stale allow-list entries | [rbac-authz](rbac-authz.md) | open |
 | Decide whether `AuthService.change_password` keeps its `actor` parameter | [rbac-authz](rbac-authz.md) | open |
+| Decide what `init` does on a schema behind head | [deploy](deploy.md) | open |
+| Reach the bundled Keycloak over the compose network | [deploy](deploy.md) | open |
+| Refuse the `oidc` layer together with the prod layer | [deploy](deploy.md) | open |
+| Build and smoke-test the images CI skips | [deploy](deploy.md) | open |
+| Run the upgrade path end to end once | [deploy](deploy.md) | open |
+| Tidy the slim-down's stale messages | [deploy](deploy.md) | open |
+| Move `orm` (and maybe `server`) to `pyproject.toml` | [deploy](deploy.md) | open |
+| Resolve the three GPU worker images in one pip install | [deploy](deploy.md) | open |
+| Fix documentation claims that are wrong against the code | [docs](docs.md) | open |
+| Move stranded material across the publish boundary | [docs](docs.md) | open |
+| Write the missing tutorials and split mixed-mode pages | [docs](docs.md) | open |
+| Tidy the deployment pages | [docs](docs.md) | open |
 | Stop paying scoped segmentation counts on every app load | [performance](performance.md) | open |
 | Check for oversized `IN` lists on `ImageInstance` | [performance](performance.md) | open |
 | Size the API pool for multi-hop connection checkout | [performance](performance.md) | open |

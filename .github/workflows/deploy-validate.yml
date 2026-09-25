@@ -1,0 +1,113 @@
+name: Deploy stack
+
+on:
+  pull_request:
+    branches: [main, development]
+    paths:
+      - 'deploy/**'
+      # The images build from these, and migrations come from the ORM.
+      - 'orm/**'
+      - 'server/**'
+      - 'client/**'
+      - 'worker/**'
+      - '.dockerignore'
+      - '.github/workflows/deploy-validate.yml'
+  push:
+    branches: [main, development]
+    paths:
+      - 'deploy/**'
+      - 'orm/**'
+      - 'server/**'
+      - 'client/**'
+      - 'worker/**'
+      - '.dockerignore'
+      - '.github/workflows/deploy-validate.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: deploy
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Write .env from the example
+        run: |
+          cp .env.example .env
+          for key in EYENED_API_SECRET_KEY EYENED_REDIS_PASSWORD MYSQL_ROOT_PASSWORD EYENED_DATABASE_PASSWORD EYENED_API_ADMIN_PASSWORD; do
+            sed -i "s/^$key=\$/$key=$(openssl rand -hex 32)/" .env
+          done
+          echo "KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -hex 32)" >> .env
+          cp compose.storage.example.yaml compose.storage.yaml
+
+      - name: Every documented layer combination resolves
+        run: |
+          check() { echo "--- $1 ($2)"; COMPOSE_FILE="$1" COMPOSE_PROFILES="$2" docker compose config -q; }
+          check compose.yaml:compose.dev.yaml local-db
+          check compose.yaml:compose.dev.yaml ""
+          check compose.yaml:compose.prod.yaml local-db
+          check compose.yaml:compose.prod.yaml ""
+          check compose.yaml:compose.prod.yaml:compose.storage.yaml:compose.oidc.yaml:compose.workers.yaml:compose.host-ports.yaml \
+                local-db,backup,gpu-inference,gpu-cfi-amd,gpu-layer-segmentation
+          # A GPU host loads the workers layer alone.
+          COMPOSE_FILE=compose.workers.yaml docker compose config -q
+
+      # The entrypoint scripts run in neither job's containers, and a syntax error
+      # in one only shows as a crash loop. The shebang picks the parser.
+      - name: Shell syntax
+        run: |
+          for f in $(find . -name '*.sh'); do
+            case "$(head -n 1 "$f")" in
+              '#!'*bash*) echo "bash -n $f"; bash -n "$f" ;;
+              *)          echo "sh -n $f"; sh -n "$f" ;;
+            esac
+          done
+
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: deploy
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Write .env from the example
+        run: |
+          cp .env.example .env
+          for key in EYENED_API_SECRET_KEY EYENED_REDIS_PASSWORD MYSQL_ROOT_PASSWORD EYENED_DATABASE_PASSWORD EYENED_API_ADMIN_PASSWORD; do
+            sed -i "s/^$key=\$/$key=$(openssl rand -hex 32)/" .env
+          done
+
+      - name: Build and start the production stack
+        run: docker compose up -d --build --wait
+
+      # Assert on data: healthy containers do not prove the schema was created.
+      - name: init succeeded and the schema is at head
+        run: |
+          test "$(docker compose ps -a --format '{{.ExitCode}}' init)" = 0
+          head=$(docker compose exec -T server python -c 'from eyened_orm.utils.alembic_utils import get_head_revision; print(get_head_revision())')
+          current=$(docker compose exec -T database sh -c 'mysql -N -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "SELECT version_num FROM alembic_version"' 2>/dev/null)
+          echo "current=$current head=$head"
+          test -n "$head" && test "$current" = "$head"
+
+      - name: The administrator can log in, and a wrong password cannot
+        run: |
+          pw=$(grep '^EYENED_API_ADMIN_PASSWORD=' .env | cut -d= -f2-)
+          login() { curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/api/auth/login \
+                      -H 'Content-Type: application/json' -d "{\"username\":\"admin\",\"password\":\"$1\"}"; }
+          test "$(login "$pw")" = 200
+          test "$(login wrong)" = 401
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color

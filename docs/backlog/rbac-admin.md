@@ -31,7 +31,8 @@
 - **Fix:** per account, grant (still grading), leave/deactivate (dormant), or remove (shared login). `GET /admin/users` rows with `has_credential: true` and no memberships are exactly this set.
 
 ### Finish trimming `docs/rbac-operations.md`
-- **Status:** partial — cutover moved to the v2026.09.0 upgrade guide and the command reference to `orm/cli.mdx`; the items below remain
+- **Status:** partial — cutover moved to the v2026.09.0 upgrade guide, the command reference to `orm/cli.mdx`, and the new-dev checklist rewritten for `deploy/`; the items below remain
 - **Source:** merge of `development` into `feature/tasks-page-performance`, 2026-08-21
-- **Problem:** its `## Commands` table duplicates `docs/src/content/docs/orm/cli.mdx` and will drift; the `test_user` table predates the multi-project task work; the new-dev checklist names `dev/sample.env`, which PR #202 deletes.
-- **Fix:** delete the Commands table (link to `cli.mdx`), re-check the `test_user` table against current enforcement, rewrite the checklist after #202 merges.
+- **Problem:** its `## Commands` table duplicates `docs/src/content/docs/orm/cli.mdx` and will drift; the `test_user` table predates the multi-project task work.
+- **Fix:** delete the Commands table (link to `cli.mdx`), re-check the `test_user` table against current enforcement.
+- **Note:** the accepted-risk register left in it is stranded outside the published site; see [docs](docs.md).

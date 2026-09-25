@@ -1500,7 +1500,7 @@ export interface components {
          * ETDRSField
          * @enum {string}
          */
-        ETDRSField: "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7";
+        ETDRSField: "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7" | "WF" | "UWF";
         /**
          * EntityType
          * @enum {string}

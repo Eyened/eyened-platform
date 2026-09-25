@@ -13,6 +13,20 @@ The `eorm` CLI covers database setup, maintenance, and inference entry points. U
 
 ## Database setup
 
+### bootstrap
+
+Brings a deployment's database to a usable state. The `deploy/` stack's `init` service runs it on every `docker compose up`, so it is idempotent and never prompts:
+
+- no `alembic_version` table: migrate to head and seed the builtin form schemas;
+- schema behind head: report the pending revisions and leave the schema alone; `--auto-migrate` (or `EYENED_AUTO_MIGRATE=true`) applies them instead. The `deploy/` stack leaves this off, so `up` never migrates an existing schema;
+- no `Creator` rows at all: create the administrator `--username` (`EYENED_API_ADMIN_USERNAME`, default `admin`) with `--password` (`EYENED_API_ADMIN_PASSWORD`), failing if the password is unset.
+
+It never changes an existing account; use `init-admin`, `set-password` or `reactivate` for that.
+
+```bash
+eorm bootstrap [--auto-migrate]
+```
+
 ### initialize-database
 
 Runs the Alembic migration trail to head. There is no separate table-creation step: `orm_baseline`, the root migration, creates the full schema. **The database itself must already exist** — pass `--recreate` to drop and create it first.
@@ -154,6 +168,9 @@ Report rows whose parent is missing. `--sample N` sets how many offending ids to
 Load or create SQL dumps. **`load-dump` is destructive** — drops and recreates the target database.
 
 ```bash
-eorm save-dump -p /path/to/dump_dir
-eorm load-dump -p /path/to/dump.sql
+# save-dump writes a dated folder INTO the directory you name
+eorm save-dump -d /path/to/dumps
+
+# load-dump takes that folder itself, not its parent
+eorm load-dump -d /path/to/dumps/eyened_db_dump_2026_09_11
 ```

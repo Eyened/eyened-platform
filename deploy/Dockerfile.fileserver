@@ -1,0 +1,20 @@
+# Production fileserver: builds the client (adapter-static) and serves the SPA from nginx.
+FROM node:24-slim AS build
+WORKDIR /app/client
+
+# Manifests before source, so a source edit re-runs only the build, not npm ci.
+# .npmrc must stay in this set: it carries engine-strict=true, and arriving with
+# the source COPY below would run this npm ci without it.
+# Plain `npm ci`, NOT --only=production: vite and svelte are devDependencies.
+COPY client/package.json client/package-lock.json client/.npmrc ./
+RUN npm ci
+
+COPY client /app/client
+# Needs client/package.json's `prepare` to tolerate failure
+# (`svelte-kit sync || echo ''`); a bare `svelte-kit sync` breaks this stage.
+RUN npm run build
+
+FROM nginx:1.27-alpine
+COPY --from=build /app/client/build /usr/share/nginx/html
+# client/static/* keeps its checkout mode; nginx workers (non-root) need it world-readable.
+RUN chmod -R a+rX /usr/share/nginx/html

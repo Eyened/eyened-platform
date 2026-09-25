@@ -1,0 +1,24 @@
+# Production layer: resource limits and the fileserver image with the built SPA.
+
+services:
+
+  server:
+    # 0 is unlimited. A cpus above the host's core count is refused at container
+    # create time, so a committed literal would not start everywhere; memory is
+    # never validated, so that one stays a literal.
+    deploy:
+      resources:
+        limits:
+          cpus: ${EYENED_SERVER_CPUS:-0}
+          memory: 16G
+
+  fileserver:
+    # Without an explicit tag the build would be tagged nginx:1.27-alpine,
+    # shadowing the official image for every project on the host.
+    image: ${COMPOSE_PROJECT_NAME:-eyened}-fileserver:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.fileserver
+    volumes:
+      # One file onto a fixed name, as in compose.dev.yaml.
+      - ./nginx/client.d/prod.conf:/etc/nginx/client.d/client.conf:ro,z

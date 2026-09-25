@@ -1,0 +1,27 @@
+# Development frontend: vite dev server over a bind-mounted source tree.
+# Production uses Dockerfile.fileserver instead.
+FROM node:24-slim
+WORKDIR /app/client
+
+# Manifests only: the dev compose layer bind-mounts the source over this path.
+# .npmrc must stay in this set: it carries engine-strict=true, and the runtime
+# install reads it off the bind mount, so omitting it here would configure the
+# two installs differently.
+COPY client/package.json client/package-lock.json client/.npmrc ./
+
+# Plain `npm ci`, NOT --only=production: vite is a devDependency.
+# The stamp records the lockfile these modules came from; entrypoint-client.sh
+# reinstalls on a mismatch. Writing it here keeps a freshly seeded volume from
+# reinstalling on first boot.
+# md5sum's status is checked before the hash is split, not piped into `cut`: a
+# pipeline reports only cut's status, writing an empty stamp that never matches.
+RUN npm ci \
+    && stamp=$(md5sum package-lock.json) \
+    && printf '%s\n' "${stamp%% *}" > node_modules/.lock-stamp \
+    && npm cache clean --force
+
+COPY deploy/entrypoint-client.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 5173
+ENTRYPOINT ["/entrypoint.sh"]
