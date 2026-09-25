@@ -19,7 +19,6 @@ from click.testing import CliRunner
 from sqlalchemy import select
 
 from eyened_orm import AuditLog, Creator, ProjectMember, TaskProject
-from eyened_orm.authz.administration import grant
 from eyened_orm.authz.bootstrap import ensure_admin
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.commands import rbac as rbac_module
@@ -188,7 +187,7 @@ def _memberships(session):
 
 def _seed_grant_all(session):
     """A creator with a real password hash -- unlike the `alice` fixture above,
-    whose `make_creator` leaves PasswordHash NULL, which `grant_all` would skip."""
+    which carries the disabled-password hash."""
     create_user(session, "alice", "pw")
     make_project(session, "A")
     make_project(session, "B")
@@ -254,8 +253,11 @@ def test_the_round_trip_persists_and_reports_each_outcome(session, stub_database
 
 @pytest.mark.parametrize("command", (deactivate_cmd, reactivate_cmd))
 def test_an_unknown_user_is_a_clean_error_not_a_traceback(session, stub_database, command):
-    """ClickException exits 1 with its message on the stream; an unhandled
-    LookupError exits 1 too, so the message is what separates them."""
+    """ClickException exits 1 with its message on the stream and no traceback;
+    AdminEntityNotFound is deliberately not a LookupError, so a stray KeyError
+    or IndexError inside the call would surface as an unhandled exception with
+    a traceback instead of this clean exit -- the traceback check is what
+    separates them."""
     result = CliRunner().invoke(command, ["--user", "nosuchuser"])
     assert result.exit_code == 1
     assert "nosuchuser" in result.output
@@ -284,7 +286,7 @@ def _init_admin_audit(session):
 
 
 def test_init_admin_audits_a_creation_as_a_creation(session, stub_database):
-    result = _init_admin("root", "s3cret")
+    result = _init_admin("root", "correct horse battery staple")
 
     assert result.exit_code == 0, result.output
     assert "root: created" in result.output
@@ -325,10 +327,10 @@ def test_init_admin_audits_a_password_reset_as_a_password_reset(session, stub_da
     ``is_admin`` must be *absent*, not False: the key's presence is what an
     auditor reconstructing administrator grants keys on.
     """
-    ensure_admin(session, "root", "s3cret")
+    ensure_admin(session, "root", "correct horse battery staple")
     session.commit()
 
-    result = _init_admin("root", "rotated")
+    result = _init_admin("root", "rotated horse battery staple")
 
     assert result.exit_code == 0, result.output
     assert "root: password_reset" in result.output
@@ -341,14 +343,14 @@ def test_init_admin_audits_a_password_reset_as_a_password_reset(session, stub_da
         "outcome": "password_reset",
     }
     # Never the secret itself, nor the hash.
-    assert "rotated" not in str(rows[0].Changes)
+    assert "rotated horse battery staple" not in str(rows[0].Changes)
 
 
 def test_init_admin_audits_a_promotion_with_a_password_as_both(session, stub_database):
     make_creator(session, "root")
     session.commit()
 
-    result = _init_admin("root", "s3cret")
+    result = _init_admin("root", "correct horse battery staple")
 
     assert result.exit_code == 0, result.output
     assert "root: promoted_and_password_reset" in result.output
@@ -367,10 +369,10 @@ def test_init_admin_writes_no_audit_row_when_nothing_changed(session, stub_datab
     """The control for the four above: a re-run that changes nothing must not
     add a row, or every assertion on `len(rows) == 1` above would be satisfied
     by a command that audits unconditionally."""
-    ensure_admin(session, "root", "s3cret")
+    ensure_admin(session, "root", "correct horse battery staple")
     session.commit()
 
-    result = _init_admin("root", "s3cret")
+    result = _init_admin("root", "correct horse battery staple")
 
     assert result.exit_code == 0, result.output
     assert "root: unchanged" in result.output
@@ -402,11 +404,96 @@ def test_set_admin_round_trip_persists_and_reports_each_outcome(
 def test_set_admin_on_an_unknown_user_is_a_clean_error_not_a_traceback(
     session, stub_database
 ):
-    """ClickException exits 1 with its message on the stream; an unhandled
-    LookupError exits 1 too, so the message is what separates them."""
+    """ClickException exits 1 with its message on the stream and no traceback;
+    AdminEntityNotFound is deliberately not a LookupError, so a stray KeyError
+    or IndexError inside the call would surface as an unhandled exception with
+    a traceback instead of this clean exit -- the traceback check is what
+    separates them."""
     result = CliRunner().invoke(set_admin_cmd, ["--user", "nosuchuser", "--off"])
     assert result.exit_code == 1
     assert "nosuchuser" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_grant_echoes_a_fresh_grant_without_a_previous_role(
+    session, stub_database, alice
+):
+    """The fresh-grant echo, which carries no `(was ...)` because there was no
+    previous role. Pinned as the whole line: a suffix that leaked onto this
+    path -- `(was None)`, or the new role repeated -- would still contain the
+    substring an `in result.output` check looks for, and the membership row
+    below is identical either way."""
+    project = make_project(session, "A")
+    session.commit()
+
+    result = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "grader"]
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == "alice: grader in A"
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {
+        project.ProjectID: ProjectRole.grader
+    }
+
+
+def test_grant_that_changes_a_role_names_the_role_it_replaced(
+    session, stub_database, alice
+):
+    """The `(was ...)` variant, in both directions. `previous` is the role that
+    was *replaced*, so an echo that read it off the new grant instead would
+    print `(was project_admin)` on the downgrade -- telling an administrator
+    that the privilege they just removed is the one still held. Both legs also
+    take the changed=True branch, so neither is distinguishable from the fresh
+    grant above by exit code or by the row."""
+    project = make_project(session, "A")
+    session.commit()
+
+    seed = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "read_only"]
+    )
+    assert seed.exit_code == 0, seed.output
+
+    up = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "project_admin"]
+    )
+    assert up.exit_code == 0, up.output
+    assert up.output.strip() == "alice: project_admin in A (was read_only)"
+
+    down = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "grader"]
+    )
+    assert down.exit_code == 0, down.output
+    assert down.output.strip() == "alice: grader in A (was project_admin)"
+    # One membership throughout: a change replaces the role, it does not stack
+    # a second row that `roles_for`'s dict would then hide behind one key.
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {
+        project.ProjectID: ProjectRole.grader
+    }
+    assert _memberships(session) == 1
+
+
+def test_granting_a_role_the_user_already_holds_reports_no_change(
+    session, stub_database, alice
+):
+    """The idempotent branch. A re-grant that fell through to the changed=True
+    echo would print `alice: grader in A` and leave the same row behind, so the
+    text is the only thing that separates "did nothing" from "did it again"."""
+    project = make_project(session, "A")
+    session.commit()
+
+    first = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "grader"]
+    )
+    assert first.exit_code == 0, first.output
+
+    result = CliRunner().invoke(
+        grant_cmd, ["--user", "alice", "--project", "A", "--role", "grader"]
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == "alice: already grader in A; no change"
+    assert ProjectMemberRepository(session).roles_for(alice.CreatorID) == {
+        project.ProjectID: ProjectRole.grader
+    }
 
 
 def test_revoke_removes_the_single_membership_and_echoes_it(
@@ -425,10 +512,11 @@ def test_revoke_removes_the_single_membership_and_echoes_it(
     "alice: revoked from A" would still satisfy the assertions below -- so a
     second, untouched membership is required to make that fallthrough loud.
     Do not shrink this back to a single project."""
-    make_project(session, "A")
+    project_a = make_project(session, "A")
     project_b = make_project(session, "B")
-    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
-    grant(session, username="alice", project_name="B", role=ProjectRole.read_only)
+    members = ProjectMemberRepository(session)
+    members.upsert(alice.CreatorID, project_a.ProjectID, ProjectRole.grader)
+    members.upsert(alice.CreatorID, project_b.ProjectID, ProjectRole.read_only)
     session.commit()
 
     result = CliRunner().invoke(
@@ -447,10 +535,11 @@ def test_revoke_all_removes_every_membership_and_names_each(
     """The reset step of the developer loop. Naming each removal is the only
     read-back this phase ships, so the echo is part of the contract, not
     decoration."""
-    make_project(session, "A")
-    make_project(session, "B")
-    grant(session, username="alice", project_name="A", role=ProjectRole.grader)
-    grant(session, username="alice", project_name="B", role=ProjectRole.read_only)
+    project_a = make_project(session, "A")
+    project_b = make_project(session, "B")
+    members = ProjectMemberRepository(session)
+    members.upsert(alice.CreatorID, project_a.ProjectID, ProjectRole.grader)
+    members.upsert(alice.CreatorID, project_b.ProjectID, ProjectRole.read_only)
     session.commit()
 
     result = CliRunner().invoke(revoke_cmd, ["--user", "alice", "--all", "--yes"])
@@ -490,7 +579,7 @@ def test_set_password_replaces_the_hash_so_only_the_new_password_verifies(
     session.commit()
 
     result = CliRunner().invoke(
-        set_password_cmd, ["--user", "alice", "--password", "new-pw"]
+        set_password_cmd, ["--user", "alice", "--password", "correct horse battery staple"]
     )
     assert result.exit_code == 0, result.output
     assert "alice: password set" in result.output
@@ -498,14 +587,14 @@ def test_set_password_replaces_the_hash_so_only_the_new_password_verifies(
     stored = session.scalars(
         select(Creator).where(Creator.CreatorName == "alice")
     ).one()
-    assert verify_password("new-pw", stored.PasswordHash) is True
+    assert verify_password("correct horse battery staple", stored.PasswordHash) is True
     assert verify_password("old-pw", stored.PasswordHash) is False
 
 
 def test_set_password_clears_the_legacy_hash_so_the_old_password_stops_working(
     session, stub_database
 ):
-    """check_login (server/routes/auth.py) verifies PasswordHash first and
+    """AuthService.authenticate (server/services/auth_service.py) verifies PasswordHash first and
     falls through to the legacy `Password` column if that misses. If
     `set_password` left a pre-existing legacy hash in place, the password
     being reset away from would keep authenticating through that fallback --
@@ -518,7 +607,7 @@ def test_set_password_clears_the_legacy_hash_so_the_old_password_stops_working(
     session.commit()
 
     result = CliRunner().invoke(
-        set_password_cmd, ["--user", "alice", "--password", "new-pw"]
+        set_password_cmd, ["--user", "alice", "--password", "correct horse battery staple"]
     )
     assert result.exit_code == 0, result.output
 
@@ -547,3 +636,57 @@ def test_set_password_refuses_an_empty_password(session, stub_database):
         select(Creator).where(Creator.CreatorName == "alice")
     ).one()
     assert verify_password("old-pw", stored.PasswordHash) is True
+
+
+def test_set_password_refuses_a_weak_password(session, stub_database, alice):
+    """The policy error is a ClickException naming the rule."""
+    result = CliRunner().invoke(
+        set_password_cmd, ["--user", "alice", "--password", "short"]
+    )
+    assert result.exit_code == 1
+    assert "at least 15" in result.output
+
+
+def test_init_admin_refuses_a_weak_password(session, stub_database):
+    """The WeakPasswordError branch Task 1 added to init_admin, naming both the
+    rule and the source the password came from."""
+    result = _init_admin("root", "short")
+    assert result.exit_code == 1
+    assert "at least 15" in result.output
+    assert "EYENED_API_ADMIN_PASSWORD" in result.output
+
+
+def test_the_deleted_administration_module_is_gone(session):
+    """The whole point of the cutover: no importable path back to the
+    Session-taking functions, so nothing can quietly keep using them."""
+    import pytest as _pytest
+
+    with _pytest.raises(ModuleNotFoundError):
+        import eyened_orm.authz.administration  # noqa: F401
+
+
+def test_revoke_all_rows_name_the_command_that_ran(session, stub_database, alice):
+    """Behavior change 2. `apply_revoke_all` delegates to `revoke`, and the
+    instance was built for `revoke`, so every row says `eorm revoke` rather
+    than naming the inner call. The same property makes `grant-for-task` rows
+    say `eorm grant-for-task` where they used to say `eorm grant`."""
+    make_project(session, "A")
+    make_project(session, "B")
+    session.commit()
+
+    for name in ("A", "B"):
+        # Checked, not discarded: a grant that failed here would surface as a
+        # confusing assertion about DELETE rows below instead of naming the
+        # arrange that never happened.
+        granted = CliRunner().invoke(
+            grant_cmd, ["--user", "alice", "--project", name, "--role", "grader"]
+        )
+        assert granted.exit_code == 0, granted.output
+    result = CliRunner().invoke(revoke_cmd, ["--user", "alice", "--all", "--yes"])
+    assert result.exit_code == 0
+
+    rows = session.scalars(
+        select(AuditLog).where(AuditLog.Action == "DELETE")
+    ).all()
+    assert len(rows) == 2
+    assert {r.TrustedPath for r in rows} == {"eorm revoke"}

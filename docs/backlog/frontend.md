@@ -8,6 +8,12 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** `client/src/lib/utils/DataTable.svelte:18` renders `{@html cell}` from JSON fetched by `dataSources.ts` `loadDataSource()`, possibly from an absolute admin-configured URL. A malicious/compromised source gets script execution. The inline eslint-disable means lint will never flag it again.
 - **Fix:** sanitize (e.g. DOMPurify), render as text, or restrict data sources to a trusted origin.
 
+### Stop treating 403 as an expired session in the API client
+- **Status:** open (blocks the admin UI)
+- **Source:** PR #247 manual-test walkthrough, 2026-09-24
+- **Problem:** `isUnauthorizedStatus` in `client/src/lib/api/client.ts` returns true for 401 and 403, so a 403 triggers `/auth/refresh`, a retry, and `redirectToLogin()`. `/api/admin/*` returns 403 to a logged-in non-admin, who is bounced to login instead of shown "forbidden". Same code on `feature/rbac-admin-client`.
+- **Fix:** refresh and retry on 401 only; surface 403 to the caller. Update `apiInvoke.test.ts` accordingly.
+
 ### Fix Svelte 5 reactivity traps
 - **Status:** open
 - **Source:** Phase 3 ESLint gate + Phase 4 svelte-check triage

@@ -48,6 +48,8 @@ Run `alembic` from `orm/migrations` with `-x env_file=<env>`, and `eorm` with `-
     eorm grant-all
     ```
 
+    `init-admin` takes the password from `EYENED_API_ADMIN_PASSWORD`, or prompts for it. If that password predates the **[password policy](/eyened-platform/guides/authentication#password-policy)** and is under 15 characters, this step can exit 1 — set a compliant one before the outage rather than during it.
+
     `grant-all` gives every existing account `grader` in every project. Before step 7, review who it granted — the query is in `docs/rbac-operations.md`, under the `grant-all` accepted risk — and remove accounts nobody recognises with `eorm revoke --user <username> --all`.
 
 7. Rebuild every image that contains `eyened_orm`, upgrade `eyened_orm` wherever external jobs run, then start the platform.

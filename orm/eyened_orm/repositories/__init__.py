@@ -6,6 +6,7 @@ from .form_schema_repository import FormSchemaRepository
 from .image_instance_repository import ImageInstanceRepository
 from .patient_repository import PatientRepository
 from .project_member_repository import ProjectMemberRepository
+from .project_repository import ProjectRepository
 from .segmentation_repository import (
     ModelSegmentationRepository,
     SegmentationRepository,
@@ -19,6 +20,7 @@ __all__ = [
     "DeviceRepository",
     "PatientRepository",
     "ProjectMemberRepository",
+    "ProjectRepository",
     "FormAnnotationRepository",
     "FormSchemaRepository",
     "StudyRepository",

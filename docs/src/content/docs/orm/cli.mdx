@@ -47,6 +47,8 @@ eorm seed-form-schemas [--update]
 
 Accounts and permissions are managed here — there is no admin UI for them. The model these commands write to is described in **[Access control](/eyened-platform/guides/access_control)**.
 
+Every command here that sets a password — `init-admin`, `create-user`, `set-password` — enforces the **[password policy](/eyened-platform/guides/authentication#password-policy)** and exits 1 naming the rule that failed.
+
 :::caution
 `eorm` is a **trusted path**: it does not authenticate its operator. Anyone with shell access on the server can run `set-admin` and self-promote, and the resulting audit row names no actor.
 :::

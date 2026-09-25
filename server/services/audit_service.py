@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import enum
 import json
 import logging
-from datetime import date, datetime, timezone
 
 from fastapi import Depends
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
-from eyened_orm import AuditLog
+from eyened_orm.audit_writer import AuditWriter
+from eyened_orm.authz.actor import ActingAdmin, Actor, TrustedPath
 
 from ..db import get_db
 from .acting_user import ActingUser
@@ -18,28 +17,30 @@ _AUDIT_LOGGER = logging.getLogger("eyened.audit")
 _BUFFER_KEY = "_audit_events"
 
 
-def _json_safe(o: object) -> object:
-    """``json.dumps(..., default=...)`` fallback for values ``diff()``/callers put
-    in ``changes``. ``TagType``, ``TaskState``, ``SubTaskState`` and ``Laterality``
-    are plain ``Enum`` subclasses (not ``str, Enum``), and ``AuditLog.Changes`` is a
-    stock JSON column (no ``default=``); serializing a raw enum member or a
-    datetime otherwise raises ``StatementError`` on flush. Scoped to this one
-    normalization site so other JSON columns (``FormData``, ``TaskConfig``, ...)
-    keep failing loudly on genuinely unserializable data."""
-    if isinstance(o, enum.Enum):
-        return o.value
-    if isinstance(o, (datetime, date)):
-        return o.isoformat()
-    return str(o)
+def _to_actor(actor: ActingUser | None, trusted_path: str | None) -> Actor:
+    """Translate this layer's two optional keywords into the ORM's Actor union.
+
+    ``ActingUser`` and ``ActingAdmin`` are deliberately not unified: ~30 call
+    sites pass ``ActingUser``, and ``Actor`` must live in the ORM, which cannot
+    import from ``server/``. The translation is one function at the boundary.
+    """
+    if actor is not None and trusted_path is not None:
+        raise ValueError("pass actor= or trusted_path=, not both")
+    if actor is not None:
+        return ActingAdmin(creator_id=actor.id)
+    if trusted_path is not None:
+        return TrustedPath(path=trusted_path)
+    raise ValueError("record() requires actor= or trusted_path=")
 
 
 class AuditService:
-    """Writes the authoritative AuditLog row (Sink 1) and buffers a JSON event
-    for the post-commit stdout mirror (Sink 2)."""
+    """Writes the authoritative AuditLog row (Sink 1, via AuditWriter) and buffers
+    a JSON event for the post-commit stdout mirror (Sink 2)."""
 
     def __init__(self, session: Session, *, enabled: bool = True) -> None:
         self._session = session
         self._enabled = enabled
+        self._writer = AuditWriter(session)
 
     def record(
         self,
@@ -52,42 +53,33 @@ class AuditService:
         project_id: int | None = None,
         changes: dict | None = None,
     ) -> None:
+        # The kill switch is checked before the actor is resolved, deliberately:
+        # a disabled service writes nothing and validates nothing, which is the
+        # behavior every existing caller and test already relies on.
         if not self._enabled:
             return
-        ts = datetime.now(timezone.utc)
-        actor_id = actor.id if actor is not None else None
-        # Normalize once: both the AuditLog row and the stdout mirror must see the
-        # same JSON-safe data. Round-tripping through json.dumps/loads (rather
-        # than a shallow per-value map) also covers enums/datetimes nested inside
-        # dicts or lists, which diff()'s {"old": ..., "new": ...} shape can produce.
-        safe_changes = (
-            json.loads(json.dumps(changes, default=_json_safe))
-            if changes is not None
-            else None
+        row = self._writer.write(
+            actor=_to_actor(actor, trusted_path),
+            action=action,
+            entity=entity,
+            entity_id=entity_id,
+            project_id=project_id,
+            changes=changes,
         )
-        row = AuditLog(
-            Timestamp=ts,
-            ActorID=actor_id,
-            TrustedPath=trusted_path,
-            Action=action,
-            Entity=entity,
-            EntityID=None if entity_id is None else str(entity_id),
-            ProjectID=project_id,
-            Changes=safe_changes,
+        # Derived from the row, not from parallel locals: the two sinks are then
+        # incapable of reporting different data for the same event.
+        self._session.info.setdefault(_BUFFER_KEY, []).append(
+            {
+                "ts": row.Timestamp.isoformat(),
+                "actor_id": row.ActorID,
+                "trusted_path": row.TrustedPath,
+                "action": row.Action,
+                "entity": row.Entity,
+                "entity_id": row.EntityID,
+                "project_id": row.ProjectID,
+                "changes": row.Changes,
+            }
         )
-        self._session.add(row)
-        self._session.flush()  # assign the AuditLog PK before buffering the event
-        event_payload = {
-            "ts": ts.isoformat(),
-            "actor_id": actor_id,
-            "trusted_path": trusted_path,
-            "action": action,
-            "entity": entity,
-            "entity_id": row.EntityID,
-            "project_id": project_id,
-            "changes": safe_changes,
-        }
-        self._session.info.setdefault(_BUFFER_KEY, []).append(event_payload)
 
     @staticmethod
     def snapshot(entity: object, *fields: str) -> dict[str, object]:

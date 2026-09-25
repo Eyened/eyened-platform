@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..creator import Creator
-from ..utils.db_users import disable_password, hash_password, verify_password
+from ..utils.db_users import build_user, check_new_password, hash_password, verify_password
 
 __all__ = ["BootstrapOutcome", "count_admins", "ensure_admin"]
 
@@ -63,7 +63,9 @@ def ensure_admin(
 
     ``password=None`` means password login is disabled for a new account and
     **left alone** for an existing one -- re-running ``init-admin`` without a
-    password must not lock the account out. ``reactivate`` is opt-in so a
+    password must not lock the account out. A password it would set must pass
+    ``check_new_password``; one that already verifies is left alone, so a
+    short existing password keeps working. ``reactivate`` is opt-in so a
     routine bootstrap cannot silently undo a deliberate deactivation.
     """
     creator = session.scalars(
@@ -71,13 +73,10 @@ def ensure_admin(
     ).first()
 
     if creator is None:
-        creator = Creator(
-            CreatorName=username,
-            IsHuman=True,
-            IsAdmin=True,
-            Inactive=False,
-            PasswordHash=hash_password(password) if password else disable_password(None),
-        )
+        if password:
+            check_new_password(password, username=username)
+        creator = build_user(username, password)
+        creator.IsAdmin = True
         session.add(creator)
         session.flush()
         return creator, BootstrapOutcome.created
@@ -92,8 +91,13 @@ def ensure_admin(
     password_reset = bool(password) and not (
         creator.PasswordHash and verify_password(password, creator.PasswordHash)
     )
-    if password_reset:
+    if password_reset and password:  # `and password` narrows str | None for mypy
+        check_new_password(password, username=username)
         creator.PasswordHash = hash_password(password)
+        # AuthService.authenticate falls through to this legacy pbkdf2 column when PasswordHash
+        # misses. Leaving it set would let the password this reset is rotating away from keep
+        # authenticating -- a reset that doesn't reset.
+        creator.Password = None
 
     # Tracked as two booleans and collapsed here, rather than one variable
     # overwritten twice: the two events are independent, and the previous

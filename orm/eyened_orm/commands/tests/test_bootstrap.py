@@ -18,6 +18,7 @@ from eyened_orm.commands.bootstrap import bootstrap
 from eyened_orm.utils.db_users import verify_password
 
 HEAD = "head_rev"
+_PASSWORD = "correct horse battery staple"
 
 
 @pytest.fixture()
@@ -77,13 +78,13 @@ def test_an_empty_database_is_migrated_seeded_and_given_an_audited_admin(session
     state, calls = db
     state["current"] = None
 
-    result = _run(EYENED_API_ADMIN_PASSWORD="s3cret")
+    result = _run(EYENED_API_ADMIN_PASSWORD=_PASSWORD)
 
     assert result.exit_code == 0, result.output
     assert calls == ["migrate", "seed"]
     admin = _admin(session)
     assert admin.IsAdmin and not admin.Inactive
-    assert verify_password("s3cret", admin.PasswordHash)
+    assert verify_password(_PASSWORD, admin.PasswordHash)
     [audit] = _bootstrap_audit(session)
     assert (audit.Action, audit.Changes) == (
         "INSERT",
@@ -94,7 +95,7 @@ def test_an_empty_database_is_migrated_seeded_and_given_an_audited_admin(session
 def test_a_schema_behind_head_is_migrated_but_not_reseeded(session, db):
     state, calls = db
     state["current"] = "older_rev"
-    ensure_admin(session, "admin", "pw")
+    ensure_admin(session, "admin", _PASSWORD)
     session.commit()
 
     result = _run(EYENED_AUTO_MIGRATE="true")
@@ -106,7 +107,7 @@ def test_a_schema_behind_head_is_migrated_but_not_reseeded(session, db):
 def test_by_default_a_schema_behind_head_is_reported_and_left_alone(session, db):
     state, calls = db
     state["current"] = "older_rev"
-    ensure_admin(session, "admin", "pw")
+    ensure_admin(session, "admin", _PASSWORD)
     session.commit()
 
     result = _run()
@@ -124,15 +125,24 @@ def test_a_first_admin_without_a_password_fails_naming_the_variable(session, db)
     assert session.scalars(select(Creator)).all() == []
 
 
+def test_a_weak_first_admin_password_fails_naming_the_rule_and_the_variable(session, db):
+    result = _run(EYENED_API_ADMIN_PASSWORD="short")
+
+    assert result.exit_code == 1
+    assert "at least 15" in result.output
+    assert "EYENED_API_ADMIN_PASSWORD" in result.output
+    assert session.scalars(select(Creator)).all() == []
+
+
 def test_a_bootstrapped_database_is_left_alone(session, db):
     """A password rotated after first boot survives: the admin step does not re-run."""
     _, calls = db
-    ensure_admin(session, "admin", "rotated")
+    ensure_admin(session, "admin", _PASSWORD)
     session.commit()
 
     result = _run(EYENED_API_ADMIN_PASSWORD="initial")
 
     assert result.exit_code == 0, result.output
     assert calls == []
-    assert verify_password("rotated", _admin(session).PasswordHash)
+    assert verify_password(_PASSWORD, _admin(session).PasswordHash)
     assert _bootstrap_audit(session) == []

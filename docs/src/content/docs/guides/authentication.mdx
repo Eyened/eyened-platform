@@ -159,3 +159,9 @@ To force re-authentication across the board, set a new `EYENED_API_SECRET_KEY` �
 Signing in successfully grants nothing on its own. What a user can see comes from their project memberships, so an account created here — by `eorm create-user`, by self-registration, or by OIDC auto-provisioning — sees an **empty platform** until it is granted a role.
 
 See **[Access control](/eyened-platform/guides/access_control)** for the model, and **[CLI reference — Users and access](/eyened-platform/orm/cli#users-and-access)** for the commands.
+
+## Password policy
+
+A new password must be at least 15 characters (maximum 128) and must not contain your username or the word `eyened`, in any capitalisation. There are no composition rules — no required digits, cases or symbols.
+
+The policy applies wherever a password is set — `eorm create-user`, `eorm set-password`, `eorm init-admin`, `POST /api/auth/register`, `POST /api/auth/change-password` — and never at login, so existing passwords keep working until they are changed.

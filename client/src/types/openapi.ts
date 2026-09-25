@@ -1211,6 +1211,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Users
+         * @description Return every human account, name-ordered, with per-row state.
+         */
+        get: operations["list_users_admin_users_get"];
+        put?: never;
+        /**
+         * Create User
+         * @description Create a human password account.
+         */
+        post: operations["create_user_admin_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}/memberships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List User Memberships
+         * @description Return one user's project memberships, ordered by project name.
+         */
+        get: operations["list_user_memberships_admin_users__user_id__memberships_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Projects
+         * @description Return every project, name-ordered, with its member count.
+         */
+        get: operations["list_projects_admin_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/projects/{project_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Grant Membership
+         * @description Grant a user a role in a project, or change the one held.
+         */
+        put: operations["grant_membership_admin_projects__project_id__members__user_id__put"];
+        post?: never;
+        /**
+         * Revoke Membership
+         * @description Remove a membership; 204 whether or not one existed.
+         */
+        delete: operations["revoke_membership_admin_projects__project_id__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}/grant-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Task Grant
+         * @description Which projects granting ``role`` for these tasks would add, and which are held.
+         */
+        get: operations["preview_task_grant_admin_users__user_id__grant_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set User Active
+         * @description Deactivate or reactivate a user; repeating the current state changes nothing.
+         */
+        put: operations["set_user_active_admin_users__user_id__active_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/users/{user_id}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set User Password
+         * @description Replace a user's password.
+         */
+        put: operations["set_user_password_admin_users__user_id__password_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1219,6 +1367,36 @@ export interface components {
         AddImageRequest: {
             /** Instance Id */
             instance_id: string;
+        };
+        /**
+         * AdminProjectResponse
+         * @description One project and how many members it has.
+         */
+        AdminProjectResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Member Count */
+            member_count: number;
+        };
+        /**
+         * AdminUserResponse
+         * @description One human account. ``active`` and ``has_credential`` are orthogonal.
+         */
+        AdminUserResponse: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Is Admin */
+            is_admin: boolean;
+            /** Active */
+            active: boolean;
+            /** Has Credential */
+            has_credential: boolean;
+            /** Employee Identifier */
+            employee_identifier: string | null;
         };
         /** AttributeCondition */
         AttributeCondition: {
@@ -1254,6 +1432,16 @@ export interface components {
             old_password: string;
             /** New Password */
             new_password: string;
+        };
+        /**
+         * CreateUserRequest
+         * @description A human password account; the password must pass the policy.
+         */
+        CreateUserRequest: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
         };
         /** CreatorMeta */
         CreatorMeta: {
@@ -1448,6 +1636,34 @@ export interface components {
             entity_type?: components["schemas"]["EntityType"] | null;
             /** Id */
             id: number;
+        };
+        /**
+         * GrantPreviewResponse
+         * @description ``to_grant`` roles would be written; ``already_held`` roles are held, at or above ``role``.
+         */
+        GrantPreviewResponse: {
+            /** User Id */
+            user_id: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "read_only" | "grader" | "project_admin";
+            /** To Grant */
+            to_grant: components["schemas"]["MembershipResponse"][];
+            /** Already Held */
+            already_held: components["schemas"]["MembershipResponse"][];
+        };
+        /**
+         * GrantRequest
+         * @description The role to hold; user and project are in the path.
+         */
+        GrantRequest: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "read_only" | "grader" | "project_admin";
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1835,6 +2051,40 @@ export interface components {
          */
         Laterality: "L" | "R";
         /**
+         * MemberGrantResponse
+         * @description The membership after a grant; ``changed`` is False if the role was already held.
+         */
+        MemberGrantResponse: {
+            /** Project Id */
+            project_id: number;
+            /** Project Name */
+            project_name: string;
+            /** User Id */
+            user_id: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "read_only" | "grader" | "project_admin";
+            /** Changed */
+            changed: boolean;
+        };
+        /**
+         * MembershipResponse
+         * @description One membership.
+         */
+        MembershipResponse: {
+            /** Project Id */
+            project_id: number;
+            /** Project Name */
+            project_name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "read_only" | "grader" | "project_admin";
+        };
+        /**
          * Modality
          * @enum {string}
          */
@@ -2147,6 +2397,22 @@ export interface components {
         SeriesMeta: {
             /** Id */
             id: number;
+        };
+        /**
+         * SetActiveRequest
+         * @description ``false`` deactivates; ``true`` reactivates.
+         */
+        SetActiveRequest: {
+            /** Active */
+            active: boolean;
+        };
+        /**
+         * SetPasswordRequest
+         * @description The new password; it must pass the policy.
+         */
+        SetPasswordRequest: {
+            /** Password */
+            password: string;
         };
         /**
          * SexEnum
@@ -2573,6 +2839,8 @@ export interface components {
             username: string;
             /** Role */
             role: number | null;
+            /** Is Admin */
+            is_admin: boolean;
             /**
              * Starred Tags
              * @default []
@@ -5595,6 +5863,341 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PatientDetailGET"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_admin_users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_user_admin_users_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_user_memberships_admin_users__user_id__memberships_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_projects_admin_projects_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProjectResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_membership_admin_projects__project_id__members__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                project_id: number;
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberGrantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_membership_admin_projects__project_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                project_id: number;
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_task_grant_admin_users__user_id__grant_preview_get: {
+        parameters: {
+            query: {
+                task_id: number[];
+                role: "read_only" | "grader" | "project_admin";
+            };
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_user_active_admin_users__user_id__active_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetActiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_user_password_admin_users__user_id__password_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

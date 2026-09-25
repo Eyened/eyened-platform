@@ -109,7 +109,7 @@ resolves per request, so each change lands on a refresh with no re-login:
 
 ```bash
 cd deploy
-docker compose exec server eorm create-user --username test_user --password test-pw   # empty platform
+docker compose exec server eorm create-user --username test_user --password correct-horse-battery   # empty platform
 docker compose exec server eorm grant --user test_user --project P --role read_only   # P's data appears
 docker compose exec server eorm grant --user test_user --project P --role grader      # writes now succeed
 docker compose exec server eorm set-admin --user test_user --on                       # restrictions vanish

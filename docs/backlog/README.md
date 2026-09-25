@@ -7,14 +7,25 @@ To add: append the item to the fitting file and add a row below. To close: delet
 
 | Item | File | Status |
 |---|---|---|
+| Validate usernames at every entry point | [auth-and-sessions](auth-and-sessions.md) | open |
+| Fence `PUBLIC_AUTH_DISABLED` | [auth-and-sessions](auth-and-sessions.md) | open |
+| End existing sessions on a password change or reset | [auth-and-sessions](auth-and-sessions.md) | open |
 | Stop a token outliving `docker compose down -v` or a restore | [auth-and-sessions](auth-and-sessions.md) | open |
+| Make `get_current_user` reject deleted and deactivated accounts | [auth-and-sessions](auth-and-sessions.md) | open |
+| Cap the absolute session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
 | Fix or delete the `api_client` branch of `POST /auth/login` | [auth-and-sessions](auth-and-sessions.md) | open |
-| Move the auth routes behind an `AuthService` | [auth-and-sessions](auth-and-sessions.md) | open |
+| Check new passwords against a breached/common-password list | [auth-and-sessions](auth-and-sessions.md) | open |
+| Move OIDC login into `AuthService` and pin the auth cookie attributes | [auth-and-sessions](auth-and-sessions.md) | partial |
+| Keep admin HTTP writes and reads off non-human Creators | [rbac-admin](rbac-admin.md) | open |
+| Rename `has_credential` on `AdminUserResponse` | [rbac-admin](rbac-admin.md) | open |
+| Build the audit-log read endpoint `GET /admin/audit` | [rbac-admin](rbac-admin.md) | open |
 | Drop the dead `eorm create-user --is-human` option | [rbac-admin](rbac-admin.md) | open |
-| Write an `AuditLog` row from `eorm create-user` | [rbac-admin](rbac-admin.md) | open |
+| Decide the 15 legacy-credential humans the cutover skipped | [rbac-admin](rbac-admin.md) | open |
 | Finish trimming `docs/rbac-operations.md` | [rbac-admin](rbac-admin.md) | partial |
 | Scope the registration id → `PublicID` lookup in the DTO layer | [rbac-authz](rbac-authz.md) | open |
 | Stop `scope.require` passing vacuously for an administrator on nonexistent ids | [rbac-authz](rbac-authz.md) | open |
+| Make the session guards fail on stale allow-list entries | [rbac-authz](rbac-authz.md) | open |
+| Decide whether `AuthService.change_password` keeps its `actor` parameter | [rbac-authz](rbac-authz.md) | open |
 | Decide what `init` does on a schema behind head | [deploy](deploy.md) | open |
 | Reach the bundled Keycloak over the compose network | [deploy](deploy.md) | open |
 | Refuse the `oidc` layer together with the prod layer | [deploy](deploy.md) | open |
@@ -39,8 +50,11 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Clear the npm Dependabot alerts in `client/` and `docs/` | [ci-and-tooling](ci-and-tooling.md) | open |
 | Add a backend ruff lint + format gate | [ci-and-tooling](ci-and-tooling.md) | open |
 | Make CI checks required on `main`/`development` (coverage Phase C) | [ci-and-tooling](ci-and-tooling.md) | open |
+| Add a mypy per-module gate over the admin surface | [ci-and-tooling](ci-and-tooling.md) | open |
+| Turn unknown test warnings into errors | [ci-and-tooling](ci-and-tooling.md) | open |
 | Repair or delete `eyened_orm.form_validation` | [ci-and-tooling](ci-and-tooling.md) | open |
 | Sanitize the `{@html}` cells in `DataTable.svelte` | [frontend](frontend.md) | open |
+| Stop treating 403 as an expired session in the API client | [frontend](frontend.md) | open |
 | Fix Svelte 5 reactivity traps | [frontend](frontend.md) | open |
 | Key the grandfathered `{#each}` blocks | [frontend](frontend.md) | open |
 | Ratchet down `@typescript-eslint/no-explicit-any` | [frontend](frontend.md) | open |

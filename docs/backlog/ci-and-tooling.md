@@ -24,6 +24,18 @@
 - **Problem:** ruleset "Protect main and dev branch" (id 18935463) gates on review only; no `required_status_checks`. Two blind spots make a required coverage gate under-measure: narrowing `[tool.coverage.run] source` below `orm` collides `db.py` paths; a directory without `__init__.py` (e.g. `orm/migrations/alembic/versions_archive/`) is invisible.
 - **Fix:** guard both blind spots in `server/tests/test_coverage_omissions.py`, then add `required_status_checks` (`Server CI / schema-sync` is the strongest candidate). Needs repo admin rights (unconfirmed).
 
+### Add a mypy per-module gate over the admin surface
+- **Status:** open
+- **Source:** RBAC admin P0.11, 2026-09-08
+- **Problem:** no `[tool.mypy]` and no type check in CI; the `Actor` union is enforced only at runtime (`AuditWriter.write`'s `match`).
+- **Fix:** per-module overrides over `authz/actor.py`, `audit_writer.py`, `authz/membership_admin.py`, `authz/account_admin.py`, `repositories/project_repository.py`; add `typing.assert_never` to the `case _`. Re-measure the baseline with `dev/.venv/bin/python` and `--follow-imports=silent` (system `python3` is 3.8).
+
+### Turn unknown test warnings into errors
+- **Status:** open
+- **Source:** RBAC admin P1 review, 2026-09-17
+- **Problem:** full suite emits ~1217 warnings (server 579), so a new one is invisible. Main causes: pydantic `schema` field shadowing on `FormSchemaBase` (`server/dtos/dtos_main.py`), passlib importing `crypt`, passlib reading `argon2.__version__`.
+- **Fix:** `filterwarnings` in `[tool.pytest.ini_options]`: one ignore per known cause, `error` for the rest.
+
 ### Repair or delete `eyened_orm.form_validation`
 - **Status:** open
 - **Source:** coverage omit guard, 2026-08-14

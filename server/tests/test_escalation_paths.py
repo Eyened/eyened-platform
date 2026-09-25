@@ -2,9 +2,9 @@
 
 Every write path to Creator.IsAdmin is an escalation path: making the column
 load-bearing turns any endpoint that can set it into a way to become an
-administrator. It is clean by construction today -- create_user takes no such
-argument, so /auth/register and OIDC auto-provision both land at the False
-default -- but that list is only exhaustive if it stays that way, and it is
+administrator. It is clean by construction today -- build_user, behind OIDC
+auto-provision, /auth/register and the admin create, never sets it, so all three
+land at the False default -- but that list is only exhaustive if it stays that way, and it is
 what keeps the deferred registration modes from opening a hole when they land.
 
 The second power, an unbounded AccessScope, has two doors: AccessScope.trusted()
@@ -38,14 +38,16 @@ _ROOT = pathlib.Path(__file__).resolve().parents[2]
 # Creator(**data) both slip past it, so this bounds the obvious writes rather
 # than proving there are no others.
 _ISADMIN_WRITERS = {
-    "orm/eyened_orm/authz/bootstrap.py",       # ensure_admin
-    "orm/eyened_orm/authz/administration.py",  # set_admin
+    "orm/eyened_orm/authz/bootstrap.py",      # ensure_admin
+    "orm/eyened_orm/authz/account_admin.py",  # AccountAdministration.set_admin
 }
 
 # Files permitted to call AccessScope.trusted(). Every entry is a path v0.3
 # places outside enforcement.
 _TRUSTED_CALLERS = {
-    "server/routes/auth.py",  # pre-authentication token refresh / OIDC
+    "server/routes/auth.py",              # check_oidc_login, pre-authentication OIDC
+    "server/services/auth_service.py",    # get_auth_service: login and registration precede any actor
+    "orm/eyened_orm/commands/shared.py",  # admin_scope_for_cli, for the eorm repositories
 }
 
 # Files permitted to construct an AccessScope whose is_admin is anything but a
@@ -170,11 +172,19 @@ def test_is_admin_is_written_only_by_the_allow_listed_writers():
 
 
 def test_only_the_allow_listed_files_call_access_scope_trusted():
-    """The unbounded-scope escape hatch is reachable from one file only.
+    """The unbounded-scope escape hatch is reachable from three files only.
 
-    ``audit_trusted`` in authz/administration.py and commands/rbac.py is a bare
-    Name call, not an attribute, so it does not match here. Do not "fix" that
-    with a substring search -- it would flag every one of those call sites.
+    ``services/auth_service.py`` builds it once, in ``get_auth_service``, because
+    authentication runs before any actor exists.
+
+    ``commands/shared.py`` is the CLI's single construction site: the `eorm`
+    repositories need a scope, and confining it to one helper keeps the CLI at
+    one entry instead of one per command module. `eorm` authenticates nobody
+    either way -- ``get_database()`` opens a Database() straight from config --
+    so the entry records where the power lives, not a new grant of it.
+
+    The scan matches an *attribute* call, so a bare ``trusted(...)`` name call
+    would not appear here. Do not "fix" that with a substring search.
     """
     offenders = set()
     for path in _python_sources():
@@ -214,7 +224,7 @@ def test_only_the_allow_listed_files_decide_a_scopes_admin_flag():
 
 
 def test_create_user_cannot_make_an_administrator():
-    """/auth/register and OIDC auto-provision both go through it."""
+    """OIDC auto-provision and /auth/register both build through build_user, which the IsAdmin writer guard scans."""
     import inspect
 
     from eyened_orm.utils.db_users import create_user
