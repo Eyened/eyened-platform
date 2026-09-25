@@ -517,3 +517,19 @@ def test_reactivating_an_already_active_user_is_a_no_op(session):
 def test_an_unknown_username_names_itself_for_deactivate_and_reactivate(session, command):
     with pytest.raises(LookupError, match="nosuchuser"):
         command(session, username="nosuchuser")
+
+
+def test_unused_declarations_reports_a_project_no_link_uses(session, spanning):
+    """A declared project no link uses -- fail-safe, but worth surfacing."""
+    from eyened_orm import TaskProject
+    from eyened_orm.authz.administration import unused_declarations
+
+    session.add(
+        TaskProject(TaskID=spanning["a_only"], ProjectID=spanning["projects"]["B"])
+    )
+    session.commit()
+
+    found = unused_declarations(session)
+    assert (spanning["a_only"], spanning["projects"]["B"]) in found
+    # ...and it does not report the ones that ARE used, or the report is noise.
+    assert (spanning["a_only"], spanning["projects"]["A"]) not in found

@@ -12,6 +12,7 @@ from .importer_dtos import ImportRow
 from .importer_errors import missing_parent_error
 from .importer_mappings_base import Entity, Lookup, LookupPart
 from .importer_mappings_image import ENTITY_SPECS
+from .importer_task_projects import declare_task_projects
 from .preparation import PreparationOptions, prepare_rows
 
 
@@ -108,6 +109,7 @@ def plan_import(
 
     builder = Builder(prepared, cache, build_order)
     builder.build(run)
+    declare_task_projects(session, run)
     return run
 
 

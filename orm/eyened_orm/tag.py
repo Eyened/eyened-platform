@@ -37,7 +37,7 @@ class CreatorTagLink(Base):
     CreatorID: Mapped[int] = mapped_column(
         ForeignKey("Creator.CreatorID", ondelete="CASCADE"), primary_key=True
     )
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Tag: Mapped["Tag"] = relationship(
         "eyened_orm.tag.Tag", back_populates="CreatorTagLinks"
@@ -60,7 +60,7 @@ class Tag(Base):
     TagDescription: Mapped[str] = mapped_column(String(256))
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     CreatorTagLinks: Mapped[Set["CreatorTagLink"]] = relationship(
         "eyened_orm.tag.CreatorTagLink",
@@ -125,7 +125,7 @@ class StudyTagLink(Base):
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     Comment: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Tag: Mapped["Tag"] = relationship(
         "eyened_orm.tag.Tag", back_populates="StudyTagLinks"
@@ -159,7 +159,7 @@ class ImageInstanceTagLink(Base):
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     Comment: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Tag: Mapped["Tag"] = relationship(
         "eyened_orm.tag.Tag", back_populates="ImageInstanceTagLinks"
@@ -192,7 +192,7 @@ class AnnotationTagLink(Base):
     )
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Tag: Mapped["Tag"] = relationship(
         "eyened_orm.tag.Tag", back_populates="AnnotationTagLinks"
@@ -222,7 +222,7 @@ class SegmentationTagLink(Base):
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     Comment: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Tag: Mapped["Tag"] = relationship(
         "eyened_orm.tag.Tag", back_populates="SegmentationTagLinks"
@@ -260,7 +260,7 @@ class FormAnnotationTagLink(Base):
 
     CreatorID: Mapped[int] = mapped_column(ForeignKey("Creator.CreatorID"))
     Comment: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Tag: Mapped["Tag"] = relationship(
         "eyened_orm.tag.Tag", back_populates="FormAnnotationTagLinks"

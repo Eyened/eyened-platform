@@ -113,7 +113,10 @@ _WRITE_PREFIXES = ("add", "save", "delete", "upsert", "remove", "replace", "clai
 # mechanism that quietly stops finding methods still reports green, so the
 # number is pinned rather than merely asserted non-zero. Moving it is a
 # deliberate act: it means a read was added, removed or exempted.
-_EXPECTED_SCANNED_READS = 38
+# The most recent moves: 37 -> 38 for TaskRepository.declared_projects, which
+# scopes itself through apply_scope like its neighbours (counted, not exempted),
+# and 38 -> 39 for the subtask-assignee read development added.
+_EXPECTED_SCANNED_READS = 39
 
 # Read methods allowed to scope themselves by consuming ``self._scope`` instead
 # of calling ``apply_scope``/``scoped_one``. Set equality, like every other

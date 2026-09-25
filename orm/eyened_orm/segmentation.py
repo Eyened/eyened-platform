@@ -3,13 +3,16 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
-from eyened_orm.data_access import get_data_access_adapter
-from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, event, func
+from rtnls_fundusprep.transformation import Interpolation, ProjectiveTransform
+from sqlalchemy import JSON, FetchedValue, ForeignKey, Index, String, UniqueConstraint, event, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
 
+from eyened_orm.data_access import get_data_access_adapter
+
 from .attribute_value_lookup_mixin import AttributeValueLookupMixin
 from .base import Base
+from .types import CurrentTimestampOnUpdate
 
 if TYPE_CHECKING:
     from eyened_orm import (
@@ -152,6 +155,96 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
             return None
         return np.linalg.inv(np.array(self.ImageProjectionMatrix))
 
+    def warp_to_image(
+        self,
+        data: np.ndarray | None = None,
+        *,
+        mode: Interpolation | None = None,
+    ) -> np.ndarray:
+        """Warp 2D segmentation data into original ``ImageInstance`` space.
+
+        Uses ``ImageProjectionMatrix`` (segmentation → image), matching::
+
+            ProjectiveTransform(matrix, in_size=data.shape[:2], out_size=image_hw)
+            transform.warp(data, image_hw)
+
+        ``data`` may be a 2D ``(H, W)`` array or a ``(1, H, W)`` volume
+        (depth singleton / ``SparseAxis=0``, as returned by ``read_data()``).
+        Height or width singletons (``SparseAxis`` 1/2) are not supported.
+        If omitted, ``read_data()`` is used.
+        Integer / label representations default to nearest-neighbor; probability
+        maps default to bilinear. Pass ``mode`` to override.
+
+        If ``ImageProjectionMatrix`` is ``None``, the array is already in image
+        space and a copy is returned after squeezing.
+
+        Always returns a newly allocated array (never an alias of ``data`` or
+        storage).
+        """
+        if not self.is_2d:
+            raise ValueError("warp_to_image is only supported for 2D segmentations")
+
+        image = self.ImageInstance
+        if not image:
+            raise ValueError("Segmentation has no associated ImageInstance")
+        if image.Rows_y is None or image.Columns_x is None:
+            raise ValueError("ImageInstance is missing Rows_y or Columns_x")
+
+        if data is None:
+            data = self.read_data()
+            if data is None:
+                raise ValueError("Segmentation has no data")
+
+        data = np.asarray(data)
+        if data.ndim == 3:
+            if data.shape[0] != 1:
+                raise ValueError(
+                    "Expected a 2D array or a (1, H, W) volume, "
+                    f"got shape {data.shape}"
+                )
+            data = data[0]
+        if data.ndim != 2:
+            raise ValueError(
+                f"Expected 2D segmentation data, got shape {data.shape}"
+            )
+
+        out_size = (image.Rows_y, image.Columns_x)
+        matrix = self.projection_matrix
+        if matrix is None:
+            if data.shape[:2] != out_size:
+                raise ValueError(
+                    f"Segmentation shape {data.shape[:2]} does not match image "
+                    f"{out_size} and ImageProjectionMatrix is None"
+                )
+            return np.array(data, copy=True)
+
+        if mode is None:
+            if self.DataRepresentation == DataRepresentation.Probability:
+                mode = Interpolation.BILINEAR
+            else:
+                mode = Interpolation.NEAREST
+
+        warp_data = data
+        restore_uint32 = False
+        if data.dtype == np.uint32:
+            # OpenCV has no CV_32U; an int32 view is bit-preserving under NEAREST.
+            if mode != Interpolation.NEAREST:
+                raise ValueError(
+                    "uint32 (R32UI) warping requires nearest-neighbor interpolation"
+                )
+            warp_data = data.view(np.int32)
+            restore_uint32 = True
+
+        transform = ProjectiveTransform(
+            np.asarray(matrix, dtype=float),
+            in_size=data.shape[:2],
+            out_size=out_size,
+        )
+        result = transform.warp(warp_data, out_size, mode=mode)
+        if restore_uint32:
+            return result.view(np.uint32)
+        return result
+
     def _api_data_path(self) -> str:
         seg_id = getattr(self, "SegmentationID", None)
         if seg_id is not None:
@@ -235,6 +328,31 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
         adapter = get_data_access_adapter()
         return adapter.read_segmentation_data(self, axis=axis, slice_index=slice_index)
 
+    def data_to_binary_mask(self, data: np.ndarray) -> np.ndarray:
+        """Threshold an array in this segmentation's representation to a boolean mask."""
+        if (
+            self.DataRepresentation == DataRepresentation.MultiClass
+            or self.DataRepresentation == DataRepresentation.MultiLabel
+        ):
+            raise ValueError(
+                "MultiClass and MultiLabel data representations are not supported for binary masks"
+            )
+
+        if self.DataRepresentation == DataRepresentation.Binary:
+            return data > 0
+        if self.DataRepresentation == DataRepresentation.DualBitMask:
+            return (data & 1) > 0
+        if self.DataRepresentation == DataRepresentation.Probability:
+            threshold = self.Threshold or 0
+            if self.DataType in (Datatype.R8, Datatype.R8UI):
+                return data > 255 * threshold
+            if self.DataType == Datatype.R32F:
+                return data > threshold
+            raise ValueError(f"Unsupported data type: {self.DataType}")
+        raise ValueError(
+            f"Unsupported data representation: {self.DataRepresentation}"
+        )
+
     @property
     def binary_mask(self) -> np.ndarray | None:
         """
@@ -246,34 +364,11 @@ class SegmentationBase(AttributeValueLookupMixin, Base):
           singleton axes and return the squeezed mask.
         - For 3D segmentations, this returns the full 3D volume.
         """
-        if (
-            self.DataRepresentation == DataRepresentation.MultiClass
-            or self.DataRepresentation == DataRepresentation.MultiLabel
-        ):
-            raise ValueError(
-                "MultiClass and MultiLabel data representations are not supported for binary masks"
-            )
-
         data = self.read_data()
         if data is None:
             return None
 
-        if self.DataRepresentation == DataRepresentation.Binary:
-            mask = data > 0
-        elif self.DataRepresentation == DataRepresentation.DualBitMask:
-            mask = (data & 1) > 0
-        elif self.DataRepresentation == DataRepresentation.Probability:
-            threshold = self.Threshold or 0
-            if self.DataType in (Datatype.R8, Datatype.R8UI):
-                mask = data > 255 * threshold
-            elif self.DataType == Datatype.R32F:
-                mask = data > threshold
-            else:
-                raise ValueError(f"Unsupported data type: {self.DataType}")
-        else:
-            raise ValueError(
-                f"Unsupported data representation: {self.DataRepresentation}"
-            )
+        mask = self.data_to_binary_mask(data)
 
         # Convenience: for "2D" segmentations (any singleton axis), return the squeezed mask.
         # Examples:
@@ -441,8 +536,11 @@ class Segmentation(SegmentationBase):
         ForeignKey("SubTask.SubTaskID", ondelete="SET NULL")
     )
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
-    DateModified: Mapped[Optional[datetime]]
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
+    DateModified: Mapped[Optional[datetime]] = mapped_column(
+        server_default=CurrentTimestampOnUpdate(),
+        server_onupdate=FetchedValue(),
+    )
 
     ReferenceSegmentationID: Mapped[Optional[int]] = mapped_column(
         ForeignKey("Segmentation.SegmentationID")
@@ -600,7 +698,7 @@ class Feature(Base):
     SegmentationModels: Mapped[List["SegmentationModel"]] = relationship(
         "eyened_orm.segmentation.SegmentationModel", back_populates="Feature"
     )
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     # Relationships for parent-child feature hierarchy
     FeatureAssociations: Mapped[List["FeatureFeatureLink"]] = relationship(
@@ -758,7 +856,7 @@ class Model(Base):
     # segmentation models have a feature and segmentations
     # attribute models have only attributes
     Description: Mapped[Optional[str]] = mapped_column(String(255))
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     # relationships
     ProducedAttributeValues: Mapped[List["AttributeValue"]] = relationship(
@@ -794,7 +892,7 @@ class ModelSegmentation(SegmentationBase):
     ModelSegmentationID: Mapped[int] = mapped_column(primary_key=True)
     ModelID: Mapped[int] = mapped_column(ForeignKey("Model.ModelID"))
 
-    DateInserted: Mapped[datetime] = mapped_column(server_default=func.now())
+    DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
 
     Model: Mapped["SegmentationModel"] = relationship(
         "eyened_orm.segmentation.SegmentationModel",

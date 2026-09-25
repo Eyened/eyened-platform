@@ -6,6 +6,15 @@ testpaths = [
     "server",
     "orm",
 ]
+markers = [
+    "mysql: needs a live MySQL database migrated to head (the schema-sync CI job)",
+]
+# config.py defaults host to "database", the dev compose service name, and a
+# plain run needs only EYENED_DATABASE_USER/PASSWORD -- which dev containers
+# get from .env regardless. Without this, a full-suite run from inside a dev
+# container collects the two `mysql` tests and points their ALTERs at the
+# shared dev database.
+addopts = ["-m", "not mysql"]
 
 [tool.coverage.run]
 # "orm", NOT "orm/eyened_orm" -- do not narrow this, however much it looks like

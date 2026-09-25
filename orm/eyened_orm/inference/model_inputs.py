@@ -26,6 +26,11 @@ sortable version. Returns ``None`` when no row qualifies.
 columns NULL (failed inference) are excluded. Set ``require_available=False``
 only when inspecting failure state (e.g. ``ImageInstance.roi`` warnings).
 
+**Unmodeled rows:** candidates with no producing model (``ModelID`` NULL, e.g.
+device PhotoLocators) are never eligible, even when no producing-model filter
+is passed. :attr:`~eyened_orm.image_instance.ImageInstance.attrs` reads those
+rows separately.
+
 Inference pipelines resolve inputs via :func:`resolve_input_attribute_value`,
 which applies the :class:`ModelInputSpec` filters for that dependency. ORM
 shorthand properties and :meth:`~eyened_orm.attribute_value_lookup_mixin.AttributeValueLookupMixin.find_attribute_value`
@@ -151,6 +156,7 @@ def _eligible_attribute_values(
     eligible: list[AttributeValue] = []
     for av in candidates_list:
         producing_model = av.ProducingModel
+        # Always skip unmodeled rows, even when no model filter is passed.
         if producing_model is None or av.ModelID is None:
             continue
 

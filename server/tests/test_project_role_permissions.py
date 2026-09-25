@@ -12,9 +12,17 @@ enforcement layer that denied everything would pass almost all of it. These
 tests are the other direction: the roles v0.3 grants must actually be granted.
 
 "Create/delete tasks" is split: the delete half is a normal case below, and the
-create half is test_anyone_can_create_a_task in test_task_write_floors.py,
-because a new task touches no projects and creation is therefore unrestricted
-for every role.
+create half lives in test_task_write_floors.py. Creation is *restricted*, not
+free: a task declares its projects in the request, and create_task calls
+scope.require(declared, ProjectRole.grader) before it inserts anything. Three
+tests there carry it:
+
+    test_creating_a_task_is_authorized_against_its_declaration
+        the allowed direction -- a grader in the declared project
+    test_creating_a_task_declaring_an_unheld_project_is_refused
+        404, the declared project is invisible to the actor
+    test_read_only_in_the_declared_project_cannot_create_a_task
+        403, the project is held but the actor is under the floor
 """
 from __future__ import annotations
 

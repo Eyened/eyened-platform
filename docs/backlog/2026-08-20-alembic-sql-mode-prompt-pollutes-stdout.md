@@ -1,7 +1,7 @@
 # `alembic upgrade --sql` writes the confirmation prompt into the generated SQL
 
 **Found:** 2026-08-20, while fixing the `alembic stamp` squash-cutover defect.
-**Status:** open — recorded, not repaired.
+**Status:** done — repaired in PR #222.
 
 `orm/migrations/alembic/env.py`'s confirmation guard writes to stdout (`input(...)`
 for the interactive prompt, `print(...)` for the `EYENED_ALEMBIC_ASSUME_YES` notice).
@@ -25,11 +25,15 @@ the next run would write the prompt line as a prefix to the first statement of
 2026-03-23 by `72788a42`. Do not read that clean file as evidence the defect is
 absent.
 
-Repair means moving the prompt (and the assume-yes notice) to stderr, or skipping it
-in `--sql`/offline mode. Either touches `orm/migrations/alembic/env.py`, which
-`orm/eyened_orm/tests/test_alembic_env_read_order.py` pins by AST (read order ahead
-of `load_env_file`, the confirmation call's existence, `compare_type`, `render_item`)
--- a fix has to keep those assertions true, and
-`test_the_confirmation_prompt_still_exists` would need updating too if the prompt
-moves to a different call. Not in scope for the squash-cutover doc/CI fixes;
-recorded here instead.
+## Repair
+
+The guard now writes to stderr throughout. The assume-yes notice and the abort
+message take `file=sys.stderr`; the interactive prompt is printed to stderr and
+`input()` is called with no argument, since `input`'s own prompt goes to stdout.
+
+`test_the_confirmation_prompt_still_exists` needed no change -- `input()` is still
+called at module level, only without its prompt argument. A new sibling,
+`test_the_confirmation_guard_writes_only_to_stderr`, pins the fix: every
+module-level `print(...)` must pass `file=sys.stderr`, and no module-level
+`input(...)` may take a prompt argument. Against the unfixed `env.py` it fails and
+the other four assertions still pass.

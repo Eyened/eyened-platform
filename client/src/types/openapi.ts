@@ -961,7 +961,7 @@ export interface paths {
         put?: never;
         /**
          * Create Task
-         * @description Create a task owned by the current user.
+         * @description Create a task owned by the current user, declaring its projects.
          */
         post: operations["create_task_task_post"];
         delete?: never;
@@ -1312,7 +1312,7 @@ export interface components {
          * ETDRSField
          * @enum {string}
          */
-        ETDRSField: "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7";
+        ETDRSField: "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7" | "WF" | "UWF";
         /**
          * EntityType
          * @enum {string}
@@ -2490,6 +2490,8 @@ export interface components {
             contact_id?: number | null;
             /** Task Definition Id */
             task_definition_id: number;
+            /** Projects */
+            projects: number[];
         };
         /** TaskResponse */
         TaskResponse: {
