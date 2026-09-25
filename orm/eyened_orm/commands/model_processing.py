@@ -23,7 +23,14 @@ from .targets import (
 
 def _get_device(device: str | None):
     """Get torch device from string or auto-detect."""
-    import torch
+    try:
+        import torch
+    except ImportError as exc:
+        raise RuntimeError(
+            "This model needs PyTorch, which is not installed. "
+            "See the inference documentation for how to run models that need it: "
+            "https://eyened.github.io/eyened-platform/orm/inference/#workers-and-images"
+        ) from exc
     from eyened_orm.inference.utils import auto_device
 
     if device is None:
@@ -37,6 +44,19 @@ CFI_ATTRIBUTE_MODEL_SLUGS: tuple[str, ...] = (
     "cfi-odfd",
     "cfi-quality",
 )
+
+# cfi-roi is fundusprep/OpenCV; the other CFI attribute slugs import torch.
+CFI_TORCH_ATTRIBUTE_SLUGS: frozenset[str] = frozenset(
+    slug for slug in CFI_ATTRIBUTE_MODEL_SLUGS if slug != "cfi-roi"
+)
+
+
+def _device_for_cfi_slug(model_slug: str, device: str | None):
+    """Resolve a torch device only for CFI pipelines that need one."""
+    if model_slug not in CFI_TORCH_ATTRIBUTE_SLUGS:
+        return None
+    return _get_device(device)
+
 
 CFI_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("cfi-amd",)
 
@@ -253,7 +273,6 @@ def _run_cfi_models_impl(
     )
 
     database = get_database()
-    device_obj = _get_device(device)
 
     with database.get_session() as session:
         target = resolve_image_target(session, spec, allow_default=True)
@@ -265,7 +284,7 @@ def _run_cfi_models_impl(
                 session,
                 target.image_ids,
                 slug,
-                device=device_obj,
+                device=_device_for_cfi_slug(slug, device),
                 batch_size=batch_size,
                 n_workers=n_workers,
                 overwrite=overwrite,
