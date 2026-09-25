@@ -21,7 +21,7 @@ def _has_tables(database: Database) -> bool:
     a SQLAlchemy one, and an undiagnosable database must be treated as
     populated -- the contract is "failing inspection falls back to
     prompting", not "failing inspection *in a way SQLAlchemy recognizes*
-    falls back to prompting". Do not narrow this back to SQLAlchemyError.
+    falls back to prompting". Do not narrow this to SQLAlchemyError.
     """
     try:
         return bool(inspect(database.engine).get_table_names())

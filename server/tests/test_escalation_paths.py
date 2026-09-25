@@ -97,8 +97,8 @@ def _python_sources():
     for dirpath, dirnames, filenames in os.walk(_ROOT):
         here = pathlib.Path(dirpath)
         # os.path.isfile, not Path.exists: the marker probe stats a path inside
-        # every directory walked, and this tree has unreadable ones (a MySQL
-        # dump under the since-removed database/tmp). Path.exists() re-raises EACCES; isfile
+        # every directory walked, and a checkout can hold unreadable ones (a
+        # root-owned MySQL dump, say). Path.exists() re-raises EACCES; isfile
         # returns False, leaving such a directory in the walk exactly as before,
         # where os.walk itself skips it.
         dirnames[:] = [

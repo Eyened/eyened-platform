@@ -19,9 +19,8 @@ PathLike = Union[str, Path]
 LayerVolumeInput = Union[np.ndarray, PathLike]
 CfiImageInput = Union[np.ndarray, PathLike]
 
-# One compose file for every worker now (``deploy/compose.workers.yaml``
-# replaced the four per-model files that used to live in ``worker/``), so what
-# varies per model is the service and the profile that service sits behind.
+# Every worker is a service in ``deploy/compose.workers.yaml``; a model maps to
+# its service and the profile that service sits behind.
 _WORKER_COMPOSE_FILE = "compose.workers.yaml"
 _WORKER_SERVICE = {
     "layer-segmentation": ("worker-layersegmentation", "gpu-layer-segmentation"),
@@ -92,13 +91,10 @@ def platform_root() -> Path:
 
 
 def _deploy_dir() -> Path:
-    """Where compose.workers.yaml and .env live. ``deploy/``, not ``worker/``."""
+    """Where compose.workers.yaml and .env live: EYENED_DEPLOY_DIR, else <repo>/deploy."""
     if "EYENED_WORKER_DIR" in os.environ and "EYENED_DEPLOY_DIR" not in os.environ:
-        # EYENED_WORKER_DIR was the old name, for a layout this replaced
-        # (worker/ held its own compose files and .env; now it holds only
-        # Dockerfiles). Nothing else in the repo reads it any more, so it is
-        # silently ignored below unless we say so — which matters for anyone
-        # who set it because their layout genuinely differs from the default.
+        # Deprecated alias of EYENED_DEPLOY_DIR, not read: warn so a custom
+        # layout is not silently ignored.
         _log(
             "EYENED_WORKER_DIR is set but is no longer read (renamed to "
             "EYENED_DEPLOY_DIR); ignoring it and falling back to "
@@ -111,7 +107,7 @@ def _image_for_model(model: str) -> str:
     """Resolve built image ref (``docker compose images -q`` is often empty)."""
     service, _profile = _WORKER_SERVICE[model]
     # Naming the service explicitly is what keeps this to ONE image ref: all
-    # four workers live in one file now, so a bare ``--images`` would return
+    # four workers share one file, so a bare ``--images`` would return
     # whichever of them the active profiles happen to select. It also means no
     # ``--profile`` flag is needed — an explicitly named service is resolved
     # whether or not its profile is enabled.

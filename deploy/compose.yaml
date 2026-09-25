@@ -50,7 +50,7 @@ services:
       # the port opens. A healthy probe ends the start period early.
       start_period: 600s
 
-  # One-shot backup tool; see README.md "Backup and restore".
+  # One-shot backup tool; see the docs site, deployment/operations, "Backup and restore".
   xtrabackup:
     profiles: ["backup"]
     image: percona/percona-xtrabackup:8.4.0-6.1

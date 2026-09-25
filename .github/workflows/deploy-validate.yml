@@ -91,7 +91,7 @@ jobs:
       - name: Build and start the production stack
         run: docker compose up -d --build --wait
 
-      # Assert on data: healthy containers alone once hid an empty schema.
+      # Assert on data: healthy containers do not prove the schema was created.
       - name: init succeeded and the schema is at head
         run: |
           test "$(docker compose ps -a --format '{{.ExitCode}}' init)" = 0

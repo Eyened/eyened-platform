@@ -26,9 +26,9 @@ Then, in `deploy/.env`:
   in `deploy/.env` — `deploy/.env.example` is where the ready-to-copy lines
   live, not the file that gets read; copy them into `.env` and replace
   `<PUBLIC_HOST>` with the value you set above.
-  Nothing derives these any more: the bundled Keycloak and an external
-  provider are configured identically, by hand, and all three must move
-  together — see `deploy/compose.yaml` and `deploy/compose.oidc.yaml`.
+  All three are set by hand, for the bundled Keycloak and an external provider
+  alike, and must change together — see `deploy/compose.yaml` and
+  `deploy/compose.oidc.yaml`.
 
 The `EYENED_OIDC_CLIENT_*` lines ship **commented out** in `deploy/.env.example`, and
 `server/config.py` defaults both to the empty string with no validation error. Leave them
@@ -76,8 +76,8 @@ One setting is genuinely optional:
 
 - `KEYCLOAK_PORT` — the host port Keycloak is published on, default `8180`. Change it if
   `8180` is already taken, and update `EYENED_OIDC_METADATA_URL` and
-  `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS` in `deploy/.env` to match — nothing derives
-  them from it any more.
+  `EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS` in `deploy/.env` to match; they are not
+  derived from it.
 
 With `deploy/.env` edited, run `docker compose up -d` from `deploy/`.
 

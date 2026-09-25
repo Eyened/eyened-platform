@@ -84,7 +84,10 @@ database.
   standalone `docker-compose.keycloak.yml` overlay it was layered with is gone: enable OIDC by
   appending `:compose.oidc.yaml` to `COMPOSE_FILE` in `deploy/.env`. Existing OIDC setups must
   also rename `DEV_KEYCLOAK_PORT` to `KEYCLOAK_PORT` — see the renames above — and set the
-  `EYENED_OIDC_*` client settings, which `deploy/.env.example` now carries.
+  `EYENED_OIDC_*` client settings, which `deploy/.env.example` now carries. The overlay derived
+  `EYENED_OIDC_METADATA_URL`, `_REDIRECT_URL` and `_ADDITIONAL_TOKEN_VALIDATIONS` from
+  `DEV_PUBLIC_HOST` and the port variables; nothing derives them now, so set all three by hand and
+  edit them whenever the public host or `KEYCLOAK_PORT` changes.
 - **`database/save_dump.sh` and `load_dump.sh` are gone.** The bundled database is backed up with
   XtraBackup or `mysqldump` through `docker compose`; see [Backup and
   restore](/eyened-platform/deployment/operations#backup-and-restore). `eorm save-dump` / `eorm load-dump` are unchanged.

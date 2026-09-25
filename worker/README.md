@@ -10,11 +10,10 @@ dependencies:
 | `Dockerfile.cfi-amd` | `pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime` | `cfi-amd` |
 | `Dockerfile.layersegmentation` | `pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime` | `layer-segmentation` |
 
-**How to run them: `deploy/compose.workers.yaml`.** One file, for workers on
-the platform host and on a separate GPU box alike. There is no `.env` here any
-more — compose reads `deploy/.env` from the compose file's own directory, so
-there is one env file for both cases. See the *Workers* section of
-[`deploy/README.md`](../deploy/README.md).
+**How to run them: `deploy/compose.workers.yaml`.** One file, configured from
+`deploy/.env`, for workers on the platform host and on a separate GPU box alike.
+See *Workers* in the
+[production guide](https://eyened.github.io/eyened-platform/deployment/production/).
 
 To rebuild one image:
 

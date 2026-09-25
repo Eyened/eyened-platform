@@ -1,4 +1,4 @@
-# RQ workers, beside the platform or on a separate GPU host (README.md, "Workers").
+# RQ workers, beside the platform or on a separate GPU host (docs site, deployment/production, "Workers").
 #
 # Never add a `depends_on`: a GPU host loads this file alone, and compose
 # rejects a dependency on a service it does not define. RQ retries its

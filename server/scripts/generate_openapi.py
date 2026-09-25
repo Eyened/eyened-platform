@@ -27,15 +27,8 @@ def project_root() -> Path:
     """Return the repository root.
 
     This file lives at <repo>/server/scripts/, so the root is two levels up.
-    `load_fastapi_app` puts the root on sys.path to import `server.main`, and
-    `default_output_dir` resolves the docs tree against it.
-
-    Nothing else depends on this file's position any more. It used to: the
-    settings were loaded by a bare `load_dotenv()`, which walks up from *this
-    file's own directory*, so `deploy/.env` resolved only because the script
-    happened to live under `deploy/`. Moving the file broke that silently — the
-    import failed inside pydantic on required settings, with nothing naming the
-    cause. The env file is now an explicit argument.
+    `load_fastapi_app` puts the root on sys.path to import `server.main`;
+    `default_env_file` and `default_output_dir` resolve against it.
     """
     return Path(__file__).resolve().parents[2]
 
