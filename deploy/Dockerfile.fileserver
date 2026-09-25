@@ -16,3 +16,5 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 COPY --from=build /app/client/build /usr/share/nginx/html
+# client/static/* keeps its checkout mode; nginx workers (non-root) need it world-readable.
+RUN chmod -R a+rX /usr/share/nginx/html
