@@ -66,4 +66,59 @@ describe("user page", () => {
 
         expect(await screen.findByText("User not found")).toBeInTheDocument();
     });
+
+    it("revokes only after confirmation", async () => {
+        const revoke = vi.fn(() => json(null, 204));
+        stubFetch({
+            "GET /api/admin/users": () => json([alice]),
+            "GET /api/admin/users/3/memberships": () =>
+                json([
+                    { project_id: 1, project_name: "Alpha", role: "grader" },
+                ]),
+            "GET /api/admin/projects": () => json(projects),
+            "DELETE /api/admin/projects/1/members/3": revoke,
+        });
+        render(UserPage);
+
+        await fireEvent.click(
+            await screen.findByRole("button", { name: "Revoke" }),
+        );
+        await fireEvent.click(
+            await screen.findByRole("button", { name: "Cancel" }),
+        );
+        expect(revoke).not.toHaveBeenCalled();
+
+        await fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+        await fireEvent.click(
+            await screen.findByRole("button", { name: "Confirm" }),
+        );
+        await vi.waitFor(() => expect(revoke).toHaveBeenCalledTimes(1));
+    });
+
+    it.each([
+        { active: true, button: "Deactivate", sent: false },
+        { active: false, button: "Reactivate", sent: true },
+    ])("$button sends active: $sent", async ({ active, button, sent }) => {
+        const setActive = vi.fn(() => json({ ...alice, active: sent }));
+        stubFetch({
+            "GET /api/admin/users": () => json([{ ...alice, active }]),
+            "GET /api/admin/users/3/memberships": () => json([]),
+            "GET /api/admin/projects": () => json(projects),
+            "PUT /api/admin/users/3/active": setActive,
+        });
+        render(UserPage);
+
+        await fireEvent.click(
+            await screen.findByRole("button", { name: button }),
+        );
+        // Reactivate is not destructive, so only Deactivate asks for confirmation.
+        if (active) {
+            await fireEvent.click(
+                await screen.findByRole("button", { name: "Confirm" }),
+            );
+        }
+        await vi.waitFor(() =>
+            expect(setActive).toHaveBeenCalledWith({ active: sent }),
+        );
+    });
 });

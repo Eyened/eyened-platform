@@ -6,9 +6,13 @@
         listMemberships,
         listProjects,
         listUsers,
+        revokeMembership,
+        setActive,
+        setPassword,
         type RoleName,
     } from "$lib/admin/api";
     import { ApiError } from "$lib/api/client";
+    import * as AlertDialog from "$lib/components/ui/alert-dialog";
     import { Button } from "$lib/components/ui/button";
     import * as Table from "$lib/components/ui/table";
     import type {
@@ -81,6 +85,28 @@
         grantProject = undefined;
         await run(() => grantMembership(projectId, userId, grantRole));
     }
+
+    let pending = $state<{ text: string; run: () => Promise<unknown> } | null>(
+        null,
+    );
+    let newPassword = $state("");
+    let passwordSet = $state(false);
+
+    function confirmThen(text: string, action: () => Promise<unknown>) {
+        pending = { text, run: action };
+    }
+
+    async function confirmed() {
+        const action = pending?.run;
+        pending = null;
+        if (action) await run(action);
+    }
+
+    async function changePassword(event: SubmitEvent) {
+        event.preventDefault();
+        passwordSet = await run(() => setPassword(userId, newPassword));
+        if (passwordSet) newPassword = "";
+    }
 </script>
 
 <a class="underline" href={resolve("/admin")}>← Users</a>
@@ -134,7 +160,21 @@
                                 {/each}
                             </select>
                         </Table.Cell>
-                        <Table.Cell></Table.Cell>
+                        <Table.Cell>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onclick={() =>
+                                    confirmThen(
+                                        `Remove ${data?.user.username} from ${m.project_name}?`,
+                                        () =>
+                                            revokeMembership(
+                                                m.project_id,
+                                                userId,
+                                            ),
+                                    )}>Revoke</Button
+                            >
+                        </Table.Cell>
                     </Table.Row>
                 {/each}
             </Table.Body>
@@ -162,4 +202,56 @@
             <Button type="submit">Grant</Button>
         </form>
     {/if}
+
+    <h3 class="mt-8 mb-2 text-lg font-semibold">Account</h3>
+    {#if data.user.active}
+        <Button
+            variant="destructive"
+            onclick={() =>
+                confirmThen(
+                    `Deactivate ${data?.user.username}? They are signed out at their next token refresh.`,
+                    () => setActive(userId, false),
+                )}>Deactivate</Button
+        >
+    {:else}
+        <Button onclick={() => run(() => setActive(userId, true))}
+            >Reactivate</Button
+        >
+    {/if}
+
+    <form onsubmit={changePassword} class="mt-4 flex items-end gap-2">
+        <label class="flex flex-col">
+            New password
+            <input
+                class="rounded border px-2 py-1"
+                type="password"
+                bind:value={newPassword}
+                aria-describedby="password-hint"
+                required
+            />
+        </label>
+        <Button type="submit">Set password</Button>
+        {#if passwordSet}<span>Password set.</span>{/if}
+    </form>
+    <p id="password-hint" class="text-gray-600">
+        At least 15 characters. Must not contain the username or "eyened".
+    </p>
+
+    <AlertDialog.Root
+        open={pending !== null}
+        onOpenChange={(open) => {
+            if (!open) pending = null;
+        }}
+    >
+        <AlertDialog.Content>
+            <AlertDialog.Title>Are you sure?</AlertDialog.Title>
+            <AlertDialog.Description>{pending?.text}</AlertDialog.Description>
+            <div class="flex justify-end gap-2">
+                <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+                <AlertDialog.Action onclick={confirmed}
+                    >Confirm</AlertDialog.Action
+                >
+            </div>
+        </AlertDialog.Content>
+    </AlertDialog.Root>
 {/if}
