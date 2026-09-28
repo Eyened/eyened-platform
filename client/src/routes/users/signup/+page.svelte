@@ -52,7 +52,8 @@
                 />
             </div>
             <p id="password-hint" class="hint">
-                At least 15 characters. Must not contain your username or "eyened".
+                At least 15 characters. Must not contain your username or
+                "eyened".
             </p>
             <div>
                 <button type="submit" disabled={!username || !password}
