@@ -74,3 +74,10 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** Phase 3 ESLint gate
 - **Problem:** query-only `goto()`s carry `svelte/no-navigation-without-resolve` disables that are correct only while `base === ''`. `resolve()` throws on raw `[...]` in a query string.
 - **Fix:** when a base path is introduced, route those through `resolve()` and drop the disables.
+
+### Reload the admin user page when its `id` param changes
+- **Status:** open
+- **Source:** PR #252 review, 2026-09-28
+- **Problem:** `client/src/routes/admin/users/[id]/+page.svelte` reads `const userId = Number(page.params.id)` once. SvelteKit reuses the component on a param-only navigation, so `/admin/users/3` → `/admin/users/4` keeps showing user 3 and later writes target user 3.
+- **Fix:** make `userId` a `$derived` of `page.params.id` and reset state + `load()` in an `$effect`, or remount via `{#key page.params.id}` in a wrapping `+layout.svelte`.
+- **Note:** unreachable today except by a history jump that skips entries (every in-app path goes through `/admin`); fix before adding any user-to-user link.

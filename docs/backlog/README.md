@@ -65,3 +65,4 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Remove small dead code | [frontend](frontend.md) | open |
 | Decide `prefer-const` for `.svelte` files | [frontend](frontend.md) | open |
 | Re-audit navigation if `kit.paths.base` is ever set | [frontend](frontend.md) | open, conditional |
+| Reload the admin user page when its `id` param changes | [frontend](frontend.md) | open |
