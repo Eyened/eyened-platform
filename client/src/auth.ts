@@ -1,11 +1,7 @@
 import { apiErrorFromResponse, fetchApi } from "$lib/api/client";
+import type { UserResponse } from "./types/openapi_types";
 
-export interface UserResponse {
-    id: number;
-    username: string;
-    role: string | null;
-    starred_tags: number[];
-}
+export type { UserResponse };
 
 interface UserLogin {
     username: string;

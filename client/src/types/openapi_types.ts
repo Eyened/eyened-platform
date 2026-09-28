@@ -1,5 +1,10 @@
 import type { components } from "./openapi";
 
+export type AdminProjectResponse =
+    components["schemas"]["AdminProjectResponse"];
+export type AdminUserResponse = components["schemas"]["AdminUserResponse"];
+export type MembershipResponse = components["schemas"]["MembershipResponse"];
+
 export type Body_create_segmentation_segmentations_post =
     components["schemas"]["Body_create_segmentation_segmentations_post"];
 export type ChangePasswordRequest =

@@ -8,6 +8,7 @@ export class UserManager {
         id: -1,
         username: "",
         role: null,
+        is_admin: false,
         starred_tags: [],
     });
     public loggedIn = $derived(this.user.id !== -1);
@@ -90,6 +91,7 @@ export class UserManager {
             id: -1,
             username: "",
             role: null,
+            is_admin: false,
             starred_tags: [],
         };
         this.starredTagIds = [];
