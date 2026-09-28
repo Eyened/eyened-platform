@@ -44,6 +44,7 @@
         <input
             class="rounded border px-2 py-1"
             bind:value={username}
+            autocomplete="off"
             required
         />
     </label>
@@ -52,6 +53,7 @@
         <input
             class="rounded border px-2 py-1"
             type="password"
+            autocomplete="new-password"
             bind:value={password}
             aria-describedby="password-hint"
             required

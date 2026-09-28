@@ -225,6 +225,7 @@
             <input
                 class="rounded border px-2 py-1"
                 type="password"
+                autocomplete="new-password"
                 bind:value={newPassword}
                 aria-describedby="password-hint"
                 required
