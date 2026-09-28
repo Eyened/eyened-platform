@@ -85,6 +85,10 @@
 
 <a class="underline" href={resolve("/admin")}>← Users</a>
 
+{#if error}
+    <p class="mt-4 text-red-600">{error}</p>
+{/if}
+
 {#if notFound}
     <p class="mt-6">User not found</p>
 {:else if data}
@@ -95,10 +99,6 @@
         {#if !data.user.has_credential}<span class="text-sm">No password</span
             >{/if}
     </h2>
-
-    {#if error}
-        <p class="mb-4 text-red-600">{error}</p>
-    {/if}
 
     <h3 class="mb-2 text-lg font-semibold">Memberships</h3>
     {#key data}
