@@ -1,6 +1,7 @@
 import { api } from "$lib/api/client";
 import { apiInvoke } from "$lib/data/api";
 import type {
+    AdminProjectResponse,
     AdminUserResponse,
     MembershipResponse,
 } from "../../types/openapi_types";
@@ -21,4 +22,40 @@ export async function createUser(
         "create user",
     );
     return res.data as AdminUserResponse;
+}
+
+export async function listMemberships(
+    userId: number,
+): Promise<MembershipResponse[]> {
+    const res = await apiInvoke(
+        () =>
+            api.GET("/admin/users/{user_id}/memberships", {
+                params: { path: { user_id: userId } },
+            }),
+        "list memberships",
+    );
+    return res.data ?? [];
+}
+
+export async function listProjects(): Promise<AdminProjectResponse[]> {
+    const res = await apiInvoke(
+        () => api.GET("/admin/projects"),
+        "list projects",
+    );
+    return res.data ?? [];
+}
+
+export async function grantMembership(
+    projectId: number,
+    userId: number,
+    role: RoleName,
+): Promise<void> {
+    await apiInvoke(
+        () =>
+            api.PUT("/admin/projects/{project_id}/members/{user_id}", {
+                params: { path: { project_id: projectId, user_id: userId } },
+                body: { role },
+            }),
+        "grant membership",
+    );
 }
