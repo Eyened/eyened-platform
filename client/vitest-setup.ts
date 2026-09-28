@@ -29,3 +29,15 @@ if (typeof WebGL2RenderingContext === "undefined") {
 afterEach(() => {
     cleanup();
 });
+
+// openapi-fetch builds `new Request("/api/...")`; Node's Request rejects a
+// relative URL, a browser resolves it against the page. Resolve it the same way.
+const NodeRequest = globalThis.Request;
+globalThis.Request = class extends NodeRequest {
+    constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(
+            typeof input === "string" ? new URL(input, location.origin) : input,
+            init,
+        );
+    }
+} as typeof Request;
