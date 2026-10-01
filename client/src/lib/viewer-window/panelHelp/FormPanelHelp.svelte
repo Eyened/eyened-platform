@@ -30,41 +30,22 @@
     <ul>
         <li>
             Activate a point field, then left-click empty image to place a
-            point. Drag a point to move it. Click a point without dragging to
-            cycle its grade. Right-click a point to remove it.
+            point. Drag a point to move it. Right-click a point to remove it.
         </li>
         <li>
-            <kbd>Ctrl</kbd>-click places another point even on top of an
-            existing marker, so two points can sit closer than the marker
-            itself. That click does not cycle or drag.
+            Click a point without dragging, or hover it and press <kbd>C</kbd>,
+            to cycle its grade. Further clicks or presses walk the values and
+            wrap.
         </li>
         <li>
             A required grade starts on the first value as soon as the point is
-            placed.
+            placed. An optional grade stays unset until that first click or
+            <kbd>C</kbd>, and the form keeps a blank choice for it.
         </li>
         <li>
-            An optional grade stays unset until you set it. The form still
-            offers a blank choice for that grade.
+            On a list of points, <kbd>Ctrl</kbd>-click places another point even
+            on top of an existing marker. That click does not cycle or drag. A
+            single landmark stays one point.
         </li>
     </ul>
-</section>
-
-<section>
-    <h2>Grade</h2>
-    <p>
-        Click a point without dragging it, or hover it and press <kbd>C</kbd>,
-        to cycle its grade. Further clicks or presses move through the remaining
-        values and wrap back to the first. On an optional grade, the first click
-        or press sets the first value.
-    </p>
-    <dl>
-        <div class="row">
-            <dt>Cycle the point's grade</dt>
-            <dd>Click or <kbd>C</kbd></dd>
-        </div>
-        <div class="row">
-            <dt>Place a point on top of another</dt>
-            <dd><kbd>Ctrl</kbd> + click</dd>
-        </div>
-    </dl>
 </section>

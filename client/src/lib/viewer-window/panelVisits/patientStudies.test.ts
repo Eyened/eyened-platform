@@ -38,7 +38,6 @@ describe("loadPatientStudies", () => {
             page: 0,
             order_by: "Study Date",
             order: "DESC",
-            include_count: true,
         });
         expect(result.studies.map((study) => study.id)).toEqual([2, 1]);
         expect(result.truncated).toBe(false);

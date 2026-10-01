@@ -44,7 +44,6 @@ async function fetchPatientStudies(
         page: 0,
         order_by: "Study Date",
         order: "DESC",
-        include_count: true,
     };
     const data = await searchStudies(query);
     const studies = [...(data.studies ?? [])].sort(

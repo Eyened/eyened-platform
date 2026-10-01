@@ -10,6 +10,7 @@ import type {
     ImagePoint,
     PointCardinality,
     PointCoordinateSpace,
+    PointEnumExtra,
     PointList,
 } from "$lib/forms/pointSchema";
 import { canPlaceOnViewer } from "$lib/forms/pointSchema";
@@ -48,11 +49,7 @@ export type PointToolOptions = {
     slotLabels?: readonly string[];
     /** Keyboard shortcut → place into that index (also sets placementIndex). */
     slotKeys?: readonly { index: number; key: string }[];
-    enumExtras?: {
-        key: string;
-        values: readonly string[];
-        required?: boolean;
-    }[];
+    enumExtras?: readonly PointEnumExtra[];
     /**
      * Fired after every local mutation of `points` (including drag moves).
      * Use for in-memory / UI sync. Prefer `onPersist` for server writes.
@@ -102,11 +99,7 @@ export class PointTool implements Overlay {
     private readonly slotKeys:
         | readonly { index: number; key: string }[]
         | undefined;
-    private readonly enumExtras: {
-        key: string;
-        values: readonly string[];
-        required?: boolean;
-    }[];
+    private readonly enumExtras: readonly PointEnumExtra[];
     private readonly onChange: ((points: PointList) => void) | undefined;
     private readonly onPersist: ((points: PointList) => void) | undefined;
     /** True while a place/drag gesture may need a persist on pointerup. */
@@ -299,7 +292,7 @@ export class PointTool implements Overlay {
         this.cycleGradeAt(this.activePointIndex ?? this.hoverPointIndex);
     }
 
-    /** Advance the first enum extra on a point. No-op when the point has no grade. */
+    /** Advance the first enum extra. An unset grade becomes the first value. */
     private cycleGradeAt(index: number | undefined) {
         if (index === undefined) return;
         const point = this.points[index];

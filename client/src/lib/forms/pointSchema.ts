@@ -29,7 +29,7 @@ export type PointEnumExtra = {
     key: string;
     values: readonly string[];
     /** True when the point object schema lists `key` in `required`. */
-    required: boolean;
+    required?: boolean;
 };
 
 export type PointSchemaAnalysis = {

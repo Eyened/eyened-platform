@@ -81,7 +81,7 @@ describe("PanelVisits", () => {
         expect(loadPatientStudies).not.toHaveBeenCalled();
     });
 
-    it("opens grading for the current visit and keeps other visits folded", async () => {
+    it("opens external data for the current visit and keeps other visits folded", async () => {
         render(PanelVisits, { props: { active: true }, context });
 
         expect(
@@ -91,9 +91,6 @@ describe("PanelVisits", () => {
             screen.getByRole("button", { name: /2020-01-01/ }),
         ).toBeInTheDocument();
         expect(screen.getByText("this visit")).toBeInTheDocument();
-        expect(
-            screen.queryByRole("heading", { name: "Visit grades" }),
-        ).not.toBeInTheDocument();
         expect(
             await screen.findAllByRole("heading", { name: /External grades/ }),
         ).toHaveLength(1);

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Input } from "$lib/components/ui/input";
-    import type { ImagePoint } from "$lib/forms/pointSchema";
+    import type { ImagePoint, PointEnumExtra } from "$lib/forms/pointSchema";
     import { Trash } from "$lib/viewer-window/icons/icons";
 
     export type PointRow = { publicId: string; index: number; pt: ImagePoint };
@@ -9,11 +9,7 @@
         row: PointRow;
         canEdit: boolean;
         hasExtras: boolean;
-        enumExtras: {
-            key: string;
-            values: readonly string[];
-            required?: boolean;
-        }[];
+        enumExtras: readonly PointEnumExtra[];
         stringExtraKeys: string[];
         indexApplicable: (pt: ImagePoint) => boolean;
         /** When false (volume schemas), blanking i is rejected upstream. */
