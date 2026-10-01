@@ -26,6 +26,13 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** 46 `svelte/require-each-key` suppressions; unkeyed eaches attach DOM/state/focus to the wrong item on reorder.
 - **Fix:** key by stable identity, prioritising blocks with local state/inputs/components; never key by index.
 
+### Hide the editing tools a project role does not allow
+- **Status:** open
+- **Source:** PR #247 review (bjliefers), 2026-10-01
+- **Problem:** a `read_only` member still sees the FormAnnotation and segmentation tools; writes are refused with 403 only after the user has worked. The client cannot gate them: no response carries the caller's role per project (`UserResponse.role` is the legacy `Creator.Role`).
+- **Fix:** expose the caller's effective role per project (e.g. a `{project_id: role}` map plus `is_admin` on `GET /auth/me`, or a `can_annotate` flag on the image/task DTOs) and gate the tool panels on it.
+- **Note:** a task spanning projects needs the floor role in every one, so the gate must evaluate all projects the image or task touches.
+
 ### Ratchet down `@typescript-eslint/no-explicit-any`
 - **Status:** open
 - **Source:** Phase 3 ESLint gate

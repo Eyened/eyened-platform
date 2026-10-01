@@ -57,6 +57,7 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Stop treating 403 as an expired session in the API client | [frontend](frontend.md) | open |
 | Fix Svelte 5 reactivity traps | [frontend](frontend.md) | open |
 | Key the grandfathered `{#each}` blocks | [frontend](frontend.md) | open |
+| Hide the editing tools a project role does not allow | [frontend](frontend.md) | open |
 | Ratchet down `@typescript-eslint/no-explicit-any` | [frontend](frontend.md) | open |
 | Gate svelte-check in CI (Phase 4) | [frontend](frontend.md) | open |
 | Fix the remaining svelte-check error clusters | [frontend](frontend.md) | open |

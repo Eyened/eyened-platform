@@ -300,6 +300,21 @@ def test_init_admin_audits_a_creation_as_a_creation(session, stub_database):
     }
 
 
+def test_init_admin_reads_both_credentials_from_the_environment(session, stub_database):
+    """A deploy script sets the env vars and must not be prompted."""
+    result = CliRunner().invoke(
+        init_admin,
+        [],
+        env={
+            "EYENED_API_ADMIN_USERNAME": "root",
+            "EYENED_API_ADMIN_PASSWORD": "correct horse battery staple",
+        },
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "root: created" in result.output
+
+
 def test_init_admin_audits_a_promotion_as_a_promotion(session, stub_database):
     make_creator(session, "root")
     session.commit()

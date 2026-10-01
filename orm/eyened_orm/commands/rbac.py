@@ -30,7 +30,11 @@ from .shared import account_admin, admin_scope_for_cli, get_database
 
 @click.command("init-admin")
 @click.option(
-    "--username", type=str, prompt=True, help="Must match EYENED_API_ADMIN_USERNAME."
+    "--username",
+    type=str,
+    envvar="EYENED_API_ADMIN_USERNAME",
+    prompt=True,
+    help="Reads EYENED_API_ADMIN_USERNAME if set; otherwise prompts.",
 )
 @click.option(
     "--password",
