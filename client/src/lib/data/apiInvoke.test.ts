@@ -137,8 +137,31 @@ describe("apiInvokeAllowEmpty", () => {
     });
 
     it("still refuses an unauthorized response, after one refresh and retry", async () => {
-        // Allowing an empty body must not extend to letting a 403 through as
+        // Allowing an empty body must not extend to letting a 401 through as
         // a successful result.
+        const refresh = vi
+            .spyOn(authClient, "refresh")
+            .mockResolvedValue({} as UserResponse);
+        const call = vi.fn().mockResolvedValue({
+            error: { detail: "Authentication required" },
+            response: new Response(null, { status: 401 }),
+        });
+
+        const thrown: unknown = await apiInvokeAllowEmpty(call).then(
+            () => null,
+            (e) => e,
+        );
+
+        expect(thrown).toBeInstanceOf(ApiError);
+        expect((thrown as ApiError).status).toBe(401);
+        expect((thrown as ApiError).message).toBe("Authentication required");
+        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(call).toHaveBeenCalledTimes(2);
+    });
+
+    it("surfaces a forbidden response without refreshing the session", async () => {
+        // 403 is a permission refusal from a valid session; refreshing cannot
+        // change it, and treating it as expiry ends in redirectToLogin().
         const refresh = vi
             .spyOn(authClient, "refresh")
             .mockResolvedValue({} as UserResponse);
@@ -155,8 +178,8 @@ describe("apiInvokeAllowEmpty", () => {
         expect(thrown).toBeInstanceOf(ApiError);
         expect((thrown as ApiError).status).toBe(403);
         expect((thrown as ApiError).message).toBe("Not enough permissions.");
-        expect(refresh).toHaveBeenCalledTimes(1);
-        expect(call).toHaveBeenCalledTimes(2);
+        expect(refresh).not.toHaveBeenCalled();
+        expect(call).toHaveBeenCalledTimes(1);
     });
 
     it("names the status when an unauthorized body carries no detail", async () => {

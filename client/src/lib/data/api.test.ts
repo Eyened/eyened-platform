@@ -12,8 +12,7 @@ vi.mock("../api/client", async (importOriginal) => {
             DELETE: vi.fn(),
         },
         withAuthRetry: async (fn: () => Promise<unknown>) => fn(),
-        isUnauthorizedStatus: (status: number) =>
-            status === 401 || status === 403,
+        isUnauthorizedStatus: (status: number) => status === 401,
         fetchApi: vi.fn(),
     };
 });
@@ -116,5 +115,34 @@ describe("subtask API helpers", () => {
             expect(apiError.message).toBe("SubTask is already assigned");
             expect(apiError.code).toBe("subtask_already_claimed");
         }
+    });
+});
+
+describe("updateSegmentationData", () => {
+    it("rejects a refused save instead of returning it as saved", async () => {
+        const { fetchApi } = await import("../api/client");
+        const { updateSegmentationData } = await import("./helpers");
+        vi.mocked(fetchApi).mockResolvedValue(
+            new Response(
+                JSON.stringify({ detail: "Not enough permissions." }),
+                {
+                    status: 403,
+                },
+            ),
+        );
+
+        const thrown: unknown = await updateSegmentationData(
+            1,
+            new ArrayBuffer(0),
+        ).then(
+            () => null,
+            (e) => e,
+        );
+
+        expect(thrown).toBeInstanceOf(ApiError);
+        expect((thrown as InstanceType<typeof ApiError>).status).toBe(403);
+        expect((thrown as InstanceType<typeof ApiError>).message).toBe(
+            "Not enough permissions.",
+        );
     });
 });
