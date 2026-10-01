@@ -1,8 +1,9 @@
 <script lang="ts">
-    import AdditionalDataSources from "$lib/browser/AdditionalDataSources.svelte";
-    import extensions from "$lib/extensions";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
+    import PanelVisits from "../panelVisits/PanelVisits.svelte";
+
+    let { active = false }: { active?: boolean } = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const { image } = viewerContext;
@@ -18,13 +19,6 @@
         "Scan mode": instance.scan?.mode,
         "ETDRS Field": instance.etdrs_field,
     };
-    const context = {
-        instance,
-        study: instance.study,
-        patient: instance.patient,
-        project: instance.project,
-    };
-    const { additional_data_sources } = extensions.viewer.panel_info;
 </script>
 
 <div id="main">
@@ -38,7 +32,7 @@
             {/each}
         </tbody>
     </table>
-    <AdditionalDataSources {context} {additional_data_sources} />
+    <PanelVisits {active} />
 </div>
 
 <style>

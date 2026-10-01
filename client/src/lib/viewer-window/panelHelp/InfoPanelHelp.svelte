@@ -2,7 +2,7 @@
 <section>
     <p>Review patient, study, device, and modality fields at a glance.</p>
     <p>
-        Additional data sources configured for your deployment may appear below
-        the main table.
+        Below the table, each visit for this patient can be opened to show the
+        external data sources configured for the info panel.
     </p>
 </section>
