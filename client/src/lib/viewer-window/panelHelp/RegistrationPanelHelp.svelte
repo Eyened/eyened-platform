@@ -30,6 +30,10 @@
     <h2>Editing points</h2>
     <ul>
         <li>Left click on empty space to add a new point.</li>
+        <li>
+            <kbd>Ctrl</kbd>-click places another point even on top of an
+            existing marker. That click does not drag.
+        </li>
         <li>Left click on an existing point, then drag to move.</li>
         <li>Right click on a point to remove it.</li>
         <li>Hold Shift while clicking to pan/zoom without editing.</li>

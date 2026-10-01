@@ -34,6 +34,11 @@
             cycle its grade. Right-click a point to remove it.
         </li>
         <li>
+            <kbd>Ctrl</kbd>-click places another point even on top of an
+            existing marker, so two points can sit closer than the marker
+            itself. That click does not cycle or drag.
+        </li>
+        <li>
             A required grade starts on the first value as soon as the point is
             placed.
         </li>
@@ -56,6 +61,10 @@
         <div class="row">
             <dt>Cycle the point's grade</dt>
             <dd>Click or <kbd>C</kbd></dd>
+        </div>
+        <div class="row">
+            <dt>Place a point on top of another</dt>
+            <dd><kbd>Ctrl</kbd> + click</dd>
         </div>
     </dl>
 </section>

@@ -216,6 +216,32 @@ describe("PointTool", () => {
         expect(tool.points[0]).toEqual({ x: 30, y: 40, severity: "mild" });
     });
 
+    it("ctrl-click stacks a point on an existing marker without cycling or dragging", () => {
+        const onPersist = vi.fn();
+        const tool = new PointTool({
+            onPersist,
+            enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
+        });
+        const viewer = mockViewer();
+        tool.points = [{ x: 10, y: 10, severity: "mild" }];
+
+        tool.pointerdown(
+            pointerEvent(viewer, { x: 10, y: 10 }, { ctrlKey: true }),
+        );
+        tool.pointermove(
+            pointerEvent(viewer, { x: 40, y: 50 }, { ctrlKey: true }),
+        );
+        tool.pointerup(
+            pointerEvent(viewer, { x: 40, y: 50 }, { ctrlKey: true }),
+        );
+
+        expect(tool.points).toEqual([
+            { x: 10, y: 10, severity: "mild" },
+            { x: 10, y: 10 },
+        ]);
+        expect(onPersist).toHaveBeenCalledTimes(1);
+    });
+
     it("does not cycle a grade when the same click places the point", () => {
         const tool = new PointTool({
             enumExtras: [

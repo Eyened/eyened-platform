@@ -115,7 +115,7 @@ export class PointTool implements Overlay {
     constructor(options: PointToolOptions = {}) {
         this.canEdit = options.canEdit ?? true;
         this.pointStyle = options.pointStyle ?? "circle";
-        this.radius = options.radius ?? 16;
+        this.radius = options.radius ?? 12;
         this.color = options.color ?? defaultStroke;
         this.name = options.label || "Point";
         this.cardinality = options.cardinality ?? "list";
@@ -144,6 +144,8 @@ export class PointTool implements Overlay {
         viewerContext: ViewerContext,
         cursor: Position2D,
         slot?: number,
+        /** When false, the new point stays put (Ctrl-click stack). */
+        drag = true,
     ) {
         if (!this.canEdit) return;
         if (this.coordinateSpace) {
@@ -194,7 +196,12 @@ export class PointTool implements Overlay {
         if (this.placementIndex !== undefined && targetSlot !== undefined) {
             this.placementIndex = targetSlot;
         }
-        this.beginDrag(viewerContext, newIndex);
+        if (drag) {
+            this.beginDrag(viewerContext, newIndex);
+        } else {
+            this.activePointIndex = undefined;
+            this.dragged = false;
+        }
     }
 
     private placeIndexOptions(
@@ -328,6 +335,16 @@ export class PointTool implements Overlay {
         if (!this.canEdit) return;
 
         if (event.button === 0) {
+            // Ctrl-click places even when the cursor is on a marker, so list
+            // points can share a spot closer than the hit radius. No cycle, no drag.
+            if (
+                event.ctrlKey &&
+                this.cardinality === "list" &&
+                this.placementIndex === undefined
+            ) {
+                this.placeAtCursor(viewerContext, cursor, undefined, false);
+                return;
+            }
             const hit = this.findHit(cursor, viewerContext);
             if (hit !== undefined) {
                 // Only switch the restricted index when one is already set
