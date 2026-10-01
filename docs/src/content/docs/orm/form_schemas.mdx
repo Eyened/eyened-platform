@@ -113,7 +113,7 @@ The viewer understands an optional vendor extension on field (or root) schemas:
 "x-eyened-widget": "keypoint"
 ```
 
-When present, SchemaForm shows a **PointField** with an Activate control that arms a shared viewer `PointTool` (place with LMB, delete with RMB). Behavior comes from ordinary JSON Schema shape:
+When present, SchemaForm shows a **PointField** with an Activate control that arms a shared viewer `PointTool` (place with LMB, delete with RMB). Click a point without dragging, or press **C** while hovering it, to cycle its grade (the first string enum). A grade listed in the point object's `required` array starts on the first enum value; an optional grade stays unset until that click or **C**. Behavior comes from ordinary JSON Schema shape:
 
 | Schema shape | Meaning |
 |--------------|---------|

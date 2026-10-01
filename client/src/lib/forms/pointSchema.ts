@@ -24,6 +24,14 @@ export type PointAddressing = "bare" | "byImage";
 export type PointCoordinateSpace = "enface2d" | "volume" | "oct";
 export type PointList = (ImagePoint | null)[];
 
+/** String enum stored on a point (the grade C cycles is the first of these). */
+export type PointEnumExtra = {
+    key: string;
+    values: readonly string[];
+    /** True when the point object schema lists `key` in `required`. */
+    required: boolean;
+};
+
 export type PointSchemaAnalysis = {
     cardinality: PointCardinality;
     addressing: PointAddressing;
@@ -31,7 +39,7 @@ export type PointSchemaAnalysis = {
     pointObjectSchema: JSONSchema;
     /** List items may be null — mid-delete leaves holes; empty click fills first null. */
     sparse: boolean;
-    enumExtras: { key: string; values: readonly string[] }[];
+    enumExtras: PointEnumExtra[];
     coordinateSpace: PointCoordinateSpace;
 };
 
@@ -101,8 +109,9 @@ function unwrapPointItemSchema(
 
 function enumExtrasFromPointSchema(
     pointObjectSchema: JSONSchema,
-): { key: string; values: readonly string[] }[] {
-    const extras: { key: string; values: readonly string[] }[] = [];
+): PointEnumExtra[] {
+    const extras: PointEnumExtra[] = [];
+    const requiredKeys = new Set(pointObjectSchema.required ?? []);
     const props = pointObjectSchema.properties ?? {};
     for (const [key, prop] of Object.entries(props)) {
         if (key === "x" || key === "y") continue;
@@ -112,7 +121,11 @@ function enumExtrasFromPointSchema(
             values.length > 0 &&
             values.every((v) => typeof v === "string")
         ) {
-            extras.push({ key, values: values as readonly string[] });
+            extras.push({
+                key,
+                values: values as readonly string[],
+                required: requiredKeys.has(key),
+            });
         }
     }
     return extras;

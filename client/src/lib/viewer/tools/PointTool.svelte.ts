@@ -21,6 +21,8 @@ import { toast } from "svelte-sonner";
 
 const defaultStroke = "rgba(0, 255, 0, 1)";
 const fillStyle = "rgba(255, 255, 255, 0.6)";
+/** Viewer-pixel movement before a press on a point becomes a drag. */
+const CLICK_DRAG_THRESHOLD_PX = 4;
 
 export type PointToolOptions = {
     canEdit?: boolean;
@@ -46,7 +48,11 @@ export type PointToolOptions = {
     slotLabels?: readonly string[];
     /** Keyboard shortcut → place into that index (also sets placementIndex). */
     slotKeys?: readonly { index: number; key: string }[];
-    enumExtras?: { key: string; values: readonly string[] }[];
+    enumExtras?: {
+        key: string;
+        values: readonly string[];
+        required?: boolean;
+    }[];
     /**
      * Fired after every local mutation of `points` (including drag moves).
      * Use for in-memory / UI sync. Prefer `onPersist` for server writes.
@@ -77,6 +83,10 @@ export class PointTool implements Overlay {
 
     private activePointIndex: number | undefined;
     private hoverPointIndex: number | undefined;
+    /** Press started on an existing point (not a placement). Click cycles its grade. */
+    private pressedExisting = false;
+    private pressOrigin: Position2D | undefined;
+    private dragged = false;
 
     toolName: ToolName = "point";
     name: string = "Point";
@@ -92,7 +102,11 @@ export class PointTool implements Overlay {
     private readonly slotKeys:
         | readonly { index: number; key: string }[]
         | undefined;
-    private readonly enumExtras: { key: string; values: readonly string[] }[];
+    private readonly enumExtras: {
+        key: string;
+        values: readonly string[];
+        required?: boolean;
+    }[];
     private readonly onChange: ((points: PointList) => void) | undefined;
     private readonly onPersist: ((points: PointList) => void) | undefined;
     /** True while a place/drag gesture may need a persist on pointerup. */
@@ -146,16 +160,20 @@ export class PointTool implements Overlay {
         const before = this.points;
         const targetSlot = slot ?? this.placementIndex;
         const indexOpts = this.placeIndexOptions(viewerContext);
+        const placeOptions =
+            indexOpts || this.enumExtras.length > 0
+                ? { ...indexOpts, enumExtras: this.enumExtras }
+                : undefined;
 
         const after =
             targetSlot !== undefined
-                ? placePointAt(before, targetSlot, position, indexOpts)
+                ? placePointAt(before, targetSlot, position, placeOptions)
                 : placePoint(
                       before,
                       position,
                       this.cardinality,
                       this.sparse,
-                      indexOpts,
+                      placeOptions,
                   );
 
         let newIndex = targetSlot;
@@ -167,6 +185,8 @@ export class PointTool implements Overlay {
         }
 
         this.setPoints(after);
+        this.pressedExisting = false;
+        this.pressOrigin = undefined;
         this.persistOnRelease = true;
         // Restricted mode (ETDRS): keep sticking to the placement index.
         // Unrestricted (Registration): leave placementIndex undefined so the
@@ -269,7 +289,11 @@ export class PointTool implements Overlay {
         }
 
         if (event.key.toLowerCase() !== "c") return;
-        const index = this.activePointIndex ?? this.hoverPointIndex;
+        this.cycleGradeAt(this.activePointIndex ?? this.hoverPointIndex);
+    }
+
+    /** Advance the first enum extra on a point. No-op when the point has no grade. */
+    private cycleGradeAt(index: number | undefined) {
         if (index === undefined) return;
         const point = this.points[index];
         if (!point) return;
@@ -278,6 +302,24 @@ export class PointTool implements Overlay {
         const points = [...this.points];
         points[index] = cycleEnumExtra(point, extra.key, extra.values);
         this.setPoints(points, { persist: true });
+    }
+
+    private pointerMoved(cursor: Position2D): boolean {
+        if (!this.pressOrigin) return false;
+        const dx = cursor.x - this.pressOrigin.x;
+        const dy = cursor.y - this.pressOrigin.y;
+        return dx * dx + dy * dy > CLICK_DRAG_THRESHOLD_PX ** 2;
+    }
+
+    private applyDrag(viewerContext: ViewerContext, cursor: Position2D) {
+        if (this.activePointIndex === undefined) return;
+        const position = viewerContext.viewerToImageCoordinates(cursor);
+        this.setPoints(
+            movePointAt(this.points, this.activePointIndex, position),
+        );
+        this.persistOnRelease = true;
+        this.dragged = true;
+        viewerContext.claimCursor("grabbing", CursorPriority.Drag);
     }
 
     pointerdown(pointerEvent: ViewerEvent<PointerEvent>) {
@@ -293,6 +335,9 @@ export class PointTool implements Overlay {
                 if (this.placementIndex !== undefined) {
                     this.placementIndex = hit;
                 }
+                this.pressOrigin = { x: cursor.x, y: cursor.y };
+                this.pressedExisting = true;
+                this.dragged = false;
                 this.persistOnRelease = true;
                 this.beginDrag(viewerContext, hit);
                 return;
@@ -319,8 +364,21 @@ export class PointTool implements Overlay {
                     persist: true,
                 });
             }
+        } else if (
+            event.button === 0 &&
+            this.pressedExisting &&
+            !this.dragged &&
+            this.activePointIndex !== undefined
+        ) {
+            if (!this.pointerMoved(cursor)) {
+                this.cycleGradeAt(this.activePointIndex);
+            } else {
+                this.applyDrag(viewerContext, cursor);
+            }
         }
 
+        this.pressedExisting = false;
+        this.pressOrigin = undefined;
         this.endDrag(viewerContext, cursor);
     }
 
@@ -328,13 +386,9 @@ export class PointTool implements Overlay {
         const { cursor, viewerContext } = e;
 
         if (this.activePointIndex !== undefined && this.canEdit) {
-            const position = viewerContext.viewerToImageCoordinates(cursor);
-            // Live render / local store only — persist on pointerup.
-            this.setPoints(
-                movePointAt(this.points, this.activePointIndex, position),
-            );
-            this.persistOnRelease = true;
-            viewerContext.claimCursor("grabbing", CursorPriority.Drag);
+            // Hold still on a graded point: pointerup cycles instead of moving.
+            if (this.pressedExisting && !this.pointerMoved(cursor)) return;
+            this.applyDrag(viewerContext, cursor);
         } else {
             this.hoverPointIndex = this.findHit(cursor, viewerContext);
         }

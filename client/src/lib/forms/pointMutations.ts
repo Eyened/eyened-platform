@@ -7,7 +7,52 @@ export type PlacePointOptions = {
      * Omit the option entirely for plain 2D images (no index property).
      */
     index?: number | null;
+    /**
+     * String enums on the point. A required one is set to its first value
+     * when the written point does not already have a valid value.
+     */
+    enumExtras?: readonly {
+        key: string;
+        values: readonly string[];
+        required?: boolean;
+    }[];
 };
+
+function withRequiredEnumDefaults(
+    point: ImagePoint,
+    options?: PlacePointOptions,
+): ImagePoint {
+    const extras = options?.enumExtras;
+    if (!extras?.length) return point;
+    let next = point;
+    for (const extra of extras) {
+        if (!extra.required || extra.values.length === 0) continue;
+        const current = next[extra.key];
+        if (typeof current === "string" && extra.values.includes(current)) {
+            continue;
+        }
+        next = { ...next, [extra.key]: extra.values[0]! };
+    }
+    return next;
+}
+
+/** Keep a valid enum already stored on a point being rewritten in place. */
+function carryEnumExtras(
+    existing: ImagePoint | null | undefined,
+    point: ImagePoint,
+    options?: PlacePointOptions,
+): ImagePoint {
+    const extras = options?.enumExtras;
+    if (!existing || !extras?.length) return point;
+    let next = point;
+    for (const extra of extras) {
+        const current = existing[extra.key];
+        if (typeof current === "string" && extra.values.includes(current)) {
+            next = { ...next, [extra.key]: current };
+        }
+    }
+    return next;
+}
 
 export function placePoint(
     points: PointList,
@@ -29,21 +74,21 @@ export function placePoint(
         // marker stays visible (visibleOnSlice rejects numeric index on 2D).
         if (!options || !("index" in options)) {
             const { index: _drop, ...rest } = merged;
-            return [rest];
+            return [withRequiredEnumDefaults(rest, options)];
         }
-        return [merged];
+        return [withRequiredEnumDefaults(merged, options)];
     }
 
     const copy = [...points];
     if (sparse) {
         for (let i = 0; i <= copy.length; i++) {
             if (!copy[i]) {
-                copy[i] = next;
+                copy[i] = withRequiredEnumDefaults(next, options);
                 return copy;
             }
         }
     }
-    copy.push(next);
+    copy.push(withRequiredEnumDefaults(next, options));
     return copy;
 }
 
@@ -60,7 +105,11 @@ export function placePointAt(
     }
     const copy = [...points];
     while (copy.length <= index) copy.push(null);
-    copy[index] = next;
+    const existing = copy[index];
+    copy[index] = withRequiredEnumDefaults(
+        carryEnumExtras(existing, next, options),
+        options,
+    );
     return copy;
 }
 

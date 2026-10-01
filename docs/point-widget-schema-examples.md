@@ -19,7 +19,7 @@ Incompatible placements toast from the viewer tool; the form Activate control is
 
 Use **`title`** for the fixed name shown on the image (e.g. `"Fovea"`). Optional properties on each point (enums, short strings) can show instead when set. Prefer a short `title`; put longer help text in `description`.
 
-Activate the tool from the form field, then click the image to place. Right-click a point to remove it. For enum properties, press **C** while hovering a point to cycle values.
+Activate the tool from the form field, then click the image to place. Right-click a point to remove it. Click a point without dragging, or press **C** while hovering it, to cycle its enum grade (the first string enum on the point). If that property is in `required`, a new point starts on the first enum value. If it is optional, the point stays unset until the first click or press of **C**.
 
 In the form entry UI you can click on a coordinate to edit it manually (both the coordinates and optional label/text).
 

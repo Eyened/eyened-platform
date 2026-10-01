@@ -9,7 +9,11 @@
         row: PointRow;
         canEdit: boolean;
         hasExtras: boolean;
-        enumExtras: { key: string; values: readonly string[] }[];
+        enumExtras: {
+            key: string;
+            values: readonly string[];
+            required?: boolean;
+        }[];
         stringExtraKeys: string[];
         indexApplicable: (pt: ImagePoint) => boolean;
         /** When false (volume schemas), blanking i is rejected upstream. */
@@ -145,7 +149,9 @@
                                 (e.currentTarget as HTMLSelectElement).value,
                             )}
                     >
-                        <option value="">—</option>
+                        {#if !extra.required}
+                            <option value="">—</option>
+                        {/if}
                         {#each extra.values as opt (opt)}
                             <option value={opt}>{opt}</option>
                         {/each}
