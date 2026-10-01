@@ -38,9 +38,6 @@ class CurrentUser:
         self.id = creator_id
         self.username = username
 
-    def get_creator(self, session: Session) -> Creator:
-        return session.query(Creator).where(Creator.CreatorID == self.id).first()
-
 
 def _decode_token_or_401(token: str, *, detail: str | None = None) -> dict:
     """Decode JWT; raise 401 when invalid."""

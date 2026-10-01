@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import Select, case, func, select, update
+from collections.abc import Sequence
+
+from sqlalchemy import Select, case, exists, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import (
@@ -79,6 +81,64 @@ class TaskRepository:
         floor pass.
         """
         return projects_of(self._session, Task, task_id)
+
+    def existing_ids(self, task_ids: Sequence[int]) -> set[int]:
+        """Which of ``task_ids`` exist, for a caller that must reject the rest.
+
+        Deliberately unscoped, for the same reason as ``project_ids`` above: the
+        CLI grants against tasks the operator names, and filtering by a scope
+        here would report a real task as missing.
+        """
+        if not task_ids:
+            return set()
+        return {
+            int(task_id)
+            for task_id in self._session.scalars(
+                select(Task.TaskID).where(Task.TaskID.in_(list(task_ids)))
+            ).all()
+        }
+
+    def unused_declarations(self) -> list[tuple[int, int]]:
+        """(task_id, project_id) pairs a task declares but no link uses.
+
+        Only one direction is possible: ``fk_SubTaskImageLink_TaskProject``
+        makes a link without a matching declaration impossible, so a
+        declaration can only be broader than its links, never narrower.
+        Broader is fail-safe -- it makes a task harder to see, not easier --
+        which is why this is a report rather than a reconciliation job.
+
+        Rows here are expected, not faults, and two ordinary kinds occupy it. A
+        task declares its projects at creation and acquires its links
+        afterwards, so ``POST /task`` puts every task it creates in this
+        report until something populates it. And removing a task's links --
+        by removing images, or by deleting a subtask, whose links cascade
+        away under ``fk_SubTaskImageLink_SubTask_Task`` -- leaves the
+        declaration standing, because ``fk_SubTaskImageLink_TaskProject``
+        carries no ``ondelete``.
+
+        Nothing outside the ``Task``-delete cascade removes a ``TaskProject``
+        row, so this report names rows it offers no way to act on.
+
+        Scoped through ``apply_scope`` on ``TaskProject`` even though that
+        entity is in none of ``scoping.py``'s three registries -- behaviour-
+        preserving for the only caller, because ``apply_scope`` short-circuits
+        on an admin scope *before* any registry lookup and so returns the
+        statement untouched; a non-admin scope instead raises ``KeyError`` and
+        fails closed rather than leaking every project's declarations.
+        """
+        stmt = apply_scope(
+            select(TaskProject.TaskID, TaskProject.ProjectID).where(
+                ~exists(
+                    select(1)
+                    .select_from(SubTaskImageLink)
+                    .where(SubTaskImageLink.TaskID == TaskProject.TaskID)
+                    .where(SubTaskImageLink.ProjectID == TaskProject.ProjectID)
+                )
+            ),
+            TaskProject,
+            self._scope,
+        )
+        return [(int(t), int(p)) for t, p in self._session.execute(stmt).all()]
 
     def list_all(self) -> list[Task]:
         """Return every task the scope may read (TaskID order), relations loaded."""

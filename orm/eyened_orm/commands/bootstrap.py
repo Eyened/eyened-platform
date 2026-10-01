@@ -9,7 +9,8 @@ import click
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..authz.administration import audit_trusted
+from ..audit_writer import AuditWriter
+from ..authz.actor import TrustedPath
 from ..authz.bootstrap import count_admins, ensure_admin
 from ..creator import Creator
 from ..form_schemas import seed_form_schemas
@@ -18,6 +19,7 @@ from ..utils.alembic_utils import (
     get_head_revision,
     upgrade_to_head,
 )
+from ..utils.db_users import WeakPasswordError
 from .shared import get_database
 
 
@@ -87,10 +89,12 @@ def _create_first_admin(session: Session, username: str, password: str | None) -
             "No accounts exist. Set EYENED_API_ADMIN_PASSWORD to create the "
             "first administrator."
         )
-    creator, outcome = ensure_admin(session, username, password)
-    audit_trusted(
-        session,
-        command="bootstrap",
+    try:
+        creator, outcome = ensure_admin(session, username, password)
+    except WeakPasswordError as exc:
+        raise click.ClickException(f"EYENED_API_ADMIN_PASSWORD: {exc}") from exc
+    AuditWriter(session).write(
+        actor=TrustedPath("eorm bootstrap"),
         action="INSERT",
         entity="Creator",
         entity_id=creator.CreatorID,

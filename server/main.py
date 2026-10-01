@@ -25,6 +25,7 @@ from server.routes import (
     devices,
     studies,
     patients,
+    admin,
 )
 from server.config import get_redis_connection, settings
 from server.services.exceptions import register_exception_handlers
@@ -46,6 +47,7 @@ app_api.include_router(subtask.router)
 app_api.include_router(devices.router)
 app_api.include_router(studies.router)
 app_api.include_router(patients.router)
+app_api.include_router(admin.router)
 
 register_exception_handlers(app_api)
 

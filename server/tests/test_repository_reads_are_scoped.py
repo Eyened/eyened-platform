@@ -93,6 +93,13 @@ _UNSCOPED_METHODS = {
     "own to resolve yet",
     "SubTaskRepository.project_ids_of_image": "resolves the project an image "
     "would bring into a task; the *after* half of a link write",
+    # Not project resolution like its neighbours above -- this answers "which
+    # of these ids exist" for a CLI operator who named them, and Task is in
+    # SET_VALUED_ENTITIES, so scoping it would really filter and report a task
+    # that genuinely exists as missing.
+    "TaskRepository.existing_ids": "answers which of these ids exist for a CLI "
+    "operator who named them; Task is in SET_VALUED_ENTITIES, so scoping it "
+    "would report a task that genuinely exists as missing",
     "SubTaskRepository.resolve_image_instance_id": "PublicID -> id resolution only; "
     "returns an int that is unusable without a subtask to attach it to",
     "SubTaskRepository.next_image_index": "returns an integer, not a row",
@@ -116,7 +123,26 @@ _WRITE_PREFIXES = ("add", "save", "delete", "upsert", "remove", "replace", "clai
 # The most recent moves: 37 -> 38 for TaskRepository.declared_projects, which
 # scopes itself through apply_scope like its neighbours (counted, not exempted),
 # and 38 -> 39 for the subtask-assignee read development added.
-_EXPECTED_SCANNED_READS = 39
+# 39 -> 42 for ProjectRepository's three reads (get_by_name, all_ids,
+# names_for), each scoped through apply_scope like its neighbours --
+# counted, not exempted. Project is in none of scoping.py's registries, so
+# apply_scope fails closed for a non-admin scope rather than filtering
+# nothing.
+# 42 -> 43 for TaskRepository.unused_declarations, scoped through
+# apply_scope on TaskProject like ProjectRepository's three reads above
+# (counted, not exempted) -- TaskProject is likewise in none of scoping.py's
+# registries, so apply_scope is a no-op for an admin scope and fails closed
+# otherwise. Its sibling TaskRepository.existing_ids joined
+# _UNSCOPED_METHODS instead and so is not counted here.
+# 43 -> 45 for ProjectRepository's two admin-listing reads (list_all,
+# member_counts), scoped through apply_scope like its three neighbours above --
+# counted, not exempted. member_counts scopes ProjectMember, which is in no
+# registry, so the call is a no-op for the admin scope and fails closed for
+# every other. CreatorRepository.list_humans, added in the same change, is not
+# among these two: CreatorRepository is in _UNSCOPED_REPOSITORIES and the walk
+# `continue`s on the class before inspecting a method.
+# 45 -> 46 for ProjectRepository.get_by_id, scoped like get_by_name.
+_EXPECTED_SCANNED_READS = 46
 
 # Read methods allowed to scope themselves by consuming ``self._scope`` instead
 # of calling ``apply_scope``/``scoped_one``. Set equality, like every other

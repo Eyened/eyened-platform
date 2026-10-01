@@ -8,6 +8,12 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** `client/src/lib/utils/DataTable.svelte:18` renders `{@html cell}` from JSON fetched by `dataSources.ts` `loadDataSource()`, possibly from an absolute admin-configured URL. A malicious/compromised source gets script execution. The inline eslint-disable means lint will never flag it again.
 - **Fix:** sanitize (e.g. DOMPurify), render as text, or restrict data sources to a trusted origin.
 
+### Stop treating 403 as an expired session in the API client
+- **Status:** open (blocks the admin UI)
+- **Source:** PR #247 manual-test walkthrough, 2026-09-24
+- **Problem:** `isUnauthorizedStatus` in `client/src/lib/api/client.ts` returns true for 401 and 403, so a 403 triggers `/auth/refresh`, a retry, and `redirectToLogin()`. `/api/admin/*` returns 403 to a logged-in non-admin, who is bounced to login instead of shown "forbidden". Same code on `feature/rbac-admin-client`.
+- **Fix:** refresh and retry on 401 only; surface 403 to the caller. Update `apiInvoke.test.ts` accordingly.
+
 ### Fix Svelte 5 reactivity traps
 - **Status:** open
 - **Source:** Phase 3 ESLint gate + Phase 4 svelte-check triage
@@ -19,6 +25,13 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** Phase 3 ESLint gate
 - **Problem:** 46 `svelte/require-each-key` suppressions; unkeyed eaches attach DOM/state/focus to the wrong item on reorder.
 - **Fix:** key by stable identity, prioritising blocks with local state/inputs/components; never key by index.
+
+### Hide the editing tools a project role does not allow
+- **Status:** open
+- **Source:** PR #247 review (bjliefers), 2026-10-01
+- **Problem:** a `read_only` member still sees the FormAnnotation and segmentation tools; writes are refused with 403 only after the user has worked. The client cannot gate them: no response carries the caller's role per project (`UserResponse.role` is the legacy `Creator.Role`).
+- **Fix:** expose the caller's effective role per project (e.g. a `{project_id: role}` map plus `is_admin` on `GET /auth/me`, or a `can_annotate` flag on the image/task DTOs) and gate the tool panels on it.
+- **Note:** a task spanning projects needs the floor role in every one, so the gate must evaluate all projects the image or task touches.
 
 ### Ratchet down `@typescript-eslint/no-explicit-any`
 - **Status:** open

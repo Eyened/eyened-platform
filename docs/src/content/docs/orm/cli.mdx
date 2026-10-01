@@ -47,6 +47,8 @@ eorm seed-form-schemas [--update]
 
 Accounts and permissions are managed here — there is no admin UI for them. The model these commands write to is described in **[Access control](/eyened-platform/guides/access_control)**.
 
+Every command here that sets a password — `init-admin`, `create-user`, `set-password` — enforces the **[password policy](/eyened-platform/guides/authentication#password-policy)** and exits 1 naming the rule that failed.
+
 :::caution
 `eorm` is a **trusted path**: it does not authenticate its operator. Anyone with shell access on the server can run `set-admin` and self-promote, and the resulting audit row names no actor.
 :::
@@ -65,7 +67,7 @@ Idempotent, and it promotes an existing account as readily as it creates one. Om
 
 | Command | Purpose |
 |---------|---------|
-| `eorm init-admin --username U [--password P]` | Create or promote the platform administrator (idempotent). Reads `EYENED_API_ADMIN_PASSWORD`, otherwise prompts twice |
+| `eorm init-admin [--username U] [--password P]` | Create or promote the platform administrator (idempotent). Reads `EYENED_API_ADMIN_USERNAME` and `EYENED_API_ADMIN_PASSWORD`; prompts for whichever is unset (the password twice) |
 | `eorm create-user --username U --password P` | Create a normal account. Grants nothing — follow it with `grant` |
 | `eorm set-admin --user U --on\|--off` | Set or clear administrator status on an existing account. The only way back down |
 | `eorm set-password --user U [--password P]` | Set an existing user's password, including for an account never meant to log in by password |

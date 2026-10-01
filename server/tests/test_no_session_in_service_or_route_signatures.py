@@ -7,10 +7,18 @@ request transaction.
 Two guards live here:
 
 1. Signature guard (test_no_service_holds_a_session,
-   test_no_route_handler_holds_a_session): no function under server/services
-   or server/routes takes/annotates a parameter as a Session, except a small
-   declared exception set (_SIGNATURE_ALLOWED below) plus the get_*_service
+   test_no_route_handler_holds_a_session,
+   test_no_authz_administration_function_holds_a_session): no function under
+   server/services, server/routes or orm/eyened_orm/authz takes/annotates a
+   parameter as a Session, except a small declared exception set
+   (_SIGNATURE_ALLOWED, _AUTHZ_SIGNATURE_ALLOWED) plus the get_*_service
    composition-root factories (_is_di_factory).
+
+   The orm/eyened_orm/authz root was added with RBAC admin P0, whose headline
+   change is that MembershipAdministration and AccountAdministration take
+   repositories rather than a Session. Without it that property was unpoliced.
+   Not extended further into orm/: the repositories own the Session by design,
+   and every one of them would be an exemption.
 
 2. Direct-DB-access guard (test_no_direct_db_access_in_service_or_route_functions):
    a stronger, independent check. The exceptions below weaken guard 1 (several
@@ -36,27 +44,14 @@ Exemptions, and what would remove them:
   ``(session)`` signature. They are part of the already-declared AuditService
   audit-sink exception: an earlier ``_ALLOWED`` named only
   ``AuditService.__init__``, which was a clerical gap, not a design decision.
-- Five auth resolvers (``get_current_user``, ``check_login``,
-  ``check_oidc_login``, ``CurrentUser.get_creator``, ``creator_to_response``)
-  legitimately read/write ``Creator`` directly ahead of the request's
-  authorization scope existing. Three still live in ``routes/auth.py``;
-  ``get_current_user`` and ``CurrentUser.get_creator`` moved to
-  ``services/current_user.py`` to delete the ``services -> routes`` import
-  edge, and their entries below are **re-keyed to that path, not dropped** --
-  the move changed where they live, not that they hold a Session.
-- Seven auth.py route handlers (``login``, ``get_token``,
-  ``get_current_user_info``, ``change_password``, ``register_user``,
-  ``refresh_token``, ``oidc_authenticate``) hold ``session`` ONLY to forward
-  it to one of the five resolvers above, or to ``create_user`` (also a
-  declared exception). ``change_password``/``register_user`` separately depend
-  on ``AuditService`` via ``Depends(get_audit_service)``, a DI factory
-  parameter -- structurally exempt (``_is_di_factory`` below), not a session
-  forward. An earlier exemption set covered the resolver callees but never
-  named the callers that must obtain and forward the session -- fixing that
-  omission is what this set is. What would remove it: converting the auth resolvers
-  into FastAPI dependencies, so route handlers stop receiving a Session at
-  all and have nothing left to forward. That conversion is out of scope for
-  this guard.
+- Two auth resolvers read/write ``Creator`` directly ahead of any scope:
+  ``check_oidc_login`` (``routes/auth.py``) and ``get_current_user``
+  (``services/current_user.py``). The password half -- ``check_login``,
+  ``CurrentUser.get_creator``, ``creator_to_response``'s read -- moved into
+  ``AuthService`` and its exemptions closed.
+- One route handler, ``oidc_authenticate``, holds ``session`` only to forward
+  it to ``check_oidc_login``. The six password-path handlers take
+  ``Depends(get_auth_service)`` instead (``_is_di_factory``).
 
 Blind spot: both scans key on the bare names ``session``/``db`` (parameter
 name for guard 1, call-receiver name for guard 2), so a local alias (e.g.
@@ -73,6 +68,23 @@ import pathlib
 _ROOT = pathlib.Path(__file__).resolve().parents[1]  # server/
 _SERVICES = _ROOT / "services"
 _ROUTES = _ROOT / "routes"
+_ORM_ROOT = _ROOT.parent / "orm"                 # the eyened_orm distribution root
+_AUTHZ = _ORM_ROOT / "eyened_orm" / "authz"
+
+# The ORM's own exemptions, keyed relative to _ORM_ROOT. Each is a function that
+# runs before, or outside, the repository layer that owns the Session.
+_AUTHZ_SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
+    ("eyened_orm/authz/bootstrap.py", "count_admins"): "reads Creator before any scope exists",
+    ("eyened_orm/authz/bootstrap.py", "ensure_admin"): "the bootstrap -- create-or-promote, runs before an admin exists",
+    ("eyened_orm/authz/denormalization.py", "_project_of"): "one-off ProjectID backfill helper, driven by a migration",
+    ("eyened_orm/authz/denormalization.py", "populate_project_ids"): "one-off ProjectID backfill, driven by a migration",
+    ("eyened_orm/authz/denormalization.py", "_populate_link"): "one-off ProjectID backfill helper, driven by a migration",
+    ("eyened_orm/authz/scoping.py", "projects_of"): (
+        "the shared project-route function the repositories themselves call; it "
+        "is the definition enforcement and the CLI share, and it executes a "
+        "selectable rather than owning a unit of work"
+    ),
+}
 
 
 def _is_di_factory(name: str) -> bool:
@@ -89,25 +101,27 @@ def _is_di_factory(name: str) -> bool:
 # does not inherit auth.py's exemptions by basename collision. See module
 # docstring for the full rationale of each group below.
 _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
-    # Auth resolvers that read/write Creator directly.
-    ("services/current_user.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
-    ("routes/auth.py", "check_login"): "auth resolver -- verifies credentials against Creator",
-    ("routes/auth.py", "check_oidc_login"): "auth resolver -- finds/creates Creator from OIDC claims",
-    ("services/current_user.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
-    ("routes/auth.py", "creator_to_response"): "read-only response helper with an optional session param",
+    # Auth resolvers that read/write Creator directly, ahead of any scope.
+    ("services/current_user.py", "get_current_user"): (
+        "auth resolver -- the dev-bypass branch reads and promotes Creator "
+        "pre-scope. What would remove it: moving that bootstrap out of the "
+        "request path"
+    ),
+    ("routes/auth.py", "check_oidc_login"): (
+        "auth resolver -- finds/creates Creator from OIDC claims. What would "
+        "remove it: extracting it into AuthService, once a test harness pins "
+        "oidc_authenticate's token-validation error branches"
+    ),
     # AuditService: audit sink; owns the session for its AuditLog write, like a repository.
     ("services/audit_service.py", "__init__"): "AuditService.__init__ -- audit sink owns its session",
     # R2: SQLAlchemy event-listener callbacks; signature is SQLAlchemy-mandated.
     ("services/audit_service.py", "_drain"): "after_commit listener callback (SQLAlchemy-mandated signature)",
     ("services/audit_service.py", "_clear"): "after_rollback/after_soft_rollback listener callback (SQLAlchemy-mandated signature)",
-    # R3: forwarding-only route handlers (see module docstring).
-    ("routes/auth.py", "login"): "forwards session to check_login/creator_to_response only",
-    ("routes/auth.py", "get_token"): "forwards session to check_login/creator_to_response only",
-    ("routes/auth.py", "get_current_user_info"): "forwards session to CurrentUser.get_creator/creator_to_response only",
-    ("routes/auth.py", "change_password"): "forwards session to check_login/creator_to_response only",
-    ("routes/auth.py", "register_user"): "forwards session to create_user/creator_to_response only",
-    ("routes/auth.py", "refresh_token"): "forwards session to CreatorRepository/creator_to_response only",
-    ("routes/auth.py", "oidc_authenticate"): "forwards session to check_oidc_login/creator_to_response only",
+    # R3: the one forwarding-only route handler left (see module docstring).
+    ("routes/auth.py", "oidc_authenticate"): (
+        "forwards session to check_oidc_login only. What would remove it: the "
+        "check_oidc_login extraction above"
+    ),
     # R1: import_api.py is slated for deprecation (see module docstring); only
     # import_single_image holds a Session, for ImportRun.apply().
     ("routes/import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; holds Session for ImportRun.apply()",
@@ -119,7 +133,27 @@ _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
 }
 
 
-def _offenders(root: pathlib.Path) -> list[str]:
+def _offenders(
+    root: pathlib.Path,
+    *,
+    root_key: pathlib.Path = _ROOT,
+    allowed: dict[tuple[str, str], str] | None = None,
+) -> list[str]:
+    """Functions under ``root`` that take or annotate a Session.
+
+    ``root_key`` is the base the exemption keys are relative to -- ``server/``
+    for the two server roots, ``orm/`` for the ORM one -- so a
+    ``services/auth.py`` and an ``eyened_orm/authz/auth.py`` cannot ever collide
+    in one another's allow-list.
+
+    ``root_key`` and ``allowed`` must be passed together. ``allowed`` defaults
+    to ``_SIGNATURE_ALLOWED``, whose keys are relative to ``server/``, so
+    ``_offenders(some_orm_root, root_key=_ORM_ROOT)`` with no matching
+    ``allowed`` would match ORM-relative paths against server-relative keys and
+    exempt nothing -- the guard goes wrong rather than failing loudly, which is
+    the one failure mode a guard cannot afford.
+    """
+    allowed = _SIGNATURE_ALLOWED if allowed is None else allowed
     # A moved/renamed test file (_SERVICES/_ROUTES derive from __file__) would
     # otherwise make rglob() silently yield nothing, and `assert [] == []`
     # would pass vacuously -- fail loudly instead.
@@ -128,12 +162,12 @@ def _offenders(root: pathlib.Path) -> list[str]:
     for path in root.rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
-        key_path = path.relative_to(_ROOT).as_posix()
+        key_path = path.relative_to(root_key).as_posix()
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            if (key_path, node.name) in _SIGNATURE_ALLOWED or _is_di_factory(node.name):
+            if (key_path, node.name) in allowed or _is_di_factory(node.name):
                 continue
             # posonlyargs covers `def f(session: Session, /)`; kwonlyargs covers
             # `def f(*, session: Session)`; args covers the common case. A bare
@@ -143,7 +177,7 @@ def _offenders(root: pathlib.Path) -> list[str]:
                 ann = getattr(arg, "annotation", None)
                 text = ast.unparse(ann) if ann is not None else ""
                 if arg.arg in {"session", "db"} or text.endswith("Session"):
-                    bad.append(f"{path.relative_to(_ROOT.parent)}::{node.name}({arg.arg})")
+                    bad.append(f"{path.relative_to(root_key.parent)}::{node.name}({arg.arg})")
     return bad
 
 
@@ -155,6 +189,17 @@ def test_no_service_holds_a_session():
 def test_no_route_handler_holds_a_session():
     """No function under server/routes takes a Session, except the declared exceptions."""
     assert _offenders(_ROUTES) == []
+
+
+def test_no_authz_administration_function_holds_a_session():
+    """P0's headline property, policed.
+
+    The administration classes take repositories; the six exemptions below are
+    the pre-scope bootstrap, the one-off denormalization backfill and the shared
+    ``projects_of`` route the repositories themselves call. A seventh entry is
+    the signal this guard exists to raise.
+    """
+    assert _offenders(_AUTHZ, root_key=_ORM_ROOT, allowed=_AUTHZ_SIGNATURE_ALLOWED) == []
 
 
 # --- Guard 2: direct DB-access AST scan -------------------------------------
@@ -170,23 +215,26 @@ _DB_METHODS = {
     "add", "add_all", "delete", "merge", "flush", "commit", "rollback", "refresh",
 }
 
-# The five auth resolvers and import_single_image are the only functions in
-# scope that legitimately call session.<method>()/db.<method>() directly. The
-# seven R3 forwarding handlers need no entry -- they pass `session` as a plain
-# argument and never call a method on it themselves, so they are not
-# offenders here in the first place.
+# The two auth resolvers, get_access_scope and import_single_image are the only
+# functions in scope that call session.<method>()/db.<method>() directly. The
+# one forwarding handler passes `session` as a plain argument, so needs no entry.
 _DB_ACCESS_ALLOWED: dict[tuple[str, str], str] = {
-    ("services/current_user.py", "get_current_user"): "auth resolver -- reads Creator pre-scope",
-    ("routes/auth.py", "check_login"): "auth resolver -- verifies credentials against Creator",
-    ("routes/auth.py", "check_oidc_login"): "auth resolver -- finds/creates Creator from OIDC claims",
-    ("services/current_user.py", "get_creator"): "CurrentUser.get_creator -- auth resolver, reads Creator by id",
-    ("routes/auth.py", "creator_to_response"): "read-only response helper with an optional session param",
+    ("services/current_user.py", "get_current_user"): (
+        "auth resolver -- the dev-bypass branch reads and promotes Creator "
+        "pre-scope. What would remove it: moving that bootstrap out of the "
+        "request path"
+    ),
+    ("routes/auth.py", "check_oidc_login"): (
+        "auth resolver -- finds/creates Creator from OIDC claims. What would "
+        "remove it: extracting it into AuthService, once a test harness pins "
+        "oidc_authenticate's token-validation error branches"
+    ),
     # Human decision: import_api.py is slated for deprecation. Calls
     # session.rollback() on the caught-failure path.
     ("routes/import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; calls session.rollback() on the caught-failure path",
     ("services/access_scope.py", "get_access_scope"): (
         "scope resolver -- reads Creator (IsAdmin/Inactive) before any scope "
-        "exists, the same case as the five auth.py resolvers. What would remove "
+        "exists, the same case as the auth resolvers above. What would remove "
         "it: a CreatorRepository read, which would need an unbounded "
         "AccessScope.trusted() inside the scope resolver -- a worse trade"
     ),

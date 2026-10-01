@@ -444,3 +444,41 @@ def test_list_assignees_for_task_returns_distinct_non_null_creators(session):
     assignees = SubTaskRepository(session, scope=admin_scope()).list_assignees_for_task(task.TaskID)
 
     assert [c.CreatorName for c in assignees] == ["amy", "zed"]
+
+
+def test_existing_ids_reports_only_the_ids_that_exist(session, spanning):
+    """The mixed case: a weaker check written `if not found:` would pass an
+    all-unknown test while silently dropping the bad half of a real list."""
+    from eyened_orm.repositories import TaskRepository
+    from eyened_orm.utils.factories import admin_scope
+
+    repo = TaskRepository(session, scope=admin_scope())
+    assert repo.existing_ids([spanning["task"], 999999]) == {spanning["task"]}
+
+
+def test_existing_ids_of_nothing_is_empty(session):
+    from eyened_orm.repositories import TaskRepository
+    from eyened_orm.utils.factories import admin_scope
+
+    assert TaskRepository(session, scope=admin_scope()).existing_ids([]) == set()
+
+
+def test_unused_declarations_reports_a_declaration_no_link_uses(session, spanning):
+    """Discriminates both directions in one arrange: ``a_only`` already declares
+    project A with a matching SubTaskImageLink (not reported); adding a second
+    declaration for project B with no link gives the reported case. Mirrors
+    ``test_unused_declarations_reports_a_project_no_link_uses`` in
+    test_authz_administration.py, against the repository method instead of the
+    raw function it wraps."""
+    from eyened_orm import TaskProject
+    from eyened_orm.repositories import TaskRepository
+    from eyened_orm.utils.factories import admin_scope
+
+    session.add(
+        TaskProject(TaskID=spanning["a_only"], ProjectID=spanning["projects"]["B"])
+    )
+    session.commit()
+
+    found = TaskRepository(session, scope=admin_scope()).unused_declarations()
+    assert (spanning["a_only"], spanning["projects"]["B"]) in found
+    assert (spanning["a_only"], spanning["projects"]["A"]) not in found

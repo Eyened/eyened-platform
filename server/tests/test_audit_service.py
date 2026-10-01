@@ -72,7 +72,9 @@ def test_commit_emits_one_stdout_event_mirroring_the_row(session, caplog):
 def test_rollback_emits_no_stdout_event(session, caplog):
     """A rolled-back record leaves no AuditLog row and emits no stdout event."""
     with caplog.at_level(logging.INFO, logger="eyened.audit"):
-        AuditService(session).record(action="DELETE", entity="Feature", entity_id=7)
+        AuditService(session).record(
+            action="DELETE", entity="Feature", actor=_actor(), entity_id=7
+        )
         session.rollback()
 
     assert session.query(AuditLog).count() == 0
@@ -135,7 +137,7 @@ def test_diff_survives_a_flush_between_the_mutation_and_the_diff(session):
     before = AuditService.snapshot(feature, "FeatureName")
     feature.FeatureName = "new"
     session.flush()  # stands in for repository.save()
-    AuditService(session).record(action="UPDATE", entity="Feature")  # flushes again
+    AuditService(session).record(action="UPDATE", entity="Feature", actor=_actor())  # flushes again
 
     assert AuditService.diff(before, feature) == {
         "FeatureName": {"old": "old", "new": "new"}
@@ -165,3 +167,26 @@ def test_record_persists_datetime_in_changes_as_isoformat(session):
     )
     row = session.query(AuditLog).one()
     assert row.Changes == {"updated_at": ts.isoformat()}
+
+
+def test_record_without_an_actor_or_trusted_path_raises(session):
+    """Actor has two variants and no third, so an enabled record() that names
+    neither cannot write a row: both columns NULL reads as an unattributed
+    change, which is the property this layer exists to prevent."""
+    from eyened_orm import AuditLog
+
+    with pytest.raises(ValueError, match="actor= or trusted_path="):
+        AuditService(session).record(action="UPDATE", entity="Feature")
+    assert session.query(AuditLog).count() == 0
+
+
+def test_record_with_both_an_actor_and_a_trusted_path_raises(session):
+    """The two are exclusive: a row carrying both would claim an authenticated
+    actor and a trusted path at once, and no reader could tell which is true."""
+    with pytest.raises(ValueError, match="not both"):
+        AuditService(session).record(
+            action="UPDATE",
+            entity="Feature",
+            actor=_actor(),
+            trusted_path="cli:import",
+        )

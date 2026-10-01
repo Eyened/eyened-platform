@@ -89,6 +89,16 @@ class TagRepository:
             CreatorTagLink, {"TagID": tag_id, "CreatorID": creator_id}
         )
 
+    def starred_tag_ids(self, creator_id: int) -> list[int]:
+        """Ids of the tags ``creator_id`` has starred, in database order."""
+        return list(
+            self._session.scalars(
+                select(CreatorTagLink.TagID).where(
+                    CreatorTagLink.CreatorID == creator_id
+                )
+            )
+        )
+
     def add_star(self, tag_id: int, creator_id: int) -> CreatorTagLink:
         """Create a star link (tag, creator) and flush so its row is written."""
         link = CreatorTagLink(TagID=tag_id, CreatorID=creator_id)

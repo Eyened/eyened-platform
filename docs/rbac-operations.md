@@ -79,7 +79,7 @@ One account, driven from the CLI, watched in the browser. Log in as it with
 refresh.
 
 ```bash
-eorm create-user --username test_user --password test-pw
+eorm create-user --username test_user --password correct-horse-battery
 ```
 
 | # | Scenario | Command | Expect in the client |
@@ -128,11 +128,11 @@ administrator) -> `EYENED_API_PUBLIC_AUTH_DISABLED=true` for feature work,
 ## Accepted risks
 
 - **The CLI does not authenticate its operator.** Every command above is a
-  trusted path (see the module docstrings on `authz/administration.py` and
-  `commands/rbac.py`): anyone with shell access can run `eorm set-admin --user
-  U --on` and self-promote, and the audit row that records it names no actor
-  -- `ActorID` is NULL by design on this path, the same as every other command
-  here.
+  trusted path (see `admin_scope_for_cli()` in `commands/shared.py`, and the
+  module docstring on `commands/rbac.py`): anyone with shell access can run
+  `eorm set-admin --user U --on` and self-promote, and the audit row that
+  records it names no actor -- `ActorID` is NULL by design on this path, the
+  same as every other command here.
 - **`grant-all` grants every project to self-registered accounts.**
   `POST /auth/register` needs no authentication, and grant-all's population
   filter is `IsHuman AND NOT Inactive AND PasswordHash IS NOT NULL` -- which a

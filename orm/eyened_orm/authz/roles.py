@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import enum
 
-__all__ = ["ProjectRole"]
+__all__ = ["ProjectRole", "parse_role"]
 
 
 class ProjectRole(enum.IntEnum):
@@ -24,3 +24,19 @@ class ProjectRole(enum.IntEnum):
     read_only = 1
     grader = 2
     project_admin = 3
+
+
+def parse_role(value: str) -> ProjectRole:
+    """Convert a CLI string to a ProjectRole, naming the valid roles on failure.
+
+    The conversion happens once, at the boundary; everything past it deals in
+    the enum, so no downstream code compares role strings.
+
+    Lives beside ``ProjectRole`` rather than on either administration class: it
+    touches no repository, and the CLI calls it *before* a session is opened.
+    """
+    try:
+        return ProjectRole[value]
+    except KeyError:
+        valid = ", ".join(r.name for r in ProjectRole)
+        raise ValueError(f"unknown role {value!r}; valid roles are: {valid}") from None

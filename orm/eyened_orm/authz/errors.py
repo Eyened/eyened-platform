@@ -15,7 +15,13 @@ from __future__ import annotations
 
 from collections.abc import Set as AbstractSet
 
-__all__ = ["AuthorizationError", "NotVisibleError", "PermissionDeniedError"]
+__all__ = [
+    "AdminEntityExists",
+    "AdminEntityNotFound",
+    "AuthorizationError",
+    "NotVisibleError",
+    "PermissionDeniedError",
+]
 
 
 class AuthorizationError(Exception):
@@ -54,4 +60,43 @@ class PermissionDeniedError(AuthorizationError):
     """The actor holds every project but sits under the floor -> 403.
 
     ``projects`` holds the ones whose role was too low.
+    """
+
+
+class AdminEntityNotFound(Exception):
+    """An administration call named a creator, project or task that does not exist.
+
+    Deliberately **not** ``LookupError``: that is the base class of ``KeyError``
+    and ``IndexError``, so catching it to build a 404 -- or, in the CLI, a clean
+    ``ClickException`` -- silently converts any dict or list miss inside the
+    call into "not found".
+
+    Deliberately not an ``AuthorizationError`` either: nothing here is a denial,
+    and the 404 policy that keeps an ``AuthorizationError``'s detail out of the
+    response body does not apply. The message names the missing entity, and the
+    CLI prints it verbatim via ``ClickException(str(exc))``.
+
+    ``entity`` is carried separately from the message for the reason this
+    module's own docstring gives about ``AuthorizationError``: a bare ``class
+    ...: ...`` satisfies the status mapping and leaves nobody able to answer
+    *which* lookup failed. Nothing maps this to an HTTP status today -- the
+    registered handlers cover ``ServiceError`` and ``AuthorizationError``, and
+    it is neither, so it would reach the broad handler as a 500. The admin API
+    raises ``NotFoundError`` instead. This class is the CLI's, and ``entity``
+    is carried separately from the message so a future handler can answer
+    *which* lookup failed. It is a separate argument rather than an
+    interpolation because the three messages do not share a shape -- two read
+    "no X named Y", the task one reads "no task with ids A, B".
+    """
+
+    def __init__(self, message: str, *, entity: str) -> None:
+        self.entity = entity
+        super().__init__(message)
+
+
+class AdminEntityExists(Exception):
+    """An administration create named a username that is taken.
+
+    Not ``ValueError``, for the reason ``AdminEntityNotFound`` is not
+    ``LookupError``: catching the builtin would also catch unrelated failures.
     """

@@ -191,7 +191,9 @@ def test_every_service_factory_depends_on_get_access_scope():
         for attr in dir(module):
             if not (attr.startswith("get_") and attr.endswith("_service")):
                 continue
-            if attr in {"get_audit_service"}:
+            # get_auth_service runs before any actor exists; get_access_scope
+            # depends on get_current_user, so resolving one would require a login.
+            if attr in {"get_audit_service", "get_auth_service"}:
                 continue
             factory = getattr(module, attr)
             if not callable(factory) or factory.__module__ != module.__name__:
@@ -271,6 +273,14 @@ def test_every_service_factory_threads_its_resolved_scope():
                     callee.endswith("Repository") or callee.endswith("Service")
                 ):
                     continue
+                # The same _EXEMPT test_every_repository_requires_a_scope
+                # honours: ProjectMemberRepository builds the scope, so there is
+                # no resolved scope to thread into it. get_access_scope has
+                # always constructed it this way; it is simply not a
+                # ``get_*_service`` factory, so this guard met the case for the
+                # first time in get_admin_service.
+                if callee in _EXEMPT:
+                    continue
                 passed = {
                     kw.arg: kw.value for kw in node.keywords if kw.arg == "scope"
                 }
@@ -284,12 +294,18 @@ def test_every_service_factory_threads_its_resolved_scope():
     assert offenders == []
 
 
+# (path under server/services, method) allowed an ``actor`` parameter. AuthService
+# holds no scope, so there the parameter is the only source of actor identity.
+_ACTOR_PARAMETER_ALLOWED = {("auth_service.py", "change_password")}
+
+
 def test_no_service_method_takes_an_actor_parameter():
     """One source of actor identity per call. Two can disagree.
 
-    server/routes/auth.py and import_api.py still build an ActingUser by hand:
-    they call AuditService directly rather than through a scoped service, so
-    there is no scope to derive it from.
+    import_api.py still builds an ActingUser by hand: it calls AuditService
+    directly rather than through a scoped service, so there is no scope to
+    derive it from. server/routes/auth.py builds one for the same reason and
+    hands it to AuthService.change_password, the one exemption above.
     """
     assert _SERVICES.is_dir(), (
         f"{_SERVICES} is not a directory -- this guard would pass vacuously"
@@ -304,6 +320,10 @@ def test_no_service_method_takes_an_actor_parameter():
             continue
         tree = ast.parse(path.read_text(), filename=str(path))
         for item in _functions(tree):
-            if "actor" in _arg_names(item.args):
+            if (
+                "actor" in _arg_names(item.args)
+                and (path.relative_to(_SERVICES).as_posix(), item.name)
+                not in _ACTOR_PARAMETER_ALLOWED
+            ):
                 offenders.append(f"{path.name}::{item.name}")
     assert offenders == []

@@ -53,11 +53,18 @@ class AccessScope:
     ) -> "AccessScope":
         """Unrestricted scope for the paths v0.3 places outside enforcement.
 
-        Its only caller today is the pre-authentication login path in
-        ``server/routes/auth.py`` -- token refresh and OIDC auto-provision,
-        which must reach a Creator row before there is an actor to scope by.
-        The ``eorm`` CLI and the RQ worker reach repositories without one.
-        Never returned by ``get_access_scope``.
+        Two callers today, both allow-listed in
+        ``test_only_the_allow_listed_files_call_access_scope_trusted``: the
+        pre-authentication login path in ``server/routes/auth.py`` (token
+        refresh and OIDC auto-provisioning, which must reach a Creator row
+        before there is an actor to scope by), and ``admin_scope_for_cli()``
+        in ``orm/eyened_orm/commands/shared.py``, called from the RBAC admin
+        commands in ``orm/eyened_orm/commands/rbac.py`` to build their
+        repositories. The RQ worker does not reach this at all -- its job
+        entrypoints in ``server/utils/tasks.py`` run plain ORM-session code
+        and never construct a repository or a scope; authorization for those
+        jobs happens earlier, in the API route that enqueues them. Never
+        returned by ``get_access_scope``.
 
         What IS pinned: ``test_only_the_allow_listed_files_call_access_scope_trusted``
         in ``server/tests/test_escalation_paths.py`` asserts the exact set of

@@ -37,6 +37,8 @@ Current authenticated user (id, username, role, starred tags).
 
 **Request body:** `{ "old_password": "string", "new_password": "string" }`
 
+The new password must meet the **[password policy](/eyened-platform/guides/authentication#password-policy)**, which also binds `/register` below. A password that fails it is rejected with **400** and a `weak_password` code naming the rule.
+
 ### POST /api/auth/register
 
 Register a new user. **Requires no authentication**, and returns **409** if the username is taken.

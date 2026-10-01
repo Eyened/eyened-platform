@@ -121,6 +121,50 @@ database.
   for the typed confirmation code only when the target database contains tables, which is what
   makes an unattended first-run bootstrap possible. A populated database is still gated.
 
+### Changed behaviour
+
+**Authentication**
+
+- **A password policy applies wherever a password is set.** At least 15 characters
+  (maximum 128), and it must not contain the username or the word `eyened`, in any
+  capitalisation. There are no composition rules. Enforced by `eorm create-user`,
+  `eorm set-password`, `eorm init-admin`, `eorm bootstrap` (the `init` service's first
+  administrator, from `EYENED_API_ADMIN_PASSWORD`), `POST /api/auth/register` and
+  `POST /api/auth/change-password` — the two routes reject with **400** and a
+  `weak_password` code. **It is not applied at login**, so existing passwords keep
+  working until they are changed. See
+  [Password policy](/eyened-platform/guides/authentication#password-policy).
+- **`init-admin` clears the legacy `Creator.Password` column when it resets a
+  password.** An account that was authenticating through that column falls back to
+  it no longer; the bcrypt hash becomes the only credential.
+
+**API**
+
+- **A nine-operation `/api/admin` surface** for the admin panel: list users, read a
+  user's memberships, list projects, grant and revoke a project membership, preview
+  the grants a task would need, create a user, set an account's active state, and set
+  an account's password. Every operation requires a platform administrator.
+- **`is_admin` on the user payload** returned by the authentication routes, so a
+  client can tell whether to offer the admin surface at all.
+
+**CLI**
+
+- **`grant` and `revoke` audit rows now carry `ProjectID`**, and so do the paths that
+  funnel through them: `grant-for-task` (via `apply_grant_plan`) and `revoke --all`
+  (via `apply_revoke_all`). The previous writer dropped the column; the project id
+  was only in `Changes`. Existing rows are **not backfilled** — their project id is
+  still readable from `Changes["project_id"]`. `grant-all` is unaffected: it still
+  writes one summary row per invocation with no `ProjectID`, since it names no single
+  project.
+- **`grant-for-task` audit rows now say `eorm grant-for-task`, not `eorm grant`.**
+  Each CLI invocation now stamps every row it writes with the command actually run,
+  instead of the shared write path hardcoding `"grant"`. `revoke --all` did **not**
+  change — it already wrote `eorm revoke` for every row it removed.
+- **`AuditWriter` stamps `Timestamp` itself** instead of leaving it to the column
+  default, so the row handed back to the caller already carries the value any mirror
+  built from it (e.g. CLI stdout) would report.
+- **`eorm create-user` writes an audit row.** It previously wrote none.
+
 ## v2026.09.0
 
 Per-project access control is now enforced, tasks declare the projects they span, and the

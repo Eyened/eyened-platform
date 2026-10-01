@@ -9,14 +9,12 @@ from urllib.parse import quote, unquote, urlencode
 import httpxyz
 import jwt
 from datetime import datetime, timedelta, timezone
-from hashlib import pbkdf2_hmac
 from jwt.algorithms import AllowedRSAKeys, RSAAlgorithm
 
-from eyened_orm import Creator, CreatorTagLink
+from eyened_orm import Creator
 from eyened_orm.authz.scope import AccessScope
 from eyened_orm.repositories.creator_repository import CreatorRepository
-from eyened_orm.utils.db_users import create_user, disable_password, verify_password, hash_password
-from server.services.password_hashing import password_hash_capacity
+from eyened_orm.utils.db_users import create_user
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, Cookie
 from fastapi.params import Query
 
@@ -26,7 +24,8 @@ from sqlalchemy.orm import Session
 from ..config import get_oidc_metadata, settings
 from ..db import get_db
 from ..services.acting_user import ActingUser
-from ..services.audit_service import AuditService, get_audit_service
+from ..services.audit_service import get_audit_service
+from ..services.auth_service import AuthService, get_auth_service
 
 # Re-exported, not redefined. These moved to server/services/current_user.py to
 # delete the services -> routes import edge (see that module's docstring); this
@@ -65,6 +64,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     role: int | None
+    is_admin: bool
     starred_tags: list[int] = []
 
 
@@ -166,70 +166,20 @@ async def is_authenticated(
 
 
 # User utilities
-def creator_to_response(
-    creator: Creator, session: Session | None = None
-) -> UserResponse:
-    """Convert a Creator object to a UserResponse."""
-    starred: list[int] = []
-    if session is not None:
-        rows = (
-            session.query(CreatorTagLink)
-            .where(CreatorTagLink.CreatorID == creator.CreatorID)
-            .all()
-        )
-        starred = [r.TagID for r in rows]
+def creator_to_response(creator: Creator, starred_tag_ids: list[int]) -> UserResponse:
+    """Convert a Creator and the ids of the tags it has starred to a UserResponse."""
     return UserResponse(
         id=creator.CreatorID,
         username=creator.CreatorName,
         role=creator.Role,
-        starred_tags=starred,
+        is_admin=creator.IsAdmin,
+        starred_tags=starred_tag_ids,
     )
 
 
-def check_login(username: str, password: str, db: Session) -> Creator:
-    """Verify user credentials and return the user."""
-    creator = db.query(Creator).where(Creator.CreatorName == username).first()
-    if creator is None or creator.Inactive:
-        # v0.3: a deactivated user *cannot authenticate* and holds no access.
-        # Checked before the password is verified, and answered with the same
-        # "Invalid credentials" as an unknown name, so the refusal does not
-        # tell a caller whether the account exists or whether the password was
-        # right. It also stops the legacy-hash migration below from writing to
-        # a revoked row.
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
-        )
-
-    # Verify password using Argon2 hash. Gated: this is the one hashing site an
-    # unauthenticated caller reaches, so it is the one that can be amplified.
-    if creator.PasswordHash:
-        with password_hash_capacity():
-            if verify_password(password, creator.PasswordHash):
-                return creator
-
-    # Legacy password hash support (for migration)
-    if creator.Password:
-        old_hash = pbkdf2_hmac(
-            "sha256", password.encode(), "6f4b661212".encode(), 10000
-        )
-        if old_hash == creator.Password:
-            # Migrate to new hash. The mutation stays pending here; get_db commits
-            # it at the request boundary.
-            with password_hash_capacity():
-                creator.PasswordHash = hash_password(password)
-            creator.Password = None
-            AuditService(db, enabled=settings.db_log.enabled).record(
-                action="UPDATE",
-                entity="Creator",
-                actor=ActingUser(id=creator.CreatorID, username=creator.CreatorName),
-                entity_id=creator.CreatorID,
-                changes={"password_hash": "migrated from legacy"},
-            )
-            return creator
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
-    )
+def _user_response(creator: Creator, auth_service: AuthService) -> UserResponse:
+    """The UserResponse for ``creator``, its starred tags read through ``auth_service``."""
+    return creator_to_response(creator, auth_service.starred_tag_ids(creator.CreatorID))
 
 
 # API endpoints
@@ -237,10 +187,10 @@ def check_login(username: str, password: str, db: Session) -> Creator:
 def login(
     user_data: TokenLoginRequest,  # Changed from UserLogin to TokenLoginRequest
     response: Response,
-    session: Session = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Login with username and password, return user info and set JWT cookies or return token."""
-    creator = check_login(user_data.username, user_data.password, session)
+    creator = auth_service.authenticate(user_data.username, user_data.password)
 
     # Create both tokens
     access_token = create_access_token(creator.CreatorID, creator.CreatorName)
@@ -249,7 +199,7 @@ def login(
     # If API client, return token in response body
     if user_data.api_client:
         return {
-            "user": creator_to_response(creator, session),
+            "user": _user_response(creator, auth_service),
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
@@ -277,13 +227,15 @@ def login(
         path="/",
     )
 
-    return creator_to_response(creator, session)
+    return _user_response(creator, auth_service)
 
 
 @router.post("/auth/token", response_model=TokenResponse)
-def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
+def get_token(
+    user_data: UserLogin, auth_service: AuthService = Depends(get_auth_service)
+):
     """Get access token for API clients."""
-    creator = check_login(user_data.username, user_data.password, session)
+    creator = auth_service.authenticate(user_data.username, user_data.password)
 
     access_token = create_access_token(creator.CreatorID, creator.CreatorName)
 
@@ -291,88 +243,50 @@ def get_token(user_data: UserLogin, session: Session = Depends(get_db)):
         access_token=access_token,
         token_type="bearer",
         expires_in=settings.access_token_expire_minutes * 60,
-        user=creator_to_response(creator, session),
+        user=_user_response(creator, auth_service),
     )
 
 
 @router.get("/auth/me", response_model=UserResponse)
 def get_current_user_info(
     current_user: CurrentUser = Depends(get_current_user),
-    session: Session = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Get current user information."""
-    return creator_to_response(current_user.get_creator(session), session)
+    return _user_response(auth_service.get_creator(current_user.id), auth_service)
 
 
 @router.post("/auth/change-password", response_model=UserResponse)
 def change_password(
     change_password_data: ChangePasswordRequest,
-    session: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
-    audit: AuditService = Depends(get_audit_service),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Change user password."""
-    creator = check_login(
-        current_user.username, change_password_data.old_password, session
-    )
-
-    # Set new password using Argon2. The mutation stays pending here; get_db
-    # commits it at the request boundary.
-    with password_hash_capacity():
-        creator.PasswordHash = hash_password(change_password_data.new_password)
-    creator.Password = None  # Clear old hash if it exists
-
-    audit.record(
-        action="UPDATE",
-        entity="Creator",
+    creator = auth_service.change_password(
+        current_user.username,
+        change_password_data.old_password,
+        change_password_data.new_password,
         actor=ActingUser(id=current_user.id, username=current_user.username),
-        entity_id=creator.CreatorID,
-        changes={"password_hash": "updated"},
     )
-
-    return creator_to_response(creator, session)
+    return _user_response(creator, auth_service)
 
 
 @router.post("/auth/register", response_model=UserResponse)
 def register_user(
     user_data: UserLogin,
-    session: Session = Depends(get_db),
-    audit: AuditService = Depends(get_audit_service),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Register a new user."""
-    try:
-        # The gate spans create_user's uniqueness query as well as its hash,
-        # because the hash happens inside it. Register is a rare write path, so
-        # holding a hashing slot across one indexed SELECT is not worth
-        # restructuring the ORM helper to avoid.
-        with password_hash_capacity():
-            new_user = create_user(session, user_data.username, user_data.password)
-    except ValueError as err:
-        # create_user only rejects an already-taken username. Uncaught, this
-        # reached main.py's blanket handler as a 500, which made an
-        # unauthenticated caller's 200-vs-500 a username-enumeration oracle.
-        # Answered the same way check_oidc_login answers the same ValueError.
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An account with this username already exists.",
-        ) from err
-
-    audit.record(
-        action="INSERT",
-        entity="Creator",
-        trusted_path="auth:register",
-        entity_id=new_user.CreatorID,
-        changes={"username": new_user.CreatorName, "is_human": new_user.IsHuman},
-    )
-
-    return creator_to_response(new_user, session)
+    new_user = auth_service.register(user_data.username, user_data.password)
+    return _user_response(new_user, auth_service)
 
 
 @router.post("/auth/refresh", response_model=UserResponse)
 def refresh_token(
     response: Response,
     refresh_token: str = Cookie(None),
-    session: Session = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Refresh access token and extend refresh token for active users."""
     if not refresh_token:
@@ -387,9 +301,7 @@ def refresh_token(
         # the same claim; a malformed sub can't arise from a token this process
         # signed itself, and if it ever did, the ValueError falls through to the
         # blanket `except Exception` below -- same 401 outcome as before.
-        creator = CreatorRepository(session, scope=AccessScope.trusted()).get_by_id(
-            int(payload["sub"])
-        )
+        creator = auth_service.get_creator(int(payload["sub"]))
         if not creator or creator.Inactive:
             # A deactivated account must not be able to renew its session
             # indefinitely off a refresh token minted while it was still
@@ -425,7 +337,7 @@ def refresh_token(
             path="/",
         )
 
-        return creator_to_response(creator, session)
+        return _user_response(creator, auth_service)
 
     except HTTPException:
         raise
@@ -673,6 +585,13 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="An account with this username already exists but is not linked to your OIDC login. Ask an administrator to link your account.",
                 ) from err
+            get_audit_service(session).record(
+                action="INSERT",
+                entity="Creator",
+                trusted_path="auth:oidc-provision",
+                entity_id=creator.CreatorID,
+                changes={"username": creator.CreatorName, "employee_identifier": identifier},
+            )
             logger.info(f"Created new account '{username}' for OIDC authenticated session, {identifier=}")
         else:
             logger.warning(f"Denied access to authenticated OIDC session, no existing account found and not creating a new one. Received claims: {id_claims}")
@@ -681,7 +600,7 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
     return creator
 
 @router.post("/auth/oidc/authenticate")
-async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest, oidc_csrf_token: str = Cookie(None), oidc_nonce: str = Cookie(None), session: Session = Depends(get_db)) -> UserResponse:
+async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest, oidc_csrf_token: str = Cookie(None), oidc_nonce: str = Cookie(None), session: Session = Depends(get_db), auth_service: AuthService = Depends(get_auth_service)) -> UserResponse:
     """Handle OIDC authentication using the code from the authorization URL."""
     # Unpack state
     try:
@@ -763,4 +682,4 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
         path="/",
     )
 
-    return creator_to_response(creator, session)
+    return _user_response(creator, auth_service)

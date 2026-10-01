@@ -54,6 +54,7 @@ from eyened_orm.patient import SexEnum
 from eyened_orm.project import ExternalEnum
 from eyened_orm.segmentation import DataRepresentation, Datatype
 from eyened_orm.tag import TagType
+from eyened_orm.utils.db_users import build_user
 
 
 def make_storage_backend(session: Session, key: str = "test-backend") -> StorageBackend:
@@ -64,7 +65,9 @@ def make_storage_backend(session: Session, key: str = "test-backend") -> Storage
 
 
 def make_creator(session: Session, name: str, is_human: bool = True) -> Creator:
-    c = Creator(CreatorName=name, IsHuman=is_human)
+    # Through build_user, so a fixture row carries the disabled-password hash
+    # every production path writes rather than a NULL no production path makes.
+    c = build_user(name, None, is_human=is_human)
     session.add(c)
     session.flush()
     return c
