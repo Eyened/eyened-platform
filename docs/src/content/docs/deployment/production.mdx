@@ -41,7 +41,9 @@ Open `http://<host>:<HTTP_PORT>` and sign in as `EYENED_API_ADMIN_USERNAME` (def
 ## Using an external database
 
 Remove `local-db` from `COMPOSE_PROFILES` and set `EYENED_DATABASE_HOST`, `_PORT`, `_USER`,
-`_PASSWORD` and `_DATABASE`. The account needs DDL rights, because migrations run as it.
+`_PASSWORD` and `_DATABASE`. Migrations run as this account, so it needs DDL rights; a restricted
+account can migrate with a second one instead (see [Applying
+migrations](/eyened-platform/deployment/operations#applying-migrations)).
 
 `MYSQL_ROOT_PASSWORD` must still be set to something non-empty even though no bundled database
 runs: compose interpolates variables for profile-disabled services too, and refuses to start
