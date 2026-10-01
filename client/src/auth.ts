@@ -1,11 +1,7 @@
 import { apiErrorFromResponse, fetchApi } from "$lib/api/client";
+import type { UserResponse } from "./types/openapi_types";
 
-export interface UserResponse {
-    id: number;
-    username: string;
-    role: string | null;
-    starred_tags: number[];
-}
+export type { UserResponse };
 
 interface UserLogin {
     username: string;
@@ -101,7 +97,7 @@ class AuthClient {
         });
 
         if (!response.ok) {
-            throw new Error("Password change failed");
+            throw await apiErrorFromResponse(response);
         }
 
         return response.json();
@@ -122,7 +118,7 @@ class AuthClient {
         });
 
         if (!response.ok) {
-            throw new Error("Registration failed");
+            throw await apiErrorFromResponse(response);
         }
 
         return response.json();

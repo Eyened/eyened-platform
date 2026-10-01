@@ -112,7 +112,7 @@ export async function apiInvokeAllowEmpty<T = unknown>(
 ): Promise<ApiCallResult<T>> {
     return withAuthRetry(async () => {
         const res = await call();
-        if (isUnauthorizedStatus(res.response.status)) {
+        if (!res.response.ok) {
             const { message, detail } = messageFromApiErrorBody(
                 res.error,
                 `Request failed: ${res.response.status}`,

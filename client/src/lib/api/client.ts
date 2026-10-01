@@ -169,8 +169,10 @@ export async function apiErrorFromResponse(
     return new ApiError(response.status, message, detail);
 }
 
+// 401 only: the API answers every auth failure with 401, and 403 means a
+// valid session was refused the action -- refreshing cannot change that.
 export function isUnauthorizedStatus(status: number): boolean {
-    return status === 401 || status === 403;
+    return status === 401;
 }
 
 /** Retry an API operation once after refreshing tokens (covers edge cases after HTTP-level retry). */
@@ -191,7 +193,7 @@ export async function withAuthRetry<T>(
     }
 }
 
-// Custom fetch wrapper that handles 401/403 responses by refreshing tokens
+// Custom fetch wrapper that handles 401 responses by refreshing tokens
 async function fetchWithAuthRetry(
     input: RequestInfo | URL,
     init?: RequestInit,
@@ -215,7 +217,7 @@ async function fetchWithAuthRetry(
     // Make the initial request
     let response = await fetch(input, requestInit);
 
-    // If we get a 401/403, try to refresh token and retry once
+    // If we get a 401, try to refresh token and retry once
     if (isUnauthorizedStatus(response.status) && !isRefreshEndpoint) {
         try {
             // Attempt to refresh the token

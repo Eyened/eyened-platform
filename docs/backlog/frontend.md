@@ -8,12 +8,6 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** `client/src/lib/utils/DataTable.svelte:18` renders `{@html cell}` from JSON fetched by `dataSources.ts` `loadDataSource()`, possibly from an absolute admin-configured URL. A malicious/compromised source gets script execution. The inline eslint-disable means lint will never flag it again.
 - **Fix:** sanitize (e.g. DOMPurify), render as text, or restrict data sources to a trusted origin.
 
-### Stop treating 403 as an expired session in the API client
-- **Status:** open (blocks the admin UI)
-- **Source:** PR #247 manual-test walkthrough, 2026-09-24
-- **Problem:** `isUnauthorizedStatus` in `client/src/lib/api/client.ts` returns true for 401 and 403, so a 403 triggers `/auth/refresh`, a retry, and `redirectToLogin()`. `/api/admin/*` returns 403 to a logged-in non-admin, who is bounced to login instead of shown "forbidden". Same code on `feature/rbac-admin-client`.
-- **Fix:** refresh and retry on 401 only; surface 403 to the caller. Update `apiInvoke.test.ts` accordingly.
-
 ### Fix Svelte 5 reactivity traps
 - **Status:** open
 - **Source:** Phase 3 ESLint gate + Phase 4 svelte-check triage
@@ -74,3 +68,10 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** Phase 3 ESLint gate
 - **Problem:** query-only `goto()`s carry `svelte/no-navigation-without-resolve` disables that are correct only while `base === ''`. `resolve()` throws on raw `[...]` in a query string.
 - **Fix:** when a base path is introduced, route those through `resolve()` and drop the disables.
+
+### Reload the admin user page when its `id` param changes
+- **Status:** open
+- **Source:** PR #252 review, 2026-09-28
+- **Problem:** `client/src/routes/admin/users/[id]/+page.svelte` reads `const userId = Number(page.params.id)` once. SvelteKit reuses the component on a param-only navigation, so `/admin/users/3` → `/admin/users/4` keeps showing user 3 and later writes target user 3.
+- **Fix:** make `userId` a `$derived` of `page.params.id` and reset state + `load()` in an `$effect`, or remount via `{#key page.params.id}` in a wrapping `+layout.svelte`.
+- **Note:** unreachable today except by a history jump that skips entries (every in-app path goes through `/admin`); fix before adding any user-to-user link.

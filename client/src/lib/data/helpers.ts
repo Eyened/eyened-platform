@@ -12,7 +12,7 @@ import type {
     TaskPATCH,
     TaskPUT,
 } from "../../types/openapi_types";
-import { api, fetchApi } from "../api/client";
+import { api, apiErrorFromResponse, fetchApi } from "../api/client";
 import { apiInvoke, apiInvokeAllowEmpty } from "./api";
 import { decodeNpy, NPYArray } from "../utils/npy_loader";
 import {
@@ -292,7 +292,7 @@ export async function updateSegmentationData(
     }
 
     const keepalive = params?.keepalive ?? false;
-    return fetchApi(`/segmentations/${segmentationId}/data`, {
+    const response = await fetchApi(`/segmentations/${segmentationId}/data`, {
         method: "PUT",
         headers: { "Content-Type": "application/octet-stream" },
         body: data,
@@ -301,6 +301,10 @@ export async function updateSegmentationData(
         // Avoid async token refresh during page unload; cookies still sent.
         skipAuthRetry: keepalive,
     });
+    if (!response.ok) {
+        throw await apiErrorFromResponse(response);
+    }
+    return response;
 }
 
 export async function getModelSegmentationData(

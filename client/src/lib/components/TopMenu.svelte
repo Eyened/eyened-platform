@@ -35,6 +35,16 @@
                         Tasks
                     </NavigationMenu.Link>
                 </NavigationMenu.Item>
+                {#if globalContext.userManager.user.is_admin}
+                    <NavigationMenu.Item>
+                        <NavigationMenu.Link
+                            href="/admin"
+                            class="rounded-md px-3 py-2 text-sm font-medium hover:bg-muted"
+                        >
+                            Admin
+                        </NavigationMenu.Link>
+                    </NavigationMenu.Item>
+                {/if}
             </NavigationMenu.List>
         </NavigationMenu.Root>
 
