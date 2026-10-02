@@ -171,7 +171,7 @@ services:
     image: nginx:1.27-alpine
     logging: *default-logging
     restart: *default-restart
-    # No env_file, for the same reason as `server`; the template needs no variables.
+    # No env_file, for the same reason as `server`; the base template needs no variables.
     ports:
       - "${HTTP_PORT:-8080}:80"
     volumes:

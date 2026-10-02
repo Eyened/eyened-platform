@@ -49,7 +49,8 @@ without it.
 
 ## HTTPS with your own certificate
 
-1. Put the certificate chain and key in one directory as `fullchain.pem` and `privkey.pem`.
+1. Copy the certificate chain and key into one directory as `fullchain.pem` and `privkey.pem`
+   (real files, not symlinks).
 2. In `deploy/.env`, append `:compose.tls.yaml` to `COMPOSE_FILE` and set `TLS_CERT_DIR` and
    `HTTPS_PORT` (default 443). `HTTP_PORT` then redirects to HTTPS.
 3. `docker compose up -d`
