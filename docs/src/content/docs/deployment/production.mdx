@@ -47,6 +47,19 @@ Remove `local-db` from `COMPOSE_PROFILES` and set `EYENED_DATABASE_HOST`, `_PORT
 runs: compose interpolates variables for profile-disabled services too, and refuses to start
 without it.
 
+## HTTPS with your own certificate
+
+1. Put the certificate chain and key in one directory as `fullchain.pem` and `privkey.pem`.
+2. In `deploy/.env`, append `:compose.tls.yaml` to `COMPOSE_FILE` and set `TLS_CERT_DIR` and
+   `HTTPS_PORT` (default 443). `HTTP_PORT` then redirects to HTTPS.
+3. `docker compose up -d`
+
+To renew, copy the new files into `TLS_CERT_DIR`, then:
+
+```bash
+docker compose exec fileserver nginx -s reload
+```
+
 ## Behind a TLS-terminating proxy
 
 The stack speaks plain HTTP on `HTTP_PORT`. To serve it over HTTPS, terminate TLS in front of it
@@ -117,8 +130,8 @@ nothing reports an error — see [Workers](#workers).
 
 Applies when `docker info` lists `selinux` under Security Options. Compose relabels the files it
 mounts from the checkout. Host paths you set — `DB_DATA_PATH`, `PLATFORM_STORAGE_PATH`,
-`BACKUP_PATH` (including the default `deploy/backups`) and dataset mounts — need labelling once,
-by absolute path:
+`BACKUP_PATH` (including the default `deploy/backups`), `TLS_CERT_DIR` and dataset mounts — need
+labelling once, by absolute path:
 
 - Local disk:
 

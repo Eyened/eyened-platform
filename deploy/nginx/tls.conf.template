@@ -1,0 +1,9 @@
+# Rendered into conf.d/server.d/ by compose.tls.yaml; ${HTTPS_PORT} is the host port.
+listen 443 ssl;
+ssl_certificate     /etc/nginx/tls/fullchain.pem;
+ssl_certificate_key /etc/nginx/tls/privkey.pem;
+
+# $host carries no port, so it is restated.
+if ($scheme = http) {
+    return 301 https://$host:${HTTPS_PORT}$request_uri;
+}

@@ -7,6 +7,8 @@ map $http_x_forwarded_proto $client_scheme {
 
 server {
     listen 80;
+    # compose.tls.yaml's snippet; matches nothing without that layer.
+    include /etc/nginx/conf.d/server.d/*.conf;
     # Docker's DNS. With the variables below nginx re-resolves `server` on each
     # request, so a recreated server container does not leave a stale IP.
     resolver 127.0.0.11 valid=10s;
