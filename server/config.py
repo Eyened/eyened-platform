@@ -140,6 +140,9 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     jwt_cookie_name: str = "jwt_token"
     refresh_cookie_name: str = "refresh_token"
+    # Enable only behind HTTPS: over plain HTTP (other than localhost) the
+    # browser drops Secure cookies and login fails.
+    cookie_secure: bool = False
     gzip_minimum_size: int = 1024 * 1024
 
     # Sizing the pool to the thread count is necessary but NOT sufficient: a

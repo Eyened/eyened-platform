@@ -56,6 +56,8 @@ Forward `X-Forwarded-Proto`. The bundled nginx prefers an inbound value over its
 `deploy/nginx/default.conf.template` maps `$http_x_forwarded_proto` to `$client_scheme` and
 passes that upstream — so the application sees `https` rather than the `http` of the inner hop.
 
+Set `EYENED_API_COOKIE_SECURE=true` in `deploy/.env`.
+
 **There is no platform-wide public-origin setting.** `PUBLIC_HOST` and `PUBLIC_URL` in
 `.env.example` apply *only* to the bundled Keycloak layer (`compose.oidc.yaml`); nothing else
 reads them, and setting them on a production stack has no effect.
