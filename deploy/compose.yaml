@@ -133,6 +133,7 @@ services:
       EYENED_API_POOL_TIMEOUT: ${EYENED_API_POOL_TIMEOUT:-5}
       EYENED_API_PASSWORD_HASH_CONCURRENCY: ${EYENED_API_PASSWORD_HASH_CONCURRENCY:-4}
       EYENED_API_AUTH_PASSWORD_ENABLED: ${EYENED_API_AUTH_PASSWORD_ENABLED:-true}
+      EYENED_API_COOKIE_SECURE: ${EYENED_API_COOKIE_SECURE:-false}
       EYENED_STORAGE_ROOT: /storage
       # Empty keeps local mode off; see compose.storage.example.yaml.
       EYENED_STORAGE_MOUNTS: ${EYENED_STORAGE_MOUNTS:-}
@@ -170,7 +171,7 @@ services:
     image: nginx:1.27-alpine
     logging: *default-logging
     restart: *default-restart
-    # No env_file, for the same reason as `server`; the template needs no variables.
+    # No env_file, for the same reason as `server`; the base template needs no variables.
     ports:
       - "${HTTP_PORT:-8080}:80"
     volumes:

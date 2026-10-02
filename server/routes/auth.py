@@ -212,7 +212,7 @@ def login(
         value=access_token,
         httponly=True,
         max_age=settings.access_token_expire_minutes * 60,
-        secure=False,  # Set to True in production
+        secure=settings.cookie_secure,
         samesite="strict",
         path="/",
     )
@@ -222,7 +222,7 @@ def login(
         value=refresh_token,
         httponly=True,
         max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
-        secure=False,  # Set to True in production
+        secure=settings.cookie_secure,
         samesite="strict",
         path="/",
     )
@@ -321,7 +321,7 @@ def refresh_token(
             value=new_access_token,
             httponly=True,
             max_age=settings.access_token_expire_minutes * 60,
-            secure=False,
+            secure=settings.cookie_secure,
             samesite="strict",
             path="/",
         )
@@ -332,7 +332,7 @@ def refresh_token(
             value=new_refresh_token,
             httponly=True,
             max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
-            secure=False,
+            secure=settings.cookie_secure,
             samesite="strict",
             path="/",
         )
@@ -432,7 +432,7 @@ def get_oidc_authorization_url(response: Response, next_: Annotated[str, Query(a
         value=csrf_token,
         httponly=True,
         max_age=cookie_age,
-        secure=False,
+        secure=settings.cookie_secure,
         samesite="strict",
         path="/",
     )
@@ -441,7 +441,7 @@ def get_oidc_authorization_url(response: Response, next_: Annotated[str, Query(a
         value=nonce_hash,
         httponly=True,
         max_age=cookie_age,
-        secure=False,
+        secure=settings.cookie_secure,
         samesite="strict",
         path="/",
     )
@@ -668,7 +668,7 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
         value=access_token,
         httponly=True,
         max_age=settings.access_token_expire_minutes * 60,
-        secure=False,  # Set to True in production
+        secure=settings.cookie_secure,
         samesite="strict",
         path="/",
     )
@@ -677,7 +677,7 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
         value=refresh_token,
         httponly=True,
         max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
-        secure=False,  # Set to True in production
+        secure=settings.cookie_secure,
         samesite="strict",
         path="/",
     )

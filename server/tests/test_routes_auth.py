@@ -814,3 +814,25 @@ def test_oidc_authenticate_logs_in_a_linked_account(
     assert (body["id"], body["username"]) == (creator_id, "oidc-user")
     # control: a star only the starred-tags read can supply, so a response built without it fails
     assert body["starred_tags"] == [tag_id]
+
+
+def test_login_marks_both_auth_cookies_secure_when_cookie_secure_is_on(
+    client_anonymous, session, signed_jwts, monkeypatch
+):
+    """With cookie_secure on, both login cookies carry the Secure attribute."""
+    import server.routes.auth as auth_routes
+
+    # Settings is frozen: replace the module's object rather than patch a field.
+    monkeypatch.setattr(
+        auth_routes, "settings", settings.model_copy(update={"cookie_secure": True})
+    )
+    _seed_user(session, "secure-user")
+
+    response = client_anonymous.post(
+        "/auth/login", json={"username": "secure-user", "password": "pw0"}
+    )
+
+    assert response.status_code == 200, response.text
+    set_cookies = response.headers.get_list("set-cookie")
+    assert len(set_cookies) == 2
+    assert all("; Secure" in cookie for cookie in set_cookies)

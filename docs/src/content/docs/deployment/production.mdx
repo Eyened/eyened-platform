@@ -41,11 +41,27 @@ Open `http://<host>:<HTTP_PORT>` and sign in as `EYENED_API_ADMIN_USERNAME` (def
 ## Using an external database
 
 Remove `local-db` from `COMPOSE_PROFILES` and set `EYENED_DATABASE_HOST`, `_PORT`, `_USER`,
-`_PASSWORD` and `_DATABASE`. The account needs DDL rights, because migrations run as it.
+`_PASSWORD` and `_DATABASE`. Migrations run as this account, so it needs DDL rights; a restricted
+account can migrate with a second one instead (see [Applying
+migrations](/eyened-platform/deployment/operations#applying-migrations)).
 
 `MYSQL_ROOT_PASSWORD` must still be set to something non-empty even though no bundled database
 runs: compose interpolates variables for profile-disabled services too, and refuses to start
 without it.
+
+## HTTPS with your own certificate
+
+1. Copy the certificate chain and key into one directory as `fullchain.pem` and `privkey.pem`
+   (real files, not symlinks).
+2. In `deploy/.env`, append `:compose.tls.yaml` to `COMPOSE_FILE` and set `TLS_CERT_DIR` and
+   `HTTPS_PORT` (default 443). `HTTP_PORT` then redirects to HTTPS.
+3. `docker compose up -d`
+
+To renew, copy the new files into `TLS_CERT_DIR`, then:
+
+```bash
+docker compose exec fileserver nginx -s reload
+```
 
 ## Behind a TLS-terminating proxy
 
@@ -55,6 +71,8 @@ and proxy to that port.
 Forward `X-Forwarded-Proto`. The bundled nginx prefers an inbound value over its own scheme —
 `deploy/nginx/default.conf.template` maps `$http_x_forwarded_proto` to `$client_scheme` and
 passes that upstream — so the application sees `https` rather than the `http` of the inner hop.
+
+Set `EYENED_API_COOKIE_SECURE=true` in `deploy/.env`.
 
 **There is no platform-wide public-origin setting.** `PUBLIC_HOST` and `PUBLIC_URL` in
 `.env.example` apply *only* to the bundled Keycloak layer (`compose.oidc.yaml`); nothing else
@@ -115,8 +133,8 @@ nothing reports an error — see [Workers](#workers).
 
 Applies when `docker info` lists `selinux` under Security Options. Compose relabels the files it
 mounts from the checkout. Host paths you set — `DB_DATA_PATH`, `PLATFORM_STORAGE_PATH`,
-`BACKUP_PATH` (including the default `deploy/backups`) and dataset mounts — need labelling once,
-by absolute path:
+`BACKUP_PATH` (including the default `deploy/backups`), `TLS_CERT_DIR` and dataset mounts — need
+labelling once, by absolute path:
 
 - Local disk:
 

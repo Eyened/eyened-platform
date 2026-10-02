@@ -1,0 +1,19 @@
+# Optional: HTTPS with your own certificate. Append :compose.tls.yaml to
+# COMPOSE_FILE and set TLS_CERT_DIR. HTTP_PORT then only redirects.
+
+services:
+
+  server:
+    environment:
+      EYENED_API_COOKIE_SECURE: "true"
+
+  fileserver:
+    ports:
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      HTTPS_PORT: ${HTTPS_PORT:-443}
+    volumes:
+      - ./nginx/tls.conf.template:/etc/nginx/templates/server.d/tls.conf.template:ro,z
+      # A directory, not file mounts, so a renewed certificate is picked up.
+      # No `z`, as for BACKUP_PATH.
+      - ${TLS_CERT_DIR:?set TLS_CERT_DIR in deploy/.env}:/etc/nginx/tls:ro
