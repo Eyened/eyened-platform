@@ -1,5 +1,10 @@
-import type { ImagePoint, PointCardinality, PointList } from "./pointSchema";
 import type { Position2D } from "$lib/types";
+import type {
+    ImagePoint,
+    PointCardinality,
+    PointEnumExtra,
+    PointList,
+} from "./pointSchema";
 
 export type PlacePointOptions = {
     /**
@@ -7,7 +12,40 @@ export type PlacePointOptions = {
      * Omit the option entirely for plain 2D images (no index property).
      */
     index?: number | null;
+    /**
+     * String enums on the point. A required one is set to its first value
+     * when the written point does not already have a valid value.
+     */
+    enumExtras?: readonly PointEnumExtra[];
 };
+
+/**
+ * Keep a valid enum from `existing` when a slot is rewritten.
+ * Otherwise fill a required enum that the written point does not already have.
+ */
+function withEnumExtras(
+    point: ImagePoint,
+    options?: PlacePointOptions,
+    existing?: ImagePoint | null,
+): ImagePoint {
+    const extras = options?.enumExtras;
+    if (!extras?.length) return point;
+    let next = point;
+    for (const extra of extras) {
+        const carried = existing?.[extra.key];
+        if (typeof carried === "string" && extra.values.includes(carried)) {
+            next = { ...next, [extra.key]: carried };
+            continue;
+        }
+        if (!extra.required || extra.values.length === 0) continue;
+        const current = next[extra.key];
+        if (typeof current === "string" && extra.values.includes(current)) {
+            continue;
+        }
+        next = { ...next, [extra.key]: extra.values[0]! };
+    }
+    return next;
+}
 
 export function placePoint(
     points: PointList,
@@ -29,21 +67,21 @@ export function placePoint(
         // marker stays visible (visibleOnSlice rejects numeric index on 2D).
         if (!options || !("index" in options)) {
             const { index: _drop, ...rest } = merged;
-            return [rest];
+            return [withEnumExtras(rest, options)];
         }
-        return [merged];
+        return [withEnumExtras(merged, options)];
     }
 
     const copy = [...points];
     if (sparse) {
         for (let i = 0; i <= copy.length; i++) {
             if (!copy[i]) {
-                copy[i] = next;
+                copy[i] = withEnumExtras(next, options);
                 return copy;
             }
         }
     }
-    copy.push(next);
+    copy.push(withEnumExtras(next, options));
     return copy;
 }
 
@@ -60,7 +98,7 @@ export function placePointAt(
     }
     const copy = [...points];
     while (copy.length <= index) copy.push(null);
-    copy[index] = next;
+    copy[index] = withEnumExtras(next, options, copy[index]);
     return copy;
 }
 

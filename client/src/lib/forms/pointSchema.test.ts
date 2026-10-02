@@ -43,7 +43,19 @@ describe("analyzePointSchema", () => {
             coordinateSpace: "enface2d",
         });
         expect(a!.enumExtras).toEqual([
-            { key: "severity", values: ["mild", "severe"] },
+            { key: "severity", values: ["mild", "severe"], required: false },
+        ]);
+    });
+
+    it("marks an enum extra required when the point schema requires it", () => {
+        const a = analyzePointSchema({
+            "x-eyened-widget": "keypoint",
+            type: "object",
+            properties: pointObject.properties,
+            required: ["x", "y", "severity"],
+        });
+        expect(a!.enumExtras).toEqual([
+            { key: "severity", values: ["mild", "severe"], required: true },
         ]);
     });
 

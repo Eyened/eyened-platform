@@ -162,6 +162,98 @@ describe("PointTool", () => {
         expect(tool.points).toEqual([]);
     });
 
+    it("seeds the first required grade on place and leaves an optional grade unset", () => {
+        const viewer = mockViewer();
+        const required = new PointTool({
+            enumExtras: [
+                { key: "severity", values: ["mild", "severe"], required: true },
+            ],
+        });
+        required.placeAtCursor(viewer, { x: 1, y: 2 });
+        expect(required.points[0]).toEqual({ x: 1, y: 2, severity: "mild" });
+
+        const optional = new PointTool({
+            enumExtras: [
+                {
+                    key: "severity",
+                    values: ["mild", "severe"],
+                    required: false,
+                },
+            ],
+        });
+        optional.placeAtCursor(viewer, { x: 3, y: 4 });
+        expect(optional.points[0]).toEqual({ x: 3, y: 4 });
+    });
+
+    it("cycles the grade on a click that does not drag", () => {
+        const onPersist = vi.fn();
+        const tool = new PointTool({
+            onPersist,
+            enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
+        });
+        const viewer = mockViewer();
+        tool.points = [{ x: 10, y: 10, severity: "mild" }];
+
+        tool.pointerdown(pointerEvent(viewer, { x: 10, y: 10 }));
+        tool.pointermove(pointerEvent(viewer, { x: 12, y: 11 }));
+        tool.pointerup(pointerEvent(viewer, { x: 12, y: 11 }));
+
+        expect(tool.points[0]).toEqual({ x: 10, y: 10, severity: "severe" });
+        expect(onPersist).toHaveBeenCalledTimes(1);
+    });
+
+    it("moves a point when the press exceeds the drag threshold and does not cycle", () => {
+        const tool = new PointTool({
+            enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
+        });
+        const viewer = mockViewer();
+        tool.points = [{ x: 10, y: 10, severity: "mild" }];
+
+        tool.pointerdown(pointerEvent(viewer, { x: 10, y: 10 }));
+        tool.pointermove(pointerEvent(viewer, { x: 30, y: 40 }));
+        tool.pointerup(pointerEvent(viewer, { x: 30, y: 40 }));
+
+        expect(tool.points[0]).toEqual({ x: 30, y: 40, severity: "mild" });
+    });
+
+    it("ctrl-click stacks a point on an existing marker without cycling or dragging", () => {
+        const onPersist = vi.fn();
+        const tool = new PointTool({
+            onPersist,
+            enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
+        });
+        const viewer = mockViewer();
+        tool.points = [{ x: 10, y: 10, severity: "mild" }];
+
+        tool.pointerdown(
+            pointerEvent(viewer, { x: 10, y: 10 }, { ctrlKey: true }),
+        );
+        tool.pointermove(
+            pointerEvent(viewer, { x: 40, y: 50 }, { ctrlKey: true }),
+        );
+        tool.pointerup(
+            pointerEvent(viewer, { x: 40, y: 50 }, { ctrlKey: true }),
+        );
+
+        expect(tool.points).toEqual([
+            { x: 10, y: 10, severity: "mild" },
+            { x: 10, y: 10 },
+        ]);
+        expect(onPersist).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not cycle a grade when the same click places the point", () => {
+        const tool = new PointTool({
+            enumExtras: [
+                { key: "severity", values: ["mild", "severe"], required: true },
+            ],
+        });
+        const viewer = mockViewer();
+        tool.pointerdown(pointerEvent(viewer, { x: 4, y: 5 }));
+        tool.pointerup(pointerEvent(viewer, { x: 4, y: 5 }));
+        expect(tool.points[0]).toEqual({ x: 4, y: 5, severity: "mild" });
+    });
+
     it("cycles enum extras on C key", () => {
         const onPersist = vi.fn();
         const tool = new PointTool({

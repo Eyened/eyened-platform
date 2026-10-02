@@ -24,3 +24,28 @@
         not here.
     </p>
 </section>
+
+<section>
+    <h2>Points</h2>
+    <ul>
+        <li>
+            Activate a point field, then left-click empty image to place a
+            point. Drag a point to move it. Right-click a point to remove it.
+        </li>
+        <li>
+            Click a point without dragging, or hover it and press <kbd>C</kbd>,
+            to cycle its grade. Further clicks or presses walk the values and
+            wrap.
+        </li>
+        <li>
+            A required grade starts on the first value as soon as the point is
+            placed. An optional grade stays unset until that first click or
+            <kbd>C</kbd>, and the form keeps a blank choice for it.
+        </li>
+        <li>
+            On a list of points, <kbd>Ctrl</kbd>-click places another point even
+            on top of an existing marker. That click does not cycle or drag. A
+            single landmark stays one point.
+        </li>
+    </ul>
+</section>

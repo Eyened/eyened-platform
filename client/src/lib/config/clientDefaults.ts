@@ -31,7 +31,7 @@ export const CLIENT_DEFAULTS: ClientConfig = {
     layout: { hide: [], prepend: [] },
     point_marker: {
         style: "cross",
-        radius: 16,
+        radius: 12,
         color: "rgba(0, 255, 0, 1)",
     },
 };
