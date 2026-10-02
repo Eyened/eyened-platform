@@ -71,16 +71,23 @@ def _image_type_tokens(ds: pydicom.dataset.FileDataset) -> set[str]:
     return {p.strip().upper() for p in parts if p and str(p).strip()}
 
 
+# First match wins. Heidelberg uses RED/AF; oct_converter uses INFRARED/AUTOFLUORESCENCE/REDFREE.
+_OP_IMAGE_TYPE_MODALITY: tuple[tuple[frozenset[str], Modality], ...] = (
+    (frozenset({"RED", "INFRARED"}), Modality.InfraredReflectance),
+    (frozenset({"AF", "AUTOFLUORESCENCE"}), Modality.Autofluorescence),
+    (frozenset({"REDFREE", "RED FREE"}), Modality.RedFreeFundus),
+)
+
+
 def _infer_modality(
     dicom_modality: ModalityType | None, image_type: set[str]
 ) -> Modality | None:
     if dicom_modality is ModalityType.OPT:
         return Modality.OCT
     if dicom_modality is ModalityType.OP:
-        if "RED" in image_type:
-            return Modality.InfraredReflectance
-        if "AF" in image_type:
-            return Modality.Autofluorescence
+        for aliases, modality in _OP_IMAGE_TYPE_MODALITY:
+            if image_type & aliases:
+                return modality
     return None
 
 
