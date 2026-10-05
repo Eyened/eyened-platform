@@ -3,6 +3,7 @@
         ImagePoint,
         PointAddressing,
         PointCardinality,
+        PointEnumExtra,
     } from "$lib/forms/pointSchema";
     import PointRowEditor, {
         type PointRow,
@@ -15,7 +16,7 @@
         expandedKey: string | null;
         canEdit: boolean;
         hasExtras: boolean;
-        enumExtras: { key: string; values: readonly string[] }[];
+        enumExtras: readonly PointEnumExtra[];
         stringExtraKeys: string[];
         formatCoord: (pt: ImagePoint) => string;
         extraPreview: (pt: ImagePoint) => string;

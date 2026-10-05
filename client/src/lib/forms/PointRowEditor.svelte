@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Input } from "$lib/components/ui/input";
-    import type { ImagePoint } from "$lib/forms/pointSchema";
+    import type { ImagePoint, PointEnumExtra } from "$lib/forms/pointSchema";
     import { Trash } from "$lib/viewer-window/icons/icons";
 
     export type PointRow = { publicId: string; index: number; pt: ImagePoint };
@@ -9,7 +9,7 @@
         row: PointRow;
         canEdit: boolean;
         hasExtras: boolean;
-        enumExtras: { key: string; values: readonly string[] }[];
+        enumExtras: readonly PointEnumExtra[];
         stringExtraKeys: string[];
         indexApplicable: (pt: ImagePoint) => boolean;
         /** When false (volume schemas), blanking i is rejected upstream. */
@@ -132,11 +132,16 @@
     {#if hasExtras}
         <div class="editor-extras">
             {#each enumExtras as extra (extra.key)}
+                {@const raw = row.pt[extra.key]}
+                {@const grade =
+                    typeof raw === "string" && extra.values.includes(raw)
+                        ? raw
+                        : ""}
                 <label>
                     {extra.key}
                     <select
                         disabled={!canEdit}
-                        value={String(row.pt[extra.key] ?? "")}
+                        value={grade}
                         onchange={(e) =>
                             onUpdateExtra(
                                 row.publicId,
@@ -145,7 +150,14 @@
                                 (e.currentTarget as HTMLSelectElement).value,
                             )}
                     >
-                        <option value="">—</option>
+                        {#if !extra.required || grade === ""}
+                            <!-- Disabled when required so an unset point is
+                                 visible, but the browser cannot snap to the
+                                 first enum value or clear a saved grade. -->
+                            <option value="" disabled={!!extra.required}
+                                >—</option
+                            >
+                        {/if}
                         {#each extra.values as opt (opt)}
                             <option value={opt}>{opt}</option>
                         {/each}

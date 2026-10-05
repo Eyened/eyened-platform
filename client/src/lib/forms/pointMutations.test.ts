@@ -87,6 +87,47 @@ describe("placePoint", () => {
         ]);
     });
 
+    it("required enum starts at the first value; optional stays unset", () => {
+        const required = [
+            { key: "severity", values: ["mild", "severe"], required: true },
+        ];
+        const optional = [
+            { key: "severity", values: ["mild", "severe"], required: false },
+        ];
+        expect(
+            placePoint([], { x: 1, y: 2 }, "list", false, {
+                enumExtras: required,
+            }),
+        ).toEqual([{ x: 1, y: 2, severity: "mild" }]);
+        expect(
+            placePoint([], { x: 1, y: 2 }, "list", false, {
+                enumExtras: optional,
+            }),
+        ).toEqual([{ x: 1, y: 2 }]);
+    });
+
+    it("single replace keeps an existing grade and fills a missing required one", () => {
+        const extras = [
+            { key: "severity", values: ["mild", "severe"], required: true },
+        ];
+        expect(
+            placePoint(
+                [{ x: 1, y: 1, severity: "severe" }],
+                { x: 9, y: 9 },
+                "single",
+                false,
+                {
+                    enumExtras: extras,
+                },
+            ),
+        ).toEqual([{ x: 9, y: 9, severity: "severe" }]);
+        expect(
+            placePoint([{ x: 1, y: 1 }], { x: 9, y: 9 }, "single", false, {
+                enumExtras: extras,
+            }),
+        ).toEqual([{ x: 9, y: 9, severity: "mild" }]);
+    });
+
     it("registration fills first null slot", () => {
         const pts = [{ x: 1, y: 1 }, null, { x: 3, y: 3 }] as const;
         expect(placePoint([...pts], { x: 2, y: 2 }, "list", true)).toEqual([
@@ -187,6 +228,25 @@ describe("placePointAt", () => {
             null,
             { x: 3, y: 4 },
         ]);
+    });
+
+    it("keeps a slot's grade and seeds a required grade on an empty slot", () => {
+        const extras = [
+            { key: "severity", values: ["mild", "severe"], required: true },
+        ];
+        expect(
+            placePointAt(
+                [{ x: 1, y: 1, severity: "severe" }],
+                0,
+                { x: 9, y: 9 },
+                {
+                    enumExtras: extras,
+                },
+            ),
+        ).toEqual([{ x: 9, y: 9, severity: "severe" }]);
+        expect(
+            placePointAt([null], 0, { x: 1, y: 2 }, { enumExtras: extras }),
+        ).toEqual([{ x: 1, y: 2, severity: "mild" }]);
     });
 
     it("stores optional index like placePoint", () => {

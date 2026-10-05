@@ -21,6 +21,10 @@
     // const study = $derived(studies.get(studyId)!);
 
     let collapse = $state(false);
+    // The browse popup lists every visit for image picking. Keep grading
+    // available there, but folded so the image rows stay in view.
+    let gradingOpen = $state(false);
+    const gradingCollapsed = $derived(mode === "overlay" && !gradingOpen);
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const browserContext = getContext<BrowserContext>("browserContext");
@@ -139,7 +143,17 @@
         </div>
         <Eye laterality={null} {study} />
 
-        {#if mode == "full"}
+        {#if mode === "overlay"}
+            <button
+                type="button"
+                class="mt-1 cursor-pointer pl-2 text-left text-sm font-semibold hover:bg-gray-300/50"
+                onclick={() => (gradingOpen = !gradingOpen)}
+            >
+                {#if gradingCollapsed}►{:else}▼{/if}
+                Grading
+            </button>
+        {/if}
+        {#if !gradingCollapsed}
             <StudyBlockForms {study} />
             <AdditionalDataSources
                 context={dataSourceContext}
