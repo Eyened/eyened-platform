@@ -97,6 +97,47 @@ describe("PointRowEditor", () => {
         expect(select.querySelectorAll("option")).toHaveLength(2);
     });
 
+    it("shows a blank required grade when the saved value is missing", async () => {
+        const onUpdateExtra = vi.fn();
+        render(PointRowEditor, {
+            props: {
+                row: { publicId: "img1", index: 0, pt: { x: 10, y: 20 } },
+                canEdit: true,
+                hasExtras: true,
+                enumExtras: [
+                    {
+                        key: "severity",
+                        values: ["mild", "severe"],
+                        required: true,
+                    },
+                ],
+                stringExtraKeys: [],
+                indexApplicable: () => false,
+                coordLabel: "[10,20]",
+                onUpdateCoord: vi.fn(),
+                onUpdateExtra,
+                onRemove: vi.fn(),
+                onCollapse: vi.fn(),
+            },
+        });
+
+        const select = screen.getByLabelText("severity") as HTMLSelectElement;
+        const blank = select.querySelector(
+            'option[value=""]',
+        ) as HTMLOptionElement;
+        expect(blank).not.toBeNull();
+        expect(blank.disabled).toBe(true);
+        expect(select.value).toBe("");
+
+        await fireEvent.change(select, { target: { value: "mild" } });
+        expect(onUpdateExtra).toHaveBeenCalledWith(
+            "img1",
+            0,
+            "severity",
+            "mild",
+        );
+    });
+
     it("hides edit controls when read-only", () => {
         render(PointRowEditor, {
             props: {

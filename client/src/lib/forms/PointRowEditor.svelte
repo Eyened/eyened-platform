@@ -132,11 +132,16 @@
     {#if hasExtras}
         <div class="editor-extras">
             {#each enumExtras as extra (extra.key)}
+                {@const raw = row.pt[extra.key]}
+                {@const grade =
+                    typeof raw === "string" && extra.values.includes(raw)
+                        ? raw
+                        : ""}
                 <label>
                     {extra.key}
                     <select
                         disabled={!canEdit}
-                        value={String(row.pt[extra.key] ?? "")}
+                        value={grade}
                         onchange={(e) =>
                             onUpdateExtra(
                                 row.publicId,
@@ -145,8 +150,13 @@
                                 (e.currentTarget as HTMLSelectElement).value,
                             )}
                     >
-                        {#if !extra.required}
-                            <option value="">—</option>
+                        {#if !extra.required || grade === ""}
+                            <!-- Disabled when required so an unset point is
+                                 visible, but the browser cannot snap to the
+                                 first enum value or clear a saved grade. -->
+                            <option value="" disabled={!!extra.required}
+                                >—</option
+                            >
                         {/if}
                         {#each extra.values as opt (opt)}
                             <option value={opt}>{opt}</option>
