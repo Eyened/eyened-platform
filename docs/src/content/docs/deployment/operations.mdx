@@ -64,6 +64,18 @@ Upgrading from a version that predates `deploy/`: read the **Deployment** sectio
 back](#upgrading-and-rolling-back)); the command is
 `docker compose run --rm -e EYENED_AUTO_MIGRATE=true init`.
 
+`init` connects as `EYENED_DATABASE_USER`, so that account needs CREATE, ALTER, DROP, INDEX and
+REFERENCES on the database to migrate. The bundled database's account has them. If yours is
+restricted, migrate as an account that has them:
+
+```bash
+docker compose run --rm -e EYENED_AUTO_MIGRATE=true \
+  -e EYENED_DATABASE_USER=<ddl-account> -e EYENED_DATABASE_PASSWORD=<password> init
+```
+
+Do not set `EYENED_AUTO_MIGRATE=true` in `.env` on such a site: the next `up` with a migration
+pending fails, and the server does not start.
+
 A database from before the August 2026 migration squash carries a revision alembic cannot find,
 and `init` fails on it. The procedure for that case is [Upgrading to
 v2026.09.0](/eyened-platform/guides/upgrading_to_v2026_09_0/).
