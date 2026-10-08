@@ -7,28 +7,35 @@
     } from "svelte/elements";
     import { type VariantProps } from "tailwind-variants";
 
+    // Carbon Button; values from @carbon/styles button/_button.scss.
     export const buttonVariants = tv({
-        base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium outline-none transition-all focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        base: "relative inline-flex max-w-80 shrink-0 cursor-pointer items-center justify-between gap-2 border border-transparent pr-15.75 pl-3.75 text-left text-body-compact-01 focus-visible:border-focus focus-visible:shadow-button-focus disabled:cursor-not-allowed aria-disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&>svg]:absolute [&>svg]:right-4",
         variants: {
             variant: {
                 default:
-                    "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
+                    "bg-button-primary text-text-on-color hover:bg-button-primary-hover active:bg-button-primary-active disabled:border-button-disabled disabled:bg-button-disabled disabled:text-text-on-color-disabled aria-disabled:border-button-disabled aria-disabled:bg-button-disabled aria-disabled:text-text-on-color-disabled",
                 destructive:
-                    "bg-destructive shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 text-white",
+                    "bg-button-danger-primary text-text-on-color hover:bg-button-danger-hover active:bg-button-danger-active disabled:border-button-disabled disabled:bg-button-disabled disabled:text-text-on-color-disabled aria-disabled:border-button-disabled aria-disabled:bg-button-disabled aria-disabled:text-text-on-color-disabled",
                 outline:
-                    "bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 border",
+                    "border-button-tertiary bg-transparent text-button-tertiary hover:bg-button-tertiary-hover hover:text-text-inverse focus-visible:bg-button-tertiary focus-visible:text-text-inverse active:border-transparent active:bg-button-tertiary-active active:text-text-inverse disabled:border-button-disabled disabled:bg-transparent disabled:text-text-disabled aria-disabled:border-button-disabled aria-disabled:bg-transparent aria-disabled:text-text-disabled",
                 secondary:
-                    "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
-                ghost: "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-                link: "text-primary underline-offset-4 hover:underline",
+                    "bg-button-secondary text-text-on-color hover:bg-button-secondary-hover active:bg-button-secondary-active disabled:border-button-disabled disabled:bg-button-disabled disabled:text-text-on-color-disabled aria-disabled:border-button-disabled aria-disabled:bg-button-disabled aria-disabled:text-text-on-color-disabled",
+                ghost: "bg-transparent pr-3.75 text-link-primary hover:bg-background-hover hover:text-link-primary-hover active:bg-background-active active:text-link-primary-hover disabled:bg-transparent disabled:text-text-disabled aria-disabled:bg-transparent aria-disabled:text-text-disabled [&_svg]:text-icon-primary disabled:[&_svg]:text-icon-disabled aria-disabled:[&_svg]:text-icon-disabled [&>svg]:static",
+                link: "text-link-primary hover:text-link-primary-hover hover:underline disabled:text-text-disabled aria-disabled:text-text-disabled",
             },
             size: {
-                default: "h-9 px-4 py-2 has-[>svg]:px-3",
-                sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
-                lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-                icon: "size-9",
+                default: "min-h-10 py-2.5",
+                sm: "min-h-8 py-1.5",
+                lg: "min-h-12 py-3.5",
+                icon: "size-10 justify-center p-0 [&>svg]:static",
             },
         },
+        compoundVariants: [
+            {
+                variant: "link",
+                class: "min-h-0 border-0 p-0 focus-visible:shadow-none focus-visible:outline-1 focus-visible:outline-focus",
+            },
+        ],
         defaultVariants: {
             variant: "default",
             size: "default",
