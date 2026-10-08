@@ -2,149 +2,159 @@
 
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@import "@fontsource-variable/ibm-plex-sans";
 
-:root {
-    --radius: 0.625rem;
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.129 0.042 264.695);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.129 0.042 264.695);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.129 0.042 264.695);
-    --primary: oklch(0.208 0.042 265.755);
-    --primary-foreground: oklch(0.984 0.003 247.858);
-    --secondary: oklch(0.968 0.007 247.896);
-    --secondary-foreground: oklch(0.208 0.042 265.755);
-    --muted: oklch(0.968 0.007 247.896);
-    --muted-foreground: oklch(0.554 0.046 257.417);
-    --accent: oklch(0.968 0.007 247.896);
-    --accent-foreground: oklch(0.208 0.042 265.755);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.929 0.013 255.508);
-    --input: oklch(0.929 0.013 255.508);
-    --ring: oklch(0.704 0.04 256.788);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
-    --sidebar: oklch(0.984 0.003 247.858);
-    --sidebar-foreground: oklch(0.129 0.042 264.695);
-    --sidebar-primary: oklch(0.208 0.042 265.755);
-    --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-    --sidebar-accent: oklch(0.968 0.007 247.896);
-    --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-    --sidebar-border: oklch(0.929 0.013 255.508);
-    --sidebar-ring: oklch(0.704 0.04 256.788);
+/* Design tokens: Carbon Gray 100. Names and rules: client/DESIGN.md. */
+
+@theme {
+    /* Colours: @carbon/themes 11.83.0, theme g100 */
+    --color-*: initial;
+    --color-background: #161616;
+    --color-background-hover: rgba(141, 141, 141, 0.16);
+    --color-background-active: rgba(141, 141, 141, 0.4);
+    --color-layer-01: #262626;
+    --color-layer-02: #393939;
+    --color-layer-hover-01: #333333;
+    --color-layer-active-01: #525252;
+    --color-layer-accent-01: #393939;
+    --color-field-01: #262626;
+    --color-field-hover-01: #333333;
+    --color-field-02: #393939;
+    --color-field-hover-02: #474747;
+    --color-border-subtle-00: #393939;
+    --color-border-subtle-01: #525252;
+    --color-border-strong-01: #6f6f6f;
+    --color-border-strong-02: #8d8d8d;
+    --color-border-interactive: #4589ff;
+    --color-border-disabled: rgba(141, 141, 141, 0.5);
+    --color-overlay: rgba(0, 0, 0, 0.6);
+    --color-skeleton-background: #292929;
+    --color-skeleton-element: #393939;
+    --color-text-primary: #f4f4f4;
+    --color-text-secondary: #c6c6c6;
+    --color-text-helper: #a8a8a8;
+    --color-text-placeholder: rgba(244, 244, 244, 0.4);
+    --color-text-on-color: #ffffff;
+    --color-text-on-color-disabled: rgba(255, 255, 255, 0.25);
+    --color-text-inverse: #161616;
+    --color-text-disabled: rgba(244, 244, 244, 0.25);
+    --color-text-error: #ff8389;
+    --color-link-primary: #78a9ff;
+    --color-link-primary-hover: #a6c8ff;
+    --color-icon-primary: #f4f4f4;
+    --color-icon-secondary: #c6c6c6;
+    --color-icon-inverse: #161616;
+    --color-icon-disabled: rgba(244, 244, 244, 0.25);
+    --color-interactive: #4589ff;
+    --color-focus: #ffffff;
+    --color-focus-inset: #161616;
+    --color-support-error: #fa4d56;
+    --color-support-success: #42be65;
+    --color-support-warning: #f1c21b;
+    --color-notification-background-error: #262626;
+    --color-notification-background-success: #262626;
+    --color-notification-background-warning: #262626;
+
+    /* Colours: @carbon/themes 11.83.0 component tokens (button, status, content-switcher), g100 */
+    --color-button-primary: #0f62fe;
+    --color-button-primary-hover: #0050e6;
+    --color-button-primary-active: #002d9c;
+    --color-button-secondary: #6f6f6f;
+    --color-button-secondary-hover: #5e5e5e;
+    --color-button-secondary-active: #393939;
+    --color-button-tertiary: #ffffff;
+    --color-button-tertiary-hover: #f4f4f4;
+    --color-button-tertiary-active: #c6c6c6;
+    --color-button-danger-primary: #da1e28;
+    --color-button-danger-hover: #b81921;
+    --color-button-danger-active: #750e13;
+    --color-button-danger-secondary: #fa4d56;
+    --color-button-disabled: rgba(141, 141, 141, 0.3);
+    --color-status-gray: #8d8d8d;
+    --color-status-blue: #4589ff;
+    --color-status-green: #42be65;
+    --color-status-red: #fa4d56;
+    --color-content-switcher-background-hover: rgba(141, 141, 141, 0.12);
+    --color-content-switcher-selected: rgba(141, 141, 141, 0.24);
+
+    /* Type: @carbon/type 11.69.0, productive set */
+    --font-*: initial;
+    --font-sans: "IBM Plex Sans Variable", system-ui, sans-serif;
+    --font-weight-*: initial;
+    --text-*: initial;
+    --text-label-01: 0.75rem;
+    --text-label-01--line-height: 1.33333;
+    --text-label-01--letter-spacing: 0.32px;
+    --text-label-01--font-weight: 400;
+    --text-helper-text-01: 0.75rem;
+    --text-helper-text-01--line-height: 1.33333;
+    --text-helper-text-01--letter-spacing: 0.32px;
+    --text-helper-text-01--font-weight: 400;
+    --text-body-compact-01: 0.875rem;
+    --text-body-compact-01--line-height: 1.28572;
+    --text-body-compact-01--letter-spacing: 0.16px;
+    --text-body-compact-01--font-weight: 400;
+    --text-body-01: 0.875rem;
+    --text-body-01--line-height: 1.42857;
+    --text-body-01--letter-spacing: 0.16px;
+    --text-body-01--font-weight: 400;
+    --text-heading-compact-01: 0.875rem;
+    --text-heading-compact-01--line-height: 1.28572;
+    --text-heading-compact-01--letter-spacing: 0.16px;
+    --text-heading-compact-01--font-weight: 600;
+    --text-heading-compact-02: 1rem;
+    --text-heading-compact-02--line-height: 1.375;
+    --text-heading-compact-02--letter-spacing: 0;
+    --text-heading-compact-02--font-weight: 600;
+    --text-heading-03: 1.25rem;
+    --text-heading-03--line-height: 1.4;
+    --text-heading-03--letter-spacing: 0;
+    --text-heading-03--font-weight: 400;
+    --text-heading-04: 1.75rem;
+    --text-heading-04--line-height: 1.28572;
+    --text-heading-04--letter-spacing: 0;
+    --text-heading-04--font-weight: 400;
+
+    /* Layout: spacing stays Tailwind's 0.25rem (tw-animate-css and calendar call --spacing());
+       use only Carbon's steps, see DESIGN.md. No breakpoints. */
+    --breakpoint-*: initial;
+    --container-*: initial;
+    --container-page: 99rem;
+
+    /* Shapes: Carbon corners are square; shadow from @carbon/styles (g100) */
+    --radius-*: initial;
+    --shadow-*: initial;
+    --shadow-popover: 0 2px 6px rgba(0, 0, 0, 0.8);
+    --shadow-button-focus:
+        inset 0 0 0 1px var(--color-focus),
+        inset 0 0 0 2px var(--color-background);
 }
 
-.dark {
-    --background: oklch(0.129 0.042 264.695);
-    --foreground: oklch(0.984 0.003 247.858);
-    --card: oklch(0.208 0.042 265.755);
-    --card-foreground: oklch(0.984 0.003 247.858);
-    --popover: oklch(0.208 0.042 265.755);
-    --popover-foreground: oklch(0.984 0.003 247.858);
-    --primary: oklch(0.929 0.013 255.508);
-    --primary-foreground: oklch(0.208 0.042 265.755);
-    --secondary: oklch(0.279 0.041 260.031);
-    --secondary-foreground: oklch(0.984 0.003 247.858);
-    --muted: oklch(0.279 0.041 260.031);
-    --muted-foreground: oklch(0.704 0.04 256.788);
-    --accent: oklch(0.279 0.041 260.031);
-    --accent-foreground: oklch(0.984 0.003 247.858);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.551 0.027 264.364);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.769 0.188 70.08);
-    --chart-4: oklch(0.627 0.265 303.9);
-    --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.208 0.042 265.755);
-    --sidebar-foreground: oklch(0.984 0.003 247.858);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-    --sidebar-accent: oklch(0.279 0.041 260.031);
-    --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.551 0.027 264.364);
+/* Base styles. Unlayered, so an unconverted component's outline-none cannot hide the ring. */
+html {
+    color-scheme: dark;
 }
 
-@theme inline {
-    --radius-sm: calc(var(--radius) - 4px);
-    --radius-md: calc(var(--radius) - 2px);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) + 4px);
-    --color-background: var(--background);
-    --color-foreground: var(--foreground);
-    --color-card: var(--card);
-    --color-card-foreground: var(--card-foreground);
-    --color-popover: var(--popover);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-primary: var(--primary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-secondary: var(--secondary);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-muted: var(--muted);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-accent: var(--accent);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-destructive: var(--destructive);
-    --color-border: var(--border);
-    --color-input: var(--input);
-    --color-ring: var(--ring);
-    --color-chart-1: var(--chart-1);
-    --color-chart-2: var(--chart-2);
-    --color-chart-3: var(--chart-3);
-    --color-chart-4: var(--chart-4);
-    --color-chart-5: var(--chart-5);
-    --color-sidebar: var(--sidebar);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-ring: var(--sidebar-ring);
+body {
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--text-body-compact-01);
+    line-height: var(--text-body-compact-01--line-height);
+    letter-spacing: var(--text-body-compact-01--letter-spacing);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus ring for everything except buttons, which draw Carbon's button focus. */
+:focus-visible:not([data-slot="button"], [class*="shadow-button-focus"]) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
 }
 
 @layer base {
-    * {
-        @apply border-border outline-ring/50;
+    /* Transparent, not none: forced-colours mode still shows it. */
+    :is([data-slot="button"], [class*="shadow-button-focus"]):focus-visible {
+        outline: 2px solid transparent;
     }
-    body {
-        @apply bg-background text-foreground;
-    }
-}
-
-/*
- * Force the light theme on a subtree even when an ancestor sets `.dark`
- * (e.g. the embedded browser widget rendered inside the dark viewer window).
- * Re-declares the same tokens as `:root` so components render light.
- */
-.browser-light-surface {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.129 0.042 264.695);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.129 0.042 264.695);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.129 0.042 264.695);
-    --primary: oklch(0.208 0.042 265.755);
-    --primary-foreground: oklch(0.984 0.003 247.858);
-    --secondary: oklch(0.968 0.007 247.896);
-    --secondary-foreground: oklch(0.208 0.042 265.755);
-    --muted: oklch(0.968 0.007 247.896);
-    --muted-foreground: oklch(0.554 0.046 257.417);
-    --accent: oklch(0.968 0.007 247.896);
-    --accent-foreground: oklch(0.208 0.042 265.755);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.929 0.013 255.508);
-    --input: oklch(0.929 0.013 255.508);
-    --ring: oklch(0.704 0.04 256.788);
-
-    color: var(--foreground);
-    background-color: var(--background);
 }

@@ -163,15 +163,6 @@ Used to create the viewerwindow context.
 {/await}
 
 <style>
-    :global(body) {
-        margin: 0;
-        height: 100vh;
-        font-family: Verdana, sans-serif;
-        font-size: small;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-    }
     canvas {
         position: absolute;
         left: 0;

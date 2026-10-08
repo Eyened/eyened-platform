@@ -40,8 +40,6 @@
     :global(body) {
         margin: 0;
         height: 100vh;
-        font-family: Verdana, sans-serif;
-        font-size: small;
         overflow: hidden;
         display: flex;
         flex-direction: column;
