@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 
+const { pageState } = vi.hoisted(() => ({
+    pageState: { url: new URL("http://localhost/") },
+}));
+
+vi.mock("$app/paths", () => ({ resolve: (path: string) => path }));
+vi.mock("$app/state", () => ({ page: pageState }));
+
 vi.mock(
     "$lib/components/Main.svelte",
     async () => import("../../../vitest-passthrough.svelte"),
@@ -30,6 +37,21 @@ describe("admin gate", () => {
         document.body.innerHTML = "";
         render(TopMenu, { context: context(false) });
         expect(screen.queryByText("Admin")).toBeNull();
+    });
+
+    it("marks the section of the current page", () => {
+        pageState.url = new URL("http://localhost/tasks/12");
+        render(TopMenu, { context: context(true) });
+        expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute(
+            "aria-current",
+            "page",
+        );
+        expect(
+            screen.getByRole("link", { name: "Browser" }),
+        ).not.toHaveAttribute("aria-current");
+        expect(screen.getByRole("link", { name: "Admin" })).not.toHaveAttribute(
+            "aria-current",
+        );
     });
 
     it("renders the admin pages for admins only", () => {
