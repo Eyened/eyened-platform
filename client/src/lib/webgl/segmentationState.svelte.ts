@@ -7,10 +7,7 @@ import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
 import type {
     ModelSegmentationGET,
     SegmentationGET,
-    SegmentationDataRepresentation,
 } from "../../types/openapi_types";
-// SimpleDataRepresentation is a subset of SegmentationDataRepresentation
-export type SimpleDataRepresentation = "Binary" | "DualBitMask" | "Probability";
 import type { AbstractImage } from "./abstractImage";
 import { DrawingHistory } from "./drawingHistory.svelte";
 import { Base64Serializer } from "./imageEncoder";
@@ -24,8 +21,8 @@ import {
     type Mask,
     type PaintSettings,
 } from "./mask.svelte";
-import { convert } from "./segmentationConverter";
 import type { SegmentationItem } from "./segmentationItem.svelte";
+import { prepareImportedMask } from "./segmentationTransfer";
 import { segmentationPlaneSize } from "./segmentationProjection";
 
 function isNavigationTimeFetchFailure(error: unknown): boolean {
@@ -208,34 +205,26 @@ export class SegmentationState {
         await this.isDrawing; // wait for previous drawing to finish
         this.ensureInitialCheckpoint();
 
-        const data = other.exportData();
-
-        const thisType = this.segmentation
-            .data_representation as SegmentationDataRepresentation;
-        const otherType = other.segmentation
-            .data_representation as SegmentationDataRepresentation;
-        const threshold = 255 * (other.segmentation.threshold ?? 0.5);
-
-        function isSimpleRepresentation(
-            t: SegmentationDataRepresentation,
-        ): t is SimpleDataRepresentation {
-            return t === "Binary" || t === "DualBitMask" || t === "Probability";
-        }
-
-        if (
-            isSimpleRepresentation(thisType) &&
-            isSimpleRepresentation(otherType)
-        ) {
-            const dataConverted = convert(data, otherType, thisType, threshold);
-            this.mask.importData(dataConverted);
-        } else if (thisType === otherType) {
+        const data = prepareImportedMask({
+            data: other.exportData(),
+            sourceWidth: other.planeWidth,
+            sourceHeight: other.planeHeight,
+            destWidth: this.mask.planeWidth,
+            destHeight: this.mask.planeHeight,
+            sourceRepresentation: other.segmentation.data_representation,
+            destRepresentation: this.segmentation.data_representation,
+            sourceMatrix: other.segmentation.image_projection_matrix,
+            destMatrix: this.segmentation.image_projection_matrix,
+            threshold: 255 * (other.segmentation.threshold ?? 0.5),
+        });
+        if (data) {
             this.mask.importData(data);
         } else {
             console.warn(
                 "SegmentationState.importOther: conversion not supported",
-                otherType,
+                other.segmentation.data_representation,
                 "->",
-                thisType,
+                this.segmentation.data_representation,
             );
         }
 
