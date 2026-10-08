@@ -83,7 +83,7 @@ git grep -nE -e '(^|[[:space:]"'"'"'{:])(text-(xs|sm|base|lg|[2-9]?xl)|font-(thi
 git grep -nE -e '(^|[[:space:]"'"'"'{])(sm|md|lg|xl|2xl):[a-z-]' -- $FILES
 
 # Colour literals, fonts and old variables in <style> blocks and style= attributes
-git grep -nE -e '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|font-family|var\(--(background|foreground|popover|muted|border|input|ring|primary|secondary|accent|destructive|card|sidebar|chart)' -- $FILES ':!src/app.css'
+git grep -nE -e '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|font-family|var\(--(background|foreground|popover|muted|border|input|ring|primary|secondary|accent|destructive|card|sidebar|chart)|var\(--color-(foreground|popover|muted|border|input|ring|primary|secondary|accent|destructive|card|sidebar|chart)(-[a-z-]*foreground)?[),]' -- $FILES ':!src/app.css'
 
 # dark: variants, and arbitrary values (data-[state=open]: and has-[>svg]: pass)
 git grep -nE -e 'dark:' -e '-\[[^]]*\]([^:]|$)' -- $FILES
