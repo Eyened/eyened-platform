@@ -16,58 +16,58 @@ Carbon [colour tokens](https://www.carbondesignsystem.com/building-blocks/founda
 Gray 100. Class names are token names (`bg-layer-01`, `text-text-primary`). Tailwind's palette and
 shadcn's colour names do not exist.
 
-| Token                                                     | Value                                         | Use                                   |
-| --------------------------------------------------------- | --------------------------------------------- | ------------------------------------- |
-| `background`                                              | `#161616`                                     | Page background                       |
-| `background-hover`                                        | `rgba(141,141,141,0.16)`                      | Hover on `background`                 |
-| `background-active`                                       | `rgba(141,141,141,0.4)`                       | Pressed on `background`               |
-| `layer-01`                                                | `#262626`                                     | Panels, table rows, modals            |
-| `layer-02`                                                | `#393939`                                     | A layer on `layer-01`; progress track |
-| `layer-hover-01`                                          | `#333333`                                     | Hover on `layer-01`                   |
-| `layer-active-01`                                         | `#525252`                                     | Pressed on `layer-01`                 |
-| `layer-accent-01`                                         | `#393939`                                     | Table header                          |
-| `field-01`                                                | `#262626`                                     | Input fill on `background`            |
-| `field-hover-01`                                          | `#333333`                                     | Input hover on `background`           |
-| `field-02`                                                | `#393939`                                     | Input fill on `layer-01`              |
-| `field-hover-02`                                          | `#474747`                                     | Input hover on `layer-01`             |
-| `border-subtle-00`                                        | `#393939`                                     | Dividers on `background`              |
-| `border-subtle-01`                                        | `#525252`                                     | Dividers on `layer-01`                |
-| `border-strong-01`                                        | `#6f6f6f`                                     | Input border on `background`          |
-| `border-strong-02`                                        | `#8d8d8d`                                     | Input border on `layer-01`            |
-| `border-interactive`                                      | `#4589ff`                                     | Current header item, selected tab     |
-| `border-disabled`                                         | `rgba(141,141,141,0.5)`                       | Disabled input border                 |
-| `overlay`                                                 | `rgba(0,0,0,0.6)`                             | Behind a modal                        |
-| `skeleton-background`                                     | `#292929`                                     | Loading placeholder                   |
-| `skeleton-element`                                        | `#393939`                                     | Loading placeholder shapes            |
-| `text-primary`                                            | `#f4f4f4`                                     | Body text, status labels              |
-| `text-secondary`                                          | `#c6c6c6`                                     | Secondary text, header nav            |
-| `text-helper`                                             | `#a8a8a8`                                     | Help text                             |
-| `text-placeholder`                                        | `rgba(244,244,244,0.4)`                       | Placeholders                          |
-| `text-on-color`                                           | `#ffffff`                                     | Text on filled buttons                |
-| `text-on-color-disabled`                                  | `rgba(255,255,255,0.25)`                      | Text on disabled filled buttons       |
-| `text-inverse`                                            | `#161616`                                     | Text on white (tertiary hover)        |
-| `text-disabled`                                           | `rgba(244,244,244,0.25)`                      | Disabled text                         |
-| `text-error`                                              | `#ff8389`                                     | Field error text                      |
-| `link-primary`                                            | `#78a9ff`                                     | Links, ghost button text              |
-| `link-primary-hover`                                      | `#a6c8ff`                                     | Link hover                            |
-| `icon-primary`                                            | `#f4f4f4`                                     | Icons                                 |
-| `icon-secondary`                                          | `#c6c6c6`                                     | Less important icons                  |
-| `icon-inverse`                                            | `#161616`                                     | Icons on white                        |
-| `icon-disabled`                                           | `rgba(244,244,244,0.25)`                      | Disabled icons                        |
-| `interactive`                                             | `#4589ff`                                     | Progress fill, selected controls      |
-| `focus`                                                   | `#ffffff`                                     | Focus ring                            |
-| `focus-inset`                                             | `#161616`                                     | Contrast ring paired with `focus`     |
-| `support-error` / `-success` / `-warning`                 | `#fa4d56` / `#42be65` / `#f1c21b`             | Notification and validation icons     |
-| `notification-background-error` / `-success` / `-warning` | `#262626`                                     | Notification fill                     |
-| `button-primary` / `-hover` / `-active`                   | `#0f62fe` / `#0050e6` / `#002d9c`             | Primary button                        |
-| `button-secondary` / `-hover` / `-active`                 | `#6f6f6f` / `#5e5e5e` / `#393939`             | Secondary button                      |
-| `button-tertiary` / `-hover` / `-active`                  | `#ffffff` / `#f4f4f4` / `#c6c6c6`             | Tertiary button                       |
-| `button-danger-primary` / `-hover` / `-active`            | `#da1e28` / `#b81921` / `#750e13`             | Danger button                         |
-| `button-danger-secondary`                                 | `#fa4d56`                                     | Danger tertiary and ghost text        |
-| `button-disabled`                                         | `rgba(141,141,141,0.3)`                       | Disabled filled button                |
-| `status-gray` / `-blue` / `-green` / `-red`               | `#8d8d8d` / `#4589ff` / `#42be65` / `#fa4d56` | Status icons                          |
-| `content-switcher-background-hover`                       | `rgba(141,141,141,0.12)`                      | Content switcher hover                |
-| `content-switcher-selected`                               | `rgba(141,141,141,0.24)`                      | Selected content switcher option      |
+| Token                                                                    | Value                                         | Use                                   |
+| ------------------------------------------------------------------------ | --------------------------------------------- | ------------------------------------- |
+| `background`                                                             | `#161616`                                     | Page background                       |
+| `background-hover`                                                       | `rgba(141,141,141,0.16)`                      | Hover on `background`                 |
+| `background-active`                                                      | `rgba(141,141,141,0.4)`                       | Pressed on `background`               |
+| `layer-01`                                                               | `#262626`                                     | Panels, table rows, modals            |
+| `layer-02`                                                               | `#393939`                                     | A layer on `layer-01`; progress track |
+| `layer-hover-01`                                                         | `#333333`                                     | Hover on `layer-01`                   |
+| `layer-active-01`                                                        | `#525252`                                     | Pressed on `layer-01`                 |
+| `layer-accent-01`                                                        | `#393939`                                     | Table header                          |
+| `field-01`                                                               | `#262626`                                     | Input fill on `background`            |
+| `field-hover-01`                                                         | `#333333`                                     | Input hover on `background`           |
+| `field-02`                                                               | `#393939`                                     | Input fill on `layer-01`              |
+| `field-hover-02`                                                         | `#474747`                                     | Input hover on `layer-01`             |
+| `border-subtle-00`                                                       | `#393939`                                     | Dividers on `background`              |
+| `border-subtle-01`                                                       | `#525252`                                     | Dividers on `layer-01`                |
+| `border-strong-01`                                                       | `#6f6f6f`                                     | Input border on `background`          |
+| `border-strong-02`                                                       | `#8d8d8d`                                     | Input border on `layer-01`            |
+| `border-interactive`                                                     | `#4589ff`                                     | Current header item, selected tab     |
+| `border-disabled`                                                        | `rgba(141,141,141,0.5)`                       | Disabled input border                 |
+| `overlay`                                                                | `rgba(0,0,0,0.6)`                             | Behind a modal                        |
+| `skeleton-background`                                                    | `#292929`                                     | Loading placeholder                   |
+| `skeleton-element`                                                       | `#393939`                                     | Loading placeholder shapes            |
+| `text-primary`                                                           | `#f4f4f4`                                     | Body text, status labels              |
+| `text-secondary`                                                         | `#c6c6c6`                                     | Secondary text, header nav            |
+| `text-helper`                                                            | `#a8a8a8`                                     | Help text                             |
+| `text-placeholder`                                                       | `rgba(244,244,244,0.4)`                       | Placeholders                          |
+| `text-on-color`                                                          | `#ffffff`                                     | Text on filled buttons                |
+| `text-on-color-disabled`                                                 | `rgba(255,255,255,0.25)`                      | Text on disabled filled buttons       |
+| `text-inverse`                                                           | `#161616`                                     | Text on white (tertiary hover)        |
+| `text-disabled`                                                          | `rgba(244,244,244,0.25)`                      | Disabled text                         |
+| `text-error`                                                             | `#ff8389`                                     | Field error text                      |
+| `link-primary`                                                           | `#78a9ff`                                     | Links, ghost button text              |
+| `link-primary-hover`                                                     | `#a6c8ff`                                     | Link hover                            |
+| `icon-primary`                                                           | `#f4f4f4`                                     | Icons                                 |
+| `icon-secondary`                                                         | `#c6c6c6`                                     | Less important icons                  |
+| `icon-inverse`                                                           | `#161616`                                     | Icons on white                        |
+| `icon-disabled`                                                          | `rgba(244,244,244,0.25)`                      | Disabled icons                        |
+| `interactive`                                                            | `#4589ff`                                     | Progress fill, selected controls      |
+| `focus`                                                                  | `#ffffff`                                     | Focus ring                            |
+| `focus-inset`                                                            | `#161616`                                     | Contrast ring paired with `focus`     |
+| `support-error` / `-success` / `-warning`                                | `#fa4d56` / `#42be65` / `#f1c21b`             | Notification and validation icons     |
+| `notification-background-error` / `-success` / `-warning`                | `#262626`                                     | Notification fill                     |
+| `button-primary` / `-hover` / `-active`                                  | `#0f62fe` / `#0050e6` / `#002d9c`             | Primary button                        |
+| `button-secondary` / `-hover` / `-active`                                | `#6f6f6f` / `#5e5e5e` / `#393939`             | Secondary button                      |
+| `button-tertiary` / `-hover` / `-active`                                 | `#ffffff` / `#f4f4f4` / `#c6c6c6`             | Tertiary button                       |
+| `button-danger-primary` / `button-danger-hover` / `button-danger-active` | `#da1e28` / `#b81921` / `#750e13`             | Danger button                         |
+| `button-danger-secondary`                                                | `#fa4d56`                                     | Danger tertiary and ghost text        |
+| `button-disabled`                                                        | `rgba(141,141,141,0.3)`                       | Disabled filled button                |
+| `status-gray` / `-blue` / `-green` / `-red`                              | `#8d8d8d` / `#4589ff` / `#42be65` / `#fa4d56` | Status icons                          |
+| `content-switcher-background-hover`                                      | `rgba(141,141,141,0.12)`                      | Content switcher hover                |
+| `content-switcher-selected`                                              | `rgba(141,141,141,0.24)`                      | Selected content switcher option      |
 
 A field on `layer-01` (modal, table row) uses `field-02`, `field-hover-02`, `border-strong-02`.
 
