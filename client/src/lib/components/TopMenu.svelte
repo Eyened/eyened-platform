@@ -50,7 +50,7 @@
                     Tasks
                 </a>
             </li>
-            {#if globalContext.userManager.user.is_admin}
+            {#if globalContext.userManager.user?.is_admin}
                 <li>
                     <a
                         href={resolve("/admin")}

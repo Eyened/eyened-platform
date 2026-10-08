@@ -140,5 +140,6 @@ Square corners (no radius classes). Shadows: `shadow-popover` for menus, popover
 - Carbon spacing steps only (see Layout).
 - Status = icon + label; colour on the icon.
 - One primary button per view; danger only for destructive actions.
-- Button icons go after the label.
+- Button icons go after the label, at most one per button. The button pins its icon to the right
+  edge, as Carbon does; there is no leading-icon variant.
 - Merge classes with `cn`/`tv` from `$lib/utils`, never `tailwind-merge`/`tailwind-variants` directly.

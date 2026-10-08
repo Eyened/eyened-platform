@@ -127,7 +127,7 @@
     --shadow-popover: 0 2px 6px rgba(0, 0, 0, 0.8);
     --shadow-button-focus:
         inset 0 0 0 1px var(--color-focus),
-        inset 0 0 0 2px var(--color-background);
+        inset 0 0 0 2px var(--color-focus-inset);
 }
 
 /* Base styles. Unlayered, so an unconverted component's outline-none cannot hide the ring. */
