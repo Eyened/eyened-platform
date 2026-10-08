@@ -26,26 +26,14 @@
 
 <Tooltip.Provider>
     <TopMenu />
-    <div class="page-container">
+    <!-- mt-12 clears the fixed 48 px header -->
+    <div class="mt-12 overflow-y-scroll">
         {#if userManager.loggedIn}
-            {@render children?.()}
+            <main class="max-w-page px-4">
+                {@render children?.()}
+            </main>
         {/if}
     </div>
 
     <UserMenu />
 </Tooltip.Provider>
-
-<style>
-    :global(body) {
-        margin: 0;
-        height: 100vh;
-        font-family: Verdana, sans-serif;
-        background-color: white;
-        display: flex;
-        flex-direction: column;
-    }
-    .page-container {
-        margin-top: 56px; /* matches --topmenu-height */
-        overflow-y: scroll;
-    }
-</style>

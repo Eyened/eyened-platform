@@ -1,87 +1,74 @@
 <script lang="ts">
-    import * as NavigationMenu from "$lib/components/ui/navigation-menu";
+    import { resolve } from "$app/paths";
+    import { page } from "$app/state";
     import { getContext } from "svelte";
     import type { GlobalContext } from "../data/globalContext.svelte";
-    import { Button } from "./ui/button";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
-    interface Props {
-        maxWidth?: string;
+    // Carbon UI shell header.
+    function inSection(section: string): boolean {
+        const path = page.url.pathname;
+        return path === section || path.startsWith(`${section}/`);
     }
 
-    let { maxWidth }: Props = $props();
+    const navItem =
+        "relative flex h-full items-center px-4 text-body-compact-01 text-text-secondary hover:bg-background-hover hover:text-text-primary active:bg-background-active aria-[current=page]:text-text-primary aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-0 aria-[current=page]:after:bottom-0 aria-[current=page]:after:h-0.75 aria-[current=page]:after:bg-border-interactive";
 </script>
 
-<nav class="topnav dark bg-neutral-900 text-white">
-    <div
-        class="container class={`${maxWidth ? 'max-w-[' + maxWidth + ']' : 'max-w-none'}`}"
+<header
+    class="fixed inset-x-0 top-0 z-50 flex h-12 items-center border-b border-border-subtle-00 bg-background"
+>
+    <a
+        href={resolve("/")}
+        class="flex h-full items-center pr-8 pl-4 text-heading-compact-01 text-text-primary"
     >
-        <NavigationMenu.Root class="left ">
-            <NavigationMenu.List class="flex items-center gap-1">
-                <NavigationMenu.Item>
-                    <NavigationMenu.Link
-                        href="/"
-                        class="rounded-md text-sm font-medium hover:bg-muted px-3 py-2"
+        EyeNED
+    </a>
+    <nav
+        aria-label="EyeNED"
+        class="relative h-full pl-4 before:absolute before:top-1/2 before:left-0 before:h-6 before:w-px before:-translate-y-1/2 before:bg-border-subtle-00"
+    >
+        <ul class="flex h-full">
+            <li>
+                <a
+                    href={resolve("/")}
+                    class={navItem}
+                    aria-current={page.url.pathname === "/"
+                        ? "page"
+                        : undefined}
+                >
+                    Browser
+                </a>
+            </li>
+            <li>
+                <a
+                    href={resolve("/tasks")}
+                    class={navItem}
+                    aria-current={inSection("/tasks") ? "page" : undefined}
+                >
+                    Tasks
+                </a>
+            </li>
+            {#if globalContext.userManager.user.is_admin}
+                <li>
+                    <a
+                        href={resolve("/admin")}
+                        class={navItem}
+                        aria-current={inSection("/admin") ? "page" : undefined}
                     >
-                        Browser
-                    </NavigationMenu.Link>
-                </NavigationMenu.Item>
-                <NavigationMenu.Item>
-                    <NavigationMenu.Link
-                        href="/tasks"
-                        class="rounded-md text-sm font-medium hover:bg-muted px-3 py-2"
-                    >
-                        Tasks
-                    </NavigationMenu.Link>
-                </NavigationMenu.Item>
-                {#if globalContext.userManager.user.is_admin}
-                    <NavigationMenu.Item>
-                        <NavigationMenu.Link
-                            href="/admin"
-                            class="rounded-md text-sm font-medium hover:bg-muted px-3 py-2"
-                        >
-                            Admin
-                        </NavigationMenu.Link>
-                    </NavigationMenu.Item>
-                {/if}
-            </NavigationMenu.List>
-        </NavigationMenu.Root>
-
-        <div class="right">
-            <Button
-                variant="ghost"
-                class="h-9"
-                onclick={() => (globalContext.showUserMenu = true)}
-            >
-                {globalContext.userManager.user?.username}
-            </Button>
-        </div>
-    </div>
-</nav>
-
-<style>
-    :root {
-        --topmenu-height: 56px;
-    }
-    .topnav {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: var(--topmenu-height);
-        background-color: black;
-        border-bottom: 5px solid #565656;
-        z-index: 50;
-    }
-    .topnav .container {
-        width: 100%;
-        height: 100%;
-        margin: 0 auto;
-        padding: 0 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        max-width: none;
-    }
-</style>
+                        Admin
+                    </a>
+                </li>
+            {/if}
+        </ul>
+    </nav>
+    <button
+        type="button"
+        aria-haspopup="dialog"
+        class="ml-auto h-12 px-4 text-body-compact-01 text-text-primary hover:bg-background-hover active:bg-background-active"
+        onclick={() => (globalContext.showUserMenu = true)}
+    >
+        {globalContext.userManager.user?.username}
+    </button>
+</header>
