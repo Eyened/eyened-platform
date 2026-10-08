@@ -23,6 +23,7 @@
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
+        "@fontsource-variable/ibm-plex-sans": "5.3.0",
         "@iconify/json": "^2.2.142",
         "@internationalized/date": "^3.9.0",
         "@lucide/svelte": "^0.544.0",
