@@ -36,7 +36,7 @@
 </script>
 
 <div class="outer flex flex-1 flex-col p-2">
-    <h3 class="m-0 flex items-center gap-4 text-base">
+    <h3 class="text-base m-0 flex items-center gap-4">
         {eye}
         {#if eyeSeries?.length > 0}
             <Button variant="outline" onclick={open}>

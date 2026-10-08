@@ -87,7 +87,7 @@
         <div class="w-[40%] overflow-y-scroll">
             <div class="flex-1 overflow-auto p-4">
                 <table
-                    class="w-full table-fixed border-collapse text-sm text-gray-500"
+                    class="text-sm text-gray-500 w-full table-fixed border-collapse"
                 >
                     <thead>
                         <tr>
@@ -101,11 +101,11 @@
                                 class="odd:bg-gray-100 even:bg-gray-200 hover:bg-white"
                             >
                                 <td
-                                    class="border-t border-gray-400 p-1 break-all"
+                                    class="border-gray-400 border-t p-1 break-all"
                                     >{key}</td
                                 >
                                 <td
-                                    class="border-t border-gray-400 p-1 break-all"
+                                    class="border-gray-400 border-t p-1 break-all"
                                 >
                                     {#if value == null}
                                         NULL

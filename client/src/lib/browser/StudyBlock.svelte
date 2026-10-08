@@ -62,11 +62,11 @@
     class="main mb-4 block flex flex-col rounded-[2px] border border-[rgb(181,188,206)] p-[0.3em] shadow-[0_6px_12px_rgba(149,157,165,0.2)]"
 >
     <div
-        class="header relative flex cursor-pointer items-center text-lg font-bold hover:bg-gray-300/50"
+        class="header text-lg font-bold hover:bg-gray-300/50 relative flex cursor-pointer items-center"
         onclick={() => (collapse = !collapse)}
     >
         <span
-            class="absolute top-1 right-1 z-10 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-600"
+            class="rounded bg-gray-100 font-mono text-gray-600 absolute top-1 right-1 z-10 px-1.5 py-0.5 text-[10px]"
         >
             {study.id}
         </span>
@@ -111,7 +111,7 @@
                 {#if study.round !== undefined || study.description !== undefined}
                     <div class="info text-[12px]">
                         <span
-                            class="z-10 rounded bg-gray-100 px-1.5 py-0.5 text-gray-600"
+                            class="rounded bg-gray-100 text-gray-600 z-10 px-1.5 py-0.5"
                         >
                             {#if study.round !== undefined}Round {study.round}
                             {/if}
@@ -146,7 +146,7 @@
         {#if mode === "overlay"}
             <button
                 type="button"
-                class="mt-1 cursor-pointer pl-2 text-left text-sm font-semibold hover:bg-gray-300/50"
+                class="text-sm font-semibold hover:bg-gray-300/50 mt-1 cursor-pointer pl-2 text-left"
                 onclick={() => (gradingOpen = !gradingOpen)}
             >
                 {#if gradingCollapsed}►{:else}▼{/if}

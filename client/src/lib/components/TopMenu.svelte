@@ -22,7 +22,7 @@
                 <NavigationMenu.Item>
                     <NavigationMenu.Link
                         href="/"
-                        class="rounded-md px-3 py-2 text-sm font-medium hover:bg-muted"
+                        class="rounded-md text-sm font-medium hover:bg-muted px-3 py-2"
                     >
                         Browser
                     </NavigationMenu.Link>
@@ -30,7 +30,7 @@
                 <NavigationMenu.Item>
                     <NavigationMenu.Link
                         href="/tasks"
-                        class="rounded-md px-3 py-2 text-sm font-medium hover:bg-muted"
+                        class="rounded-md text-sm font-medium hover:bg-muted px-3 py-2"
                     >
                         Tasks
                     </NavigationMenu.Link>
@@ -39,7 +39,7 @@
                     <NavigationMenu.Item>
                         <NavigationMenu.Link
                             href="/admin"
-                            class="rounded-md px-3 py-2 text-sm font-medium hover:bg-muted"
+                            class="rounded-md text-sm font-medium hover:bg-muted px-3 py-2"
                         >
                             Admin
                         </NavigationMenu.Link>

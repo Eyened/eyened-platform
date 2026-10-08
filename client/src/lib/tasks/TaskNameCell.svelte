@@ -15,7 +15,7 @@
         <!-- eslint-enable svelte/no-navigation-without-resolve -->
     </Tooltip.Trigger>
     <Tooltip.Content sideOffset={6}>
-        <div class="p-2 text-sm">
+        <div class="text-sm p-2">
             {task.description || "No description"}
         </div>
     </Tooltip.Content>

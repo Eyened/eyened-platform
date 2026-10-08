@@ -45,7 +45,7 @@
 <div class="inline-block">
     <div class="inline-block">
         {#each selectedValues as value}
-            <div class="m-1 inline-block rounded-full bg-gray-200 px-2 py-1">
+            <div class="bg-gray-200 m-1 inline-block rounded-full px-2 py-1">
                 <button type="button" onclick={() => removeValue(value)}>
                     <Fa
                         class="inline-block hover:cursor-pointer"
@@ -60,7 +60,7 @@
         <Popover.Trigger bind:ref={triggerRef}>
             <button
                 type="button"
-                class="m-1 inline-block rounded-full bg-gray-200 px-2 py-1"
+                class="bg-gray-200 m-1 inline-block rounded-full px-2 py-1"
             >
                 +
             </button>

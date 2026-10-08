@@ -263,11 +263,11 @@
                                 </ButtonGroup>
                                 {#if assignees.length > 0}
                                     <label
-                                        class="flex items-center gap-2 text-sm"
+                                        class="text-sm flex items-center gap-2"
                                     >
                                         Pick:
                                         <select
-                                            class="rounded border px-2 py-1 text-sm"
+                                            class="rounded text-sm border px-2 py-1"
                                             value={typeof assigneeFilter ===
                                             "number"
                                                 ? String(assigneeFilter)

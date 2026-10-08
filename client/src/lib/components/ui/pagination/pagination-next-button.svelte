@@ -24,7 +24,7 @@
         buttonVariants({
             size: "default",
             variant: "ghost",
-            class: "gap-1 px-2.5 sm:pr-2.5",
+            class: "sm:pr-2.5 gap-1 px-2.5",
         }),
         className,
     )}

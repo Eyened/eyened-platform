@@ -9,7 +9,7 @@
 </script>
 
 <Main>
-    <div class="mx-auto w-full max-w-5xl p-10">
+    <div class="max-w-5xl mx-auto w-full p-10">
         {#if userManager.user.is_admin}
             {@render children()}
         {:else}

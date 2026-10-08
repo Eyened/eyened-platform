@@ -21,7 +21,7 @@
         <h2 class="text-2xl font-bold">Features</h2>
         <button
             onclick={() => (createOpen = true)}
-            class="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+            class="rounded bg-green-600 text-white hover:bg-green-700 px-4 py-2"
         >
             Add Feature
         </button>
@@ -38,7 +38,7 @@
             <FeatureForm onsubmit={handleCreate} />
             <Dialog.Footer>
                 <Dialog.Close
-                    class="rounded bg-gray-500 px-3 py-1 text-white hover:bg-gray-600"
+                    class="rounded bg-gray-500 text-white hover:bg-gray-600 px-3 py-1"
                     >Close</Dialog.Close
                 >
             </Dialog.Footer>
