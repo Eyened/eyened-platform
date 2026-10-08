@@ -23,8 +23,10 @@ Run in the worktree `eyened-platform-worktrees/client-carbon`, from `client/` un
    reason and a `DESIGN.md` row.
 4. Run the gates (CI does not run on stacked PRs):
    `npm run verify:runes && npm run lint && npm run check && npm run test && npm run build`
-5. Run the old-token check below over the file set; it must print nothing.
-6. Demo on the dev stack: recreate only the `client` service with the worktree's `client/`
+5. Button icons go after the label, at most one per button; move any leading icon and drop extras.
+   Don't change the button's base icon classes to keep a leading icon.
+6. Run the old-token check below over the file set; it must print nothing.
+7. Demo on the dev stack: recreate only the `client` service with the worktree's `client/`
    mounted; the database, server and storage mounts stay as they are. From the main checkout's
    `deploy/`, with an override file outside the repo:
 
@@ -49,16 +51,16 @@ Run in the worktree `eyened-platform-worktrees/client-carbon`, from `client/` un
       -f compose.host-ports.yaml up -d client
     ```
 
-7. On the demo: tick the behaviour checklist; open each other importer's screen and check it
+8. On the demo: tick the behaviour checklist; open each other importer's screen and check it
    still works.
-8. Open the PR with `gh stack submit`. The body has:
+9. Open the PR with `gh stack submit`. The body has:
     - the behaviour checklist;
     - the Carbon conformance table (Element · Carbon page · Result). The Result cell names the
       values compared, for example "✓ 40 px rows; header `layer-accent-01`; Tab/Enter";
     - the other importers checked;
     - what still looks unstyled and why.
-9. In the same PR: `DESIGN.md` entries for each component touched, and this file updated.
-10. A review fix is a new commit on its own branch, then `gh stack rebase` and `gh stack push`.
+10. In the same PR: `DESIGN.md` entries for each component touched, and this file updated.
+11. A review fix is a new commit on its own branch, then `gh stack rebase` and `gh stack push`.
     Never merge into a stack branch; never use GitHub's Merge button.
 
 ## Old-token check
@@ -67,7 +69,7 @@ Put the file set in `FILES`, then run each pattern. The `-e` matters: one patter
 `-`. Use `[[:space:]]`, not `\s` — inside a bracket in `git grep -E`, `\s` matches nothing.
 
 ```sh
-FILES="src/routes/<screen> src/lib/<…>"   # *.svelte, *.ts, *.css only
+FILES="src/routes/<screen> src/lib/<…> :!*llms.txt"   # *.svelte, *.ts, *.css only
 
 # shadcn colour utilities (Carbon names like text-text-primary pass)
 git grep -nE -e '(^|[[:space:]"'"'"'{:])(bg|text|border|ring|outline|fill|stroke|divide|placeholder)-(input|ring|foreground|primary|secondary|muted|accent|destructive|card|popover|sidebar|chart)\b' -- $FILES
