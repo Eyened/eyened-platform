@@ -73,7 +73,7 @@
 </script>
 
 <div
-    class="right-0 left-0 z-50 w-full bg-black/90 {placement === 'top'
+    class="bg-black/90 right-0 left-0 z-50 w-full {placement === 'top'
         ? 'sticky top-0'
         : 'fixed bottom-0'}"
 >

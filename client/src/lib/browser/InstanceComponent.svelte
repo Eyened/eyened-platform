@@ -76,7 +76,7 @@
     class:ring-emerald-400={selected}
 >
     <div
-        class="title group cursor-pointer text-sm text-gray-500 hover:text-black"
+        class="title group text-sm text-gray-500 hover:text-black cursor-pointer"
         onclick={openInfoPanel}
     >
         <div class="title-flip">
@@ -109,7 +109,7 @@
     </div>
 
     <Dialog.Root bind:open={popupOpen}>
-        <Dialog.Content class="max-h-[85vh] sm:max-w-[85vw]">
+        <Dialog.Content class="sm:max-w-[85vw] max-h-[85vh]">
             <InstanceInfoLazy instanceId={instance.id} />
         </Dialog.Content>
     </Dialog.Root>

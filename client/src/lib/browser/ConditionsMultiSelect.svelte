@@ -35,7 +35,7 @@
         {@const isActive = selectedValues.includes(value[name])}
         {@const isHighlight = filter == "" || filteredValues.includes(value)}
         <li
-            class="item m-[0.1em] cursor-pointer rounded-[0.2em] border border-black/10 px-[0.2em] py-[0.1em] text-[0.9em] text-black/60 opacity-20 hover:bg-gray-100"
+            class="item border-black/10 text-black/60 hover:bg-gray-100 m-[0.1em] cursor-pointer rounded-[0.2em] border px-[0.2em] py-[0.1em] text-[0.9em] opacity-20"
             class:bg-[#b6ddf9]={isActive}
             class:opacity-100={isHighlight}
             onclick={() => toggle(value[name])}
