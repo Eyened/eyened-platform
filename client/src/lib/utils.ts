@@ -1,7 +1,8 @@
 import { type ClassValue, clsx } from "clsx";
 import { cubicOut } from "svelte/easing";
 import type { TransitionConfig } from "svelte/transition";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+import { createTV } from "tailwind-variants";
 
 import { readable, type Readable, type Unsubscriber } from "svelte/store";
 
@@ -103,6 +104,30 @@ export function toggleInSet<T>(
         set.add(item);
     }
 }
+
+// Carbon type tokens and shadows from app.css, so tailwind-merge does not drop them.
+const twMergeConfig = {
+    extend: {
+        theme: {
+            text: [
+                "label-01",
+                "helper-text-01",
+                "body-compact-01",
+                "body-01",
+                "heading-compact-01",
+                "heading-compact-02",
+                "heading-03",
+                "heading-04",
+            ],
+            shadow: ["popover", "button-focus"],
+        },
+    },
+};
+
+const twMerge = extendTailwindMerge(twMergeConfig);
+
+// Use this tv, not tailwind-variants' own, so variants merge with the same config.
+export const tv = createTV({ twMergeConfig });
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
