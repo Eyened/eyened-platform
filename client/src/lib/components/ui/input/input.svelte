@@ -24,7 +24,7 @@
         ...restProps
     }: Props = $props();
 
-    // Carbon text input; values from @carbon/styles text-input. Focus ring comes from app.css.
+    // Carbon text input; values from @carbon/styles components/text-input. Focus ring comes from app.css.
     const inputClasses =
         "h-10 w-full min-w-0 border-0 border-b border-border-strong-01 bg-field-01 px-4 text-body-compact-01 text-text-primary placeholder:text-text-placeholder aria-invalid:not-focus:outline-2 aria-invalid:not-focus:-outline-offset-2 aria-invalid:not-focus:outline-support-error disabled:cursor-not-allowed disabled:border-transparent disabled:text-text-disabled";
 </script>
