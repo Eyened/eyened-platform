@@ -100,7 +100,7 @@
             alt=""
             width="128"
             height="132"
-            class="mx-auto mb-6 w-32"
+            class="mx-auto mb-12 w-32"
         />
         <h1 class="mb-8 text-heading-03">Log in to EyeNED</h1>
 
