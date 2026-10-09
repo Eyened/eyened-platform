@@ -75,3 +75,9 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** `client/src/routes/admin/users/[id]/+page.svelte` reads `const userId = Number(page.params.id)` once. SvelteKit reuses the component on a param-only navigation, so `/admin/users/3` → `/admin/users/4` keeps showing user 3 and later writes target user 3.
 - **Fix:** make `userId` a `$derived` of `page.params.id` and reset state + `load()` in an `$effect`, or remount via `{#key page.params.id}` in a wrapping `+layout.svelte`.
 - **Note:** unreachable today except by a history jump that skips entries (every in-app path goes through `/admin`); fix before adding any user-to-user link.
+
+### Show an error when the login options fail to load
+- **Status:** open
+- **Source:** client Carbon PR 1 (`ui/carbon-1-login`) final review, 2026-10-09
+- **Problem:** `client/src/lib/LoginForm.svelte` `onMount` awaits `authClient.options()` without a catch; on failure neither the password form nor the OIDC button renders, leaving only the logo and title. v1 behaved the same.
+- **Fix:** catch the rejection and show an `InlineNotification` with title "Log in failed" and the error message.
