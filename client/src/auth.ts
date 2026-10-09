@@ -63,7 +63,7 @@ class AuthClient {
         });
 
         if (!response.ok) {
-            throw new Error("Login failed");
+            throw await apiErrorFromResponse(response);
         }
 
         return response.json(); // Direct user response, no token handling
