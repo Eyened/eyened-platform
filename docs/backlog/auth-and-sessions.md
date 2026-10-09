@@ -24,14 +24,14 @@
 ### Stop a token outliving `docker compose down -v` or a restore
 - **Status:** open
 - **Source:** PR #202 Wave G testing, 2026-09-15
-- **Problem:** `EYENED_API_SECRET_KEY` lives in `deploy/.env`, which neither `docker compose down -v` nor an XtraBackup restore touches, and `get_current_user` (`server/services/current_user.py`) trusts the `CreatorID` in any validly signed token. Measured: `alice`'s cookie (`CreatorID` 2) from before a reset authenticated as a new `bob` on the same id (200); before `bob` existed it was a 500, not 401.
+- **Problem:** `EYENED_API_SECRET_KEY` lives in `deploy/.env`, which neither `docker compose down -v` nor an XtraBackup restore touches, and `get_current_user` (`server/services/current_user.py`) trusts the `CreatorID` in any validly signed token. Measured: `alice`'s cookie (`CreatorID` 2) from before a reset authenticated as a new `bob` on the same id (200); before `bob` existed it was a 500 (now 401 on `/auth/me`).
 - **Fix:** bind tokens to something that changes with the account (a truncated HMAC of `PasswordHash`, or a per-account token version) checked on every request, and 401 on a missing Creator. Until then, document rotating `EYENED_API_SECRET_KEY` after a reset or restore.
 - **Note:** same token binding as "End existing sessions on a password change or reset"; fix both together.
 
 ### Make `get_current_user` reject deleted and deactivated accounts
 - **Status:** open
 - **Source:** RBAC admin P1 spec (2026-09-11) + P3b brainstorm (2026-09-18)
-- **Problem:** the token paths in `get_current_user` never read the Creator. `GET /auth/me` for a deleted Creator dereferences `None` → 500 (refresh gives 401); a deactivated user can still call `GET /auth/me` and `GET /import/status/{task_id}` until the access token expires (30 min).
+- **Problem:** the token paths in `get_current_user` never read the Creator. `GET /auth/me` now 401s for a deleted Creator (PR #265), but every other route still trusts the token; a deactivated user can still call `GET /auth/me` and `GET /import/status/{task_id}` until the access token expires (30 min).
 - **Fix:** read the Creator inside `get_current_user` and 401 on missing or `Inactive`; on routes that also resolve a scope the second `db.get` is an identity-map hit.
 - **Note:** `/auth/me` returning 200 for a deactivated account is currently pinned by `test_a_deactivated_account_cannot_authenticate`; update that test deliberately.
 
