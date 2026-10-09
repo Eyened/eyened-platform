@@ -41,6 +41,13 @@
 - **Problem:** every `/auth/refresh` mints a fresh 7-day refresh token, so an active session never ends (NIST 800-63B-4 AAL1: SHOULD ≤ 30 days).
 - **Fix:** carry the original login time through refreshes and refuse to refresh past a cap.
 
+### Make "Keep me logged in" change the session lifetime
+- **Status:** open
+- **Source:** client Carbon PR 1 (`ui/carbon-1-login`) final review, 2026-10-09; ignored since `10b97913`
+- **Problem:** the login form sends `remember_me`, but `POST /auth/login` parses `TokenLoginRequest` (`server/routes/auth.py`), which has no such field, and always sets both cookies with a fixed `max_age` (refresh 7 days). Unticking does nothing; v1 gave 1 hour unticked and 30 days ticked.
+- **Fix:** add `remember_me` to `TokenLoginRequest`; when false, set both cookies without `max_age` and mint a short refresh token from a new setting. Carry the choice as a `remember` claim in the refresh JWT that `/auth/refresh` copies forward; a missing claim means `True`, so issued tokens keep working. One cookie helper for login, refresh and OIDC.
+- **Note:** decide the short lifetime (v1 parity: 60 min) and whether OIDC honours it (no deployment uses OIDC). Same claim forwarding as "Cap the absolute session lifetime"; fix both together.
+
 ### Fix or delete the `api_client` branch of `POST /auth/login`
 - **Status:** open
 - **Source:** RBAC admin P1, reproduced at `30752985` + documentation triage, 2026-09-21; broken since `10b97913`

@@ -13,6 +13,7 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Stop a token outliving `docker compose down -v` or a restore | [auth-and-sessions](auth-and-sessions.md) | open |
 | Make `get_current_user` reject deleted and deactivated accounts | [auth-and-sessions](auth-and-sessions.md) | open |
 | Cap the absolute session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
+| Make "Keep me logged in" change the session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
 | Fix or delete the `api_client` branch of `POST /auth/login` | [auth-and-sessions](auth-and-sessions.md) | open |
 | Check new passwords against a breached/common-password list | [auth-and-sessions](auth-and-sessions.md) | open |
 | Move OIDC login into `AuthService` and pin the auth cookie attributes | [auth-and-sessions](auth-and-sessions.md) | partial |
@@ -65,3 +66,4 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Decide `prefer-const` for `.svelte` files | [frontend](frontend.md) | open |
 | Re-audit navigation if `kit.paths.base` is ever set | [frontend](frontend.md) | open, conditional |
 | Reload the admin user page when its `id` param changes | [frontend](frontend.md) | open |
+| Show an error when the login options fail to load | [frontend](frontend.md) | open |
