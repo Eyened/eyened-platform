@@ -2,13 +2,13 @@
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
     import { page } from "$app/state";
-    import { getContext } from "svelte";
+    import { getContext, type Snippet } from "svelte";
     import type { GlobalContext } from "../data/globalContext.svelte";
     import TopMenu from "./TopMenu.svelte";
     import UserMenu from "./UserMenu.svelte";
     import * as Tooltip from "./ui/tooltip";
 
-    let { children }: { children: any } = $props();
+    let { children }: { children: Snippet } = $props();
 
     const { userManager } = getContext<GlobalContext>("globalContext");
 
