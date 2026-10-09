@@ -1,5 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { Toaster } from "$lib/components/ui/sonner";
     import { GlobalContext } from "$lib/data/globalContext.svelte";
     import Dialogue from "$lib/Dialogue.svelte";
@@ -33,6 +34,13 @@
 
 {#await init then _}
     {@render children()}
+{:catch error}
+    <div class="m-4">
+        <InlineNotification
+            title="Page failed to load"
+            subtitle={error.message}
+        />
+    </div>
 {/await}
 <Toaster />
 
