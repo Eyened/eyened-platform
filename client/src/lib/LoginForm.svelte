@@ -1,10 +1,15 @@
 <script lang="ts">
+    import { ApiError } from "$lib/api/client";
     import { Button } from "$lib/components/ui/button/index.js";
     import { Checkbox } from "$lib/components/ui/checkbox/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
-    import { Input } from "$lib/components/ui/input/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
+    import {
+        PasswordInput,
+        TextInput,
+    } from "$lib/components/ui/text-input/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import { getContext, onMount } from "svelte";
+    import { getContext, onMount, tick } from "svelte";
     import { authClient } from "../auth";
 
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -12,11 +17,27 @@
     let username = $state("");
     let password = $state("");
     let rememberMe = $state(true);
-    let passwordError = $state<string | null>(null);
-    async function handlePasswordLogin(e: Event) {
+    let usernameInput = $state<HTMLInputElement | null>(null);
+    let passwordInput = $state<HTMLInputElement | null>(null);
+
+    // Empty-field errors appear on submit and clear once the field has text.
+    let submitted = $state(false);
+    const usernameError = $derived(
+        submitted && !username ? "Username is required" : undefined,
+    );
+    const passwordError = $derived(
+        submitted && !password ? "Password is required" : undefined,
+    );
+
+    let loginError = $state<{ title: string; subtitle: string } | null>(null);
+
+    async function handlePasswordLogin(e: SubmitEvent) {
         e.preventDefault();
+        loginError = null;
+        submitted = true;
         if (!username || !password) {
-            passwordError = "Please enter both username and password";
+            await tick();
+            (username ? passwordInput : usernameInput)?.focus();
             return;
         }
         try {
@@ -25,111 +46,119 @@
                 password,
                 rememberMe,
             );
-            passwordError = null;
         } catch (err) {
-            passwordError =
-                err instanceof Error ? err.message : "Unknown error occurred";
+            loginError =
+                err instanceof ApiError && err.status === 401
+                    ? {
+                          title: "Incorrect username or password",
+                          subtitle: "Try again.",
+                      }
+                    : {
+                          title: "Log in failed",
+                          subtitle:
+                              err instanceof Error ? err.message : String(err),
+                      };
+            password = "";
+            submitted = false;
+            // No live role on the notification: Username's aria-describedby
+            // reads it when focus lands, after the DOM has updated.
+            await tick();
+            usernameInput?.focus();
         }
     }
 
     let oidcError = $state<string | null>(null);
-    async function handleOIDCLogin(e: Event) {
-        e.preventDefault();
-        let authorizeUrl = "";
+    async function handleOIDCLogin() {
+        oidcError = null;
+        let authorizeUrl: string;
         try {
-            let resp = await authClient.OIDCAuthorize();
-            authorizeUrl = resp.url;
+            authorizeUrl = (await authClient.OIDCAuthorize()).url;
         } catch (err) {
-            oidcError =
-                err instanceof Error ? err.message : "Unknown error occurred";
+            oidcError = err instanceof Error ? err.message : String(err);
+            return;
         }
-
-        // Redirect the browser to the OIDC authorize URL
         window.location.href = authorizeUrl;
     }
 
     // Query the API for available authentication options
-    let passwordModalEnabled = $state(false);
-    let oidcModalEnabled = $state(false);
+    let passwordEnabled = $state(false);
+    let oidcEnabled = $state(false);
     let oidcProviderName = $state("");
-    async function getAuthOptions() {
-        let options = await authClient.options();
-        passwordModalEnabled = options.password_enabled;
-        oidcModalEnabled = options.oidc_enabled;
+    onMount(async () => {
+        const options = await authClient.options();
+        passwordEnabled = options.password_enabled;
+        oidcEnabled = options.oidc_enabled;
         oidcProviderName = options.oidc_provider_name;
-    }
-    onMount(() => {
-        getAuthOptions();
     });
 </script>
 
-<div class="flex min-h-screen flex-col items-center justify-center p-4">
-    {#if passwordModalEnabled}
-        <div
-            class="rounded-xl border-gray-200 bg-white shadow-sm m-4 w-[440px] border p-8"
-        >
-            <form onsubmit={handlePasswordLogin} class="space-y-6">
-                <Field.Set>
-                    <Field.Group>
-                        <Field.Field>
-                            <Field.Label for="username">Username</Field.Label>
-                            <Input
-                                id="username"
-                                type="text"
-                                placeholder="Enter your username"
-                                bind:value={username}
-                            />
-                        </Field.Field>
+<!-- Carbon Login pattern, one step, centred. -->
+<main class="flex flex-1 justify-center overflow-y-auto px-4">
+    <div class="my-auto w-80 py-16">
+        <img
+            src="/logo-dark.png"
+            alt=""
+            width="128"
+            height="132"
+            class="mx-auto mb-12 w-32"
+        />
+        <h1 class="mb-8 text-heading-03">Log in to EyeNED</h1>
 
-                        <Field.Field>
-                            <Field.Label for="password">Password</Field.Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="Enter your password"
-                                bind:value={password}
-                            />
-                        </Field.Field>
-
-                        <Field.Field>
-                            <div class="flex items-center gap-2">
-                                <Checkbox
-                                    id="rememberMe"
-                                    bind:checked={rememberMe}
-                                />
-                                <Field.Label
-                                    for="rememberMe"
-                                    class="cursor-pointer select-none"
-                                    >Remember me</Field.Label
-                                >
-                            </div>
-                        </Field.Field>
-                    </Field.Group>
-                </Field.Set>
-
-                {#if passwordError}
-                    <p class="text-sm text-red-600">{passwordError}</p>
-                {/if}
-
-                <Button type="submit" class="w-full">Login</Button>
-            </form>
-        </div>
-    {/if}
-
-    {#if oidcModalEnabled}
-        <div
-            class="rounded-xl border-gray-200 bg-white shadow-sm m-4 w-[440px] border p-8"
-        >
-            <Button class="w-full" onclick={handleOIDCLogin}
-                >Login with {oidcProviderName}</Button
+        {#if passwordEnabled}
+            <form
+                novalidate
+                class="flex flex-col gap-6"
+                onsubmit={handlePasswordLogin}
             >
+                <TextInput
+                    labelText="Username"
+                    autocomplete="username"
+                    bind:value={username}
+                    bind:ref={usernameInput}
+                    invalidText={usernameError}
+                    aria-describedby={loginError ? "login-error" : undefined}
+                />
+                <PasswordInput
+                    labelText="Password"
+                    autocomplete="current-password"
+                    bind:value={password}
+                    bind:ref={passwordInput}
+                    invalidText={passwordError}
+                />
+                <Field.Field orientation="horizontal">
+                    <Checkbox id="keep-logged-in" bind:checked={rememberMe} />
+                    <Field.Label
+                        for="keep-logged-in"
+                        class="text-body-compact-01 text-text-primary"
+                        >Keep me logged in</Field.Label
+                    >
+                </Field.Field>
+                {#if loginError}
+                    <InlineNotification
+                        id="login-error"
+                        role="none"
+                        title={loginError.title}
+                        subtitle={loginError.subtitle}
+                    />
+                {/if}
+                <Button type="submit" size="lg" class="w-full">Log in</Button>
+            </form>
+        {/if}
 
+        {#if oidcEnabled}
+            <Button
+                size="lg"
+                class="mt-6 w-full"
+                variant={passwordEnabled ? "outline" : "default"}
+                onclick={handleOIDCLogin}>Log in with {oidcProviderName}</Button
+            >
             {#if oidcError}
-                <p class="text-sm text-red-600">{oidcError}</p>
+                <InlineNotification
+                    class="mt-4"
+                    title="Log in failed"
+                    subtitle={oidcError}
+                />
             {/if}
-        </div>
-    {/if}
-</div>
-
-<style>
-</style>
+        {/if}
+    </div>
+</main>

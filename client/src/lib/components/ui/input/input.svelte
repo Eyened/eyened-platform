@@ -23,18 +23,17 @@
         class: className,
         ...restProps
     }: Props = $props();
+
+    // Carbon text input; values from @carbon/styles components/text-input. Focus ring comes from app.css.
+    const inputClasses =
+        "h-10 w-full min-w-0 border-0 border-b border-border-strong-01 bg-field-01 px-4 text-body-compact-01 text-text-primary placeholder:text-text-placeholder aria-invalid:not-focus:outline-2 aria-invalid:not-focus:-outline-offset-2 aria-invalid:not-focus:outline-support-error disabled:cursor-not-allowed disabled:border-transparent disabled:text-text-disabled";
 </script>
 
 {#if type === "file"}
     <input
         bind:this={ref}
         data-slot="input"
-        class={cn(
-            "rounded-md border-input text-sm font-medium shadow-xs selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground md:text-sm dark:bg-input/30 flex h-9 w-full min-w-0 border bg-transparent px-3 pt-1.5 ring-offset-background transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50",
-            "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-            "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
-            className,
-        )}
+        class={cn(inputClasses, className)}
         type="file"
         bind:files
         bind:value
@@ -44,12 +43,7 @@
     <input
         bind:this={ref}
         data-slot="input"
-        class={cn(
-            "rounded-md border-input text-base shadow-xs selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground md:text-sm dark:bg-input/30 flex h-9 w-full min-w-0 border bg-background px-3 py-1 ring-offset-background transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50",
-            "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-            "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
-            className,
-        )}
+        class={cn(inputClasses, className)}
         {type}
         bind:value
         {...restProps}
