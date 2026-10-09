@@ -92,14 +92,14 @@ one class sets size, line height, letter spacing and weight (`text-body-compact-
 
 - Spacing: Carbon's [scale](https://www.carbondesignsystem.com/building-blocks/foundations/spacing/overview)
   only — `0.5 1 2 3 4 6 8 10 12 16 20 24 40`. Exceptions: Button padding `1.5 2.5 3.5 3.75 15.75`
-  (Carbon's values minus the 1 px border), Button max width `max-w-80` (20 rem) and the header's 3 px current-item bar `0.75`.
+  (Carbon's values minus the 1 px border), Button max width `max-w-80` (20 rem) and the header's 3 px current-item bar `0.75`, and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values).
 - Header 48 px (`h-12`), fixed; content below it (`mt-12`) in `<main class="max-w-page px-4">`,
   left-aligned with the wordmark.
 - No breakpoints.
 
 ## Shapes
 
-Square corners (no radius classes). Shadows: `shadow-popover` for menus, popovers, tooltips;
+Square corners; the one radius is rounded-checkbox (2 px, Carbon checkbox). Shadows: `shadow-popover` for menus, popovers, tooltips;
 `shadow-button-focus` for Button focus.
 
 ## Components
@@ -118,18 +118,32 @@ Square corners (no radius classes). Shadows: `shadow-popover` for menus, popover
 - **Button** (`ui/button`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/button/guidelines).
 - **Link** (`ui/button` `variant="link"`, or `<a>` with `text-link-primary hover:text-link-primary-hover`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/link/guidelines).
+- **Text input / Password input** (`ui/text-input` over `ui/input`, `ui/label`, `ui/field`):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/text-input/guidelines).
+  Carbon prop names (`labelText`, `invalidText`).
+- **Checkbox** (`ui/checkbox`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/checkbox/guidelines).
+- **Notification (inline)** (`ui/inline-notification` over `ui/alert`):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/notification/guidelines).
+  Low contrast only: Carbon's high-contrast default is a light box on Gray 100. Error kind only.
+- **Login** (`LoginForm.svelte`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/login).
+  Logo above the title: `static/logo-dark.png`, the favicon with its navy almond recoloured
+  `#f4f4f4` (navy is 1.01:1 on `background`).
 
 ### Deviations from Carbon
 
-| Element            | Carbon                                                              | Ours                                               | Reason                                                 |
-| ------------------ | ------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
-| Header text        | Wordmark `body-compact-01` at 600 / 0.1 px; nav 0 px letter spacing | `heading-compact-01` / `body-compact-01` (0.16 px) | Weights and spacing come only from type tokens         |
-| Header user action | Icon-only                                                           | Username as text                                   | A grader on a shared workstation sees who is logged in |
-| Header nav         | Hidden below `lg`                                                   | Always shown                                       | No breakpoints; desktop use                            |
+| Element             | Carbon                                                              | Ours                                               | Reason                                                 |
+| ------------------- | ------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
+| Header text         | Wordmark `body-compact-01` at 600 / 0.1 px; nav 0 px letter spacing | `heading-compact-01` / `body-compact-01` (0.16 px) | Weights and spacing come only from type tokens         |
+| Header user action  | Icon-only                                                           | Username as text                                   | A grader on a shared workstation sees who is logged in |
+| Header nav          | Hidden below `lg`                                                   | Always shown                                       | No breakpoints; desktop use                            |
+| Login flow          | Two steps: username, then password or SSO                           | One step; OIDC button shown up front               | Our provider is fixed; nothing to route                |
+| Password toggle     | Tooltip                                                             | `aria-label` only                                  | `ui/tooltip` is restyled in PR 3                       |
+| Field validation    | On blur                                                             | On submit; cleared once the field has text         | Blur validation flashes an error when tabbing to OIDC  |
+| Filled status icons | Inner mark (`!`, `×`) filled                                        | Transparent; the background shows through          | `carbon-icons-svelte` ships the inner path unfilled    |
 
 ## Keyboard & Focus
 
-- Every focusable element shows a 2 px `focus` ring inside its edge. Never `outline-none` or
+- Every focusable element shows a 2 px `focus` ring inside its edge (checkbox: 1 px outside, as Carbon draws it). Never `outline-none` or
   `outline-hidden`.
 - Buttons: `focus` border plus `shadow-button-focus`; Link (`ui/button` `variant="link"` only): 1 px `focus` outline; a plain `<a>` gets the 2 px ring.
 

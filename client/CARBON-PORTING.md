@@ -114,6 +114,11 @@ git grep -nE -e 'dark:' -e '-\[[^]]*\]([^:]|$)' -- $FILES
 | The demo container runs as root and writes `.svelte-kit` into the worktree; `npm run check` then fails with EACCES                     | `chown` it back through `docker exec` (step 6) — never `rm` it                                                        |
 | A caller puts an icon before the label                                                                                                 | Carbon puts it after; move it when the caller's screen is ported                                                      |
 | `docs/superpowers/` (specs, plans) is gitignored, so it is not in the worktree                                                         | Pass the main checkout's path to agents working in the worktree                                                       |
+| `shadcn-svelte add` imports `tv` from `tailwind-variants` and bumps the package                                                        | Copy the files from `https://shadcn-svelte.com/registry/<name>.json` by hand; import `tv` from `$lib/utils`           |
+| A Carbon type class without `text-` (`body-compact-01`) emits no CSS, and the old-token check misses it                                | Always write `text-<type token>`                                                                                      |
+| PR 0's unlayered `:focus-visible` rule beats `outline-offset-*` utilities                                                              | A ring outside the element needs its own unlayered rule in `app.css` (see the checkbox)                               |
+| `carbon-icons-svelte` components are Svelte 4 (legacy mode)                                                                            | Don't force runes globally                                                                                            |
+| Importing `carbon-icons-svelte` from the package index slows the dev server                                                            | Import `carbon-icons-svelte/lib/<Name>.svelte`                                                                        |
 
 ## Known problems on screens still to port
 
@@ -133,6 +138,7 @@ git grep -nE -e 'dark:' -e '-\[[^]]*\]([^:]|$)' -- $FILES
 | `src/lib/components/UserMenu.svelte`                                                                    | Opens a `dialog`, transparent until Modal is restyled                                                              | PR 2                                        |
 | Viewer side panels (`TaskPanel.svelte` etc.)                                                            | Carbon's 63 px right button padding may overflow narrow panels                                                     | Viewer                                      |
 | Unconverted shadcn `ui/` components                                                                     | `bg-popover`/`bg-background` gone: menus, popovers and dialogs are transparent                                     | The layer that first restyles each          |
+| `src/lib/components/ui/field/` `legend`, `separator`, `title`, `content`, `set`, `group`, `description` | shadcn tokens; only `field`, `field-label`, `field-error` are restyled                                             | The layer that first uses each              |
 
 Viewer decisions already taken: the image area is `#000000`, and image drawings (segmentations,
 points, grids) keep their own colours outside the theme.
