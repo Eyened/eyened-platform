@@ -166,7 +166,7 @@
         <Button
             href={`/tasks/${taskId}/grade/${row.index}`}
             target="_blank"
-            class="rounded bg-blue-500 px-2 py-1 text-white hover:bg-blue-600"
+            class="rounded bg-blue-500 text-white hover:bg-blue-600 px-2 py-1"
         >
             View
         </Button>
@@ -178,7 +178,7 @@
                     <div class="relative inline-block">
                         <InstanceComponent instance={img} />
                         <button
-                            class="absolute -top-1 -right-1 z-10 h-6 w-6 rounded-full bg-red-600 text-center text-xs leading-6 text-white shadow hover:bg-red-700"
+                            class="bg-red-600 text-xs text-white shadow hover:bg-red-700 absolute -top-1 -right-1 z-10 h-6 w-6 rounded-full text-center leading-6"
                             onclick={(e) => {
                                 e.stopPropagation();
                                 removeImage(img.id);
@@ -209,7 +209,7 @@
                 const target = e.target as HTMLTextAreaElement;
                 await updateComments(target.value);
             }}
-            class="min-h-[60px] w-full rounded border p-2"
+            class="rounded min-h-[60px] w-full border p-2"
             placeholder="Add comments..."
         ></textarea>
     </Table.Cell>

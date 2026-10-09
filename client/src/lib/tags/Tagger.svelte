@@ -140,7 +140,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <TooltipProvider>
     <div
-        class="tagging-component rounded-md border border-gray-300 bg-gray-100 p-2 text-lg"
+        class="tagging-component rounded-md border-gray-300 bg-gray-100 text-lg border p-2"
         onclick={(e) => e.stopPropagation()}
     >
         <!-- Dialog with the new tag form -->
@@ -239,7 +239,7 @@
                         </TooltipContent>
                     </Tooltip>
                     <button
-                        class="ml-2 hover:text-red-700"
+                        class="hover:text-red-700 ml-2"
                         onclick={(e) => {
                             e.stopPropagation();
                             handleUntag(tag.id);

@@ -66,7 +66,7 @@
 <div class="flex min-h-screen flex-col items-center justify-center p-4">
     {#if passwordModalEnabled}
         <div
-            class="m-4 w-[440px] rounded-xl border border-gray-200 bg-white p-8 shadow-sm"
+            class="rounded-xl border-gray-200 bg-white shadow-sm m-4 w-[440px] border p-8"
         >
             <form onsubmit={handlePasswordLogin} class="space-y-6">
                 <Field.Set>
@@ -118,7 +118,7 @@
 
     {#if oidcModalEnabled}
         <div
-            class="m-4 w-[440px] rounded-xl border border-gray-200 bg-white p-8 shadow-sm"
+            class="rounded-xl border-gray-200 bg-white shadow-sm m-4 w-[440px] border p-8"
         >
             <Button class="w-full" onclick={handleOIDCLogin}
                 >Login with {oidcProviderName}</Button

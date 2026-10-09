@@ -4,10 +4,10 @@
     import { GlobalContext } from "$lib/data/globalContext.svelte";
     import Dialogue from "$lib/Dialogue.svelte";
     import Popup from "$lib/Popup.svelte";
-    import { setContext } from "svelte";
+    import { setContext, type Snippet } from "svelte";
     import "../app.css";
 
-    let { children }: { children: any } = $props();
+    let { children }: { children: Snippet } = $props();
 
     function closePopup() {
         globalContext.popupComponent = null;
@@ -40,8 +40,6 @@
     :global(body) {
         margin: 0;
         height: 100vh;
-        font-family: Verdana, sans-serif;
-        font-size: small;
         overflow: hidden;
         display: flex;
         flex-direction: column;

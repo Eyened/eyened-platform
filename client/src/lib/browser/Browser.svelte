@@ -139,7 +139,7 @@
     {#if mode === "overlay" && browserContext.selectedIds.length > 0}
         <Selection placement="top" />
     {/if}
-    <div id="main" class="font-sm flex w-full flex-row bg-gray-200">
+    <div id="main" class="font-sm bg-gray-200 flex w-full flex-row">
         <div class="min-w-0 flex-5 flex-col p-4">
             {#if browserContext.filterMode === "basic"}
                 <FilterShorcuts
@@ -173,7 +173,7 @@
             <Button
                 variant="default"
                 onclick={handleSearch}
-                class="mr-2 w-full text-sm"
+                class="text-sm mr-2 w-full"
             >
                 Search
             </Button>

@@ -112,13 +112,13 @@
 <a class="underline" href={resolve("/admin")}>← Users</a>
 
 {#if error}
-    <p class="mt-4 text-red-600">{error}</p>
+    <p class="text-red-600 mt-4">{error}</p>
 {/if}
 
 {#if notFound}
     <p class="mt-6">User not found</p>
 {:else if data}
-    <h2 class="mt-4 mb-6 text-2xl font-bold">
+    <h2 class="text-2xl font-bold mt-4 mb-6">
         {data.user.username}
         {#if data.user.is_admin}<span class="text-sm">Admin</span>{/if}
         <span class="text-sm">{data.user.active ? "Active" : "Inactive"}</span>
@@ -126,7 +126,7 @@
             >{/if}
     </h2>
 
-    <h3 class="mb-2 text-lg font-semibold">Memberships</h3>
+    <h3 class="text-lg font-semibold mb-2">Memberships</h3>
     {#key data}
         <Table.Root>
             <Table.Header>
@@ -203,7 +203,7 @@
         </form>
     {/if}
 
-    <h3 class="mt-8 mb-2 text-lg font-semibold">Account</h3>
+    <h3 class="text-lg font-semibold mt-8 mb-2">Account</h3>
     {#if data.user.active}
         <Button
             variant="destructive"
