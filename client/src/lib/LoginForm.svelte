@@ -95,7 +95,13 @@
 <!-- Carbon Login pattern, one step. -->
 <main class="px-4 pt-16">
     <div class="w-80">
-        <img src="/logo-dark.png" alt="" class="mb-6 w-16" />
+        <img
+            src="/logo-dark.png"
+            alt=""
+            width="64"
+            height="66"
+            class="mb-6 w-16"
+        />
         <h1 class="mb-8 text-heading-03">Log in to EyeNED</h1>
 
         {#if passwordEnabled}
