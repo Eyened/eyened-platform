@@ -92,15 +92,15 @@
     });
 </script>
 
-<!-- Carbon Login pattern, one step. -->
-<main class="px-4 pt-16">
-    <div class="w-80">
+<!-- Carbon Login pattern, one step, centred. -->
+<main class="flex flex-1 justify-center overflow-y-auto px-4">
+    <div class="my-auto w-80 py-16">
         <img
             src="/logo-dark.png"
             alt=""
-            width="64"
-            height="66"
-            class="mb-6 w-16"
+            width="128"
+            height="132"
+            class="mx-auto mb-6 w-32"
         />
         <h1 class="mb-8 text-heading-03">Log in to EyeNED</h1>
 
