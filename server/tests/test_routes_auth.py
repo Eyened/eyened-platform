@@ -557,6 +557,14 @@ def test_me_reports_is_admin_for_an_administrator_and_for_everyone_else(
     assert (as_admin.json()["is_admin"], as_member.json()["is_admin"]) == (True, False)
 
 
+def test_me_is_401_for_a_token_whose_account_no_longer_exists(client_anonymous, signed_jwts):
+    """/auth/me is 401, not 500, for a validly signed token naming a missing Creator."""
+    resp = client_anonymous.get("/auth/me", headers=_bearer(999_999, "gone"))
+
+    assert resp.status_code == 401, resp.text
+    assert resp.json()["detail"] == "Authentication required"
+
+
 def _audit_ids(session):
     """Every AuditLog id present now, to diff against after the act."""
     return set(session.scalars(select(AuditLog.AuditLogID)))

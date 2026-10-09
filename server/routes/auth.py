@@ -253,7 +253,12 @@ def get_current_user_info(
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Get current user information."""
-    return _user_response(auth_service.get_creator(current_user.id), auth_service)
+    creator = auth_service.get_creator(current_user.id)
+    if creator is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
+        )
+    return _user_response(creator, auth_service)
 
 
 @router.post("/auth/change-password", response_model=UserResponse)
