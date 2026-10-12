@@ -158,6 +158,7 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
 | Login flow          | Two steps: username, then password or SSO                           | One step; OIDC button shown up front               | Our provider is fixed; nothing to route                |
 | Field validation    | On blur                                                             | On submit; cleared once the field has text         | Blur validation flashes an error when tabbing to OIDC  |
 | Filled status icons | Inner mark (`!`, `×`) filled                                        | Transparent; the background shows through          | `carbon-icons-svelte` ships the inner path unfilled    |
+| Archived / Aborted  | Status indicator kinds only (none for archived or stopped)          | Gray `Archive` / `StopOutline` icons               | Carbon's status set has no archived or stopped kind    |
 | Tasks table filter  | Toolbar filter menu                                                 | "Show archived" checkbox in the table toolbar      | A filter menu is deferred to a later layer             |
 
 ## Keyboard & Focus
