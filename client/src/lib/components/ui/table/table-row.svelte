@@ -14,7 +14,7 @@
     bind:this={ref}
     data-slot="table-row"
     class={cn(
-        "group h-10 border-b border-border-subtle-01 bg-layer-01 hover:bg-layer-hover-01 table-xl:h-16",
+        "group h-10 border-b border-border-subtle-01 bg-layer-01 hover:bg-layer-hover-01 table-xl:h-16 table-lg:h-12",
         className,
     )}
     {...restProps}
