@@ -1,6 +1,5 @@
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
-import { page } from "$app/state";
 import { authClient, type UserResponse } from "../auth";
 
 export class UserManager {
@@ -15,10 +14,7 @@ export class UserManager {
     public starredTagIds = $state<number[]>([]);
 
     async init(pathname: string) {
-        if (
-            pathname.startsWith("/users/login") ||
-            pathname.startsWith("/users/oidc-callback")
-        ) {
+        if (pathname.startsWith("/users/oidc-callback")) {
             return;
         }
 
@@ -26,7 +22,7 @@ export class UserManager {
         if (user === null) {
             console.log("User is not logged in");
             // Only redirect if we're not already on the login page
-            if (!page.url.pathname.startsWith("/users/login")) {
+            if (!pathname.startsWith("/users/login")) {
                 console.log(
                     "redirecting to",
                     encodeURIComponent(window.location.href),
@@ -43,6 +39,11 @@ export class UserManager {
         this.user = user;
         this.starredTagIds = user.starred_tags ?? [];
 
+        // Already logged in: skip the login form.
+        if (pathname.startsWith("/users/login")) {
+            await goToNext(nextFromUrl());
+        }
+
         // await this.setCreator(user.id);
     }
 
@@ -51,7 +52,7 @@ export class UserManager {
         this.starredTagIds = this.user.starred_tags ?? [];
         // await this.setCreator(resp.id);
 
-        await goToNext(new URLSearchParams(window.location.search).get("next"));
+        await goToNext(nextFromUrl());
     }
 
     async OIDCLogin(code: string, state: string) {
@@ -92,6 +93,10 @@ export class UserManager {
         this.user = user;
         this.starredTagIds = user.starred_tags ?? [];
     }
+}
+
+function nextFromUrl() {
+    return new URLSearchParams(window.location.search).get("next");
 }
 
 // `next` comes from the URL, so it can name another origin (a mistyped port,

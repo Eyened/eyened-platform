@@ -34,3 +34,35 @@ describe("UserManager.login", () => {
         expect(goto).toHaveBeenCalledWith(expected);
     });
 });
+
+describe("UserManager.init", () => {
+    it.each([
+        { search: "?next=%2Ftasks", expected: "/tasks" },
+        { search: "", expected: "/" },
+    ])(
+        "sends a logged-in user on /users/login$search to $expected",
+        async ({ search, expected }) => {
+            vi.spyOn(authClient, "me").mockResolvedValue({
+                id: 1,
+                username: "ada",
+                role: null,
+                is_admin: false,
+                starred_tags: [],
+            });
+            history.replaceState(null, "", `/users/login${search}`);
+
+            await new UserManager().init("/users/login");
+
+            expect(goto).toHaveBeenCalledWith(expected);
+        },
+    );
+
+    it("leaves a logged-out user on /users/login", async () => {
+        vi.spyOn(authClient, "me").mockResolvedValue(null);
+        history.replaceState(null, "", "/users/login?next=%2Ftasks");
+
+        await new UserManager().init("/users/login");
+
+        expect(goto).not.toHaveBeenCalled();
+    });
+});
