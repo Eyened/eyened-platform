@@ -81,3 +81,9 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** client Carbon PR 1 (`ui/carbon-1-login`) final review, 2026-10-09
 - **Problem:** `client/src/lib/LoginForm.svelte` `onMount` awaits `authClient.options()` without a catch; on failure neither the password form nor the OIDC button renders, leaving only the logo and title. v1 behaved the same.
 - **Fix:** catch the rejection and show an `InlineNotification` with title "Log in failed" and the error message.
+
+### Collapse the header nav into a Carbon side nav below `lg`
+- **Status:** open
+- **Source:** client Carbon PR 2 (`ui/carbon-2-tasks`, #267), 2026-10-12
+- **Problem:** `client/src/lib/components/TopMenu.svelte` shows its links inline at every width. Carbon's UI shell moves header links into a hamburger side nav below the `lg` breakpoint (66rem); `client/DESIGN.md` records this as the `Header nav` deviation ("Few items; no side nav yet").
+- **Fix:** add a Carbon side nav (hamburger `HeaderMenuButton` + `SideNav`) shown below `lg:`, hide the inline links there, then delete the `Header nav` deviation row.
