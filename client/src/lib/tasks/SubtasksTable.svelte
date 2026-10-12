@@ -81,9 +81,7 @@
             <Table.Head>Assignee</Table.Head>
             <Table.Head>Images</Table.Head>
             <Table.Head>Comments</Table.Head>
-            <Table.Head class="w-24"
-                ><span class="sr-only">Actions</span></Table.Head
-            >
+            <Table.Head><span class="sr-only">Actions</span></Table.Head>
         </Table.Row>
     </Table.Header>
     <Table.Body>

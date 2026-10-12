@@ -191,21 +191,22 @@
         <span class="line-clamp-1">{row.comments || "—"}</span>
     </Table.Cell>
     <!-- Carbon inline row actions: ghost icon-only buttons in a trailing column. -->
-    <Table.Cell class={cn("w-24 pe-2 text-end whitespace-nowrap", joined)}>
+    <Table.Cell class={cn("pe-2 text-end whitespace-nowrap", joined)}>
         {#if isUnassigned || isMine}
-            <IconButton
-                label={isUnassigned
+            <Button
+                variant="ghost"
+                aria-label={isUnassigned
                     ? `Claim set ${row.index}`
                     : `Unclaim set ${row.index}`}
                 aria-disabled={pending || undefined}
                 onclick={toggleClaim}
             >
                 {#if isUnassigned}
-                    <TaskAdd />
+                    Claim <TaskAdd />
                 {:else}
-                    <TaskRemove />
+                    Unclaim <TaskRemove />
                 {/if}
-            </IconButton>
+            </Button>
         {/if}
         <IconButton
             label="Edit comments for set {row.index}"
