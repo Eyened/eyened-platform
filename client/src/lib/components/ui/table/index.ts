@@ -7,6 +7,7 @@ import ExpandedRow from "./table-expanded-row.svelte";
 import Footer from "./table-footer.svelte";
 import Head from "./table-head.svelte";
 import Header from "./table-header.svelte";
+import Pagination from "./table-pagination.svelte";
 import Row from "./table-row.svelte";
 import SkeletonRows from "./table-skeleton-rows.svelte";
 import Skeleton from "./table-skeleton.svelte";
@@ -24,6 +25,7 @@ export {
     Footer,
     Head,
     Header,
+    Pagination,
     Row,
     Skeleton,
     Toolbar,
@@ -40,6 +42,7 @@ export {
     Footer as TableFooter,
     Head as TableHead,
     Header as TableHeader,
+    Pagination as TablePagination,
     Row as TableRow,
     Skeleton as TableSkeleton,
     SkeletonRows as TableSkeletonRows,
