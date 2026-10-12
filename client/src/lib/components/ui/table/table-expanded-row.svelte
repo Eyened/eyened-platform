@@ -20,7 +20,7 @@
     bind:this={ref}
     data-slot="table-expanded-row"
     class={cn(
-        "border-b border-border-subtle-01 bg-layer-01 [tr:hover+&]:bg-layer-hover-01",
+        "border-b border-border-subtle-01 bg-layer-01 hover:bg-layer-hover-01 [tr:hover+&]:bg-layer-hover-01",
         className,
     )}
     {...restProps}
