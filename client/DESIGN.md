@@ -126,8 +126,6 @@ Square corners; the one radius is rounded-checkbox (2 px, Carbon checkbox). Shad
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/notification/guidelines).
   Low contrast only: Carbon's high-contrast default is a light box on Gray 100. Error kind only.
 - **Login** (`LoginForm.svelte`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/login); one centred column, as Carbon suggests without an illustration.
-  Logo centred above the title, 128 px: `static/logo-dark.png`, the favicon with its navy almond recoloured
-  `#f4f4f4` (navy is 1.01:1 on `background`).
 
 ### Deviations from Carbon
 
