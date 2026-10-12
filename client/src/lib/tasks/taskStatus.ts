@@ -1,9 +1,9 @@
 import type { CarbonIconProps } from "carbon-icons-svelte";
-import Archive from "carbon-icons-svelte/lib/Archive.svelte";
 import CheckmarkFilled from "carbon-icons-svelte/lib/CheckmarkFilled.svelte";
 import CircleDash from "carbon-icons-svelte/lib/CircleDash.svelte";
+import Incomplete from "carbon-icons-svelte/lib/Incomplete.svelte";
 import InProgress from "carbon-icons-svelte/lib/InProgress.svelte";
-import StopOutline from "carbon-icons-svelte/lib/StopOutline.svelte";
+import UndefinedFilled from "carbon-icons-svelte/lib/UndefinedFilled.svelte";
 import type { Component } from "svelte";
 import type { TaskState } from "../../types/openapi_types";
 
@@ -33,13 +33,13 @@ export const TASK_STATUS: Record<TaskState, Status> = {
     },
     Aborted: {
         label: "Aborted",
-        icon: StopOutline,
-        iconClass: "text-status-gray",
+        icon: Incomplete,
+        iconClass: "text-status-blue",
     },
     Archived: {
         label: "Archived",
-        icon: Archive,
-        iconClass: "text-status-gray",
+        icon: UndefinedFilled,
+        iconClass: "text-status-purple",
     },
 };
 
