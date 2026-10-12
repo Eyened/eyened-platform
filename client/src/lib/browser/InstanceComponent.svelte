@@ -2,6 +2,7 @@
     import * as Dialog from "$lib/components/ui/dialog";
     import CopyIconButton from "$lib/components/CopyIconButton.svelte";
     import { getThumbUrl } from "$lib/data-loading/utils";
+    import { cn } from "$lib/utils.js";
 
     import { getContext } from "svelte";
     import type { ImageGET } from "../../types/openapi_types";
@@ -13,11 +14,14 @@
     interface Props {
         instance: ImageGET;
         showSegmentationInfo?: boolean;
+        // false: a click does not toggle the browser selection, and no selection border shows.
+        selectable?: boolean;
     }
 
     let {
         instance,
         showSegmentationInfo: _showSegmentationInfo = false,
+        selectable = true,
     }: Props = $props();
     let size = $derived(browserContext.thumbnailSize);
     let popupOpen = $state(false);
@@ -70,18 +74,18 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="main flex flex-col rounded-[0.1em] border-[0.2em] border-transparent p-[0.2em]"
-    class:bg-emerald-50={selected}
-    class:ring-2={selected}
-    class:ring-emerald-400={selected}
+    class={cn(
+        "main flex flex-col border border-transparent p-0.5",
+        selectable && selected && "border-layer-selected-inverse",
+    )}
 >
     <div
-        class="title group text-sm text-gray-500 hover:text-black cursor-pointer"
+        class="title group cursor-pointer text-label-01 text-text-secondary hover:text-text-primary"
         onclick={openInfoPanel}
     >
         <div class="title-flip">
-            <div class="title-face title-face-default text-xs">{name}</div>
-            <div class="title-face title-face-hover text-xs">
+            <div class="title-face title-face-default">{name}</div>
+            <div class="title-face title-face-hover">
                 <span class="public-id truncate">{publicId}</span>
                 <CopyIconButton
                     text={publicId}
@@ -93,9 +97,12 @@
     </div>
     <div
         class="tile flex flex-1 flex-col items-center justify-center"
-        onpointerdown={toggleSelect}
+        onpointerdown={selectable ? toggleSelect : undefined}
     >
-        <div class="thumbnail-container" style="width: {size}; height: {size};">
+        <div
+            class="thumbnail-container bg-background"
+            style="width: {size}; height: {size};"
+        >
             {#if image_url}
                 <img
                     src={image_url}
@@ -109,7 +116,7 @@
     </div>
 
     <Dialog.Root bind:open={popupOpen}>
-        <Dialog.Content class="sm:max-w-[85vw] max-h-[85vh]">
+        <Dialog.Content>
             <InstanceInfoLazy instanceId={instance.id} />
         </Dialog.Content>
     </Dialog.Root>
@@ -167,7 +174,6 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background-color: black;
     }
 
     img.thumbnail {

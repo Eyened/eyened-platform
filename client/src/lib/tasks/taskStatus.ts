@@ -7,7 +7,7 @@ import UndefinedFilled from "carbon-icons-svelte/lib/UndefinedFilled.svelte";
 import type { Component } from "svelte";
 import type { TaskState } from "../../types/openapi_types";
 
-type Status = {
+export type Status = {
     label: string;
     icon: Component<CarbonIconProps>;
     iconClass: string;
