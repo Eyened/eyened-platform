@@ -23,7 +23,7 @@
     import { SUBTASK_STATES, SUBTASK_STATUS } from "$lib/tasks/subtaskStatus";
     import { TASK_STATUS } from "$lib/tasks/taskStatus";
     import { cn } from "$lib/utils.js";
-    import { getContext, onDestroy, onMount } from "svelte";
+    import { getContext, onDestroy, onMount, tick } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
     import type { SubTaskWithImagesGET } from "../../../types/openapi_types";
 
@@ -94,14 +94,21 @@
             text: SUBTASK_STATUS[s].label,
         })),
     ];
-    const assigneeItems = $derived([
-        { id: "all", text: "All assignees" },
-        { id: "unassigned", text: "Unassigned" },
-        { id: "me", text: "Assigned to me" },
-        ...assignees
-            .filter((a) => String(a.id) !== me)
-            .map((a) => ({ id: String(a.id), text: a.name })),
-    ]);
+    const assigneeItems = $derived.by(() => {
+        const items = [
+            { id: "all", text: "All assignees" },
+            { id: "unassigned", text: "Unassigned" },
+            { id: "me", text: "Assigned to me" },
+            ...assignees
+                .filter((a) => String(a.id) !== me)
+                .map((a) => ({ id: String(a.id), text: a.name })),
+        ];
+        // An id from the URL that the list lacks (load failed, no sets) still gets a label.
+        if (!items.some((i) => i.id === assignee)) {
+            items.push({ id: assignee, text: `Assignee #${assignee}` });
+        }
+        return items;
+    });
 
     function query() {
         return {
@@ -187,6 +194,7 @@
 
     // After an action: the old rows stay until the new ones arrive; assignees reload too.
     async function refresh() {
+        const active = document.activeElement;
         loadAssignees();
         try {
             await loadSubtasks();
@@ -195,6 +203,11 @@
                 title: "Subtasks could not be loaded",
                 subtitle: message(e),
             };
+        }
+        // The refresh may remove the focused row (claim under "Unassigned"); keep focus on the page.
+        await tick();
+        if (active instanceof HTMLElement && !active.isConnected) {
+            document.getElementById(headingId)?.focus();
         }
     }
 
