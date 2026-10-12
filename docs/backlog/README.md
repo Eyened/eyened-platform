@@ -67,3 +67,4 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Re-audit navigation if `kit.paths.base` is ever set | [frontend](frontend.md) | open, conditional |
 | Reload the admin user page when its `id` param changes | [frontend](frontend.md) | open |
 | Show an error when the login options fail to load | [frontend](frontend.md) | open |
+| Collapse the header nav into a Carbon side nav below `lg` | [frontend](frontend.md) | open |
