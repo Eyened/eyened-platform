@@ -21,9 +21,12 @@ shadcn's colour names do not exist.
 | `background`                                                             | `#161616`                                     | Page background                       |
 | `background-hover`                                                       | `rgba(141,141,141,0.16)`                      | Hover on `background`                 |
 | `background-active`                                                      | `rgba(141,141,141,0.4)`                       | Pressed on `background`               |
+| `background-inverse`                                                     | `#f4f4f4`                                     | Tooltip                               |
+| `background-selected`                                                    | `rgba(141,141,141,0.24)`                      | Pressed search clear button           |
 | `layer-01`                                                               | `#262626`                                     | Panels, table rows, modals            |
 | `layer-02`                                                               | `#393939`                                     | A layer on `layer-01`; progress track |
 | `layer-hover-01`                                                         | `#333333`                                     | Hover on `layer-01`                   |
+| `layer-hover-02`                                                         | `#474747`                                     | Select options inside a modal         |
 | `layer-active-01`                                                        | `#525252`                                     | Pressed on `layer-01`                 |
 | `layer-accent-01`                                                        | `#393939`                                     | Table header                          |
 | `field-01`                                                               | `#262626`                                     | Input fill on `background`            |
@@ -69,7 +72,7 @@ shadcn's colour names do not exist.
 | `content-switcher-background-hover`                                      | `rgba(141,141,141,0.12)`                      | Content switcher hover                |
 | `content-switcher-selected`                                              | `rgba(141,141,141,0.24)`                      | Selected content switcher option      |
 
-A field on `layer-01` (modal, table row) uses `field-02`, `field-hover-02`, `border-strong-02`.
+A field inside a dialog uses `field-02`, `field-hover-02`, `border-strong-02` automatically (`in-dialog:` variant in `app.css`, Carbon's Layer).
 
 ## Typography
 
@@ -92,15 +95,14 @@ one class sets size, line height, letter spacing and weight (`text-body-compact-
 
 - Spacing: Carbon's [scale](https://www.carbondesignsystem.com/building-blocks/foundations/spacing/overview)
   only — `0.5 1 2 3 4 6 8 10 12 16 20 24 40`. Exceptions: Button padding `1.5 2.5 3.5 3.75 15.75`
-  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80`/`w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's 3 px current-item bar `0.75`, and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values).
+  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80`/`w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's 3 px current-item bar `0.75`, and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, and the modal widths and heights (Carbon's percentages as fractions).
 - Header 48 px (`h-12`), fixed; content below it (`mt-12`) in `<main class="max-w-page px-4">`,
   left-aligned with the wordmark.
-- No breakpoints.
+- Breakpoints: Carbon's `md` 42rem, `lg` 66rem, `xlg` 82rem ([Carbon](https://www.carbondesignsystem.com/building-blocks/foundations/2x-grid/overview)); use them only where a Carbon component page specifies breakpoint behaviour (Modal). Carbon's `max` (99rem) is `max-w-page`.
 
 ## Shapes
 
-Square corners; the one radius is rounded-checkbox (2 px, Carbon checkbox). Shadows: `shadow-popover` for menus, popovers, tooltips;
-`shadow-button-focus` for Button focus.
+Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, Carbon). Shadows: `shadow-popover` for menus and popovers (Carbon tooltips have none); `shadow-button-focus` for Button focus. Motion: `animate-loading-rotate` (690 ms) for the loading spinner.
 
 ## Components
 
@@ -126,6 +128,23 @@ Square corners; the one radius is rounded-checkbox (2 px, Carbon checkbox). Shad
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/notification/guidelines).
   Low contrast only: Carbon's high-contrast default is a light box on Gray 100. Error kind only.
 - **Login** (`LoginForm.svelte`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/login); one centred column, as Carbon suggests without an illustration.
+- **Data table** (`ui/table`, `size` `md` 40 px or `xl` 64 px for two-line rows; `Table.Toolbar`, `Table.ToolbarSearch`):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/usage). Fewer than three row
+  actions are inline icon buttons, not an overflow menu.
+- **Search** (`Table.ToolbarSearch`, persistent): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/search/usage).
+- **Modal** (`ui/modal` over `ui/dialog`; `danger`, sizes `xs`/`sm`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/modal/usage).
+  Submit shows Inline loading on the primary, disables the rest and blocks closing; a server error is an inline
+  notification above the footer.
+- **Inline loading** (`ui/inline-loading`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/inline-loading/usage).
+- **Select** (`ui/select-input` `SelectInput`/`SelectItem` over `ui/native-select`, a native `<select>`):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/select/usage). bits-ui's `ui/select` is Carbon's Dropdown.
+- **Text area** (`ui/text-area` over `ui/textarea`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/text-input/usage).
+- **Tooltip** (`ui/tooltip`) and **Icon button** (`ui/icon-button`, ghost, label = tooltip + accessible name):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/tooltip/usage).
+- **Progress bar** (`ui/progress-bar` over `ui/progress`, small): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/progress-bar/usage).
+- **Empty state** (`ui/empty`, left-aligned, no image): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/empty-states).
+- **Status indicator** (`ui/status-indicator`; task states in `src/lib/tasks/taskStatus.ts`):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/status-indicators).
 
 ### Deviations from Carbon
 
@@ -133,9 +152,8 @@ Square corners; the one radius is rounded-checkbox (2 px, Carbon checkbox). Shad
 | ------------------- | ------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
 | Header text         | Wordmark `body-compact-01` at 600 / 0.1 px; nav 0 px letter spacing | `heading-compact-01` / `body-compact-01` (0.16 px) | Weights and spacing come only from type tokens         |
 | Header user action  | Icon-only                                                           | Username as text                                   | A grader on a shared workstation sees who is logged in |
-| Header nav          | Hidden below `lg`                                                   | Always shown                                       | No breakpoints; desktop use                            |
+| Header nav          | Hidden below `lg`                                                   | Always shown                                       | Few items; no side nav yet                             |
 | Login flow          | Two steps: username, then password or SSO                           | One step; OIDC button shown up front               | Our provider is fixed; nothing to route                |
-| Password toggle     | Tooltip                                                             | `aria-label` only                                  | `ui/tooltip` is restyled in PR 3                       |
 | Field validation    | On blur                                                             | On submit; cleared once the field has text         | Blur validation flashes an error when tabbing to OIDC  |
 | Filled status icons | Inner mark (`!`, `×`) filled                                        | Transparent; the background shows through          | `carbon-icons-svelte` ships the inner path unfilled    |
 
@@ -144,6 +162,7 @@ Square corners; the one radius is rounded-checkbox (2 px, Carbon checkbox). Shad
 - Every focusable element shows a 2 px `focus` ring inside its edge (checkbox: 1 px outside, as Carbon draws it). Never `outline-none` or
   `outline-hidden`.
 - Buttons: `focus` border plus `shadow-button-focus`; Link (`ui/button` `variant="link"` only): 1 px `focus` outline; a plain `<a>` gets the 2 px ring.
+- Modal: focus starts on the first field (danger: Cancel); while submitting, focus parks on the primary button, which is aria-disabled, not disabled.
 
 ## Do's and Don'ts
 
