@@ -185,7 +185,8 @@
         {/if}
     </Table.Cell>
     <Table.Cell class={joined}>{assigneeName}</Table.Cell>
-    <Table.Cell class={joined}>{imageCount}</Table.Cell>
+    <Table.Cell class={cn("whitespace-nowrap", joined)}>{imageCount}</Table.Cell
+    >
     <Table.Cell class={joined}>
         <span class="line-clamp-1">{row.comments || "—"}</span>
     </Table.Cell>
