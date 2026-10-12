@@ -280,6 +280,28 @@ describe("task subtasks page", () => {
         expect(setNumbers()[0]).toBe("40");
     });
 
+    it("does not navigate when a response lands after unmount", async () => {
+        let finish = () => {};
+        vi.mocked(fetchSubTasks).mockImplementationOnce(
+            () =>
+                new Promise((done) => {
+                    finish = () => done(respond(subtaskPage(0, 1, 1)));
+                }),
+        );
+        pageState.url = new URL("http://localhost/tasks/9");
+        const { unmount } = render(TaskPage, {
+            props: { data: { taskid: 9 } },
+            context,
+        } as never);
+        await waitFor(() => expect(fetchSubTasks).toHaveBeenCalled());
+
+        unmount();
+        finish();
+        await new Promise((r) => setTimeout(r, 0));
+
+        expect(goto).not.toHaveBeenCalled();
+    });
+
     it("claims every unassigned set on the page", async () => {
         vi.mocked(fetchSubTasks).mockImplementation(async () =>
             respond({

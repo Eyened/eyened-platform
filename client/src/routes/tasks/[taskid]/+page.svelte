@@ -23,7 +23,7 @@
     import { SUBTASK_STATES, SUBTASK_STATUS } from "$lib/tasks/subtaskStatus";
     import { TASK_STATUS } from "$lib/tasks/taskStatus";
     import { cn } from "$lib/utils.js";
-    import { getContext, onMount } from "svelte";
+    import { getContext, onDestroy, onMount } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
     import type { SubTaskWithImagesGET } from "../../../types/openapi_types";
 
@@ -260,6 +260,11 @@
         await refresh();
         claiming = false;
     }
+
+    // Invalidates in-flight responses, so none navigates after unmount.
+    onDestroy(() => {
+        request += 1;
+    });
 
     onMount(async () => {
         if (data.taskid === null) {
