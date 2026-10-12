@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { flushSync } from "svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ingestTasks, tasks } from "$lib/data/stores.svelte";
@@ -108,5 +108,23 @@ describe("TasksTable", () => {
         );
 
         expect(taskNames()).toEqual(["Alpha", "Old"]);
+    });
+
+    it("focuses the heading when an edit hides the row", async () => {
+        const heading = document.createElement("h1");
+        heading.id = "tasks-heading";
+        heading.tabIndex = -1;
+        document.body.append(heading);
+        renderTable([task(1, "Alpha"), task(2, "Beta")]);
+
+        await fireEvent.click(
+            screen.getAllByRole("button", { name: "Edit" })[0],
+        );
+        ingestTasks([task(1, "Alpha", { task_state: "Archived" })]);
+        flushSync();
+        await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await waitFor(() => expect(heading).toHaveFocus());
+        heading.remove();
     });
 });

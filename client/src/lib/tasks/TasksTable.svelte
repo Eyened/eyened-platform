@@ -130,6 +130,14 @@
             document.getElementById(headingId)?.focus();
         }
     }
+
+    // An edit can hide its row (archived, or no longer matching the search).
+    function focusHeadingIfHidden(event: Event) {
+        if (editing && !visible.some((t) => t.id === editing?.id)) {
+            event.preventDefault();
+            document.getElementById(headingId)?.focus();
+        }
+    }
 </script>
 
 {#if current.length === 0}
@@ -284,6 +292,7 @@
     successDescription="Saved"
     errorTitle="Task could not be saved"
     onsubmit={saveEdit}
+    onCloseAutoFocus={focusHeadingIfHidden}
 >
     <div class="flex flex-col gap-6">
         <TextInput
