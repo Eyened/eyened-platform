@@ -27,6 +27,9 @@ shadcn's colour names do not exist.
 | `layer-02`                                                               | `#393939`                                                 | A layer on `layer-01`                             |
 | `layer-hover-01`                                                         | `#333333`                                                 | Hover on `layer-01`                               |
 | `layer-hover-02`                                                         | `#474747`                                                 | Select options inside a modal                     |
+| `layer-selected-01`                                                      | `#393939`                                                 | Selected dropdown item                            |
+| `layer-selected-hover-01`                                                | `#474747`                                                 | Hover on a selected dropdown item                 |
+| `layer-selected-inverse`                                                 | `#f4f4f4`                                                 | Table expand chevron; selected thumbnail border   |
 | `layer-active-01`                                                        | `#525252`                                                 | Pressed on `layer-01`                             |
 | `layer-accent-01`                                                        | `#393939`                                                 | Table header                                      |
 | `field-01`                                                               | `#262626`                                                 | Input fill on `background`                        |
@@ -35,6 +38,7 @@ shadcn's colour names do not exist.
 | `field-hover-02`                                                         | `#474747`                                                 | Input hover on `layer-01`                         |
 | `border-subtle-00`                                                       | `#393939`                                                 | Dividers on `background`; progress track          |
 | `border-subtle-01`                                                       | `#525252`                                                 | Dividers on `layer-01`                            |
+| `border-subtle-02`                                                       | `#6f6f6f`                                                 | Open dropdown field inside a modal                |
 | `border-strong-01`                                                       | `#6f6f6f`                                                 | Input border on `background`                      |
 | `border-strong-02`                                                       | `#8d8d8d`                                                 | Input border on `layer-01`                        |
 | `border-interactive`                                                     | `#4589ff`                                                 | Current header item, selected tab                 |
@@ -53,6 +57,7 @@ shadcn's colour names do not exist.
 | `text-error`                                                             | `#ff8389`                                                 | Field error text                                  |
 | `link-primary`                                                           | `#78a9ff`                                                 | Links, ghost button text                          |
 | `link-primary-hover`                                                     | `#a6c8ff`                                                 | Link hover                                        |
+| `link-secondary`                                                         | `#a6c8ff`                                                 | A link in a hovered table row                     |
 | `icon-primary`                                                           | `#f4f4f4`                                                 | Icons                                             |
 | `icon-secondary`                                                         | `#c6c6c6`                                                 | Less important icons                              |
 | `icon-inverse`                                                           | `#161616`                                                 | Icons on white                                    |
@@ -95,7 +100,7 @@ one class sets size, line height, letter spacing and weight (`text-body-compact-
 
 - Spacing: Carbon's [scale](https://www.carbondesignsystem.com/building-blocks/foundations/spacing/overview)
   only — `0.5 1 2 3 4 6 8 10 12 16 20 24 40`. Exceptions: Button padding `1.5 2.5 3.5 3.75 15.75`
-  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's and side nav's 3 px current-item bar `0.75`, the side nav `w-64` (Carbon's 256 px), and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), and the modal widths and heights (Carbon's percentages as fractions).
+  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's and side nav's 3 px current-item bar `0.75`, the side nav `w-64` (Carbon's 256 px), and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), the modal widths and heights (Carbon's percentages as fractions), the dropdown menu `max-h-66` (5.5 items) and inline menu `min-w-72 max-w-120` (288 / 480 px), the expanded table row `ps-14` (3.5 rem), and the pagination select `pe-9` (2.25 rem).
 - Header 48 px (`h-12`), fixed; content below it (`mt-12`) in `<main class="max-w-page px-4">`,
   left-aligned with the wordmark.
 - Reflow: every screen works at 320 CSS px wide. Nothing is cut off or overlapping, no information or action is lost (truncated text follows the Carbon component's overflow guidance), and every action can be reached by scrolling vertically only ([WCAG 2.1 SC 1.4.10](https://www.w3.org/WAI/WCAG21/Understanding/reflow.html)). Exempt, as WCAG allows: the image canvas and a data table's grid, which scroll in their own box; the table toolbar and pagination still reflow.
@@ -130,17 +135,27 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/notification/guidelines).
   Low contrast only: Carbon's high-contrast default is a light box on Gray 100. Error kind only.
 - **Login** (`LoginForm.svelte`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/login); one centred column, as Carbon suggests without an illustration.
-- **Data table** (`ui/table`, `size` `md` 40 px or `xl` 64 px for two-line rows; `Table.Toolbar`, `Table.ToolbarSearch`):
+- **Data table** (`ui/table`, `size` `md` 40 px, `lg` 48 px or `xl` 64 px for two-line rows; `Table.Toolbar`, `Table.ToolbarSearch`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/usage). Fewer than three row
   actions are inline icon buttons, not an overflow menu. `Table.Skeleton` is Carbon's DataTableSkeleton
-  (toolbar, real headers, 5 skeleton rows, `aria-busy`), shown while a table loads.
+  (toolbar, real headers, 5 skeleton rows, `aria-busy`), shown while a table loads. Expandable rows: `Table.ExpandButton` in the first cell and in the header (expand all), `Table.ExpandedRow` below its row; row actions are ghost icon-only buttons (`IconButton`) in a trailing column whose header is an sr-only `Actions`; `Table.SkeletonRows` replaces the body while a filter or page loads. Links are `link-primary`, `link-secondary` while their row is hovered.
 - **Search** (`Table.ToolbarSearch`, persistent): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/search/usage).
 - **Modal** (`ui/modal` over `ui/dialog`; `danger`, sizes `xs`/`sm`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/modal/usage).
   Submit shows Inline loading on the primary, disables the rest and blocks closing; a server error is an inline
   notification above the footer.
 - **Inline loading** (`ui/inline-loading`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/inline-loading/usage).
 - **Select** (`ui/select-input` `SelectInput`/`SelectItem` over `ui/native-select`, a native `<select>`):
-  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/select/usage). bits-ui's `ui/select` is Carbon's Dropdown.
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/select/usage). For a custom menu use Dropdown.
+- **Dropdown** (`ui/dropdown` over `ui/select` (bits-ui); `type` `default` or `inline`, size lg 48 px):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/dropdown/usage). Inline in a table toolbar to
+  filter it; each filter has an "All" item.
+- **Breadcrumb** (`ui/breadcrumb`; the current page is not listed; trailing `/`):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/breadcrumb/usage).
+- **Pagination** (`Table.Pagination`, directly below its table, height matching the rows; use `Table.Pagination`, not `ui/pagination`):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/pagination/usage).
+- **Notification (inline), for page actions**: one notification above the table toolbar for failed row actions
+  and reloads, no success toasts ([Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/notifications)).
+  Error kind only, so a partial claim-all ("Claimed 1 of 2 sets") deliberately shows as an error; there is no warning kind.
 - **Text area** (`ui/text-area` over `ui/textarea`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/text-input/usage).
 - **Tooltip** (`ui/tooltip`) and **Icon button** (`ui/icon-button`, ghost, label = tooltip + accessible name):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/tooltip/usage).
@@ -167,6 +182,7 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
   `outline-hidden`.
 - Buttons: `focus` border plus `shadow-button-focus`; Link (`ui/button` `variant="link"` only): 1 px `focus` outline; a plain `<a>` gets the 2 px ring.
 - Modal: focus starts on the first field (danger: Cancel); while submitting, focus parks on the primary button, which is aria-disabled, not disabled.
+- Pagination: Previous and Next are aria-disabled at the ends; reaching the last page moves focus to Previous, reaching page 1 to Next (Carbon React).
 
 ## Do's and Don'ts
 
