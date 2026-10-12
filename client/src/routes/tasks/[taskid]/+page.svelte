@@ -8,7 +8,9 @@
     import { Button } from "$lib/components/ui/button/index.js";
     import { Dropdown } from "$lib/components/ui/dropdown/index.js";
     import * as Empty from "$lib/components/ui/empty/index.js";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
+    import * as Popover from "$lib/components/ui/popover/index.js";
     import { StatusIndicator } from "$lib/components/ui/status-indicator/index.js";
     import * as Table from "$lib/components/ui/table/index.js";
     import {
@@ -23,6 +25,7 @@
     import { SUBTASK_STATES, SUBTASK_STATUS } from "$lib/tasks/subtaskStatus";
     import { TASK_STATUS } from "$lib/tasks/taskStatus";
     import { cn } from "$lib/utils.js";
+    import Filter from "carbon-icons-svelte/lib/Filter.svelte";
     import { getContext, onDestroy, onMount, tick } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
     import type { SubTaskWithImagesGET } from "../../../types/openapi_types";
@@ -355,23 +358,47 @@
                 </Empty.Header>
             </Empty.Root>
         {:else}
+            {#snippet filters(type: "default" | "inline")}
+                <Dropdown
+                    {type}
+                    labelText="Status"
+                    items={statusItems}
+                    selectedId={status}
+                    onselect={selectStatus}
+                />
+                <Dropdown
+                    {type}
+                    labelText="Assignee"
+                    items={assigneeItems}
+                    selectedId={assignee}
+                    onselect={selectAssignee}
+                />
+            {/snippet}
             <Table.Toolbar>
-                <div class="flex h-full items-center gap-4 ps-4">
-                    <Dropdown
-                        type="inline"
-                        labelText="Status"
-                        items={statusItems}
-                        selectedId={status}
-                        onselect={selectStatus}
-                    />
-                    <Dropdown
-                        type="inline"
-                        labelText="Assignee"
-                        items={assigneeItems}
-                        selectedId={assignee}
-                        onselect={selectAssignee}
-                    />
+                <div class="hidden h-full items-center gap-4 ps-4 md:flex">
+                    {@render filters("inline")}
                 </div>
+                <!-- Below md the filters move behind a toolbar filter button (Carbon TableToolbarMenu). -->
+                <Popover.Root>
+                    <Popover.Trigger>
+                        {#snippet child({ props })}
+                            <IconButton
+                                {...props}
+                                label="Filter"
+                                class="size-12 md:hidden"
+                            >
+                                <Filter />
+                            </IconButton>
+                        {/snippet}
+                    </Popover.Trigger>
+                    <Popover.Content
+                        align="start"
+                        sideOffset={0}
+                        class="flex w-72 flex-col gap-6 rounded-none border-0 bg-layer-01 p-4 text-text-primary shadow-popover"
+                    >
+                        {@render filters("default")}
+                    </Popover.Content>
+                </Popover.Root>
                 <Button
                     size="lg"
                     class="ms-auto"

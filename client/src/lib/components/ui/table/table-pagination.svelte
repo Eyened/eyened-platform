@@ -56,13 +56,18 @@
 
 <div
     bind:this={root}
-    class="flex h-12 items-center justify-between bg-layer-01 text-body-compact-01"
+    class="@container flex h-12 items-center justify-between bg-layer-01 text-body-compact-01"
 >
     <div class="flex h-full items-center ps-4">
-        <label for="{uid}-size" class="whitespace-nowrap text-text-primary">
+        <label
+            for="{uid}-size"
+            class="whitespace-nowrap text-text-primary @max-[42rem]:hidden"
+        >
             Items per page:
         </label>
-        <div class="h-full border-e border-border-subtle-01">
+        <div
+            class="h-full border-e border-border-subtle-01 @max-[42rem]:hidden"
+        >
             <NativeSelect.Root
                 id="{uid}-size"
                 class={select}
@@ -80,13 +85,17 @@
                 {/each}
             </NativeSelect.Root>
         </div>
-        <span class="ms-4 whitespace-nowrap text-text-secondary">
+        <span
+            class="ms-4 whitespace-nowrap text-text-secondary @max-[42rem]:ms-0"
+        >
             {first}–{last} of {totalItems} items
         </span>
     </div>
-    <div class="flex h-full items-center border-s border-border-subtle-01">
+    <div
+        class="flex h-full items-center border-s border-border-subtle-01 @max-[42rem]:border-s-0"
+    >
         <label for="{uid}-page" class="sr-only">Page of {pagesText}</label>
-        <div class="h-full">
+        <div class="h-full @max-[42rem]:hidden">
             <NativeSelect.Root
                 id="{uid}-page"
                 class={select}
@@ -101,7 +110,9 @@
                 {/each}
             </NativeSelect.Root>
         </div>
-        <span class="me-4 whitespace-nowrap text-text-primary">
+        <span
+            class="me-4 whitespace-nowrap text-text-primary @max-[42rem]:hidden"
+        >
             of {pagesText}
         </span>
         <IconButton

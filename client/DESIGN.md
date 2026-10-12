@@ -137,7 +137,7 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
 - **Login** (`LoginForm.svelte`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/login); one centred column, as Carbon suggests without an illustration.
 - **Data table** (`ui/table`, `size` `md` 40 px, `lg` 48 px or `xl` 64 px for two-line rows; `Table.Toolbar`, `Table.ToolbarSearch`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/usage). Fewer than three row
-  actions are inline icon buttons, not an overflow menu. `Table.Skeleton` is Carbon's DataTableSkeleton
+  actions are inline buttons, not an overflow menu. `Table.Skeleton` is Carbon's DataTableSkeleton
   (toolbar, real headers, 5 skeleton rows, `aria-busy`), shown while a table loads. Expandable rows: `Table.ExpandButton` in the first cell and in the header (expand all), `Table.ExpandedRow` below its row; row actions are ghost buttons with a text label and icon (Claim, Unclaim, Edit) in a trailing column, whose header is an sr-only `Actions`; `Table.SkeletonRows` replaces the body while a filter or page loads. Links are `link-primary`, `link-secondary` while their row is hovered.
 - **Search** (`Table.ToolbarSearch`, persistent): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/search/usage).
 - **Modal** (`ui/modal` over `ui/dialog`; `danger`, sizes `xs`/`sm`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/modal/usage).
@@ -148,11 +148,13 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/select/usage). For a custom menu use Dropdown.
 - **Dropdown** (`ui/dropdown` over `ui/select` (bits-ui); `type` `default` or `inline`, size lg 48 px):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/dropdown/usage). Inline in a table toolbar to
-  filter it; each filter has an "All" item.
+  filter it; each filter has an "All" item. Below md the toolbar's filters move behind a Filter icon button that
+  opens them as default Dropdowns (Carbon puts toolbar filters in a `TableToolbarMenu`).
 - **Breadcrumb** (`ui/breadcrumb`; the current page is not listed; trailing `/`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/breadcrumb/usage).
 - **Pagination** (`Table.Pagination`, directly below its table, height matching the rows; use `Table.Pagination`, not `ui/pagination`):
-  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/pagination/usage).
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/pagination/usage). Narrower than 42rem it
+  shows only the item range and Previous/Next (a container query, as in `@carbon/styles`).
 - **Notification (inline), for page actions**: one notification above the table toolbar for failed row actions
   and reloads, no success toasts ([Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/notifications)).
   Error kind only, so a partial claim-all ("Claimed 1 of 2 sets") deliberately shows as an error; there is no warning kind.
