@@ -5,7 +5,6 @@
     import InstanceComponent from "$lib/browser/InstanceComponent.svelte";
     import { ApiError, isOutOfDeclaration } from "$lib/api/client";
     import { Button } from "$lib/components/ui/button/index.js";
-    import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { StatusIndicator } from "$lib/components/ui/status-indicator/index.js";
     import * as Table from "$lib/components/ui/table/index.js";
     import { updateSubTask } from "$lib/data/api";
@@ -190,7 +189,7 @@
     <Table.Cell class={joined}>
         <span class="line-clamp-1">{row.comments || "—"}</span>
     </Table.Cell>
-    <!-- Carbon inline row actions: ghost icon-only buttons in a trailing column. -->
+    <!-- Carbon inline row actions: ghost buttons with text and icon in a trailing column. -->
     <Table.Cell class={cn("pe-2 text-end whitespace-nowrap", joined)}>
         {#if isUnassigned || isMine}
             <Button
@@ -208,12 +207,13 @@
                 {/if}
             </Button>
         {/if}
-        <IconButton
-            label="Edit comments for set {row.index}"
+        <Button
+            variant="ghost"
+            aria-label="Edit comments for set {row.index}"
             onclick={(e) => onedit(row, e.currentTarget)}
         >
-            <Edit />
-        </IconButton>
+            Edit <Edit />
+        </Button>
     </Table.Cell>
 </Table.Row>
 
