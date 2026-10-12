@@ -54,8 +54,12 @@
     function setOpen(value: boolean) {
         if (busy) return;
         open = value;
-        if (!value) error = null;
     }
+
+    // However it closed (the dialog or the parent's bound prop), a reopen starts without the old error.
+    $effect(() => {
+        if (!open) error = null;
+    });
 
     async function submit(event: SubmitEvent) {
         event.preventDefault();

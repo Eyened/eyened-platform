@@ -2,7 +2,7 @@
 
 Design rules for `client/`, implementing ADR 0006 (`Eyened/designdocuments`,
 `decisions/0006-web-ui-design-system.md`) with IBM's [Carbon Design System](https://www.carbondesignsystem.com/).
-Values from `@carbon/themes` 11.83.0 and `@carbon/type` 11.69.0 (not installed). `src/app.css` is
+Values from `@carbon/themes` 11.83.0, `@carbon/type` 11.69.0 and `@carbon/styles` 1.117.0 (not installed). `src/app.css` is
 the token source; change this file in the same commit as any value there.
 
 ## Overview

@@ -6,7 +6,7 @@ import Modal from "./modal.svelte";
 const body = createRawSnippet(() => ({ render: () => "<p>Body</p>" }));
 
 function renderModal(onsubmit: () => false | Promise<unknown>) {
-    render(Modal, {
+    return render(Modal, {
         props: {
             open: true,
             modalHeading: "Edit task",
@@ -31,6 +31,19 @@ describe("Modal", () => {
         expect(
             screen.getByRole("button", { name: "Save" }),
         ).not.toHaveAttribute("aria-disabled", "true");
+    });
+
+    it("drops a stale error when the parent closes it and it is reopened", async () => {
+        const { rerender } = renderModal(() =>
+            Promise.reject(new Error("Forbidden")),
+        );
+        await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+        await rerender({ open: false });
+        await rerender({ open: true });
+
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
 
     it("submits once and cannot be closed while pending", async () => {

@@ -68,6 +68,16 @@ describe("TasksTable", () => {
         expect(taskNames()).toEqual(["Alpha renamed", "Gamma"]);
     });
 
+    it("shows the empty state once every task is deleted", () => {
+        renderTable([task(1, "Alpha"), task(2, "Beta")]);
+
+        tasks.delete(1);
+        tasks.delete(2);
+        flushSync();
+
+        expect(screen.getByText("No tasks yet")).toBeInTheDocument();
+    });
+
     it("searches name, description and creator, ignoring case", async () => {
         renderTable([
             task(1, "Alpha"),
