@@ -7,6 +7,7 @@
     const uid = $props.id(); // $props.id() is not allowed as a destructuring default
     let {
         labelText,
+        helperText,
         id = uid,
         value = $bindable(""),
         rows = 4,
@@ -14,6 +15,7 @@
         ...restProps
     }: Omit<HTMLTextareaAttributes, "value"> & {
         labelText: string;
+        helperText?: string;
         id?: string;
         value?: string;
         class?: string;
@@ -22,5 +24,16 @@
 
 <Field.Field class={className}>
     <Field.Label for={id}>{labelText}</Field.Label>
-    <Textarea {...restProps} bind:value {id} {rows} />
+    <Textarea
+        {...restProps}
+        bind:value
+        {id}
+        {rows}
+        aria-describedby={helperText ? `${id}-helper` : undefined}
+    />
+    {#if helperText}
+        <p id="{id}-helper" class="text-helper-text-01 text-text-helper">
+            {helperText}
+        </p>
+    {/if}
 </Field.Field>

@@ -1,112 +1,114 @@
 <script lang="ts">
     import { BrowserContext } from "$lib/browser/browserContext.svelte";
-    import PaginatedResults from "$lib/components/PaginatedResults.svelte";
-    import { Button } from "$lib/components/ui/button";
-    import * as Table from "$lib/components/ui/table";
-    import SubTaskRow from "$lib/tasks/SubTaskRow.svelte";
-    import { ApiError } from "$lib/api/client";
-    import { updateSubTask } from "$lib/data/api";
+    import * as Table from "$lib/components/ui/table/index.js";
     import { setContext } from "svelte";
+    import type { SvelteSet } from "svelte/reactivity";
     import type { SubTaskWithImagesGET } from "../../types/openapi_types";
-    import { toast } from "svelte-sonner";
+    import SubtaskCommentsModal from "./SubtaskCommentsModal.svelte";
+    import SubTaskRow from "./SubTaskRow.svelte";
 
+    type Props = {
+        rows: SubTaskWithImagesGET[];
+        taskId: number;
+        headingId: string;
+        /** Owned by the page, which clears it on a filter or page change. */
+        expanded: SvelteSet<number>;
+        /** A filter or page change is loading: skeleton rows under the real header. */
+        loading?: boolean;
+        onerror: (title: string, subtitle?: string) => void;
+        onchange: () => void;
+    };
     let {
         rows,
         taskId,
-        count,
-        page,
-        perPage = 20,
-        onPageChange,
-        onAssignmentChange,
-    }: {
-        rows: SubTaskWithImagesGET[];
-        taskId: number;
-        count: number;
-        page: number;
-        perPage?: number;
-        onPageChange: (p: number) => void;
-        onAssignmentChange?: () => void | Promise<void>;
-    } = $props();
+        headingId,
+        expanded,
+        loading = false,
+        onerror,
+        onchange,
+    }: Props = $props();
 
-    const browserContext = new BrowserContext();
-    setContext("browserContext", browserContext);
+    // Thumbnails read their size and selection from a browser context.
+    setContext("browserContext", new BrowserContext());
 
-    const unassignedOnPage = $derived(
-        rows.filter((r) => !r.creator && !r.creator_id),
+    const allExpanded = $derived(
+        rows.length > 0 && rows.every((r) => expanded.has(r.id)),
     );
-    let claimingPage = $state(false);
 
-    async function claimAllUnassignedOnPage() {
-        if (unassignedOnPage.length === 0) return;
-        claimingPage = true;
-        let claimed = 0;
-        let failed = 0;
-        try {
-            for (const row of unassignedOnPage) {
-                try {
-                    await updateSubTask(row.id, { claim: true });
-                    claimed += 1;
-                } catch (e) {
-                    if (
-                        e instanceof ApiError &&
-                        e.code === "subtask_already_claimed"
-                    ) {
-                        continue;
-                    }
-                    failed += 1;
-                }
-            }
-            if (failed === 0) {
-                toast.success(`Claimed ${claimed} subtask(s)`);
-            } else {
-                toast.message(`Claimed ${claimed}, failed ${failed}`);
-            }
-            await onAssignmentChange?.();
-        } finally {
-            claimingPage = false;
+    function toggleAll() {
+        if (allExpanded) expanded.clear();
+        else for (const r of rows) expanded.add(r.id);
+    }
+
+    function toggle(id: number) {
+        if (expanded.has(id)) expanded.delete(id);
+        else expanded.add(id);
+    }
+
+    let editing = $state<SubTaskWithImagesGET | null>(null);
+    let editOpen = $state(false);
+    let returnFocus: HTMLElement | null = null;
+
+    function openComments(subtask: SubTaskWithImagesGET, button: HTMLElement) {
+        editing = subtask;
+        returnFocus = button;
+        editOpen = true;
+    }
+
+    // A save assigns the set, so a page filtered by assignee can drop its row.
+    function focusHeadingIfGone(event: Event) {
+        if (!returnFocus?.isConnected) {
+            event.preventDefault();
+            document.getElementById(headingId)?.focus();
         }
     }
 </script>
 
-<div class="mb-3 flex items-center gap-2">
-    <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={claimingPage || unassignedOnPage.length === 0}
-        onclick={claimAllUnassignedOnPage}
-    >
-        Claim all unassigned on this page
-        {#if unassignedOnPage.length > 0}
-            ({unassignedOnPage.length})
+<Table.Root size="lg" aria-labelledby={headingId}>
+    <Table.Header>
+        <Table.Row>
+            <Table.Head id="{headingId}-expand" class="w-10 ps-2 pe-0">
+                <Table.ExpandButton
+                    expanded={allExpanded}
+                    ontoggle={toggleAll}
+                    aria-label={allExpanded
+                        ? "Collapse all rows"
+                        : "Expand all rows"}
+                />
+            </Table.Head>
+            <Table.Head>Set</Table.Head>
+            <Table.Head>Status</Table.Head>
+            <Table.Head>Assignee</Table.Head>
+            <Table.Head>Images</Table.Head>
+            <Table.Head>Comments</Table.Head>
+            <Table.Head class="w-24"
+                ><span class="sr-only">Actions</span></Table.Head
+            >
+        </Table.Row>
+    </Table.Header>
+    <Table.Body>
+        {#if loading}
+            <Table.SkeletonRows columns={7} />
+        {:else}
+            {#each rows as row (row.id)}
+                <SubTaskRow
+                    subtask={row}
+                    {taskId}
+                    {headingId}
+                    expanded={expanded.has(row.id)}
+                    ontoggle={() => toggle(row.id)}
+                    onedit={openComments}
+                    {onerror}
+                    {onchange}
+                />
+            {/each}
         {/if}
-    </Button>
-</div>
+    </Table.Body>
+</Table.Root>
 
-<PaginatedResults {count} {perPage} {page} {onPageChange}>
-    <div class="rounded-md border">
-        <Table.Root>
-            <Table.Header>
-                <Table.Row>
-                    <Table.Head>ID</Table.Head>
-                    <Table.Head>Status</Table.Head>
-                    <Table.Head>Assignee</Table.Head>
-                    <Table.Head>View</Table.Head>
-                    <Table.Head>Images</Table.Head>
-                    <Table.Head>Comments</Table.Head>
-                </Table.Row>
-            </Table.Header>
-            <Table.Body>
-                {#each rows as row (row.id)}
-                    <SubTaskRow subtask={row} {taskId} {onAssignmentChange} />
-                {:else}
-                    <Table.Row>
-                        <Table.Cell colspan="6" class="h-24 text-center">
-                            No results.
-                        </Table.Cell>
-                    </Table.Row>
-                {/each}
-            </Table.Body>
-        </Table.Root>
-    </div>
-</PaginatedResults>
+<SubtaskCommentsModal
+    bind:open={editOpen}
+    subtask={editing}
+    {onchange}
+    onCloseAutoFocus={focusHeadingIfGone}
+/>
