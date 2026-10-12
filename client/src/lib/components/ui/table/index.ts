@@ -6,6 +6,8 @@ import Footer from "./table-footer.svelte";
 import Head from "./table-head.svelte";
 import Header from "./table-header.svelte";
 import Row from "./table-row.svelte";
+import Toolbar from "./table-toolbar.svelte";
+import ToolbarSearch from "./table-toolbar-search.svelte";
 
 export {
     Root,
@@ -16,6 +18,8 @@ export {
     Head,
     Header,
     Row,
+    Toolbar,
+    ToolbarSearch,
     //
     Root as Table,
     Body as TableBody,
@@ -25,4 +29,6 @@ export {
     Head as TableHead,
     Header as TableHeader,
     Row as TableRow,
+    Toolbar as TableToolbar,
+    ToolbarSearch as TableToolbarSearch,
 };
