@@ -33,6 +33,15 @@ if (!Element.prototype.hasPointerCapture) {
     Element.prototype.hasPointerCapture = () => false;
 }
 
+// bits-ui Tooltip (IconButton) observes element size on focus; jsdom has no ResizeObserver.
+if (typeof ResizeObserver === "undefined") {
+    globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    };
+}
+
 // Unmount any component rendered by a test so DOM state never leaks between tests.
 afterEach(() => {
     cleanup();
