@@ -13,7 +13,8 @@ export type TaskForm = {
  */
 export function taskPatch(task: TaskGET, form: TaskForm): TaskPATCH | null {
     const patch: TaskPATCH = {};
-    if (form.name !== task.name) patch.name = form.name;
+    // The form's name arrives trimmed; stored names may not be.
+    if (form.name !== task.name.trim()) patch.name = form.name;
     if (form.description !== (task.description ?? ""))
         patch.description = form.description;
     if (form.task_state !== (task.task_state ?? null))

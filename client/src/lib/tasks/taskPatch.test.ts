@@ -19,6 +19,15 @@ describe("taskPatch", () => {
         ).toEqual({ task_state: "Finished" });
     });
 
+    it("ignores whitespace around a stored name when only the status changed", () => {
+        expect(
+            taskPatch(
+                { ...task, name: "Alpha " },
+                { name: "Alpha", description: "", task_state: "Finished" },
+            ),
+        ).toEqual({ task_state: "Finished" });
+    });
+
     it("is null when nothing changed", () => {
         expect(
             taskPatch(task, {
