@@ -191,7 +191,7 @@
         <span class="line-clamp-1">{row.comments || "—"}</span>
     </Table.Cell>
     <!-- Carbon inline row actions: ghost icon-only buttons in a trailing column. -->
-    <Table.Cell class={cn("w-24 pe-2 text-end", joined)}>
+    <Table.Cell class={cn("w-24 pe-2 text-end whitespace-nowrap", joined)}>
         {#if isUnassigned || isMine}
             <IconButton
                 label={isUnassigned
