@@ -25,6 +25,14 @@ if (typeof WebGL2RenderingContext === "undefined") {
     } as unknown as typeof WebGL2RenderingContext;
 }
 
+// bits-ui Select scrolls the highlighted item into view and checks pointer capture; jsdom has neither.
+if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = () => {};
+}
+if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = () => false;
+}
+
 // Unmount any component rendered by a test so DOM state never leaks between tests.
 afterEach(() => {
     cleanup();

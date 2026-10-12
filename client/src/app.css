@@ -18,6 +18,9 @@
     --color-layer-02: #393939;
     --color-layer-hover-01: #333333;
     --color-layer-hover-02: #474747;
+    --color-layer-selected-01: #393939;
+    --color-layer-selected-hover-01: #474747;
+    --color-layer-selected-inverse: #f4f4f4;
     --color-layer-active-01: #525252;
     --color-layer-accent-01: #393939;
     --color-field-01: #262626;
@@ -26,6 +29,7 @@
     --color-field-hover-02: #474747;
     --color-border-subtle-00: #393939;
     --color-border-subtle-01: #525252;
+    --color-border-subtle-02: #6f6f6f;
     --color-border-strong-01: #6f6f6f;
     --color-border-strong-02: #8d8d8d;
     --color-border-interactive: #4589ff;
@@ -44,6 +48,7 @@
     --color-text-error: #ff8389;
     --color-link-primary: #78a9ff;
     --color-link-primary-hover: #a6c8ff;
+    --color-link-secondary: #a6c8ff;
     --color-icon-primary: #f4f4f4;
     --color-icon-secondary: #c6c6c6;
     --color-icon-inverse: #161616;
@@ -198,6 +203,11 @@
 @custom-variant in-dialog (&:where([data-slot="dialog-content"] *));
 /* Data table size: rows and cells follow the table's data-size. */
 @custom-variant table-xl (&:where([data-size="xl"] *));
+@custom-variant table-lg (&:where([data-size="lg"] *));
+/* Dropdown (Carbon list-box): an item after a hovered, highlighted or selected one hides its divider. */
+@custom-variant after-active-item (&:where([data-slot="select-item"]:is(:hover, [data-highlighted], [data-selected]) + [data-slot="select-item"] *));
+/* Dropdown: items in an inline dropdown's menu. */
+@custom-variant dropdown-inline (&:where([data-dropdown="inline"] *));
 
 /* Base styles. Unlayered, so an unconverted component's outline-none cannot hide the ring. */
 html {
