@@ -132,7 +132,7 @@
     }
 </script>
 
-{#if rows.length === 0}
+{#if current.length === 0}
     <Empty.Root>
         <Empty.Header>
             <Empty.Title>No tasks yet</Empty.Title>
