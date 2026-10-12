@@ -3,6 +3,6 @@
         $props();
 </script>
 
-<button class="inline-flex items-center gap-2 text-left font-medium" {onclick}>
+<button class="font-medium inline-flex items-center gap-2 text-left" {onclick}>
     {label}
 </button>

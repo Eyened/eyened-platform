@@ -306,7 +306,7 @@
     {#each conditions || [] as condition, i (condition.variable + String(i))}
         {@const ops = getOperatorOptions(condition.variable)}
         {@const sig = getFieldSignature(condition.variable)}
-        <div class="flex items-center gap-2 rounded-lg border p-0">
+        <div class="rounded-lg flex items-center gap-2 border p-0">
             <!-- Field Selector -->
             <div class="flex-1">
                 <SelectWithSearch
@@ -415,7 +415,7 @@
 
     <!-- Draft Row -->
     {#if draftRow !== null}
-        <div class="flex items-center gap-2 rounded-lg border bg-muted/50 p-0">
+        <div class="rounded-lg bg-muted/50 flex items-center gap-2 border p-0">
             <!-- Field Selector -->
             <div class="flex-1">
                 <SelectWithSearch
