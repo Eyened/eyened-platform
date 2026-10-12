@@ -15,7 +15,7 @@
 </script>
 
 <span
-    class="inline-flex items-center gap-2 text-body-compact-01 text-text-primary"
+    class="inline-flex items-center gap-2 text-body-compact-01 whitespace-nowrap text-text-primary"
 >
     <Icon aria-hidden="true" class={iconClass} />
     {label}
