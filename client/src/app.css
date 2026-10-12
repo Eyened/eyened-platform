@@ -12,9 +12,12 @@
     --color-background: #161616;
     --color-background-hover: rgba(141, 141, 141, 0.16);
     --color-background-active: rgba(141, 141, 141, 0.4);
+    --color-background-inverse: #f4f4f4;
+    --color-background-selected: rgba(141, 141, 141, 0.24);
     --color-layer-01: #262626;
     --color-layer-02: #393939;
     --color-layer-hover-01: #333333;
+    --color-layer-hover-02: #474747;
     --color-layer-active-01: #525252;
     --color-layer-accent-01: #393939;
     --color-field-01: #262626;
@@ -116,20 +119,40 @@
     --text-heading-04--font-weight: 400;
 
     /* Layout: spacing stays Tailwind's 0.25rem (tw-animate-css and calendar call --spacing());
-       use only Carbon's steps, see DESIGN.md. No breakpoints. */
+       use only Carbon's steps, see DESIGN.md. Breakpoints: Carbon's (@carbon/layout), see DESIGN.md. */
     --breakpoint-*: initial;
+    --breakpoint-md: 42rem;
+    --breakpoint-lg: 66rem;
+    --breakpoint-xlg: 82rem;
     --container-*: initial;
     --container-page: 99rem;
 
     /* Shapes: Carbon corners are square; shadow from @carbon/styles (g100) */
     --radius-*: initial;
     --radius-checkbox: 2px;
+    --radius-tooltip: 2px;
     --shadow-*: initial;
     --shadow-popover: 0 2px 6px rgba(0, 0, 0, 0.8);
     --shadow-button-focus:
         inset 0 0 0 1px var(--color-focus),
         inset 0 0 0 2px var(--color-focus-inset);
+
+    /* Motion: @carbon/styles 1.117.0 loading (690 ms linear rotation) */
+    --animate-loading-rotate: loading-rotate 690ms linear infinite;
+    @keyframes loading-rotate {
+        from {
+            transform: rotate(0deg);
+        }
+        to {
+            transform: rotate(360deg);
+        }
+    }
 }
+
+/* Carbon layering: a field inside a dialog uses the 02 set, as Carbon's Layer does. */
+@custom-variant in-dialog (&:where([data-slot="dialog-content"] *));
+/* Data table size: rows and cells follow the table's data-size. */
+@custom-variant table-xl (&:where([data-size="xl"] *));
 
 /* Base styles. Unlayered, so an unconverted component's outline-none cannot hide the ring. */
 html {
