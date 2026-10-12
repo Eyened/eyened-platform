@@ -154,7 +154,7 @@
     <Table.Toolbar>
         <Table.ToolbarSearch
             labelText="Search tasks"
-            placeholder="Search by name, description or creator"
+            placeholder="Search tasks"
             bind:value={
                 () => search,
                 (v) => {
@@ -255,6 +255,9 @@
                                     value={t.num_tasks_ready}
                                     max={t.num_tasks}
                                     helperText="{t.num_tasks_ready} / {t.num_tasks} ready"
+                                    status={t.num_tasks_ready === t.num_tasks
+                                        ? "finished"
+                                        : "active"}
                                 />
                             {:else}
                                 No subtasks

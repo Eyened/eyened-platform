@@ -58,6 +58,17 @@ describe("TasksTable", () => {
         pageState.url = new URL("http://localhost/tasks");
     });
 
+    it("marks a task finished once every subtask is ready", () => {
+        renderTable([
+            task(1, "Done", { num_tasks: 2, num_tasks_ready: 2 }),
+            task(2, "Half", { num_tasks: 2, num_tasks_ready: 1 }),
+        ]);
+        const icons = document.querySelectorAll(
+            '[data-slot="progress-bar-status-icon"]',
+        );
+        expect(icons).toHaveLength(1);
+    });
+
     it("shows renames and deletes made in the tasks store", () => {
         renderTable([task(1, "Alpha"), task(2, "Beta"), task(3, "Gamma")]);
 
