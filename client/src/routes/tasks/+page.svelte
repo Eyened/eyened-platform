@@ -1,6 +1,7 @@
 <script lang="ts">
     import Main from "$lib/components/Main.svelte";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
+    import * as Table from "$lib/components/ui/table/index.js";
     import { fetchTasks } from "$lib/data/api";
     import TasksTable from "$lib/tasks/TasksTable.svelte";
 
@@ -17,7 +18,13 @@
     >
         Tasks
     </h1>
-    {#await loading then list}
+    {#await loading}
+        <Table.Skeleton
+            size="xl"
+            headers={["Task", "Status", "Creator", "Progress", ""]}
+            aria-labelledby={headingId}
+        />
+    {:then list}
         <TasksTable rows={list} {headingId} />
     {:catch error}
         <InlineNotification

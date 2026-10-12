@@ -147,6 +147,50 @@
             transform: rotate(360deg);
         }
     }
+
+    /* @carbon/styles 1.117.0 utilities/_skeleton.scss + _keyframes.scss (skeleton) */
+    --animate-skeleton: skeleton 3000ms ease-in-out infinite;
+    @keyframes skeleton {
+        0% {
+            opacity: 0.3;
+            transform: scaleX(0);
+            transform-origin: left;
+        }
+        20% {
+            opacity: 1;
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+        28% {
+            transform: scaleX(1);
+            transform-origin: right;
+        }
+        51% {
+            transform: scaleX(0);
+            transform-origin: right;
+        }
+        58% {
+            transform: scaleX(0);
+            transform-origin: right;
+        }
+        82% {
+            transform: scaleX(1);
+            transform-origin: right;
+        }
+        83% {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+        96% {
+            transform: scaleX(0);
+            transform-origin: left;
+        }
+        100% {
+            opacity: 0.3;
+            transform: scaleX(0);
+            transform-origin: left;
+        }
+    }
 }
 
 /* Carbon layering: a field inside a dialog uses the 02 set, as Carbon's Layer does. */
