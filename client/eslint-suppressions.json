@@ -7,19 +7,6 @@
       "count": 1
     }
   },
-  "src/lib/browser/AdvancedFilters.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 18
-    },
-    "svelte/require-each-key": {
-      "count": 2
-    }
-  },
-  "src/lib/browser/Browser.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/lib/browser/ConditionsMultiSelect.svelte": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
@@ -55,10 +42,10 @@
   },
   "src/lib/browser/browserContext.svelte.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 28
+      "count": 14
     },
     "svelte/prefer-svelte-reactivity": {
-      "count": 9
+      "count": 4
     }
   },
   "src/lib/browser/dataSources.ts": {
@@ -74,11 +61,6 @@
   "src/lib/components/MultiSelectWithSearch.svelte": {
     "svelte/require-each-key": {
       "count": 2
-    }
-  },
-  "src/lib/components/MySelect.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
     }
   },
   "src/lib/components/SelectWithSearch.svelte": {
