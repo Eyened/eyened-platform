@@ -244,14 +244,12 @@
                         browserContext.loading ||
                         undefined}
                 >
+                    Search
                     {#if browserContext.loading}
                         <InlineLoading
-                            class="text-inherit"
+                            class="absolute inset-y-0 right-4 w-auto"
                             status="active"
-                            description="Searching…"
                         />
-                    {:else}
-                        Search
                     {/if}
                 </Button>
                 <Button
