@@ -104,7 +104,7 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 ### Drop a stale search response after a Studies/Images switch
 - **Status:** open
 - **Source:** P4 browser search final review / demo 2026-10-13
-- **Problem:** `resetForQueryModeChange` in `client/src/lib/browser/browserContext.svelte.ts` does not bump `searchSeq`, so an in-flight Studies response can be processed as Images. Nothing visible today.
+- **Problem:** `resetForQueryModeChange` in `client/src/lib/browser/browserContext.svelte.ts` does not bump `searchSeq`, so an in-flight Studies response can be processed as Images. When the switch removes every condition no new search starts, so that response lands as Images and `loading` stays true until it does.
 - **Fix:** `this.searchSeq++` in the reset.
 
 ### Skip the hover background on disabled calendar days
@@ -116,7 +116,7 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 ### Round-trip a comma inside an "is one of" value
 - **Status:** open
 - **Source:** P4 browser search final review / demo 2026-10-13
-- **Problem:** `conditionsToRows` / `rowsToConditions` in `client/src/lib/browser/conditionConfig.ts` join and split the "is one of" text on commas, so `["a,b"]` comes back as `["a","b"]`. Inherited v1 encoding.
+- **Problem:** the value parser in `client/src/lib/browser/conditionConfig.ts` splits "is one of" text on commas and `condition-row.svelte` joins list values with ", ", so `["a,b"]` comes back as `["a","b"]`. Inherited v1 encoding.
 - **Fix:** an escape or quoting rule for commas in the text, or a multi-value input instead of comma-separated text.
 
 ### Announce Delete condition once
