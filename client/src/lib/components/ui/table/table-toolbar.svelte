@@ -14,7 +14,10 @@
 <div
     bind:this={ref}
     data-slot="table-toolbar"
-    class={cn("relative flex h-12 w-full items-center bg-layer-01", className)}
+    class={cn(
+        "relative flex h-12 w-full items-center bg-layer-01 in-dialog:bg-layer-02",
+        className,
+    )}
     {...restProps}
 >
     {@render children?.()}
