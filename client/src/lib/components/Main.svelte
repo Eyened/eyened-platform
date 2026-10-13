@@ -8,7 +8,8 @@
     import UserMenu from "./UserMenu.svelte";
     import * as Tooltip from "./ui/tooltip";
 
-    let { children }: { children: Snippet } = $props();
+    let { children, wide = false }: { children: Snippet; wide?: boolean } =
+        $props();
 
     const { userManager } = getContext<GlobalContext>("globalContext");
 
@@ -29,7 +30,7 @@
     <!-- mt-12 clears the fixed 48 px header -->
     <div class="mt-12 overflow-y-scroll">
         {#if userManager.loggedIn}
-            <main class="max-w-page px-4">
+            <main class={wide ? "px-4" : "max-w-page px-4"}>
                 {@render children?.()}
             </main>
         {/if}

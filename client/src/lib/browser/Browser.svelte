@@ -8,6 +8,8 @@
     import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import * as Table from "$lib/components/ui/table/index.js";
+    import { cn } from "$lib/utils.js";
+    import Filter from "carbon-icons-svelte/lib/Filter.svelte";
     import { onMount, setContext, tick } from "svelte";
     import AdvancedFilters from "./AdvancedFilters.svelte";
     import BrowserContent from "./BrowserContent.svelte";
@@ -55,6 +57,26 @@
 
     let patientInput = $state<HTMLInputElement | null>(null);
 
+    // Carbon lg. Open from lg up, collapsed below (UI shell left panel); not remembered.
+    const LG = "(min-width: 66rem)";
+    let filtersOpen = $state(matchMedia(LG).matches);
+    let toggle = $state<HTMLButtonElement | null>(null);
+    const filterCount = $derived(browserContext.activeConditions.length);
+
+    // Below lg the open column overlays the results: Escape and Search close it.
+    function closeOverlay() {
+        if (matchMedia(LG).matches) return;
+        filtersOpen = false;
+        toggle?.focus();
+    }
+
+    function onFiltersKeydown(e: KeyboardEvent) {
+        if (e.key !== "Escape" || matchMedia(LG).matches) return;
+        // The picker's modal closes on Escape; its document listener skips a stopped event.
+        e.stopPropagation();
+        closeOverlay();
+    }
+
     const countText = $derived.by(() => {
         if (!browserContext.hasSearched || browserContext.failed) return "";
         if (browserContext.loading && browserContext.count === 0) return "";
@@ -72,7 +94,7 @@
             const hasConditions = browserContext.restoreFromParams(
                 page.url.searchParams,
             );
-            if (mode === "full") {
+            if (mode === "full" && filtersOpen) {
                 await tick();
                 patientInput?.focus();
             }
@@ -108,6 +130,7 @@
         e.stopPropagation();
         if (browserContext.canSearch && !browserContext.loading) {
             browserContext.submitSearch();
+            closeOverlay();
         }
     }
 
@@ -118,59 +141,39 @@
 </script>
 
 <div class="flex flex-col">
+    {#if mode === "full"}
+        <h1 tabindex="-1" class="sr-only">Browser</h1>
+    {/if}
     {#if mode === "overlay" && browserContext.selectedIds.length > 0}
         <Selection placement="top" />
     {/if}
-    {#if mode === "full"}
-        <h1 tabindex="-1" class="mt-8 mb-6 text-heading-04 text-text-primary">
-            Browser
-        </h1>
-    {/if}
 
-    <form
-        role="search"
-        novalidate
-        onsubmit={submit}
-        class="flex flex-col gap-6"
+    <!-- Carbon table-toolbar strip; below md it wraps to two lines. -->
+    <Table.Toolbar
+        class={cn("h-auto flex-wrap md:h-12", mode === "full" && "mt-8")}
     >
-        <FilterShorcuts bind:patientInput />
-        <AdvancedFilters />
-        {#if browserContext.notification}
-            {@const n = browserContext.notification}
-            <InlineNotification
-                kind={n.kind}
-                title={n.title}
-                subtitle={n.subtitle}
-            />
-        {/if}
-        <div class="flex">
-            <Button
-                type="submit"
-                aria-disabled={!browserContext.canSearch ||
-                    browserContext.loading ||
-                    undefined}
-            >
-                {#if browserContext.loading}
-                    <InlineLoading
-                        class="text-inherit"
-                        status="active"
-                        description="Searching…"
-                    />
-                {:else}
-                    Search
-                {/if}
-            </Button>
+        <Button
+            bind:ref={toggle}
+            variant="ghost"
+            size="lg"
+            aria-expanded={filtersOpen}
+            aria-controls="browser-filters"
+            onclick={() => (filtersOpen = !filtersOpen)}
+        >
+            {filtersOpen || filterCount === 0
+                ? "Filters"
+                : `Filters (${filterCount})`}
+            <Filter aria-hidden="true" />
+        </Button>
+        {#if !filtersOpen && filterCount > 0}
             <Button
                 variant="ghost"
+                size="lg"
                 onclick={() => browserContext.clearFilters()}
             >
                 Clear filters
             </Button>
-        </div>
-    </form>
-
-    <!-- Carbon table-toolbar strip; below md it wraps to two lines. -->
-    <Table.Toolbar class="mt-8 h-auto flex-wrap md:h-12">
+        {/if}
         <p
             aria-live="polite"
             class="flex h-12 flex-1 items-center ps-4 text-body-compact-01 text-text-secondary"
@@ -202,8 +205,60 @@
         </div>
     </Table.Toolbar>
 
-    <BrowserContent {mode} />
-    <footer></footer>
+    <!-- From lg the column pushes the results; below lg it overlays them. -->
+    <div class="relative flex gap-4">
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <!-- Escape bubbles up from the fields inside this form. -->
+        <form
+            id="browser-filters"
+            role="search"
+            novalidate
+            hidden={!filtersOpen}
+            onsubmit={submit}
+            onkeydown={onFiltersKeydown}
+            class="z-10 flex w-80 shrink-0 flex-col gap-6 border-e border-border-subtle-00 bg-background py-6 pe-4 max-lg:absolute max-lg:start-0 max-lg:top-0 in-dialog:bg-layer-01"
+        >
+            <h2 class="text-heading-compact-02 text-text-primary">Filters</h2>
+            <FilterShorcuts bind:patientInput />
+            <AdvancedFilters />
+            {#if browserContext.notification}
+                {@const n = browserContext.notification}
+                <InlineNotification
+                    kind={n.kind}
+                    title={n.title}
+                    subtitle={n.subtitle}
+                />
+            {/if}
+            <div class="flex">
+                <Button
+                    type="submit"
+                    aria-disabled={!browserContext.canSearch ||
+                        browserContext.loading ||
+                        undefined}
+                >
+                    {#if browserContext.loading}
+                        <InlineLoading
+                            class="text-inherit"
+                            status="active"
+                            description="Searching…"
+                        />
+                    {:else}
+                        Search
+                    {/if}
+                </Button>
+                <Button
+                    variant="ghost"
+                    onclick={() => browserContext.clearFilters()}
+                >
+                    Clear filters
+                </Button>
+            </div>
+        </form>
+        <div class="max-w-page min-w-0 flex-1">
+            <BrowserContent {mode} />
+            <footer></footer>
+        </div>
+    </div>
     {#if mode !== "overlay" && browserContext.selectedIds.length > 0}
         <Selection />
     {/if}

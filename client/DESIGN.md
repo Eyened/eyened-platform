@@ -104,7 +104,8 @@ one class sets size, line height, letter spacing and weight (`text-body-compact-
   (Carbon's values minus the 1 px border), Button max width and login column `max-w-80`/`w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's 3 px current-item bar `0.75`, and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), the modal widths and heights (Carbon's percentages as fractions), the dropdown menu `max-h-66` (5.5 items) and inline menu `min-w-72 max-w-120` (288 / 480 px), the expanded table row `ps-14` (3.5 rem), and the pagination select `pe-9` (2.25 rem), the content switcher lg padding `px-3.5` (14 px), the number input `min-w-37.5` (150 px), the calendar `w-72` (288 px) and its today dot `bottom-1.75` (7 px), the condition builder popover `max-h-88 max-w-80 min-w-48` (22 / 20 / 12 rem), and the `ui/command` list `max-h-75` (shadcn's 300 px, for its other callers).
 - Header 48 px (`h-12`), fixed; content below it (`mt-12`) in `<main class="max-w-page px-4">`,
   left-aligned with the wordmark.
-- Breakpoints: Carbon's `md` 42rem, `lg` 66rem, `xlg` 82rem ([Carbon](https://www.carbondesignsystem.com/building-blocks/foundations/2x-grid/overview)); use them only where a Carbon component page specifies breakpoint behaviour (Modal). Carbon's `max` (99rem) is `max-w-page`.
+- Browser filter column: `w-80`, left of the results; on `/` the page drops `max-w-page` (`Main wide`) and the results keep it ([2x Grid, Left-hand navigation](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/)).
+- Breakpoints: Carbon's `md` 42rem, `lg` 66rem, `xlg` 82rem ([Carbon](https://www.carbondesignsystem.com/building-blocks/foundations/2x-grid/overview)); use them only where a Carbon component page specifies breakpoint behaviour (Modal). Carbon's `max` (99rem) is `max-w-page`. Exception: below `lg` the browser filter column collapses behind a toggle and overlays the results ([UI shell left panel, Non-persistent left panel](https://carbondesignsystem.com/building-blocks/core/components/ui-shell-left-panel/accessibility/)); collapsed, the toggle shows the filter count and Clear filters ([Filtering, Filter states](https://www.carbondesignsystem.com/building-blocks/core/patterns/filtering)).
 
 ## Shapes
 
@@ -178,8 +179,8 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each) a
   and `@carbon/ibm-products-styles` 2.95.0.
 - **Browser search** (`/`, `lib/browser`): [Search](https://www.carbondesignsystem.com/building-blocks/core/patterns/search)
   and [Filtering](https://www.carbondesignsystem.com/building-blocks/core/patterns/filtering): Search is a batch
-  button, `aria-disabled` until the search fields load and there is at least one complete condition (Basic or Advanced); sort, page size and Studies/Images apply at once; one
-  notification at the bottom of the form, above its buttons.
+  button, `aria-disabled` until the search fields load and there is at least one complete condition; sort, page size and Studies/Images apply at once; one
+  notification at the bottom of the form, above its buttons. Clear filters also clears the results.
 
 ### Deviations from Carbon
 
@@ -195,7 +196,7 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each) a
 | Condition builder connectors | `if`/`unless` and `and`/`or` menus                                                            | Static "if" / "and"                                                                                                                    | The server ANDs every condition                         |
 | Condition builder parts      | Select all / Deselect all, delete-hover preview, builder heading; Add shown on hover or focus | Left out; Delete always visible, Add on the last row. Added: _is empty_ with no value part, comma-separated _is one of_ on text fields | KISS; _is empty_ and _is one of_ are v1 search features |
 | Calendar header              | Month and a year number input                                                                 | Month and year as a heading                                                                                                            | The date can be typed as `yyyy-mm-dd`                   |
-| Date picker width            | 288 px                                                                                        | Fills its column                                                                                                                       | The three Basic fields line up                          |
+| Date picker width            | 288 px                                                                                        | Fills its column                                                                                                                       | Fills the filter column                                 |
 | Date picker text             | `code-02` (IBM Plex Mono)                                                                     | `body-compact-01`                                                                                                                      | No mono font installed; no new packages                 |
 | Date picker calendar         | Opens on input click; icon decorative                                                         | A 48 px calendar button (icon where Carbon's sits)                                                                                     | Dates are typed; the calendar opens on demand           |
 
