@@ -4,6 +4,7 @@
     // Carbon ContentSwitcher, low contrast (the default selected option is a light bar on Gray 100).
     // Values from @carbon/styles 1.117.0 content-switcher/_content-switcher.scss; keys from Carbon React
     // ContentSwitcher. Automatic: an arrow key selects. Manual: arrows move focus, Enter or Space selects.
+    // Grid of equal columns: with w-fit, every option is as wide as the longest label.
     let {
         items,
         selectedId = $bindable(),
@@ -45,7 +46,7 @@
     role="tablist"
     aria-label={label}
     class={cn(
-        "flex w-full overflow-hidden rounded-content-switcher border border-border-strong-01 in-dialog:border-border-strong-02",
+        "grid w-full auto-cols-fr grid-flow-col overflow-hidden rounded-content-switcher border border-border-strong-01 in-dialog:border-border-strong-02",
         size === "lg" ? "h-12" : "h-10",
         className,
     )}
@@ -60,7 +61,7 @@
             tabindex={selected ? 0 : -1}
             data-selected={selected || undefined}
             class={cn(
-                "relative flex min-w-0 flex-1 cursor-pointer items-center text-start text-body-compact-01 whitespace-nowrap text-text-secondary hover:bg-content-switcher-background-hover hover:text-text-primary",
+                "relative flex min-w-0 cursor-pointer items-center text-start text-body-compact-01 whitespace-nowrap text-text-secondary hover:bg-content-switcher-background-hover hover:text-text-primary",
                 // 1 × 16 px divider between options, hidden next to a hovered, focused or selected one
                 "before:absolute before:start-0 before:h-4 before:w-px before:bg-border-strong-01 first:before:hidden hover:before:hidden focus-visible:before:hidden data-selected:before:hidden [&:focus-visible+&]:before:hidden [&:hover+&]:before:hidden [[data-selected]+&]:before:hidden",
                 "data-selected:rounded-content-switcher data-selected:bg-content-switcher-selected data-selected:text-heading-compact-01 data-selected:text-text-primary data-selected:shadow-content-switcher-selected data-selected:hover:bg-content-switcher-selected",

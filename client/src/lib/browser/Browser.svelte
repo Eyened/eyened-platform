@@ -137,7 +137,7 @@
     >
         <ContentSwitcher
             label="Filter mode"
-            class="w-40"
+            class="w-fit"
             items={[
                 { id: "basic", text: "Basic" },
                 { id: "advanced", text: "Advanced" },
@@ -198,7 +198,7 @@
                 label="Results"
                 size="lg"
                 selectionMode="manual"
-                class="w-40"
+                class="w-fit"
                 items={[
                     { id: "studies", text: "Studies" },
                     { id: "instances", text: "Images" },
