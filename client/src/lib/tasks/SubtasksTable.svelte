@@ -16,7 +16,7 @@
         /** A filter or page change is loading: skeleton rows under the real header. */
         loading?: boolean;
         onerror: (title: string, subtitle?: string) => void;
-        onchange: () => void;
+        onchange: () => void | Promise<void>;
     };
     let {
         rows,
