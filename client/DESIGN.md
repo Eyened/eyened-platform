@@ -145,7 +145,7 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each) a
 - **Inline loading** (`ui/inline-loading`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/inline-loading/usage).
 - **Select** (`ui/select-input` `SelectInput`/`SelectItem` over `ui/native-select`, a native `<select>`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/select/usage). For a custom menu use Dropdown.
-- **Dropdown** (`ui/dropdown` over `ui/select` (bits-ui); `type` `default` or `inline`, size lg 48 px):
+- **Dropdown** (`ui/dropdown` over `ui/select` (bits-ui); `type` `default` or `inline`, size lg 48 px or md 40 px):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/dropdown/usage). Inline in a table toolbar to
   filter it; each filter has an "All" item. Below md the toolbar's filters move behind a Filter icon button that
   opens them as default Dropdowns (Carbon puts toolbar filters in a `TableToolbarMenu`).

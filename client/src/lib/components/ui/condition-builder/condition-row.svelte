@@ -251,7 +251,7 @@
                 onCloseAutoFocus={(e) => onCloseAutoFocus(e, part)}
                 class="max-h-88 w-auto max-w-80 min-w-48 overflow-auto rounded-none border-0 bg-layer-01 p-0 text-text-primary shadow-popover"
             >
-                <h2 class="p-4 text-heading-compact-01">{titles[part]}</h2>
+                <h3 class="p-4 text-heading-compact-01">{titles[part]}</h3>
                 {#if part === "property"}
                     <ItemOption
                         options={properties}
@@ -352,17 +352,24 @@
     </span>
 {/snippet}
 
-<div role="row" aria-label="Condition row" class="me-0.5 mb-0.5 flex">
+<!-- Only the part cells wrap; Delete and Add stay on the first line. -->
+<div
+    role="row"
+    aria-label="Condition row"
+    class="mb-0.5 flex basis-full items-start"
+>
     <!-- Static connector (__connector--disabled): the server ANDs every condition. -->
     <span
         role="gridcell"
-        class="me-0.5 flex h-8 min-w-16 items-center bg-layer-01 px-2 text-text-helper in-dialog:bg-layer-02"
+        class="me-0.5 flex h-8 min-w-16 shrink-0 items-center bg-layer-01 px-2 text-text-helper in-dialog:bg-layer-02"
     >
         {index === 0 ? "if" : "and"}
     </span>
-    {#each parts as part (part)}
-        {@render partCell(part)}
-    {/each}
+    <div class="flex min-w-0 flex-1 flex-wrap gap-y-0.5">
+        {#each parts as part (part)}
+            {@render partCell(part)}
+        {/each}
+    </div>
     {@render iconCell("delete", "Delete condition", onremove)}
     {#if cells.includes("add")}
         {@render iconCell("add", "Add condition", onadd)}
