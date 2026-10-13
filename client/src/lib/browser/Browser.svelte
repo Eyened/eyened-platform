@@ -1,23 +1,24 @@
 <script lang="ts">
+    import { afterNavigate } from "$app/navigation";
     import { page } from "$app/state";
     import Selection from "$lib/browser/Selection.svelte";
-
-    import MySelect from "$lib/components/MySelect.svelte";
-    import { Button } from "$lib/components/ui/button";
-    import * as Card from "$lib/components/ui/card";
-    import { onMount, setContext } from "svelte";
-    import {
-        searchOrderBy,
-        studiesSearchOrderBy,
-    } from "../../types/openapi_constants";
-    import FixedSpinner from "../components/FixedSpinner.svelte";
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { ContentSwitcher } from "$lib/components/ui/content-switcher/index.js";
+    import { Dropdown } from "$lib/components/ui/dropdown/index.js";
+    import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
+    import * as Table from "$lib/components/ui/table/index.js";
+    import { onMount, setContext, tick } from "svelte";
     import AdvancedFilters from "./AdvancedFilters.svelte";
     import BrowserContent from "./BrowserContent.svelte";
     import {
         BrowserContext,
-        decodeConditions,
+        SORT_COLUMNS,
         type Condition,
+        type FilterMode,
         type QueryMode,
+        type SortBy,
+        type SortDirection,
     } from "./browserContext.svelte";
     import FilterShorcuts from "./FilterShorcuts.svelte";
 
@@ -40,19 +41,49 @@
         initialConditions,
         initialSelectedIds,
     }: Props = $props();
-
+    // svelte-ignore state_referenced_locally
     const browserContext: BrowserContext = context ?? new BrowserContext();
     setContext("browserContext", browserContext);
+
+    const SORT_TEXT: Record<SortBy, string> = {
+        "Study Date": "Study date",
+        "Patient Birthdate": "Patient birthdate",
+        "Date Inserted": "Date added",
+    };
+    const sortItems = SORT_COLUMNS.flatMap((column) => [
+        { id: `${column}|ASC`, text: `${SORT_TEXT[column]}, oldest first` },
+        { id: `${column}|DESC`, text: `${SORT_TEXT[column]}, newest first` },
+    ]);
+
+    let patientInput = $state<HTMLInputElement | null>(null);
+
+    const countText = $derived.by(() => {
+        if (!browserContext.hasSearched || browserContext.failed) return "";
+        if (browserContext.loading && browserContext.count === 0) return "";
+        const n = browserContext.count;
+        return browserContext.queryMode === "instances"
+            ? `${n} ${n === 1 ? "image" : "images"}`
+            : `${n} ${n === 1 ? "study" : "studies"}`;
+    });
 
     onMount(async () => {
         browserContext.urlSync = syncUrl;
         await browserContext.loadSignatures();
 
         if (syncUrl) {
-            initParamState();
-            // After signatures are in state, optionally kick off a search if there are pre-existing conditions
-            await browserContext.search();
+            const hasConditions = browserContext.restoreFromParams(
+                page.url.searchParams,
+            );
+            if (mode === "full" && browserContext.filterMode === "basic") {
+                await tick();
+                patientInput?.focus();
+            }
+            // Only a URL with conditions searches; no params means no request (B9).
+            if (hasConditions) await browserContext.search();
         } else {
+            if (initialSelectedIds?.length) {
+                browserContext.selectedIds = [...initialSelectedIds];
+            }
             if (initialConditions?.length) {
                 browserContext.applyInitialConditions(initialConditions, {
                     queryMode: "studies",
@@ -61,204 +92,133 @@
                 });
                 await browserContext.search();
             }
-            if (initialSelectedIds?.length) {
-                browserContext.selectedIds = [...initialSelectedIds];
-            }
         }
     });
 
-    function initParamState() {
-        // read the query string into state
-        const params = page.url.searchParams;
-        // Retrieve the query parameters from the URL
-        const conds = decodeConditions(params.get("conditions") || "");
-
-        browserContext.page = parseInt(params.get("page") || "0", 10);
-        const limitParam = params.get("limit");
-        if (limitParam !== null && limitParam !== "") {
-            const parsedLimit = parseInt(limitParam, 10);
-            if (!Number.isNaN(parsedLimit)) browserContext.limit = parsedLimit;
+    // A patient or date link in a study header navigates this same route: read the URL again (B16).
+    // Our own searches use goto (type "goto"); arriving from another route is onMount's job.
+    afterNavigate((nav) => {
+        if (!syncUrl || nav.type !== "link" || !nav.to) return;
+        if (nav.from?.route.id !== nav.to.route.id) return;
+        if (browserContext.restoreFromParams(nav.to.url.searchParams)) {
+            browserContext.search();
         }
+    });
 
-        // new: query mode and sort
-        const qm = params.get("queryMode");
-        if (qm === "instances" || qm === "studies")
-            browserContext.queryMode = qm;
-
-        const dm = params.get("displayMode");
-        if (dm === "instance" || dm === "study")
-            browserContext.displayMode = dm;
-
-        const fm = params.get("filterMode");
-        if (fm === "basic" || fm === "advanced") browserContext.filterMode = fm;
-        if (conds.length) {
-            if (fm === "advanced") browserContext.advancedConditions = conds;
-            if (fm === "basic") browserContext.basicCondition = conds[0];
+    function submit(e: SubmitEvent) {
+        e.preventDefault();
+        // In the picker this form sits inside the modal's form; a bubbling submit would save.
+        e.stopPropagation();
+        if (browserContext.canSearch && !browserContext.loading) {
+            browserContext.submitSearch();
         }
-
-        const ob = params.get("order_by");
-        if (ob) browserContext.sortBy = ob as any;
-
-        const od = params.get("order");
-        if (od === "ASC" || od === "DESC") browserContext.sortDirection = od;
     }
 
-    let limitOptions = $derived(
-        browserContext.queryMode === "instances" &&
-            browserContext.displayMode === "instance"
-            ? browserContext.limitOptionsInstances
-            : browserContext.limitOptionsStudies,
-    );
-
-    let sortByColumns = $derived(
-        browserContext.displayMode === "instance"
-            ? searchOrderBy
-            : studiesSearchOrderBy,
-    );
-
-    // Handle limit as string for MySelect component
-    let limitAsString = $derived(String(browserContext.limit));
-
-    const handleSearch = () => {
-        browserContext.page = 0;
-        browserContext.search();
-    };
-
-    $effect(() => {
-        if (limitAsString && limitAsString !== String(browserContext.limit)) {
-            browserContext.limit = parseInt(limitAsString, 10);
-        }
-    });
+    function selectSort(id: string) {
+        const [by, direction] = id.split("|");
+        browserContext.setSort(by as SortBy, direction as SortDirection);
+    }
 </script>
 
-{#if browserContext.loading}
-    <FixedSpinner />
-{/if}
-
-<div id="container">
+<div class="flex flex-col">
     {#if mode === "overlay" && browserContext.selectedIds.length > 0}
         <Selection placement="top" />
     {/if}
-    <div id="main" class="font-sm bg-gray-200 flex w-full flex-row">
-        <div class="min-w-0 flex-5 flex-col p-4">
-            {#if browserContext.filterMode === "basic"}
-                <FilterShorcuts
-                    bind:condition={browserContext.basicCondition}
-                />
-            {:else if browserContext.activeSignature.length}
-                <AdvancedFilters
-                    signature={browserContext.activeSignature}
-                    bind:conditions={browserContext.advancedConditions}
-                />
-            {/if}
+    {#if mode === "full"}
+        <h1 tabindex="-1" class="mt-8 mb-6 text-heading-04 text-text-primary">
+            Browser
+        </h1>
+    {/if}
 
-            <div class="">
-                <div class="float-right">
-                    <Button
-                        variant="link"
-                        onclick={() =>
-                            (browserContext.filterMode =
-                                browserContext.filterMode === "basic"
-                                    ? "advanced"
-                                    : "basic")}
-                        class="text-xs"
-                    >
-                        {browserContext.filterMode === "advanced"
-                            ? "Basic Filters"
-                            : "Advanced Filters"}
-                    </Button>
-                </div>
-            </div>
-
+    <form
+        role="search"
+        novalidate
+        onsubmit={submit}
+        class="flex flex-col gap-6"
+    >
+        <ContentSwitcher
+            label="Filter mode"
+            class="w-40"
+            items={[
+                { id: "basic", text: "Basic" },
+                { id: "advanced", text: "Advanced" },
+            ]}
+            selectedId={browserContext.filterMode}
+            onchange={(id) => (browserContext.filterMode = id as FilterMode)}
+        />
+        {#if browserContext.filterMode === "basic"}
+            <FilterShorcuts bind:patientInput />
+        {:else}
+            <AdvancedFilters />
+        {/if}
+        {#if browserContext.notification}
+            {@const n = browserContext.notification}
+            <InlineNotification
+                kind={n.kind}
+                title={n.title}
+                subtitle={n.subtitle}
+            />
+        {/if}
+        <div class="flex">
             <Button
-                variant="default"
-                onclick={handleSearch}
-                class="text-sm mr-2 w-full"
+                type="submit"
+                aria-disabled={!browserContext.canSearch ||
+                    browserContext.loading ||
+                    undefined}
             >
-                Search
+                {#if browserContext.loading}
+                    <InlineLoading
+                        class="text-inherit"
+                        status="active"
+                        description="Searching…"
+                    />
+                {:else}
+                    Search
+                {/if}
+            </Button>
+            <Button
+                variant="ghost"
+                onclick={() => browserContext.clearFilters()}
+            >
+                Clear filters
             </Button>
         </div>
-        <div class="min-w-0 flex-5 p-4">
-            <Card.Root>
-                <Card.Content class="flex flex-col gap-4">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-8">
-                            <div class="flex items-center gap-2">
-                                <label for="queryType">Query: </label>
-                                <MySelect
-                                    options={[
-                                        {
-                                            value: "instances",
-                                            label: "Instances",
-                                        },
-                                        { value: "studies", label: "Studies" },
-                                    ]}
-                                    bind:value={browserContext.queryMode}
-                                    onchange={(queryMode) =>
-                                        browserContext.resetForQueryModeChange(
-                                            queryMode as QueryMode,
-                                        )}
-                                    placeholder="Query Type"
-                                />
-                            </div>
-                            <!-- {#if browserContext.queryMode === "instances"}
-								<div class="flex items-center gap-2">
-									<label for="displayMode">Display: </label>
-									<MySelect
-										options={[
-											{ value: "instance", label: "Instances" },
-											{ value: "study", label: "Studies" },
-										]}
-										bind:value={browserContext.displayMode}
-										placeholder="Render Mode"
-									/>
-								</div>
-							{/if} -->
-                        </div>
-                    </div>
+    </form>
 
-                    <div class="flex flex-1 items-center gap-8">
-                        <div class="flex items-center gap-2">
-                            <label for="sortBy">Sort: </label>
-                            <MySelect
-                                options={sortByColumns.map((v) => ({
-                                    value: v,
-                                    label: v,
-                                }))}
-                                bind:value={browserContext.sortBy}
-                                placeholder="Sort by Column"
-                            />
-
-                            <MySelect
-                                options={[
-                                    { value: "ASC", label: "ASC" },
-                                    { value: "DESC", label: "DESC" },
-                                ]}
-                                bind:value={browserContext.sortDirection}
-                                placeholder="Sort order"
-                            />
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <label for="limit">Items per page: </label>
-                            <MySelect
-                                options={limitOptions.map((opt) => ({
-                                    value: String(opt),
-                                    label: opt,
-                                }))}
-                                bind:value={limitAsString}
-                                placeholder="Per page"
-                            />
-                        </div>
-                    </div>
-                </Card.Content>
-            </Card.Root>
+    <!-- Carbon table-toolbar strip; below md it wraps to two lines. -->
+    <Table.Toolbar class="mt-8 h-auto flex-wrap md:h-12">
+        <p
+            aria-live="polite"
+            class="flex h-12 flex-1 items-center ps-4 text-body-compact-01 text-text-secondary"
+        >
+            {countText}
+        </p>
+        <div class="flex h-12 items-center gap-4">
+            <!-- Manual: an arrow key moves focus without searching. -->
+            <ContentSwitcher
+                label="Results"
+                size="lg"
+                selectionMode="manual"
+                class="w-40"
+                items={[
+                    { id: "studies", text: "Studies" },
+                    { id: "instances", text: "Images" },
+                ]}
+                selectedId={browserContext.queryMode}
+                onchange={(id) =>
+                    browserContext.resetForQueryModeChange(id as QueryMode)}
+            />
+            <Dropdown
+                type="inline"
+                labelText="Sort by"
+                items={sortItems}
+                selectedId={`${browserContext.sortBy}|${browserContext.sortDirection}`}
+                onselect={selectSort}
+            />
         </div>
-    </div>
+    </Table.Toolbar>
 
-    <div id="content" class="p-4">
-        <BrowserContent {mode} />
-    </div>
+    <BrowserContent {mode} />
     <footer></footer>
     {#if mode !== "overlay" && browserContext.selectedIds.length > 0}
         <Selection />
