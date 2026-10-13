@@ -5,7 +5,7 @@
     import { getContext } from "svelte";
     import type { BrowserContext } from "./browserContext.svelte";
 
-    // Basic filters: each filled field is its own condition (AND, B10). Enter in a field submits
+    // Quick fields: each filled field is its own condition (AND, B10). Enter in a field submits
     // the surrounding search form.
     const ALL = "__all__";
     const browserContext = getContext<BrowserContext>("browserContext");
@@ -21,7 +21,7 @@
     ]);
 </script>
 
-<div class="grid gap-x-4 gap-y-6 md:grid-cols-3">
+<div class="flex flex-col gap-6">
     <TextInput
         labelText="Patient identifier"
         autocomplete="off"
@@ -33,6 +33,7 @@
         bind:value={browserContext.basic.studyDate}
     />
     <Dropdown
+        size="md"
         labelText="Project"
         items={projectItems}
         bind:selectedId={

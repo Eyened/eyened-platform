@@ -10,4 +10,14 @@
     );
 </script>
 
-<ConditionBuilder {properties} bind:rows={browserContext.advancedRows} />
+<div class="flex flex-col gap-2">
+    <!-- The builder's grid is named by label; this is the visible copy. -->
+    <p aria-hidden="true" class="text-label-01 text-text-secondary">
+        Conditions
+    </p>
+    <ConditionBuilder
+        {properties}
+        label="Conditions"
+        bind:rows={browserContext.advancedRows}
+    />
+</div>
