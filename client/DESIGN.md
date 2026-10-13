@@ -42,6 +42,7 @@ shadcn's colour names do not exist.
 | `border-strong-01`                                                       | `#6f6f6f`                                                 | Input border on `background`                      |
 | `border-strong-02`                                                       | `#8d8d8d`                                                 | Input border on `layer-01`                        |
 | `border-interactive`                                                     | `#4589ff`                                                 | Current header item, selected tab                 |
+| `border-inverse`                                                         | `#f4f4f4`                                                 | Ring of the selected content switcher option      |
 | `border-disabled`                                                        | `rgba(141,141,141,0.5)`                                   | Disabled input border                             |
 | `overlay`                                                                | `rgba(0,0,0,0.6)`                                         | Behind a modal                                    |
 | `skeleton-background`                                                    | `#292929`                                                 | Loading placeholder                               |
@@ -100,14 +101,14 @@ one class sets size, line height, letter spacing and weight (`text-body-compact-
 
 - Spacing: Carbon's [scale](https://www.carbondesignsystem.com/building-blocks/foundations/spacing/overview)
   only — `0.5 1 2 3 4 6 8 10 12 16 20 24 40`. Exceptions: Button padding `1.5 2.5 3.5 3.75 15.75`
-  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80`/`w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's 3 px current-item bar `0.75`, and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), the modal widths and heights (Carbon's percentages as fractions), the dropdown menu `max-h-66` (5.5 items) and inline menu `min-w-72 max-w-120` (288 / 480 px), the expanded table row `ps-14` (3.5 rem), and the pagination select `pe-9` (2.25 rem).
+  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80`/`w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's 3 px current-item bar `0.75`, and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), the modal widths and heights (Carbon's percentages as fractions), the dropdown menu `max-h-66` (5.5 items) and inline menu `min-w-72 max-w-120` (288 / 480 px), the expanded table row `ps-14` (3.5 rem), and the pagination select `pe-9` (2.25 rem), the content switcher lg padding `px-3.5` (14 px), the number input `min-w-37.5` (150 px), the calendar `w-72` (288 px) and its today dot `bottom-1.75` (7 px), the condition builder popover `max-h-88 max-w-80 min-w-48` (22 / 20 / 12 rem), and the `ui/command` list `max-h-75` (shadcn's 300 px, for its other callers).
 - Header 48 px (`h-12`), fixed; content below it (`mt-12`) in `<main class="max-w-page px-4">`,
   left-aligned with the wordmark.
 - Breakpoints: Carbon's `md` 42rem, `lg` 66rem, `xlg` 82rem ([Carbon](https://www.carbondesignsystem.com/building-blocks/foundations/2x-grid/overview)); use them only where a Carbon component page specifies breakpoint behaviour (Modal). Carbon's `max` (99rem) is `max-w-page`.
 
 ## Shapes
 
-Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, Carbon). Shadows: `shadow-popover` for menus and popovers (Carbon tooltips have none); `shadow-button-focus` for Button focus. Motion: `animate-loading-rotate` (690 ms) for the loading spinner; `animate-skeleton` (3000 ms) for skeletons.
+Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each) and rounded-content-switcher (4 px), Carbon's. Shadows: `shadow-popover` for menus and popovers (Carbon tooltips have none); `shadow-button-focus` for Button focus; `shadow-content-switcher-selected` (an inset 1 px `border-inverse` ring) for the selected content switcher option. Motion: `animate-loading-rotate` (690 ms) for the loading spinner; `animate-skeleton` (3000 ms) for skeletons.
 
 ## Components
 
@@ -131,16 +132,16 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
 - **Checkbox** (`ui/checkbox`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/checkbox/guidelines).
 - **Notification (inline)** (`ui/inline-notification` over `ui/alert`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/notification/guidelines).
-  Low contrast only: Carbon's high-contrast default is a light box on Gray 100. Error kind only.
+  Low contrast only: Carbon's high-contrast default is a light box on Gray 100. Error (role alert) and warning (role status) kinds.
 - **Login** (`LoginForm.svelte`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/login); one centred column, as Carbon suggests without an illustration.
 - **Data table** (`ui/table`, `size` `md` 40 px, `lg` 48 px or `xl` 64 px for two-line rows; `Table.Toolbar`, `Table.ToolbarSearch`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/usage). Fewer than three row
   actions are inline buttons, not an overflow menu. `Table.Skeleton` is Carbon's DataTableSkeleton
   (toolbar, real headers, 5 skeleton rows, `aria-busy`), shown while a table loads. Expandable rows: `Table.ExpandButton` in the first cell and in the header (expand all), `Table.ExpandedRow` below its row; row actions are ghost buttons with a text label and icon (Claim, Unclaim, Edit) in a trailing column, whose header is an sr-only `Actions`; `Table.SkeletonRows` replaces the body while a filter or page loads. Links are `link-primary`, `link-secondary` while their row is hovered.
 - **Search** (`Table.ToolbarSearch`, persistent): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/search/usage).
-- **Modal** (`ui/modal` over `ui/dialog`; `danger`, sizes `xs`/`sm`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/modal/usage).
+- **Modal** (`ui/modal` over `ui/dialog`; `danger`, sizes `xs`/`sm`/`lg`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/modal/usage).
   Submit shows Inline loading on the primary, disables the rest and blocks closing; a server error is an inline
-  notification above the footer.
+  notification above the footer. `hasScrollingContent` (Carbon React): the body scrolls with a fade and is a focusable region labelled by the heading, and a server error sits above the footer.
 - **Inline loading** (`ui/inline-loading`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/inline-loading/usage).
 - **Select** (`ui/select-input` `SelectInput`/`SelectItem` over `ui/native-select`, a native `<select>`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/select/usage). For a custom menu use Dropdown.
@@ -152,10 +153,10 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/breadcrumb/usage).
 - **Pagination** (`Table.Pagination`, directly below its table, height matching the rows; use `Table.Pagination`, not `ui/pagination`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/pagination/usage). Narrower than 42rem it
-  shows only the item range and Previous/Next (a container query, as in `@carbon/styles`).
+  shows only the item range and Previous/Next (a container query, as in `@carbon/styles`). Below browser results it has a top border, as Carbon draws one outside a table (`class="border-t border-border-subtle-01"`).
 - **Notification (inline), for page actions**: one notification above the table toolbar for failed row actions
   and reloads, no success toasts ([Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/notifications)).
-  Error kind only, so a partial claim-all ("Claimed 1 of 2 sets") deliberately shows as an error; there is no warning kind.
+  A partial claim-all ("Claimed 1 of 2 sets") deliberately shows as an error.
 - **Text area** (`ui/text-area` over `ui/textarea`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/text-input/usage).
 - **Tooltip** (`ui/tooltip`) and **Icon button** (`ui/icon-button`, ghost, label = tooltip + accessible name):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/tooltip/usage).
@@ -164,18 +165,39 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
 - **Empty state** (`ui/empty`, left-aligned, no image): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/empty-states).
 - **Status indicator** (`ui/status-indicator`; task states in `src/lib/tasks/taskStatus.ts`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/status-indicators).
+- **Content switcher** (`ui/content-switcher`, low contrast; `selectionMode` automatic or manual; sizes md, lg):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/content-switcher/usage). Low contrast because
+  the default selected option is a light bar on Gray 100.
+- **Date picker** (`ui/date-picker`, single, typed as `yyyy-mm-dd`, the stored format; calendar `ui/calendar`):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/date-picker/usage).
+- **Number input** (`ui/number-input`, `hideSteppers`, `allowEmpty`: the value is the raw text):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/number-input/usage).
+- **Condition builder** (`ui/condition-builder`: IBM Products ConditionBuilder, Non-Hierarchical, rebuilt in Svelte;
+  option lists on `ui/command`; ARIA grid with one Tab stop): no guidelines page; references are
+  `@carbon/ibm-products` 2.99.0 ([source and Storybook docs](https://github.com/carbon-design-system/ibm-products/tree/main/packages/ibm-products/src/components/ConditionBuilder))
+  and `@carbon/ibm-products-styles` 2.95.0.
+- **Browser search** (`/`, `lib/browser`): [Search](https://www.carbondesignsystem.com/building-blocks/core/patterns/search)
+  and [Filtering](https://www.carbondesignsystem.com/building-blocks/core/patterns/filtering): Search is a batch
+  button, disabled until there is a complete condition; sort, page size and Studies/Images apply at once; one
+  notification at the bottom of the form, above its buttons.
 
 ### Deviations from Carbon
 
-| Element             | Carbon                                                              | Ours                                               | Reason                                                 |
-| ------------------- | ------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
-| Header text         | Wordmark `body-compact-01` at 600 / 0.1 px; nav 0 px letter spacing | `heading-compact-01` / `body-compact-01` (0.16 px) | Weights and spacing come only from type tokens         |
-| Header user action  | Icon-only                                                           | Username as text                                   | A grader on a shared workstation sees who is logged in |
-| Header nav          | Hidden below `lg`                                                   | Always shown                                       | Few items; no side nav yet                             |
-| Login flow          | Two steps: username, then password or SSO                           | One step; OIDC button shown up front               | Our provider is fixed; nothing to route                |
-| Field validation    | On blur                                                             | On submit; cleared once the field has text         | Blur validation flashes an error when tabbing to OIDC  |
-| Filled status icons | Inner mark (`!`, `×`) filled                                        | Transparent; the background shows through          | `carbon-icons-svelte` ships the inner path unfilled    |
-| Tasks table filter  | Toolbar filter menu                                                 | "Show archived" checkbox in the table toolbar      | A filter menu is deferred to a later layer             |
+| Element                      | Carbon                                                                                        | Ours                                                                                                                      | Reason                                                  |
+| ---------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Header text                  | Wordmark `body-compact-01` at 600 / 0.1 px; nav 0 px letter spacing                           | `heading-compact-01` / `body-compact-01` (0.16 px)                                                                        | Weights and spacing come only from type tokens          |
+| Header user action           | Icon-only                                                                                     | Username as text                                                                                                          | A grader on a shared workstation sees who is logged in  |
+| Header nav                   | Hidden below `lg`                                                                             | Always shown                                                                                                              | Few items; no side nav yet                              |
+| Login flow                   | Two steps: username, then password or SSO                                                     | One step; OIDC button shown up front                                                                                      | Our provider is fixed; nothing to route                 |
+| Field validation             | On blur                                                                                       | On submit; cleared once the field has text                                                                                | Blur validation flashes an error when tabbing to OIDC   |
+| Filled status icons          | Inner mark (`!`, `×`) filled                                                                  | Transparent; the background shows through                                                                                 | `carbon-icons-svelte` ships the inner path unfilled     |
+| Tasks table filter           | Toolbar filter menu                                                                           | "Show archived" checkbox in the table toolbar                                                                             | A filter menu is deferred to a later layer              |
+| Condition builder connectors | `if`/`unless` and `and`/`or` menus                                                            | Static "if" / "and"                                                                                                       | The server ANDs every condition                         |
+| Condition builder parts      | Select all / Deselect all, delete-hover preview, builder heading; Add shown on hover or focus | Left out; Delete and Add always visible. Added: _is empty_ with no value part, comma-separated _is one of_ on text fields | KISS; _is empty_ and _is one of_ are v1 search features |
+| Calendar header              | Month and a year number input                                                                 | Month and year as a heading                                                                                               | The date can be typed as `yyyy-mm-dd`                   |
+| Date picker width            | 288 px                                                                                        | Fills its column                                                                                                          | The three Basic fields line up                          |
+| Date picker text             | `code-02` (IBM Plex Mono)                                                                     | `body-compact-01`                                                                                                         | No mono font installed; no new packages                 |
+| Date picker calendar         | Opens on input click; icon decorative                                                         | A 48 px calendar button (icon where Carbon's sits)                                                                        | Dates are typed (spec D8); the calendar opens on demand |
 
 ## Keyboard & Focus
 
@@ -184,6 +206,10 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
 - Buttons: `focus` border plus `shadow-button-focus`; Link (`ui/button` `variant="link"` only): 1 px `focus` outline; a plain `<a>` gets the 2 px ring.
 - Modal: focus starts on the first field (danger: Cancel); while submitting, focus parks on the primary button, which is aria-disabled, not disabled.
 - Pagination: Previous and Next are aria-disabled at the ends; reaching the last page moves focus to Previous, reaching page 1 to Next (Carbon React).
+- Content switcher: ←/→ move between options (wrapping); automatic selects on the move, manual on Enter or Space.
+- Condition builder: one Tab stop; ←/→ move through every part, ↑/↓ to the same part of the next condition;
+  Enter or Space opens a part's popover, which traps focus and returns it to the part on close; Escape clears a
+  search field first, then closes.
 
 ## Do's and Don'ts
 
