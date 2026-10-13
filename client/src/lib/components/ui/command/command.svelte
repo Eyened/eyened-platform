@@ -15,7 +15,7 @@
     bind:ref
     data-slot="command"
     class={cn(
-        "flex h-full w-full flex-col overflow-hidden bg-layer-01 text-text-primary",
+        "flex h-full w-full flex-col overflow-hidden bg-layer-01 text-text-primary in-dialog:bg-layer-02",
         className,
     )}
     {...restProps}

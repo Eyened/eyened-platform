@@ -59,7 +59,7 @@
         {/if}
     </div>
     <Table.Pagination
-        class="border-t border-border-subtle-01"
+        class="border-t border-border-subtle-01 in-dialog:border-border-subtle-02"
         page={browserContext.page + 1}
         pageSize={browserContext.limit}
         pageSizes={browserContext.limitOptions}

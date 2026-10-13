@@ -68,6 +68,10 @@
         if (!open) error = null;
     });
 
+    // The success close outlives a submit; an unmount mid-wait must not fire it.
+    let closeTimer: ReturnType<typeof setTimeout> | undefined;
+    $effect(() => () => clearTimeout(closeTimer));
+
     async function submit(event: SubmitEvent) {
         event.preventDefault();
         // Only this form's own primary button (or Enter in a field, whose submitter is the primary) saves.
@@ -88,7 +92,7 @@
             return;
         }
         status = "finished";
-        setTimeout(() => {
+        closeTimer = setTimeout(() => {
             status = "inactive";
             setOpen(false);
         }, SUCCESS_MS);
