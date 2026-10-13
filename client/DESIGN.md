@@ -145,7 +145,7 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each) a
 - **Modal** (`ui/modal` over `ui/dialog`; `danger`, sizes `xs`/`sm`/`lg`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/modal/usage).
   Submit shows Inline loading on the primary, disables the rest and blocks closing; a server error is an inline
   notification above the footer. `hasScrollingContent` (Carbon React): the body scrolls with a fade and is a focusable region labelled by the heading.
-- **Inline loading** (`ui/inline-loading`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/inline-loading/usage).
+- **Inline loading** (`ui/inline-loading`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/inline-loading/usage). The description is optional; the browser's Search button shows the spinner only (label unchanged, so its width holds).
 - **Select** (`ui/select-input` `SelectInput`/`SelectItem` over `ui/native-select`, a native `<select>`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/select/usage). For a custom menu use Dropdown.
 - **Dropdown** (`ui/dropdown` over `ui/select` (bits-ui); `type` `default` or `inline`, size lg 48 px or md 40 px):

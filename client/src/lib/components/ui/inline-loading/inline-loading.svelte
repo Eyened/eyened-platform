@@ -4,13 +4,14 @@
 
     // Carbon InlineLoading, active and finished states; values from @carbon/styles 1.117.0
     // inline-loading and loading, spinner markup from Carbon React Loading.tsx (small).
+    // Like Carbon React, the description is optional; without one the spinner svg is named "Loading" by its <title>.
     let {
         status,
         description,
         class: className,
     }: {
         status: "active" | "finished";
-        description: string;
+        description?: string;
         class?: string;
     } = $props();
 </script>
@@ -23,13 +24,19 @@
         className,
     )}
 >
-    <div class="relative mr-2 flex items-center justify-center">
+    <div
+        class={cn(
+            "relative flex items-center justify-center",
+            description && "mr-2",
+        )}
+    >
         {#if status === "active"}
             <svg
                 viewBox="0 0 100 100"
-                aria-hidden="true"
                 class="size-4 animate-loading-rotate fill-none"
+                aria-hidden={description ? "true" : undefined}
             >
+                {#if !description}<title>Loading</title>{/if}
                 <circle
                     cx="50%"
                     cy="50%"
@@ -51,5 +58,5 @@
             <CheckmarkFilled aria-hidden="true" class="text-support-success" />
         {/if}
     </div>
-    <span>{description}</span>
+    {#if description}<span>{description}</span>{/if}
 </div>
