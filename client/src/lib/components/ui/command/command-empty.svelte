@@ -12,6 +12,6 @@
 <CommandPrimitive.Empty
     bind:ref
     data-slot="command-empty"
-    class={cn("text-sm py-6 text-center", className)}
+    class={cn("px-4 py-2 text-body-compact-01 text-text-secondary", className)}
     {...restProps}
 />
