@@ -2,46 +2,39 @@
     import { Tooltip as TooltipPrimitive } from "bits-ui";
     import { cn } from "$lib/utils.js";
 
+    // Carbon tooltip: high contrast, no shadow; values from @carbon/styles 1.117.0
+    // tooltip/_tooltip.scss and popover/_popover.scss. `size="icon"` is the icon-button tooltip.
     let {
         ref = $bindable(null),
         class: className,
-        sideOffset = 0,
+        sideOffset,
         side = "top",
+        size = "default",
         children,
-        arrowClasses,
         ...restProps
-    }: TooltipPrimitive.ContentProps & {
-        arrowClasses?: string;
-    } = $props();
+    }: TooltipPrimitive.ContentProps & { size?: "default" | "icon" } = $props();
+
+    const icon = $derived(size === "icon");
 </script>
 
 <TooltipPrimitive.Portal>
     <TooltipPrimitive.Content
         bind:ref
         data-slot="tooltip-content"
-        {sideOffset}
+        sideOffset={sideOffset ?? (icon ? 8 : 12)}
         {side}
         class={cn(
-            "rounded-md bg-primary text-xs text-primary-foreground z-50 w-fit origin-(--bits-tooltip-content-transform-origin) animate-in px-3 py-1.5 text-balance fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+            "z-50 w-fit max-w-72 animate-in rounded-tooltip bg-background-inverse text-text-inverse fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
+            icon ? "px-4 py-0.5 text-body-compact-01" : "p-4 text-body-01",
             className,
         )}
         {...restProps}
     >
         {@render children?.()}
-        <TooltipPrimitive.Arrow>
-            {#snippet child({ props })}
-                <div
-                    class={cn(
-                        "bg-primary z-50 size-2.5 rotate-45 rounded-[2px]",
-                        "data-[side=top]:translate-x-1/2 data-[side=top]:translate-y-[calc(-50%_+_2px)]",
-                        "data-[side=bottom]:-translate-x-1/2 data-[side=bottom]:-translate-y-[calc(-50%_+_1px)]",
-                        "data-[side=right]:translate-x-[calc(50%_+_2px)] data-[side=right]:translate-y-1/2",
-                        "data-[side=left]:-translate-y-[calc(50%_-_3px)]",
-                        arrowClasses,
-                    )}
-                    {...props}
-                ></div>
-            {/snippet}
-        </TooltipPrimitive.Arrow>
+        <TooltipPrimitive.Arrow
+            class="text-background-inverse"
+            width={icon ? 8 : 12}
+            height={icon ? 4 : 6}
+        />
     </TooltipPrimitive.Content>
 </TooltipPrimitive.Portal>

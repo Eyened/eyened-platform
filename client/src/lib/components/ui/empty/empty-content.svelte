@@ -11,10 +11,7 @@
 
 <div
     data-slot="empty-content"
-    class={cn(
-        "max-w-sm text-sm flex w-full min-w-0 flex-col items-center gap-4 text-balance",
-        className,
-    )}
+    class={cn("flex flex-col items-start gap-4", className)}
     {...restProps}
 >
     {@render children?.()}

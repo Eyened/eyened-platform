@@ -11,7 +11,7 @@
 
 <div
     data-slot="empty-title"
-    class={cn("text-lg font-medium tracking-tight", className)}
+    class={cn("text-heading-compact-02 text-text-primary", className)}
     {...restProps}
 >
     {@render children?.()}

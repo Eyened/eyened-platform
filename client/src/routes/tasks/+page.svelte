@@ -1,41 +1,35 @@
 <script lang="ts">
     import Main from "$lib/components/Main.svelte";
-    import * as Tooltip from "$lib/components/ui/tooltip";
-    import TasksTable from "$lib/tasks/TasksTable.svelte";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
+    import * as Table from "$lib/components/ui/table/index.js";
     import { fetchTasks } from "$lib/data/api";
+    import TasksTable from "$lib/tasks/TasksTable.svelte";
 
-    const loading = fetchTasks().catch((error) => {
-        console.error("Failed to fetch tasks:", error);
-        // Error is logged, but we don't redirect here since fetchWithAuthRetry
-        // already handles redirects for authentication errors
-        throw error;
-    });
+    const headingId = "tasks-heading";
+    const loading = fetchTasks();
 </script>
 
 <Main>
+    <!-- tabindex=-1: focus lands here after a delete -->
+    <h1
+        id={headingId}
+        tabindex="-1"
+        class="mt-8 mb-6 text-heading-04 text-text-primary"
+    >
+        Tasks
+    </h1>
     {#await loading}
-        <p>Loading tasks...</p>
-    {:then tasks}
-        <div style="display:flex; justify-content:center; padding: 40px;">
-            <div style="width: 100%; max-width: 1440px;">
-                <h2 class="text-2xl font-bold mb-6">Tasks</h2>
-                <Tooltip.Provider>
-                    <TasksTable rows={tasks} />
-                </Tooltip.Provider>
-            </div>
-        </div>
+        <Table.Skeleton
+            size="xl"
+            headers={["Task", "Status", "Creator", "Progress", ""]}
+            aria-labelledby={headingId}
+        />
+    {:then list}
+        <TasksTable rows={list} {headingId} />
     {:catch error}
-        <div style="display:flex; justify-content:center; padding: 40px;">
-            <div style="width: 100%; max-width: 1440px;">
-                <h2 class="text-2xl font-bold mb-6">Tasks</h2>
-                <p class="text-red-600">
-                    Failed to load tasks: {error.message}
-                </p>
-                <p class="text-sm text-gray-600 mt-2">
-                    If you were redirected to login, please log in and try
-                    again.
-                </p>
-            </div>
-        </div>
+        <InlineNotification
+            title="Tasks could not be loaded"
+            subtitle={error instanceof Error ? error.message : String(error)}
+        />
     {/await}
 </Main>

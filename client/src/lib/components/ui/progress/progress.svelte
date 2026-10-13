@@ -7,15 +7,18 @@
         class: className,
         max = 100,
         value,
+        indicatorClass,
         ...restProps
-    }: WithoutChildrenOrChild<ProgressPrimitive.RootProps> = $props();
+    }: WithoutChildrenOrChild<ProgressPrimitive.RootProps> & {
+        indicatorClass?: string;
+    } = $props();
 </script>
 
 <ProgressPrimitive.Root
     bind:ref
     data-slot="progress"
     class={cn(
-        "bg-primary/20 relative h-2 w-full overflow-hidden rounded-full",
+        "relative h-2 w-full min-w-12 overflow-hidden bg-border-subtle-00",
         className,
     )}
     {value}
@@ -24,7 +27,10 @@
 >
     <div
         data-slot="progress-indicator"
-        class="bg-primary h-full w-full flex-1 transition-all"
+        class={cn(
+            "h-full w-full bg-interactive transition-transform duration-110",
+            indicatorClass,
+        )}
         style="transform: translateX(-{100 -
             (100 * (value ?? 0)) / (max ?? 1)}%)"
     ></div>
