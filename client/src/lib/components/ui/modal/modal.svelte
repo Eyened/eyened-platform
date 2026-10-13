@@ -130,10 +130,9 @@
                 {/if}
                 <Dialog.Title id={headingId}>{modalHeading}</Dialog.Title>
             </Dialog.Header>
-            <fieldset
-                disabled={busy}
-                class="flex min-h-0 min-w-0 flex-1 flex-col"
-            >
+            <!-- contents: Chrome lays out fieldset children in an anonymous box that does not pass the
+                 form's flex height down, so a scrolling body would grow to its content. -->
+            <fieldset disabled={busy} class="contents">
                 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
                 <div
                     role={hasScrollingContent ? "region" : undefined}
