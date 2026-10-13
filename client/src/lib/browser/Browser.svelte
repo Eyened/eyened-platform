@@ -41,7 +41,6 @@
         initialConditions,
         initialSelectedIds,
     }: Props = $props();
-    // svelte-ignore state_referenced_locally
     const browserContext: BrowserContext = context ?? new BrowserContext();
     setContext("browserContext", browserContext);
 

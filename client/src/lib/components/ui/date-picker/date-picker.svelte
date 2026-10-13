@@ -33,8 +33,9 @@
     let field = $state<HTMLElement | null>(null);
     let calendar = $state<HTMLElement | null>(null);
     // Checked when the field changes (blur), not on every key.
-    let showInvalid = $state(false);
+    let checked = $state(false);
     const date = $derived(toDate(value));
+    const showInvalid = $derived(checked && value !== "" && !date);
     const errorId = $derived(`${id}-error`);
 
     function toDate(text: string): DateValue | undefined {
@@ -49,7 +50,6 @@
     function pick(picked: DateValue | undefined) {
         if (!picked) return;
         value = picked.toString();
-        showInvalid = false;
         open = false;
     }
 </script>
@@ -70,8 +70,8 @@
             aria-invalid={showInvalid || undefined}
             aria-describedby={showInvalid ? errorId : undefined}
             class="pe-12"
-            oninput={() => (showInvalid = false)}
-            onchange={() => (showInvalid = value !== "" && !date)}
+            oninput={() => (checked = false)}
+            onchange={() => (checked = true)}
         />
         <Popover.Root bind:open>
             <Popover.Trigger>
