@@ -38,6 +38,7 @@
         "@vitest/coverage-v8": "^4.1.10",
         "autoprefixer": "^10.4.21",
         "bits-ui": "^2.14.4",
+        "carbon-icons-svelte": "13.16.0",
         "eslint": "^10.7.0",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-svelte": "^3.20.0",

@@ -123,6 +123,7 @@
 
     /* Shapes: Carbon corners are square; shadow from @carbon/styles (g100) */
     --radius-*: initial;
+    --radius-checkbox: 2px;
     --shadow-*: initial;
     --shadow-popover: 0 2px 6px rgba(0, 0, 0, 0.8);
     --shadow-button-focus:
@@ -146,10 +147,20 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus ring for everything except buttons, which draw Carbon's button focus. */
-:focus-visible:not([data-slot="button"], [class*="shadow-button-focus"]) {
+/* Focus ring for everything except buttons, which draw Carbon's button focus, and checkboxes. */
+:focus-visible:not(
+        [data-slot="button"],
+        [data-slot="checkbox"],
+        [class*="shadow-button-focus"]
+    ) {
     outline: 2px solid var(--color-focus);
     outline-offset: -2px;
+}
+
+/* Carbon draws the checkbox ring outside the box; an outline-offset utility loses to the rule above. */
+[data-slot="checkbox"]:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
 }
 
 @layer base {
