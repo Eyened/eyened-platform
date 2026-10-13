@@ -18,7 +18,8 @@
     // One ConditionBuilder condition (ConditionBlock): a static "if"/"and", then property, operator
     // and value cells, each a button with its popover, then Delete and, on the last row, Add.
     // Values from @carbon/ibm-products-styles 2.95.0 _conditionBuilderItem.scss (button: 32 px,
-    // layer-01, hover layer-hover-01; property in heading-01; value truncated at 10 rem).
+    // layer-01, hover layer-hover-01; property in heading-01; value truncated at 10 rem). A long
+    // property truncates to fit the row; property and value show their full text in a tooltip.
     type Part = "property" | "operator" | "value";
 
     let {
@@ -192,8 +193,13 @@
     {@const label = text(part)}
     {@const incomplete = !!row.incomplete && missing === part}
     {@const tip =
-        label === "" && !incomplete ? ADD[part] : part === "value" ? label : ""}
-    <span role="gridcell">
+        label === "" && !incomplete
+            ? ADD[part]
+            : part === "operator"
+              ? ""
+              : label}
+    <!-- min-w-0 max-w-full: a long property shrinks to the parts' width, so its label truncates. -->
+    <span role="gridcell" class="max-w-full min-w-0">
         <Popover.Root
             bind:open={() => openPart === part, (open) => setOpen(part, open)}
         >
@@ -217,7 +223,7 @@
                                     class={cn(
                                         cellButton,
                                         part === "property" &&
-                                            "text-heading-compact-01",
+                                            "max-w-full text-heading-compact-01",
                                         part === "value" && "max-w-40",
                                     )}
                                 >
@@ -356,7 +362,7 @@
 <div
     role="row"
     aria-label="Condition row"
-    class="mb-0.5 flex basis-full items-start"
+    class="mb-0.5 flex min-w-0 basis-full items-start"
 >
     <!-- Static connector (__connector--disabled): the server ANDs every condition. -->
     <span
