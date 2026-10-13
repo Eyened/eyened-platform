@@ -88,7 +88,6 @@ export class GlobalContext {
         params.set("order", "ASC");
         params.set("queryMode", "studies");
         params.set("displayMode", "study");
-        params.set("filterMode", "advanced");
         return resolve(`/?${params.toString()}`);
     }
 
@@ -107,7 +106,6 @@ export class GlobalContext {
         params.set("order", "ASC");
         params.set("queryMode", "instances");
         params.set("displayMode", "instance");
-        params.set("filterMode", "advanced");
         return resolve(`/?${params.toString()}`);
     }
 

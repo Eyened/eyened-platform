@@ -18,7 +18,10 @@
         successDescription: string;
         errorTitle: string;
         danger?: boolean;
-        size?: "xs" | "sm";
+        size?: "xs" | "sm" | "lg";
+        /** Carbon React hasScrollingContent: the body scrolls with a fade and is a focusable
+         *  region; a server error sits above the footer, outside the scrolling body. */
+        hasScrollingContent?: boolean;
         /** Return false to stay idle (invalid input, nothing to save); reject to show the error. */
         onsubmit: () => false | Promise<unknown>;
         onCloseAutoFocus?: (event: Event) => void;
@@ -36,10 +39,14 @@
         errorTitle,
         danger = false,
         size = "sm",
+        hasScrollingContent = false,
         onsubmit,
         onCloseAutoFocus,
         children,
     }: Props = $props();
+
+    const uid = $props.id();
+    const headingId = `${uid}-heading`;
 
     const SUCCESS_MS = 1500; // Carbon InlineLoading: the finished state shows for 1.5 s
     const footerButton = "h-16 max-w-none basis-1/2 items-start pt-3.5 pb-8";
@@ -61,8 +68,15 @@
         if (!open) error = null;
     });
 
+    // The success close outlives a submit; an unmount mid-wait must not fire it.
+    let closeTimer: ReturnType<typeof setTimeout> | undefined;
+    $effect(() => () => clearTimeout(closeTimer));
+
     async function submit(event: SubmitEvent) {
         event.preventDefault();
+        // Only this form's own primary button (or Enter in a field, whose submitter is the primary) saves.
+        if (event.target !== event.currentTarget) return;
+        if (event.submitter && event.submitter !== primary) return;
         if (busy) return;
         const pending = onsubmit();
         if (pending === false) return;
@@ -78,7 +92,7 @@
             return;
         }
         status = "finished";
-        setTimeout(() => {
+        closeTimer = setTimeout(() => {
             status = "inactive";
             setOpen(false);
         }, SUCCESS_MS);
@@ -89,10 +103,13 @@
     <Dialog.Content
         class={cn(
             "gap-0 p-0",
-            // Carbon modal/_modal.scss: xs 48% / 32% / 24%, sm 60% / 42% / 36% at md / lg / xlg.
+            // Carbon modal/_modal.scss at md / lg / xlg: xs 48% / 32% / 24%, sm 60% / 42% / 36%,
+            // lg 96% / 84% / 72% (max height 90% at md from ui/dialog, 96% from lg).
             size === "xs"
                 ? "md:w-12/25 lg:max-h-12/25 lg:w-8/25 xlg:w-6/25"
-                : "md:w-3/5 lg:max-h-18/25 lg:w-21/50 xlg:w-9/25",
+                : size === "lg"
+                  ? "md:w-24/25 lg:max-h-24/25 lg:w-21/25 xlg:w-18/25"
+                  : "md:w-3/5 lg:max-h-18/25 lg:w-21/50 xlg:w-9/25",
         )}
         interactOutsideBehavior="ignore"
         onOpenAutoFocus={(e) => {
@@ -111,19 +128,39 @@
                         {modalLabel}
                     </p>
                 {/if}
-                <Dialog.Title>{modalHeading}</Dialog.Title>
+                <Dialog.Title id={headingId}>{modalHeading}</Dialog.Title>
             </Dialog.Header>
-            <fieldset
-                disabled={busy}
-                class="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 pt-2 pb-12 text-body-01 text-text-primary"
-            >
-                {@render children()}
-                {#if error}
-                    <InlineNotification
-                        class="mt-6"
-                        title={errorTitle}
-                        subtitle={error}
-                    />
+            <!-- contents: Chrome lays out fieldset children in an anonymous box that does not pass the
+                 form's flex height down, so a scrolling body would grow to its content. -->
+            <fieldset disabled={busy} class="contents">
+                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                <div
+                    role={hasScrollingContent ? "region" : undefined}
+                    aria-labelledby={hasScrollingContent
+                        ? headingId
+                        : undefined}
+                    tabindex={hasScrollingContent ? 0 : undefined}
+                    class={cn(
+                        "min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-12 text-body-01 text-text-primary",
+                        hasScrollingContent && "modal-scroll-fade *:last:mb-6",
+                    )}
+                >
+                    {@render children()}
+                    {#if error && !hasScrollingContent}
+                        <InlineNotification
+                            class="mt-6"
+                            title={errorTitle}
+                            subtitle={error}
+                        />
+                    {/if}
+                </div>
+                {#if error && hasScrollingContent}
+                    <div class="px-4 pb-4">
+                        <InlineNotification
+                            title={errorTitle}
+                            subtitle={error}
+                        />
+                    </div>
                 {/if}
             </fieldset>
             <div class="flex h-16">

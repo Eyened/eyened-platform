@@ -11,9 +11,6 @@
 
 <CalendarPrimitive.Header
     bind:ref
-    class={cn(
-        "text-sm font-medium flex h-(--cell-size) w-full items-center justify-center gap-1.5",
-        className,
-    )}
+    class={cn("flex h-10 items-center justify-between", className)}
     {...restProps}
 />

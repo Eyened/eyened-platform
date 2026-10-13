@@ -6,6 +6,7 @@
         "type" | "value" | "files"
     > & {
         labelText: string;
+        hideLabel?: boolean;
         invalidText?: string;
         id?: string;
         value?: string;
@@ -24,6 +25,7 @@
     const uid = $props.id(); // $props.id() is not allowed as a destructuring default
     let {
         labelText,
+        hideLabel = false,
         invalidText,
         id = uid,
         value = $bindable(""),
@@ -42,7 +44,9 @@
 </script>
 
 <Field.Field class={className}>
-    <Field.Label for={id}>{labelText}</Field.Label>
+    <Field.Label for={id} class={hideLabel ? "sr-only" : undefined}
+        >{labelText}</Field.Label
+    >
     <div class="relative">
         <Input
             {...restProps}

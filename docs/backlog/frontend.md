@@ -87,3 +87,58 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** client Carbon PR 2 (`ui/carbon-2-tasks`, #267), 2026-10-12
 - **Problem:** `client/src/lib/components/TopMenu.svelte` shows its links inline at every width. Carbon's UI shell moves header links into a hamburger side nav below the `lg` breakpoint (66rem); `client/DESIGN.md` records this as the `Header nav` deviation ("Few items; no side nav yet").
 - **Fix:** add a Carbon side nav (hamburger `HeaderMenuButton` + `SideNav`) shown below `lg:`, hide the inline links there, then delete the `Header nav` deviation row.
+
+### One date format across the client
+- **Status:** open
+- **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) review, 2026-10-13
+- **Problem:** the date picker types and shows ISO yyyy-mm-dd (P4 spec decision D8: the stored format, unambiguous in Dutch and English). A dd-mm-yyyy input was requested as more intuitive, but the client already shows dates in mixed formats: ISO in `browser/StudyBlock.svelte` (study header), `viewer-window/panelVisits/PanelVisits.svelte` and the `browser/dataSources.ts` results; "3 Oct 2026" in `lib/utils.ts` (en-GB); "Oct 3, 2026" in `viewer-window/panelForm/FormItem.svelte` (en-US); the browser locale in `viewer-window/panelForm/FormItemContent.svelte`.
+- **Fix:** pick one display/input format: fixed dd-mm-yyyy, `Intl` locale-based, or unambiguous "13 Oct 2026" with lenient input. Amend D8 first. Keep ISO on the wire and in URLs; change only display and input. Show the format as visible helper text (Carbon date picker guidance), not only as a placeholder.
+- **Note:** about 5-8 files, plus the tests `StudyBlock.test.ts`, `PanelVisits.test.ts` and `patientStudies.test.ts`.
+
+### Rank exact property matches first in the ConditionBuilder search
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** typing "Study Date" in the property search lists "Study Tag Name" first; `ui/command` (bits-ui Command) scores with its default fuzzy filter.
+- **Fix:** pass a custom `filter` that ranks exact, then prefix matches above fuzzy ones.
+
+### Drop a stale search response after a Studies/Images switch
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** `resetForQueryModeChange` in `client/src/lib/browser/browserContext.svelte.ts` does not bump `searchSeq`, so an in-flight Studies response can be processed as Images. When the switch removes every condition no new search starts, so that response lands as Images and `loading` stays true until it does.
+- **Fix:** `this.searchSeq++` in the reset.
+
+### Skip the hover background on disabled calendar days
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** `client/src/lib/components/ui/calendar/calendar-day.svelte` applies `hover:bg-layer-hover-01` to disabled days too.
+- **Fix:** apply the hover background only to enabled days.
+
+### Round-trip a comma inside an "is one of" value
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** the value parser in `client/src/lib/browser/conditionConfig.ts` splits "is one of" text on commas and `condition-row.svelte` joins list values with ", ", so `["a,b"]` comes back as `["a","b"]`. Inherited v1 encoding.
+- **Fix:** an escape or quoting rule for commas in the text, or a multi-value input instead of comma-separated text.
+
+### Announce Delete condition once
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** in `client/src/lib/components/ui/condition-builder/condition-row.svelte` the gridcell and its button both carry `aria-label="Delete condition"`, so it is read twice. Matches the IBM ConditionBuilder source.
+- **Fix:** label only the button.
+
+### Contain focus in the open filter overlay below lg
+- **Status:** open
+- **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) Task 3 review, 2026-10-13
+- **Problem:** below `lg` the open filter column in `client/src/lib/browser/Browser.svelte` is a 20rem `max-lg:absolute` overlay. Tab from its last button moves into the results it covers, so the focused element is hidden (WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)). Clicking outside does not close it.
+- **Fix:** trap focus in the overlay while open, or move it into a Carbon side-panel pattern; close on outside click.
+
+### Find the cause of the intermittent `npm run test` error
+- **Status:** open
+- **Source:** client Carbon PR 4 Task 3 review, 2026-10-13
+- **Problem:** `npm run test` (client) intermittently reports "Errors 1 error" (or 2) with all 401 tests passing; it exited 0 in some runs and 1 in others. It predates the filter-column change. Captured: `ReferenceError: document is not defined` in `bits-ui/dist/internal/body-scroll-lock.svelte.js:34` (`resetBodyStyle`, from a `setTimeout` cleanup), attributed to `ui/modal/modal.test.ts` and `tasks/SubtasksTable.test.ts`: the timer fires after the jsdom environment is torn down.
+- **Fix:** await or flush the modal's scroll-lock cleanup (or unmount) before each of those tests ends; confirm with repeated runs.
+
+### Show portalled menus above the viewer overlay panel
+- **Status:** open
+- **Source:** client Carbon PR 4 demo, 2026-10-13
+- **Problem:** in the viewer overlay, condition-builder popovers (and other portalled menus, such as the picker's menus noted in PR 3) render behind `div#panel` (`position: fixed; z-index: 1000` in `client/src/lib/viewer-window/TopRowImages.svelte:121-123`), because portal content uses `z-50` (`client/src/lib/components/ui/popover/popover-content.svelte:24`). Pointer clicks can't reach them; the keyboard still works. It predates the filter-column change.
+- **Fix:** one shared layer order for overlays and portalled menus.

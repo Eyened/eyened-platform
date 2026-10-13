@@ -29,8 +29,8 @@
         onedit: (subtask: SubTaskWithImagesGET, button: HTMLElement) => void;
         /** A row action failed; the page shows it and refreshes. */
         onerror: (title: string, subtitle?: string) => void;
-        /** A claim or unclaim succeeded; the page refreshes. */
-        onchange: () => void;
+        /** A claim, unclaim or image save finished (or a save failed); the page refreshes. */
+        onchange: () => void | Promise<void>;
     };
     let {
         subtask: row,
@@ -109,6 +109,8 @@
         }
     }
 
+    // Success or failure, the row is refreshed, so the next save starts from what was saved. On
+    // failure the picker stays open with the error and the selection (R1).
     async function confirmImages(selectedIds: string[]) {
         const initial = currentImageIds;
         const added = selectedIds.filter((id) => !initial.includes(id));
@@ -120,24 +122,20 @@
             for (const id of added) {
                 await addSubTaskImage(row.id, id);
             }
+            await onchange();
         } catch (e) {
+            await onchange();
             if (e instanceof ApiError && isOutOfDeclaration(e)) {
-                // The loop above stops at the first refusal, so whatever ran before it is
-                // already saved. Say so, or the grader re-submits and double-adds those.
-                onerror(
-                    e.detail.message,
-                    `Image project ${e.detail.image_projects.join(", ")}; ` +
+                // The loop stops at the first refusal, so whatever ran before it is already saved.
+                throw new Error(
+                    `${e.detail.message} ` +
+                        `Image project ${e.detail.image_projects.join(", ")}; ` +
                         `task declares ${e.detail.declared_projects.join(", ")}. ` +
                         `Earlier changes were saved; the rest were not applied.`,
-                );
-            } else {
-                onerror(
-                    `Images for set ${row.index} could not be saved`,
-                    message(e),
+                    { cause: e }, // eslint preserve-caught-error
                 );
             }
-        } finally {
-            showPicker = false;
+            throw e;
         }
     }
 </script>
@@ -242,11 +240,11 @@
 
 {#if showPicker}
     <BrowserPicker
+        bind:open={showPicker}
         initialConditions={pickerConditions}
         initialSelectedIds={currentImageIds}
         onConfirm={confirmImages}
-        onCancel={() => (showPicker = false)}
-        confirmLabel="Save images"
-        title={`Select images for set ${row.index}`}
+        modalLabel="Set {row.index}"
+        errorTitle="Images for set {row.index} could not be saved"
     />
 {/if}

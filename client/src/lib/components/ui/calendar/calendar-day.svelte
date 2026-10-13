@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { buttonVariants } from "$lib/components/ui/button/index.js";
     import { cn } from "$lib/utils.js";
     import { Calendar as CalendarPrimitive } from "bits-ui";
 
@@ -10,25 +9,17 @@
     }: CalendarPrimitive.DayProps = $props();
 </script>
 
+<!-- Carbon .flatpickr-day: 40 px; today in link-primary at 600 with a 4 px dot; selected button-primary.
+     The focus ring colours are unlayered rules in app.css (data-slot="calendar-day"). -->
 <CalendarPrimitive.Day
     bind:ref
+    data-slot="calendar-day"
     class={cn(
-        buttonVariants({ variant: "ghost" }),
-        "font-normal flex size-(--cell-size) flex-col items-center justify-center gap-1 p-0 leading-none whitespace-nowrap select-none",
-        "[&[data-today]:not([data-selected])]:bg-accent [&[data-today]:not([data-selected])]:text-accent-foreground [&[data-today][data-disabled]]:text-muted-foreground",
-        "data-[selected]:bg-primary data-[selected]:text-primary-foreground dark:data-[selected]:hover:bg-accent/50",
-        // Outside months
-        "[&[data-outside-month]:not([data-selected])]:text-muted-foreground [&[data-outside-month]:not([data-selected])]:hover:text-accent-foreground",
-        // Disabled
-        "data-[disabled]:text-muted-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        // Unavailable
-        "data-[unavailable]:text-muted-foreground data-[unavailable]:line-through",
-        // hover
-        "dark:hover:text-accent-foreground",
-        // focus
-        "focus:border-ring focus:ring-ring/50 focus:relative",
-        // inner spans
-        "[&>span]:text-xs [&>span]:opacity-70",
+        "relative flex size-10 cursor-pointer items-center justify-center text-body-compact-01 text-text-primary select-none hover:bg-layer-hover-01",
+        "data-outside-month:text-text-helper",
+        "data-today:text-heading-compact-01 data-today:not-data-selected:text-link-primary data-today:after:absolute data-today:after:bottom-1.75 data-today:after:left-1/2 data-today:after:size-1 data-today:after:-translate-x-1/2 data-today:after:bg-link-primary",
+        "data-selected:bg-button-primary data-selected:text-text-on-color data-selected:after:hidden",
+        "data-disabled:cursor-not-allowed data-disabled:text-text-disabled data-unavailable:text-text-disabled data-unavailable:line-through",
         className,
     )}
     {...restProps}

@@ -2,7 +2,8 @@
     import { Label } from "$lib/components/ui/label/index.js";
     import * as Select from "$lib/components/ui/select/index.js";
 
-    // Carbon Dropdown (carbon-components-svelte prop names) over ui/select, size lg.
+    // Carbon Dropdown (carbon-components-svelte prop names) over ui/select, size lg (48 px) or md (40 px);
+    // menu items match the field height and the menu shows 5.5 items (@carbon/styles 1.117.0 list-box).
     // `onselect` fires only when the user picks a different item.
     const uid = $props.id(); // $props.id() is not allowed as a destructuring default
     let {
@@ -10,6 +11,7 @@
         selectedId = $bindable(),
         labelText,
         type = "default",
+        size = "lg",
         id = uid,
         onselect,
     }: {
@@ -17,6 +19,7 @@
         selectedId?: string;
         labelText: string;
         type?: "default" | "inline";
+        size?: "md" | "lg";
         id?: string;
         onselect?: (selectedId: string) => void;
     } = $props();
@@ -51,12 +54,24 @@
         }
     >
         <!-- label then trigger, so the name includes the selected value: "Status Not started" -->
-        <Select.Trigger {id} aria-labelledby="{id}-label {id}" variant={type}>
+        <Select.Trigger
+            {id}
+            aria-labelledby="{id}-label {id}"
+            variant={type}
+            class={size === "md" ? "h-10" : undefined}
+        >
             {selectedText}
         </Select.Trigger>
-        <Select.Content variant={type}>
+        <Select.Content
+            variant={type}
+            class={size === "md" ? "max-h-55" : undefined}
+        >
             {#each items as item (item.id)}
-                <Select.Item value={item.id} label={item.text} />
+                <Select.Item
+                    value={item.id}
+                    label={item.text}
+                    class={size === "md" ? "h-10" : undefined}
+                />
             {/each}
         </Select.Content>
     </Select.Root>

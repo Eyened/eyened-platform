@@ -13,7 +13,10 @@
     bind:ref
     data-slot="command-item"
     class={cn(
-        "rounded-sm text-sm aria-selected:bg-accent aria-selected:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 px-2 py-1.5 outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        // ConditionBuilder option (_conditionBuilderItem.scss .item-option__option): 32 px minimum, hover
+        // layer-hover; bits-ui's highlighted option (data-selected) gets the focus outline; a chosen
+        // option (aria-checked) is layer-selected.
+        "relative flex min-h-8 cursor-pointer items-center gap-2 px-4 text-body-01 text-text-primary select-none hover:bg-layer-hover-01 aria-checked:bg-layer-selected-01 aria-checked:hover:bg-layer-selected-hover-01 data-disabled:cursor-not-allowed data-disabled:text-text-disabled data-selected:outline-2 data-selected:-outline-offset-2 data-selected:outline-focus in-dialog:hover:bg-layer-hover-02 in-dialog:aria-checked:bg-layer-selected-02 in-dialog:aria-checked:hover:bg-layer-selected-hover-02 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
     )}
     {...restProps}

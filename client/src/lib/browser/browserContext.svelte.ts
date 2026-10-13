@@ -17,16 +17,120 @@ import type {
     StudySearchCondition,
     StudySearchQuery,
 } from "../../types/openapi_types";
+import type { BuilderRow } from "$lib/components/ui/condition-builder/types.js";
+import {
+    acceptsRow,
+    conditionsToRows,
+    isIsoDate,
+    labelFor,
+    rowsToConditions,
+} from "./conditionConfig";
 
 export type QueryMode = "studies" | "instances";
 export type DisplayMode = "instance" | "study";
-export type FilterMode = "basic" | "advanced";
 
 export type Condition = SearchConditionT;
 export type SignatureField = SignatureFieldT;
 export type InstancesSortBy = SearchQuery["order_by"];
 export type StudiesSortBy = StudySearchQuery["order_by"];
 export type SortDirection = "ASC" | "DESC";
+export type SortBy = InstancesSortBy | StudiesSortBy;
+
+/** The search form's one notification; the latest replaces the previous. */
+export type SearchNotification = {
+    kind: "error" | "warning";
+    title: string;
+    subtitle: string;
+};
+
+/** The quick fields; each filled field is a condition, ANDed with the builder rows. */
+export type BasicFields = {
+    patientIdentifier: string;
+    studyDate: string;
+    projectName: string;
+};
+
+/** The columns both modes sort by. */
+export const SORT_COLUMNS: SortBy[] = [
+    "Study Date",
+    "Patient Birthdate",
+    "Date Inserted",
+];
+
+const EMPTY_BASIC: BasicFields = {
+    patientIdentifier: "",
+    studyDate: "",
+    projectName: "",
+};
+
+type SearchResult = {
+    result_ids?: (string | number)[];
+    count?: number | null;
+    studies?: { id: number }[];
+};
+
+function basicConditions(basic: BasicFields): Condition[] {
+    const conditions: Condition[] = [];
+    const id = basic.patientIdentifier.trim();
+    if (id)
+        conditions.push({
+            type: "default",
+            variable: "Patient Identifier",
+            operator: "==",
+            value: id,
+        });
+    if (isIsoDate(basic.studyDate))
+        conditions.push({
+            type: "default",
+            variable: "Study Date",
+            operator: "==",
+            value: basic.studyDate,
+        });
+    if (basic.projectName)
+        conditions.push({
+            type: "default",
+            variable: "Project Name",
+            operator: "IN",
+            value: [basic.projectName],
+        });
+    return conditions;
+}
+
+// A condition fills a quick field only if it fits it exactly; the first fit wins, the rest become rows.
+function splitConditions(conditions: Condition[]): {
+    basic: BasicFields;
+    rest: Condition[];
+} {
+    const basic = { ...EMPTY_BASIC };
+    const rest: Condition[] = [];
+    for (const c of conditions) {
+        const text = typeof c.value === "string" ? c.value : "";
+        if (
+            !basic.patientIdentifier &&
+            c.variable === "Patient Identifier" &&
+            c.operator === "==" &&
+            text.trim()
+        )
+            basic.patientIdentifier = text;
+        else if (
+            !basic.studyDate &&
+            c.variable === "Study Date" &&
+            c.operator === "==" &&
+            isIsoDate(text)
+        )
+            basic.studyDate = text;
+        else if (
+            !basic.projectName &&
+            c.variable === "Project Name" &&
+            c.operator === "IN" &&
+            Array.isArray(c.value) &&
+            c.value.length === 1
+        )
+            basic.projectName = String(c.value[0]);
+        else rest.push(c);
+    }
+    return { basic, rest };
+}
 
 export class BrowserContext {
     // Default smallest per current mode
@@ -43,7 +147,6 @@ export class BrowserContext {
     queryMode: QueryMode = $state("studies");
     displayMode: DisplayMode = $state("study");
     loading: boolean = $state(false);
-    filterMode: FilterMode = $state("basic");
 
     // When false, searches/pagination will not push state to the URL.
     // Used when the browser is embedded as a widget (e.g. overlays).
@@ -52,20 +155,25 @@ export class BrowserContext {
     page: number = $state(0);
     limit: number = $state(10);
     count: number = $state(0);
-    sortBy: InstancesSortBy | StudiesSortBy = $state("Study Date");
+    sortBy: SortBy = $state("Study Date");
     sortDirection: SortDirection = $state("ASC");
-
-    resultIds: Set<number> = $state(new Set());
 
     // NEW: ordered arrays for rendering
     orderedInstanceIds: string[] = $state([]);
     orderedStudyIds: number[] = $state([]);
 
-    // renamed
-    advancedConditions: Condition[] = $state([]);
+    /** Condition builder rows, ANDed with the quick fields (`basic`). */
+    advancedRows: BuilderRow[] = $state([]);
+    basic: BasicFields = $state({ ...EMPTY_BASIC });
+    notification: SearchNotification | null = $state(null);
+    /** A search ran since the page opened, or since the Studies/Images switch cleared the results. */
+    hasSearched: boolean = $state(false);
+    /** The last search failed: no results and no count. */
+    failed: boolean = $state(false);
+    signaturesLoaded: boolean = $state(false);
 
-    // new
-    basicCondition: Condition | null = $state(null);
+    // Only the latest search's response is applied (B12).
+    private searchSeq = 0;
 
     // Signature state for dynamic filters
     instancesSignature: SignatureField[] = $state([]);
@@ -78,6 +186,23 @@ export class BrowserContext {
         this.queryMode === "instances"
             ? this.instancesSignature
             : this.studiesSignature,
+    );
+
+    limitOptions: number[] = $derived(
+        this.queryMode === "instances" && this.displayMode === "instance"
+            ? this.limitOptionsInstances
+            : this.limitOptionsStudies,
+    );
+
+    /** The quick fields' and the builder's complete conditions, ANDed; incomplete rows are left out. */
+    activeConditions: Condition[] = $derived([
+        ...basicConditions(this.basic),
+        ...rowsToConditions(this.advancedRows, this.activeSignature),
+    ]);
+
+    /** Search needs the search fields and at least one complete condition (B9). */
+    canSearch: boolean = $derived(
+        this.signaturesLoaded && this.activeConditions.length > 0,
     );
 
     private getInstance(id: string): ImageGET | undefined {
@@ -104,165 +229,10 @@ export class BrowserContext {
             .filter((x): x is StudyGET => x !== undefined),
     );
 
-    toggleFilterMode() {
-        this.filterMode = this.filterMode === "basic" ? "advanced" : "basic";
-    }
-
     // Helper to get allowed values (returns [] if type marker)
     getValueOptions(fieldName: string): string[] {
         const f = this.activeSignature.find((s) => s.name === fieldName);
         return Array.isArray(f?.values) ? (f!.values as string[]) : [];
-    }
-
-    // Get signature field by variable name (handles attribute encoding)
-    private getFieldSignature(fieldValue: string): SignatureField | undefined {
-        if (fieldValue.includes("__")) {
-            const parts = fieldValue.split("__");
-            if (parts.length === 3) {
-                const [model, feature, name] = parts;
-                return this.activeSignature.find(
-                    (s) =>
-                        s.name === name &&
-                        s.model === model &&
-                        (feature === "none"
-                            ? !s.feature
-                            : s.feature === feature),
-                );
-            }
-        }
-        return this.activeSignature.find((s) => s.name === fieldValue);
-    }
-
-    // Get operator options for a field based on its signature
-    private getOperatorOptions(fieldName: string): Condition["operator"][] {
-        const sig = this.getFieldSignature(fieldName);
-        if (!sig) return [];
-
-        const ops: Condition["operator"][] = [];
-
-        if (Array.isArray(sig.values)) {
-            ops.push("IN");
-        } else {
-            switch (sig.values) {
-                case "string":
-                    ops.push("==");
-                    // Free-text fields flagged as multi (e.g. Patient Identifier)
-                    // additionally support matching several values at once.
-                    if ((sig as any).multi) ops.push("IN");
-                    break;
-                case "int":
-                case "float":
-                case "date":
-                    ops.push(">", "<", "==");
-                    break;
-                default:
-                    ops.push("==");
-            }
-        }
-
-        if ((sig as any).nullable) {
-            ops.push("IS NULL" as Condition["operator"]);
-        }
-
-        return ops;
-    }
-
-    // Get default operator for a field
-    private getDefaultOperator(fieldName: string): Condition["operator"] {
-        const sig = this.getFieldSignature(fieldName);
-        if (!sig) return "==";
-        return Array.isArray(sig.values) ? "IN" : "==";
-    }
-
-    // Coerce value based on field type
-    private coerceValue(
-        value: any,
-        fieldType: string | string[],
-    ): Condition["value"] {
-        if (Array.isArray(fieldType)) {
-            if (Array.isArray(value)) {
-                return value.map(String);
-            }
-            if (value == null || value === "") {
-                return [];
-            }
-            return [String(value)];
-        }
-
-        switch (fieldType) {
-            case "int":
-                return typeof value === "string"
-                    ? parseInt(value, 10) || 0
-                    : value;
-            case "float":
-                return typeof value === "string"
-                    ? parseFloat(value) || 0
-                    : value;
-            case "date":
-            case "string":
-            default:
-                return value;
-        }
-    }
-
-    // Normalize a single condition against current signature
-    private normalizeCondition(condition: Condition): Condition | null {
-        const sig = this.getFieldSignature(condition.variable);
-        if (!sig) return null; // Drop unknown fields
-
-        const allowedOps = this.getOperatorOptions(condition.variable);
-        const operator = allowedOps.includes(condition.operator)
-            ? condition.operator
-            : this.getDefaultOperator(condition.variable);
-
-        let value = condition.value;
-        if (operator !== "IS NULL") {
-            value = this.coerceValue(condition.value, sig.values);
-            // IN always operates on a list of values, even for free-text fields
-            // whose signature type is a scalar (e.g. Patient Identifier).
-            if (operator === "IN" && !Array.isArray(value)) {
-                value = value == null || value === "" ? [] : [String(value)];
-            }
-        }
-
-        if ((condition as any).type === "attribute") {
-            return {
-                type: "attribute",
-                model: (condition as any).model || "",
-                variable: condition.variable as any,
-                operator: operator as any,
-                value,
-                feature: (condition as any).feature ?? undefined,
-            } as any;
-        } else {
-            return {
-                type: "default",
-                variable: condition.variable as any,
-                operator: operator as any,
-                value,
-            } as any;
-        }
-    }
-
-    // Normalize conditions array against current signature (public for use in components)
-    normalizeConditions(conditions: Condition[]): Condition[] {
-        return conditions
-            .map((c) => this.normalizeCondition(c))
-            .filter((c): c is Condition => c !== null);
-    }
-
-    // Set advanced conditions with normalization
-    setAdvancedConditions(conditions: Condition[]) {
-        this.advancedConditions = this.normalizeConditions(conditions);
-    }
-
-    /** Active filter conditions for the current filter mode. */
-    getActiveConditions(): Condition[] {
-        return this.filterMode === "advanced"
-            ? this.advancedConditions
-            : this.basicCondition
-              ? [this.basicCondition]
-              : [];
     }
 
     private async loadSignatureFields() {
@@ -275,85 +245,135 @@ export class BrowserContext {
     }
 
     async loadSignatures() {
-        this.loading = true;
         try {
             await this.loadSignatureFields();
-        } finally {
-            this.loading = false;
+            this.signaturesLoaded = true;
+        } catch {
+            this.notification = {
+                kind: "error",
+                title: "Could not load search fields",
+                subtitle: "Reload the page to try again.",
+            };
         }
+    }
+
+    /** Restore state from the URL; true when the filters have conditions. */
+    restoreFromParams(params: URLSearchParams): boolean {
+        const qm = params.get("queryMode");
+        if (qm === "instances" || qm === "studies") this.queryMode = qm;
+        const dm = params.get("displayMode");
+        if (dm === "instance" || dm === "study") this.displayMode = dm;
+        const sortBy = SORT_COLUMNS.find((c) => c === params.get("order_by"));
+        if (sortBy) this.sortBy = sortBy;
+        const order = params.get("order");
+        if (order === "ASC" || order === "DESC") this.sortDirection = order;
+        const limit = Number(params.get("limit"));
+        this.limit = this.limitOptions.includes(limit)
+            ? limit
+            : this.getDefaultLimit();
+        const page = params.get("page") ?? "";
+        this.page = /^\d+$/.test(page) ? Number(page) : 0;
+
+        // No conditions param (the header's Browser link): keep the form.
+        if (params.has("conditions"))
+            this.setFilters(decodeConditions(params.get("conditions") ?? ""));
+        return this.activeConditions.length > 0;
+    }
+
+    /** Studies/Images: keeps the selection, the sort and the conditions the new mode accepts (B2, B13). */
+    async resetForQueryModeChange(queryMode: QueryMode) {
+        const searchAgain = this.hasSearched;
+        const from = this.activeSignature;
+        this.queryMode = queryMode;
+        this.displayMode = queryMode === "instances" ? "instance" : "study";
+        this.page = 0;
+        this.limit = this.getDefaultLimit();
+        this.clearResults();
+        this.failed = false;
+        this.hasSearched = false;
+
+        const removed = this.advancedRows.filter(
+            (r) => !acceptsRow(r, this.activeSignature),
+        );
+        if (removed.length > 0) {
+            this.advancedRows = this.advancedRows.filter(
+                (r) => !removed.includes(r),
+            );
+            const labels = removed
+                .map((r) => labelFor(r.property ?? "", from))
+                .filter((l, i, all) => all.indexOf(l) === i);
+            this.notification = {
+                kind: "warning",
+                title: "Conditions removed",
+                subtitle: `${queryMode === "instances" ? "Images" : "Studies"} can't use ${labels.join(", ")}.`,
+            };
+        }
+        if (searchAgain && this.activeConditions.length > 0)
+            await this.runSearch();
+    }
+
+    /** Empties both filter groups, the notification and the results (B9); the selection stays. */
+    clearFilters() {
+        this.basic = { ...EMPTY_BASIC };
+        this.advancedRows = [];
+        this.notification = null;
+        this.searchSeq++; // drop a search still in flight
+        this.loading = false;
+        this.failed = false;
+        this.hasSearched = false;
+        this.clearResults();
+        this.updateURL([]);
+    }
+
+    /** Search the current page (pagination, URL restore, a widget's seed). */
+    async search() {
+        return this.runSearch();
+    }
+
+    /** The Search button and Enter: always page 1 (B11). */
+    async submitSearch() {
+        this.page = 0;
+        return this.runSearch();
+    }
+
+    // Sort, page and page size apply at once, but only once a search has run (B5).
+    async setPage(page: number) {
+        this.page = page;
+        if (this.hasSearched) await this.runSearch();
+    }
+
+    async setPageSize(limit: number) {
+        this.limit = limit;
+        this.page = 0;
+        if (this.hasSearched) await this.runSearch();
+    }
+
+    async setSort(by: SortBy, direction: SortDirection) {
+        this.sortBy = by;
+        this.sortDirection = direction;
+        this.page = 0;
+        if (this.hasSearched) await this.runSearch();
+    }
+
+    // Seed state for an embedded/widget usage (no URL involved).
+    applyInitialConditions(
+        conds: Condition[],
+        opts: { queryMode?: QueryMode; displayMode?: DisplayMode } = {},
+    ) {
+        if (opts.queryMode) this.queryMode = opts.queryMode;
+        if (opts.displayMode) this.displayMode = opts.displayMode;
+        this.setFilters(conds);
+    }
+
+    private setFilters(conditions: Condition[]) {
+        const { basic, rest } = splitConditions(conditions);
+        this.basic = basic;
+        this.advancedRows = conditionsToRows(rest, this.activeSignature);
     }
 
     // Refresh signatures (e.g., after creating/modifying tags)
     async refreshSignatures() {
         return this.loadSignatureFields();
-    }
-
-    // Reset state when queryMode changes
-    async resetForQueryModeChange(queryMode: QueryMode) {
-        const currentConditions = this.getActiveConditions();
-
-        this.page = 0;
-        this.limit = this.getDefaultLimit();
-        this.count = 0;
-
-        this.sortBy = "Study Date";
-        this.sortDirection = "ASC";
-
-        this.resultIds = new Set();
-        this.orderedInstanceIds = [];
-        this.orderedStudyIds = [];
-        this.selectedIds = [];
-
-        if (queryMode == "instances") {
-            this.displayMode = "instance";
-            this.limit = this.limitOptionsInstances[0];
-        } else {
-            this.displayMode = "study";
-            this.limit = this.limitOptionsStudies[0];
-        }
-
-        // Auto-search with previous conditions if we had any
-        if (currentConditions.length > 0) {
-            await this.runSearch({ conditions: currentConditions });
-        }
-    }
-
-    /** Run search using the current filter conditions (pagination, Search button, etc.). */
-    async search() {
-        return this.runSearch();
-    }
-
-    // Seed state for an embedded/widget usage (no URL involved).
-    // Normalizes the conditions against the loaded signature and stores them
-    // in the active filter slot so a subsequent search() picks them up.
-    applyInitialConditions(
-        conds: Condition[],
-        opts: {
-            queryMode?: QueryMode;
-            displayMode?: DisplayMode;
-            filterMode?: FilterMode;
-        } = {},
-    ) {
-        if (opts.queryMode) this.queryMode = opts.queryMode;
-        if (opts.displayMode) this.displayMode = opts.displayMode;
-        this.filterMode = opts.filterMode ?? "advanced";
-
-        const normalized = this.normalizeConditions(conds ?? []);
-        if (this.filterMode === "advanced") {
-            this.advancedConditions = normalized;
-        } else {
-            this.basicCondition = normalized[0] ?? null;
-        }
-    }
-
-    // Method to load conditions from external source (like URL)
-    loadConditions(conds: Condition[]) {
-        // Preserve legacy callers; default these into advanced
-        // Normalize conditions when loading from external source
-        this.advancedConditions = this.normalizeConditions(conds ?? []);
-        // If it looks like a single basic condition, also set basic
-        this.basicCondition =
-            conds?.length === 1 ? conds[0] : this.basicCondition;
     }
 
     toggleInstance(instance: ImageGET) {
@@ -365,74 +385,76 @@ export class BrowserContext {
         }
     }
 
-    /** Search with explicit conditions (e.g. URL restore, overlay patient search). */
-    async fetch(query: Condition[], updateUrl: boolean = true) {
-        return this.runSearch({ conditions: query, updateUrl });
+    openTab(imageIds: string[]) {
+        const suffix_string = `?instances=${imageIds.join(",")}`;
+        const url = `${window.location.origin}/view${suffix_string}`;
+        window.open(url, "_blank")?.focus();
     }
 
-    private async runSearch(
-        options: {
-            conditions?: Condition[];
-            updateUrl?: boolean;
-        } = {},
-    ) {
-        const query = this.normalizeConditions(
-            options.conditions ?? this.getActiveConditions(),
-        );
-        if (!query.length) {
-            return;
-        }
-
-        this.advancedConditions = query;
-
-        if (options.updateUrl !== false) {
-            this.updateURL(query);
-        }
-
+    private async runSearch() {
+        const query = this.activeConditions;
+        if (query.length === 0) return;
+        const seq = ++this.searchSeq;
+        this.updateURL(query);
         this.loading = true;
-        // When embedded as a widget (no URL sync), the selection represents the
-        // set the user is building up across multiple searches, so keep it.
-        if (this.urlSync) {
-            this.selectedIds = [];
-        }
-
+        this.hasSearched = true;
+        // On the landing page a search clears the selection (v1; PR 5 changes this). A widget keeps it.
+        if (this.urlSync) this.selectedIds = [];
         try {
-            const res = await this.executeSearch(query);
+            const res: SearchResult = await this.executeSearch(query);
+            if (seq !== this.searchSeq) return;
+            this.failed = false;
+            if (this.notification?.kind === "error") this.notification = null;
             this.processSearchResults(res);
-            return res;
+        } catch {
+            if (seq !== this.searchSeq) return;
+            this.failed = true;
+            this.clearResults();
+            this.notification = {
+                kind: "error",
+                title: "Search failed",
+                subtitle: "Try searching again.",
+            };
         } finally {
-            this.loading = false;
+            if (seq === this.searchSeq) this.loading = false;
         }
+    }
+
+    private clearResults() {
+        this.count = 0;
+        this.orderedInstanceIds = [];
+        this.orderedStudyIds = [];
     }
 
     private updateURL(query: Condition[]) {
         if (!this.urlSync) return;
-        const params = new URLSearchParams();
-        params.set("page", this.page.toString());
-        params.set("limit", this.limit.toString());
-        params.set("conditions", encodeConditions(query));
-        params.set("order_by", String(this.sortBy));
-        params.set("order", this.sortDirection);
-        params.set("queryMode", this.queryMode);
-        params.set("displayMode", this.displayMode);
-        params.set("filterMode", this.filterMode);
+        const params = new URLSearchParams([
+            ["page", String(this.page)],
+            ["limit", String(this.limit)],
+            ["conditions", encodeConditions(query)],
+            ["order_by", String(this.sortBy)],
+            ["order", this.sortDirection],
+            ["queryMode", this.queryMode],
+            ["displayMode", this.displayMode],
+        ]);
+        // Replace, not push: Back leaves the page instead of changing only the URL (B6).
         // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
-        goto(`?${params.toString()}`);
+        goto(`?${params}`, {
+            replaceState: true,
+            keepFocus: true,
+            noScroll: true,
+        });
     }
 
-    private buildSearchBody(query: Condition[]) {
-        return {
+    private executeSearch(query: Condition[]) {
+        const body = {
             conditions: query,
             limit: this.limit,
             page: this.page,
             order_by: this.sortBy,
-            order: this.sortDirection ?? "ASC",
+            order: this.sortDirection,
             include_count: true,
         };
-    }
-
-    private executeSearch(query: Condition[]) {
-        const body = this.buildSearchBody(query);
         return this.queryMode === "instances"
             ? searchInstances(body as SearchQuery)
             : searchStudies({
@@ -441,37 +463,18 @@ export class BrowserContext {
               } as StudySearchQuery);
     }
 
-    private processSearchResults(res: any) {
-        // searchInstances/searchStudies already ingest; track current result set
-        this.resultIds = new Set(res.result_ids ?? []);
+    // searchInstances/searchStudies ingest into the stores; keep the ids in the server's order,
+    // which is order_by's (server/routes/search.py), not the date (B1).
+    private processSearchResults(res: SearchResult) {
         this.count = res.count ?? 0;
-
-        // Set ordered IDs based on query mode
-        let studyIds;
+        const ids = res.result_ids ?? [];
         if (this.queryMode === "instances") {
-            this.orderedInstanceIds = (res.result_ids ?? []).map((id: number) =>
-                String(id),
-            );
-            studyIds = (res.studies ?? []).map((s: any) => s.id);
+            this.orderedInstanceIds = ids.map(String);
+            this.orderedStudyIds = (res.studies ?? []).map((s) => s.id);
         } else {
-            studyIds = res.result_ids ?? [];
             this.orderedInstanceIds = [];
+            this.orderedStudyIds = ids.map(Number);
         }
-
-        // Sort studies by date
-        const get_date = (studyId: number) => {
-            const study = studies.get(studyId);
-            return study ? new Date(study.date).getTime() : 0;
-        };
-        this.orderedStudyIds = studyIds.sort(
-            (a: number, b: number) => get_date(b) - get_date(a),
-        );
-    }
-
-    openTab(imageIds: string[]) {
-        const suffix_string = `?instances=${imageIds.join(",")}`;
-        const url = `${window.location.origin}/view${suffix_string}`;
-        window.open(url, "_blank")?.focus();
     }
 }
 

@@ -20,6 +20,8 @@
     --color-layer-hover-02: #474747;
     --color-layer-selected-01: #393939;
     --color-layer-selected-hover-01: #474747;
+    --color-layer-selected-02: #525252;
+    --color-layer-selected-hover-02: #636363;
     --color-layer-selected-inverse: #f4f4f4;
     --color-layer-active-01: #525252;
     --color-layer-accent-01: #393939;
@@ -33,6 +35,7 @@
     --color-border-strong-01: #6f6f6f;
     --color-border-strong-02: #8d8d8d;
     --color-border-interactive: #4589ff;
+    --color-border-inverse: #f4f4f4;
     --color-border-disabled: rgba(141, 141, 141, 0.5);
     --color-overlay: rgba(0, 0, 0, 0.6);
     --color-skeleton-background: #292929;
@@ -137,11 +140,14 @@
     --radius-*: initial;
     --radius-checkbox: 2px;
     --radius-tooltip: 2px;
+    --radius-content-switcher: 4px;
     --shadow-*: initial;
     --shadow-popover: 0 2px 6px rgba(0, 0, 0, 0.8);
     --shadow-button-focus:
         inset 0 0 0 1px var(--color-focus),
         inset 0 0 0 2px var(--color-focus-inset);
+    --shadow-content-switcher-selected: inset 0 0 0 1px
+        var(--color-border-inverse);
 
     /* Motion: @carbon/styles 1.117.0 loading (690 ms linear rotation) */
     --animate-loading-rotate: loading-rotate 690ms linear infinite;
@@ -199,8 +205,8 @@
     }
 }
 
-/* Carbon layering: a field inside a dialog uses the 02 set, as Carbon's Layer does. */
-@custom-variant in-dialog (&:where([data-slot="dialog-content"] *));
+/* Carbon Layer: inside a dialog or a ConditionBuilder popover, surfaces and fields use the 02 set. */
+@custom-variant in-dialog (&:where([data-slot="dialog-content"] *, [data-slot="condition-popover"] *));
 /* Data table size: rows and cells follow the table's data-size. */
 @custom-variant table-xl (&:where([data-size="xl"] *));
 @custom-variant table-lg (&:where([data-size="lg"] *));
@@ -208,6 +214,38 @@
 @custom-variant after-active-item (&:where([data-slot="select-item"]:is(:hover, [data-highlighted], [data-selected]) + [data-slot="select-item"] *));
 /* Dropdown: items in an inline dropdown's menu. */
 @custom-variant dropdown-inline (&:where([data-dropdown="inline"] *));
+
+/* Command list (ConditionBuilder ItemOption). bits-ui wraps each item in its own display:contents
+   [data-item-wrapper], so siblings are the wrappers: the first option, and an option after a
+   hovered, highlighted or chosen one, hide their divider. */
+@custom-variant first-option (&:where([data-item-wrapper]:first-child *));
+@custom-variant after-active-option (&:where([data-item-wrapper]:has(> [data-slot="command-item"]:is(:hover, [data-selected], [aria-checked="true"])) + [data-item-wrapper] *));
+
+/* Carbon Modal hasScrollingContent (modal/_modal.scss .cds--modal-scroll-content): the body fades over its
+   last 80 px. A mask uses only alpha, so the colour does not matter. */
+@utility modal-scroll-fade {
+    border-block-end: 2px solid transparent;
+    mask-image:
+        linear-gradient(
+            to bottom,
+            #000 calc(100% - 80px),
+            transparent calc(100% - 48px),
+            transparent 100%
+        ),
+        linear-gradient(to left, #000 0, 16px, transparent 16px),
+        linear-gradient(to right, #000 0, 2px, transparent 2px),
+        linear-gradient(to top, #000 0, 2px, transparent 2px);
+}
+
+/* Carbon NumberInput with hideSteppers (number-input/_number-input.scss): no native spin buttons. */
+@utility number-input-no-steppers {
+    appearance: textfield;
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+        appearance: none;
+        margin: 0;
+    }
+}
 
 /* Base styles. Unlayered, so an unconverted component's outline-none cannot hide the ring. */
 html {
@@ -225,10 +263,11 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus ring for everything except buttons, which draw Carbon's button focus, and checkboxes. */
+/* Focus ring for everything except buttons, which draw Carbon's button focus, checkboxes, and command lists (their highlighted option shows the focus). */
 :focus-visible:not(
         [data-slot="button"],
         [data-slot="checkbox"],
+        [data-slot="command"],
         [class*="shadow-button-focus"]
     ) {
     outline: 2px solid var(--color-focus);
@@ -239,6 +278,16 @@ body {
 [data-slot="checkbox"]:focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 1px;
+}
+
+/* Carbon calendar (date-picker/_flatpickr.scss): a focused day's ring is button-primary; on the
+   selected day, a 1 px layer-02 ring 3 px inside. */
+[data-slot="calendar-day"]:focus-visible {
+    outline-color: var(--color-button-primary);
+}
+[data-slot="calendar-day"][data-selected]:focus-visible {
+    outline: 1px solid var(--color-layer-02);
+    outline-offset: -3px;
 }
 
 @layer base {
