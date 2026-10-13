@@ -8,8 +8,8 @@
     import type { BuilderProperty, BuilderRow } from "./types.js";
 
     // IBM Products ConditionBuilder, Non-Hierarchical, rebuilt in Svelte: behaviour from
-    // @carbon/ibm-products 2.99.0, values from @carbon/ibm-products-styles 2.95.0. Conditions flow
-    // inline and wrap; the grid is one Tab stop with a roving tabindex (ARIA grid).
+    // @carbon/ibm-products 2.99.0, values from @carbon/ibm-products-styles 2.95.0. One condition
+    // per line, its parts wrap; the grid is one Tab stop with a roving tabindex (ARIA grid).
     const uid = $props.id();
     let {
         properties,

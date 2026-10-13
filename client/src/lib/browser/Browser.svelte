@@ -213,8 +213,9 @@
         </div>
     </Table.Toolbar>
 
-    <!-- From lg the column pushes the results; below lg it overlays them. -->
-    <div class="relative flex gap-4">
+    <!-- From lg the column pushes the results; below lg it overlays them, stacked in one grid cell
+         so the container grows to fit the open column. -->
+    <div class="relative flex gap-4 max-lg:grid max-lg:grid-cols-1">
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <!-- Escape bubbles up from the fields inside this form. -->
         <form
@@ -224,7 +225,7 @@
             hidden={!filtersOpen}
             onsubmit={submit}
             onkeydown={onFiltersKeydown}
-            class="z-10 flex w-80 shrink-0 flex-col gap-6 border-e border-border-subtle-00 bg-background py-6 pe-4 max-lg:absolute max-lg:start-0 max-lg:top-0 in-dialog:bg-layer-01"
+            class="z-10 flex w-80 shrink-0 flex-col gap-6 border-e border-border-subtle-00 bg-background py-6 pe-4 max-lg:col-start-1 max-lg:row-start-1 max-lg:self-start max-lg:justify-self-start in-dialog:border-border-subtle-01 in-dialog:bg-layer-01"
         >
             <h2 class="text-heading-compact-02 text-text-primary">Filters</h2>
             <FilterShorcuts bind:patientInput />
@@ -260,7 +261,9 @@
                 </Button>
             </div>
         </form>
-        <div class="max-w-page min-w-0 flex-1">
+        <div
+            class="max-w-page min-w-0 flex-1 max-lg:col-start-1 max-lg:row-start-1"
+        >
             <BrowserContent {mode} />
             <footer></footer>
         </div>

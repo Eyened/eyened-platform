@@ -4,7 +4,7 @@
 
     // Carbon InlineLoading, active and finished states; values from @carbon/styles 1.117.0
     // inline-loading and loading, spinner markup from Carbon React Loading.tsx (small).
-    // Like Carbon React, the description is optional; without one the spinner svg is named "Loading" by its <title>.
+    // Like Carbon React, the description is optional; without one the spinner svg is an img named "Loading".
     let {
         status,
         description,
@@ -34,6 +34,8 @@
             <svg
                 viewBox="0 0 100 100"
                 class="size-4 animate-loading-rotate fill-none"
+                role={description ? undefined : "img"}
+                aria-label={description ? undefined : "Loading"}
                 aria-hidden={description ? "true" : undefined}
             >
                 {#if !description}<title>Loading</title>{/if}

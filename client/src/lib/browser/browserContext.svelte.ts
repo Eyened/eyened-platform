@@ -43,7 +43,7 @@ export type SearchNotification = {
     subtitle: string;
 };
 
-/** One value per Basic field; each filled field is its own condition (AND). */
+/** The quick fields; each filled field is a condition, ANDed with the builder rows. */
 export type BasicFields = {
     patientIdentifier: string;
     studyDate: string;
@@ -162,7 +162,7 @@ export class BrowserContext {
     orderedInstanceIds: string[] = $state([]);
     orderedStudyIds: number[] = $state([]);
 
-    /** Condition builder rows: the only source of the Advanced conditions. */
+    /** Condition builder rows, ANDed with the quick fields (`basic`). */
     advancedRows: BuilderRow[] = $state([]);
     basic: BasicFields = $state({ ...EMPTY_BASIC });
     notification: SearchNotification | null = $state(null);
