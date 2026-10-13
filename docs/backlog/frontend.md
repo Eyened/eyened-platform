@@ -136,3 +136,9 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** client Carbon PR 4 Task 3 review, 2026-10-13
 - **Problem:** `npm run test` (client) intermittently reports "Errors 1 error" (or 2) with all 401 tests passing; it exited 0 in some runs and 1 in others. It predates the filter-column change. Captured: `ReferenceError: document is not defined` in `bits-ui/dist/internal/body-scroll-lock.svelte.js:34` (`resetBodyStyle`, from a `setTimeout` cleanup), attributed to `ui/modal/modal.test.ts` and `tasks/SubtasksTable.test.ts`: the timer fires after the jsdom environment is torn down.
 - **Fix:** await or flush the modal's scroll-lock cleanup (or unmount) before each of those tests ends; confirm with repeated runs.
+
+### Show portalled menus above the viewer overlay panel
+- **Status:** open
+- **Source:** client Carbon PR 4 demo, 2026-10-13
+- **Problem:** in the viewer overlay, condition-builder popovers (and other portalled menus, such as the picker's menus noted in PR 3) render behind `div#panel` (`position: fixed; z-index: 1000` in `client/src/lib/viewer-window/TopRowImages.svelte:121-123`), because portal content uses `z-50` (`client/src/lib/components/ui/popover/popover-content.svelte:24`). Pointer clicks can't reach them; the keyboard still works. It predates the filter-column change.
+- **Fix:** one shared layer order for overlays and portalled menus.
