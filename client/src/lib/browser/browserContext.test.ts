@@ -88,7 +88,6 @@ describe("BrowserContext", () => {
 
     it("keeps the selection, the sort and the rows images accept when switching to images", async () => {
         const ctx = await makeContext();
-        ctx.filterMode = "advanced";
         ctx.advancedRows = [
             {
                 id: 1,
@@ -156,16 +155,17 @@ describe("BrowserContext", () => {
         });
     });
 
-    it("searches the Basic fields as AND conditions and leaves Advanced alone", async () => {
+    it("searches the quick fields and the builder rows as one AND list", async () => {
         vi.mocked(api.searchStudies).mockResolvedValue(response([]));
         const ctx = await makeContext();
-        const rows = [{ id: 1, property: "Study Round", operator: "isEmpty" }];
-        ctx.advancedRows = rows;
         ctx.basic = {
             patientIdentifier: "P1",
             studyDate: "2024-05-01",
             projectName: "Alpha",
         };
+        ctx.advancedRows = [
+            { id: 1, property: "Study Round", operator: "isEmpty" },
+        ];
 
         await ctx.submitSearch();
 
@@ -175,33 +175,59 @@ describe("BrowserContext", () => {
             condition("Patient Identifier", "==", "P1"),
             condition("Study Date", "==", "2024-05-01"),
             condition("Project Name", "IN", ["Alpha"]),
+            condition("Study Round", "IS NULL", null),
         ]);
-        expect(ctx.advancedRows).toEqual(rows);
     });
 
-    it("restores Basic fields and Advanced rows from the URL", async () => {
+    it("restores each condition into the quick field it fits and the rest into rows", async () => {
         const ctx = await makeContext();
-
-        const basic = new URLSearchParams({
-            filterMode: "basic",
-            conditions: encodeConditions([
-                condition("Patient Identifier", "==", "P1"),
-            ]),
-        });
-        expect(ctx.restoreFromParams(basic)).toBe(true);
-        expect(ctx.basic.patientIdentifier).toBe("P1");
-
-        const advanced = new URLSearchParams({
-            filterMode: "advanced",
+        const conditions = [
+            condition("Patient Identifier", "==", "P1"),
+            condition("Patient Identifier", "==", "P2"),
+            condition("Study Date", "==", "2024-05-01"),
+            condition("Project Name", "IN", ["Alpha", "Beta"]),
+        ];
+        const params = new URLSearchParams({
             page: "2",
-            conditions: encodeConditions([condition("Study Round", ">", 2)]),
+            conditions: encodeConditions(conditions),
         });
-        expect(ctx.restoreFromParams(advanced)).toBe(true);
-        expect(ctx.filterMode).toBe("advanced");
+
+        expect(ctx.restoreFromParams(params)).toBe(true);
         expect(ctx.page).toBe(2);
-        expect(ctx.advancedRows).toEqual([
-            { id: 1, property: "Study Round", operator: "greater", value: "2" },
+        expect(ctx.basic).toEqual({
+            patientIdentifier: "P1",
+            studyDate: "2024-05-01",
+            projectName: "",
+        });
+        expect(ctx.activeConditions).toEqual([
+            conditions[0],
+            conditions[2],
+            conditions[1],
+            conditions[3],
         ]);
+    });
+
+    it("clears both filter groups and the results, keeping the selection", async () => {
+        vi.mocked(api.searchStudies).mockResolvedValue(response([1]));
+        const ctx = await makeContext();
+        ctx.basic.patientIdentifier = "P1";
+        ctx.advancedRows = [
+            { id: 1, property: "Study Round", operator: "isEmpty" },
+        ];
+        await ctx.submitSearch();
+        ctx.selectedIds = ["7"];
+
+        ctx.clearFilters();
+
+        expect(ctx.basic).toEqual({
+            patientIdentifier: "",
+            studyDate: "",
+            projectName: "",
+        });
+        expect(ctx.advancedRows).toEqual([]);
+        expect(ctx.count).toBe(0);
+        expect(ctx.hasSearched).toBe(false);
+        expect(ctx.selectedIds).toEqual(["7"]);
     });
 
     it("applies only the latest of overlapping searches", async () => {

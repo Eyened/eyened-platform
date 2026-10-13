@@ -15,7 +15,6 @@
         BrowserContext,
         SORT_COLUMNS,
         type Condition,
-        type FilterMode,
         type QueryMode,
         type SortBy,
         type SortDirection,
@@ -73,7 +72,7 @@
             const hasConditions = browserContext.restoreFromParams(
                 page.url.searchParams,
             );
-            if (mode === "full" && browserContext.filterMode === "basic") {
+            if (mode === "full") {
                 await tick();
                 patientInput?.focus();
             }
@@ -87,7 +86,6 @@
                 browserContext.applyInitialConditions(initialConditions, {
                     queryMode: "studies",
                     displayMode: "study",
-                    filterMode: "advanced",
                 });
                 await browserContext.search();
             }
@@ -135,21 +133,8 @@
         onsubmit={submit}
         class="flex flex-col gap-6"
     >
-        <ContentSwitcher
-            label="Filter mode"
-            class="w-fit"
-            items={[
-                { id: "basic", text: "Basic" },
-                { id: "advanced", text: "Advanced" },
-            ]}
-            selectedId={browserContext.filterMode}
-            onchange={(id) => (browserContext.filterMode = id as FilterMode)}
-        />
-        {#if browserContext.filterMode === "basic"}
-            <FilterShorcuts bind:patientInput />
-        {:else}
-            <AdvancedFilters />
-        {/if}
+        <FilterShorcuts bind:patientInput />
+        <AdvancedFilters />
         {#if browserContext.notification}
             {@const n = browserContext.notification}
             <InlineNotification

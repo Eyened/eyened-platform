@@ -28,7 +28,6 @@ import {
 
 export type QueryMode = "studies" | "instances";
 export type DisplayMode = "instance" | "study";
-export type FilterMode = "basic" | "advanced";
 
 export type Condition = SearchConditionT;
 export type SignatureField = SignatureFieldT;
@@ -97,19 +96,40 @@ function basicConditions(basic: BasicFields): Condition[] {
     return conditions;
 }
 
-// A v1 single-condition Basic URL restores unchanged; other variables have no Basic field.
-function basicFromConditions(conditions: Condition[]): BasicFields {
+// A condition fills a quick field only if it fits it exactly; the first fit wins, the rest become rows.
+function splitConditions(conditions: Condition[]): {
+    basic: BasicFields;
+    rest: Condition[];
+} {
     const basic = { ...EMPTY_BASIC };
+    const rest: Condition[] = [];
     for (const c of conditions) {
-        const value = Array.isArray(c.value)
-            ? (c.value[0] ?? "")
-            : String(c.value ?? "");
-        if (c.variable === "Patient Identifier")
-            basic.patientIdentifier = value;
-        else if (c.variable === "Study Date") basic.studyDate = value;
-        else if (c.variable === "Project Name") basic.projectName = value;
+        const text = typeof c.value === "string" ? c.value : "";
+        if (
+            !basic.patientIdentifier &&
+            c.variable === "Patient Identifier" &&
+            c.operator === "==" &&
+            text.trim()
+        )
+            basic.patientIdentifier = text;
+        else if (
+            !basic.studyDate &&
+            c.variable === "Study Date" &&
+            c.operator === "==" &&
+            isIsoDate(text)
+        )
+            basic.studyDate = text;
+        else if (
+            !basic.projectName &&
+            c.variable === "Project Name" &&
+            c.operator === "IN" &&
+            Array.isArray(c.value) &&
+            c.value.length === 1
+        )
+            basic.projectName = String(c.value[0]);
+        else rest.push(c);
     }
-    return basic;
+    return { basic, rest };
 }
 
 export class BrowserContext {
@@ -127,7 +147,6 @@ export class BrowserContext {
     queryMode: QueryMode = $state("studies");
     displayMode: DisplayMode = $state("study");
     loading: boolean = $state(false);
-    filterMode: FilterMode = $state("basic");
 
     // When false, searches/pagination will not push state to the URL.
     // Used when the browser is embedded as a widget (e.g. overlays).
@@ -175,12 +194,11 @@ export class BrowserContext {
             : this.limitOptionsStudies,
     );
 
-    /** The active filter mode's complete conditions; incomplete builder rows are left out. */
-    activeConditions: Condition[] = $derived(
-        this.filterMode === "advanced"
-            ? rowsToConditions(this.advancedRows, this.activeSignature)
-            : basicConditions(this.basic),
-    );
+    /** The quick fields' and the builder's complete conditions, ANDed; incomplete rows are left out. */
+    activeConditions: Condition[] = $derived([
+        ...basicConditions(this.basic),
+        ...rowsToConditions(this.advancedRows, this.activeSignature),
+    ]);
 
     /** Search needs the search fields and at least one complete condition (B9). */
     canSearch: boolean = $derived(
@@ -239,7 +257,7 @@ export class BrowserContext {
         }
     }
 
-    /** Restore state from the URL; true when the restored filter mode has conditions. */
+    /** Restore state from the URL; true when the filters have conditions. */
     restoreFromParams(params: URLSearchParams): boolean {
         const qm = params.get("queryMode");
         if (qm === "instances" || qm === "studies") this.queryMode = qm;
@@ -256,18 +274,9 @@ export class BrowserContext {
         const page = params.get("page") ?? "";
         this.page = /^\d+$/.test(page) ? Number(page) : 0;
 
-        const conditions = decodeConditions(params.get("conditions") ?? "");
-        const fm = params.get("filterMode");
-        if (fm === "basic") {
-            this.filterMode = "basic";
-            this.basic = basicFromConditions(conditions);
-        } else if (fm === "advanced") {
-            this.filterMode = "advanced";
-            this.advancedRows = conditionsToRows(
-                conditions,
-                this.activeSignature,
-            );
-        }
+        // No conditions param (the header's Browser link): keep the form.
+        if (params.has("conditions"))
+            this.setFilters(decodeConditions(params.get("conditions") ?? ""));
         return this.activeConditions.length > 0;
     }
 
@@ -303,11 +312,17 @@ export class BrowserContext {
             await this.runSearch();
     }
 
-    /** Empties the active filter mode and the notification; results, URL and selection stay (R8). */
+    /** Empties both filter groups, the notification and the results (B9); the selection stays. */
     clearFilters() {
-        if (this.filterMode === "advanced") this.advancedRows = [];
-        else this.basic = { ...EMPTY_BASIC };
+        this.basic = { ...EMPTY_BASIC };
+        this.advancedRows = [];
         this.notification = null;
+        this.searchSeq++; // drop a search still in flight
+        this.loading = false;
+        this.failed = false;
+        this.hasSearched = false;
+        this.clearResults();
+        this.updateURL([]);
     }
 
     /** Search the current page (pagination, URL restore, a widget's seed). */
@@ -343,20 +358,17 @@ export class BrowserContext {
     // Seed state for an embedded/widget usage (no URL involved).
     applyInitialConditions(
         conds: Condition[],
-        opts: {
-            queryMode?: QueryMode;
-            displayMode?: DisplayMode;
-            filterMode?: FilterMode;
-        } = {},
+        opts: { queryMode?: QueryMode; displayMode?: DisplayMode } = {},
     ) {
         if (opts.queryMode) this.queryMode = opts.queryMode;
         if (opts.displayMode) this.displayMode = opts.displayMode;
-        this.filterMode = opts.filterMode ?? "advanced";
-        if (this.filterMode === "advanced") {
-            this.advancedRows = conditionsToRows(conds, this.activeSignature);
-        } else {
-            this.basic = basicFromConditions(conds);
-        }
+        this.setFilters(conds);
+    }
+
+    private setFilters(conditions: Condition[]) {
+        const { basic, rest } = splitConditions(conditions);
+        this.basic = basic;
+        this.advancedRows = conditionsToRows(rest, this.activeSignature);
     }
 
     // Refresh signatures (e.g., after creating/modifying tags)
@@ -424,7 +436,6 @@ export class BrowserContext {
             ["order", this.sortDirection],
             ["queryMode", this.queryMode],
             ["displayMode", this.displayMode],
-            ["filterMode", this.filterMode],
         ]);
         // Replace, not push: Back leaves the page instead of changing only the URL (B6).
         // eslint-disable-next-line svelte/no-navigation-without-resolve -- query-only nav on current route
