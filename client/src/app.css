@@ -280,6 +280,16 @@ body {
     outline-offset: 1px;
 }
 
+/* Carbon calendar (date-picker/_flatpickr.scss): a focused day's ring is button-primary; on the
+   selected day, a 1 px layer-02 ring 3 px inside. */
+[data-slot="calendar-day"]:focus-visible {
+    outline-color: var(--color-button-primary);
+}
+[data-slot="calendar-day"][data-selected]:focus-visible {
+    outline: 1px solid var(--color-layer-02);
+    outline-offset: -3px;
+}
+
 @layer base {
     /* Transparent, not none: forced-colours mode still shows it. */
     :is([data-slot="button"], [class*="shadow-button-focus"]):focus-visible {

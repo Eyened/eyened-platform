@@ -1,32 +1,25 @@
 <script lang="ts">
     import { Calendar as CalendarPrimitive } from "bits-ui";
-    import ChevronLeftIcon from "@lucide/svelte/icons/chevron-left";
-    import {
-        buttonVariants,
-        type ButtonVariant,
-    } from "$lib/components/ui/button/index.js";
+    import ChevronLeft from "carbon-icons-svelte/lib/ChevronLeft.svelte";
     import { cn } from "$lib/utils.js";
 
+    // Carbon .flatpickr-prev-month: 40 px, hover layer-hover-01.
     let {
         ref = $bindable(null),
         class: className,
         children,
-        variant = "ghost",
         ...restProps
-    }: CalendarPrimitive.PrevButtonProps & {
-        variant?: ButtonVariant;
-    } = $props();
+    }: CalendarPrimitive.PrevButtonProps = $props();
 </script>
 
 {#snippet Fallback()}
-    <ChevronLeftIcon class="size-4" />
+    <ChevronLeft />
 {/snippet}
 
 <CalendarPrimitive.PrevButton
     bind:ref
     class={cn(
-        buttonVariants({ variant }),
-        "size-(--cell-size) bg-transparent p-0 select-none disabled:opacity-50 rtl:rotate-180",
+        "flex size-10 cursor-pointer items-center justify-center text-icon-primary hover:bg-layer-hover-01 disabled:cursor-not-allowed disabled:text-icon-disabled",
         className,
     )}
     children={children || Fallback}
