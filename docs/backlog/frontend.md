@@ -87,3 +87,10 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** client Carbon PR 2 (`ui/carbon-2-tasks`, #267), 2026-10-12
 - **Problem:** `client/src/lib/components/TopMenu.svelte` shows its links inline at every width. Carbon's UI shell moves header links into a hamburger side nav below the `lg` breakpoint (66rem); `client/DESIGN.md` records this as the `Header nav` deviation ("Few items; no side nav yet").
 - **Fix:** add a Carbon side nav (hamburger `HeaderMenuButton` + `SideNav`) shown below `lg:`, hide the inline links there, then delete the `Header nav` deviation row.
+
+### One date format across the client
+- **Status:** open
+- **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) review, 2026-10-13
+- **Problem:** the date picker types and shows ISO yyyy-mm-dd (P4 spec decision D8: the stored format, unambiguous in Dutch and English). A dd-mm-yyyy input was requested as more intuitive, but the client already shows dates in mixed formats: ISO in `browser/StudyBlock.svelte` (study header), `viewer-window/panelVisits/PanelVisits.svelte` and the `browser/dataSources.ts` results; "3 Oct 2026" in `lib/utils.ts` (en-GB); "Oct 3, 2026" in `viewer-window/panelForm/FormItem.svelte` (en-US); the browser locale in `viewer-window/panelForm/FormItemContent.svelte`.
+- **Fix:** pick one display/input format: fixed dd-mm-yyyy, `Intl` locale-based, or unambiguous "13 Oct 2026" with lenient input. Amend D8 first. Keep ISO on the wire and in URLs; change only display and input. Show the format as visible helper text (Carbon date picker guidance), not only as a placeholder.
+- **Note:** about 5-8 files, plus the tests `StudyBlock.test.ts`, `PanelVisits.test.ts` and `patientStudies.test.ts`.

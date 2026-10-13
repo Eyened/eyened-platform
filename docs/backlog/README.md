@@ -71,3 +71,4 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Collapse the header nav into a Carbon side nav below `lg` | [frontend](frontend.md) | open |
 | Send per-task `can_edit_status` / `can_edit_details` / `can_delete` on `TaskGET` | [rbac-authz](rbac-authz.md) | open |
 | Validate task names on the server | [data-integrity](data-integrity.md) | open |
+| One date format across the client | [frontend](frontend.md) | open |
