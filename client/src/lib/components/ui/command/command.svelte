@@ -15,7 +15,7 @@
     bind:ref
     data-slot="command"
     class={cn(
-        "rounded-md bg-popover text-popover-foreground flex h-full w-full flex-col overflow-hidden",
+        "flex h-full w-full flex-col overflow-hidden bg-layer-01 text-text-primary",
         className,
     )}
     {...restProps}
