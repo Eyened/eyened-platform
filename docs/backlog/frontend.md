@@ -88,3 +88,33 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** the date picker types and shows ISO yyyy-mm-dd (P4 spec decision D8: the stored format, unambiguous in Dutch and English). A dd-mm-yyyy input was requested as more intuitive, but the client already shows dates in mixed formats: ISO in `browser/StudyBlock.svelte` (study header), `viewer-window/panelVisits/PanelVisits.svelte` and the `browser/dataSources.ts` results; "3 Oct 2026" in `lib/utils.ts` (en-GB); "Oct 3, 2026" in `viewer-window/panelForm/FormItem.svelte` (en-US); the browser locale in `viewer-window/panelForm/FormItemContent.svelte`.
 - **Fix:** pick one display/input format: fixed dd-mm-yyyy, `Intl` locale-based, or unambiguous "13 Oct 2026" with lenient input. Amend D8 first. Keep ISO on the wire and in URLs; change only display and input. Show the format as visible helper text (Carbon date picker guidance), not only as a placeholder.
 - **Note:** about 5-8 files, plus the tests `StudyBlock.test.ts`, `PanelVisits.test.ts` and `patientStudies.test.ts`.
+
+### Rank exact property matches first in the ConditionBuilder search
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** typing "Study Date" in the property search lists "Study Tag Name" first; `ui/command` (bits-ui Command) scores with its default fuzzy filter.
+- **Fix:** pass a custom `filter` that ranks exact, then prefix matches above fuzzy ones.
+
+### Drop a stale search response after a Studies/Images switch
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** `resetForQueryModeChange` in `client/src/lib/browser/browserContext.svelte.ts` does not bump `searchSeq`, so an in-flight Studies response can be processed as Images. Nothing visible today.
+- **Fix:** `this.searchSeq++` in the reset.
+
+### Skip the hover background on disabled calendar days
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** `client/src/lib/components/ui/calendar/calendar-day.svelte` applies `hover:bg-layer-hover-01` to disabled days too.
+- **Fix:** apply the hover background only to enabled days.
+
+### Round-trip a comma inside an "is one of" value
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** `conditionsToRows` / `rowsToConditions` in `client/src/lib/browser/conditionConfig.ts` join and split the "is one of" text on commas, so `["a,b"]` comes back as `["a","b"]`. Inherited v1 encoding.
+- **Fix:** an escape or quoting rule for commas in the text, or a multi-value input instead of comma-separated text.
+
+### Announce Delete condition once
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** in `client/src/lib/components/ui/condition-builder/condition-row.svelte` the gridcell and its button both carry `aria-label="Delete condition"`, so it is read twice. Matches the IBM ConditionBuilder source.
+- **Fix:** label only the button.
