@@ -77,6 +77,8 @@
 
     function onFiltersKeydown(e: KeyboardEvent) {
         if (e.key !== "Escape" || matchMedia(LG).matches) return;
+        // A Select keeps focus on its trigger while open; let Escape close the menu first.
+        if ((e.target as Element).closest('[aria-expanded="true"]')) return;
         // The picker's modal closes on Escape; its document listener skips a stopped event.
         e.stopPropagation();
         closeOverlay();
