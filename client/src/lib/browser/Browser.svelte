@@ -63,6 +63,11 @@
     let toggle = $state<HTMLButtonElement | null>(null);
     const filterCount = $derived(browserContext.activeConditions.length);
 
+    // Notifications live in the column; open it so they are seen below lg.
+    $effect(() => {
+        if (browserContext.notification) filtersOpen = true;
+    });
+
     // Below lg the open column overlays the results: Escape and Search close it.
     function closeOverlay() {
         if (matchMedia(LG).matches) return;
@@ -169,7 +174,10 @@
             <Button
                 variant="ghost"
                 size="lg"
-                onclick={() => browserContext.clearFilters()}
+                onclick={() => {
+                    browserContext.clearFilters();
+                    toggle?.focus();
+                }}
             >
                 Clear filters
             </Button>
