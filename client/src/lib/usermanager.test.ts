@@ -57,9 +57,11 @@ describe("UserManager.init", () => {
         },
     );
 
-    it("leaves a logged-out user on /users/login", async () => {
-        vi.spyOn(authClient, "me").mockResolvedValue(null);
-        history.replaceState(null, "", "/users/login?next=%2Ftasks");
+    it("leaves a user on /users/login when the session refresh fails", async () => {
+        vi.spyOn(authClient, "me").mockRejectedValue(
+            new Error("Token refresh failed"),
+        );
+        history.replaceState(null, "", "/users/login");
 
         await new UserManager().init("/users/login");
 

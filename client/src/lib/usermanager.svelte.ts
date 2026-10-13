@@ -18,7 +18,12 @@ export class UserManager {
             return;
         }
 
-        const user = await authClient.me();
+        const onLoginPage = pathname.startsWith("/users/login");
+        // Logged out, me() rejects once the session refresh fails; on the
+        // login page that just means: show the form.
+        const user = onLoginPage
+            ? await authClient.me().catch(() => null)
+            : await authClient.me();
         if (user === null) {
             console.log("User is not logged in");
             // Only redirect if we're not already on the login page
