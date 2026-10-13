@@ -81,3 +81,10 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** client Carbon PR 1 (`ui/carbon-1-login`) final review, 2026-10-09
 - **Problem:** `client/src/lib/LoginForm.svelte` `onMount` awaits `authClient.options()` without a catch; on failure neither the password form nor the OIDC button renders, leaving only the logo and title. v1 behaved the same.
 - **Fix:** catch the rejection and show an `InlineNotification` with title "Log in failed" and the error message.
+
+### One date format across the client
+- **Status:** open
+- **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) review, 2026-10-13
+- **Problem:** the date picker types and shows ISO yyyy-mm-dd (P4 spec decision D8: the stored format, unambiguous in Dutch and English). A dd-mm-yyyy input was requested as more intuitive, but the client already shows dates in mixed formats: ISO in `browser/StudyBlock.svelte` (study header), `viewer-window/panelVisits/PanelVisits.svelte` and the `browser/dataSources.ts` results; "3 Oct 2026" in `lib/utils.ts` (en-GB); "Oct 3, 2026" in `viewer-window/panelForm/FormItem.svelte` (en-US); the browser locale in `viewer-window/panelForm/FormItemContent.svelte`.
+- **Fix:** pick one display/input format: fixed dd-mm-yyyy, `Intl` locale-based, or unambiguous "13 Oct 2026" with lenient input. Amend D8 first. Keep ISO on the wire and in URLs; change only display and input. Show the format as visible helper text (Carbon date picker guidance), not only as a placeholder.
+- **Note:** about 5-8 files, plus the tests `StudyBlock.test.ts`, `PanelVisits.test.ts` and `patientStudies.test.ts`.
