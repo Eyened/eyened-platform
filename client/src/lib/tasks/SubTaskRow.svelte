@@ -29,7 +29,7 @@
         onedit: (subtask: SubTaskWithImagesGET, button: HTMLElement) => void;
         /** A row action failed; the page shows it and refreshes. */
         onerror: (title: string, subtitle?: string) => void;
-        /** A claim or unclaim succeeded, or a save failed; the page refreshes. */
+        /** A claim, unclaim or image save finished (or a save failed); the page refreshes. */
         onchange: () => void | Promise<void>;
     };
     let {
