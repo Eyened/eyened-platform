@@ -189,4 +189,12 @@ describe("SubTaskRow image selection", () => {
         expect(addSubTaskImage).toHaveBeenCalledTimes(1);
         expect(addSubTaskImage).toHaveBeenCalledWith(31, "2");
     });
+
+    it("refreshes after a successful save", async () => {
+        vi.mocked(addSubTaskImage).mockReset().mockResolvedValue(undefined);
+        const { props, onchange } = await openPicker();
+
+        await props.onConfirm(["1"]);
+        expect(onchange).toHaveBeenCalled();
+    });
 });

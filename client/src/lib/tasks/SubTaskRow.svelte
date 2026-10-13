@@ -29,7 +29,6 @@
         onedit: (subtask: SubTaskWithImagesGET, button: HTMLElement) => void;
         /** A row action failed; the page shows it and refreshes. */
         onerror: (title: string, subtitle?: string) => void;
-        /** A claim or unclaim succeeded; the page refreshes. */
         /** A claim or unclaim succeeded, or a save failed; the page refreshes. */
         onchange: () => void | Promise<void>;
     };
@@ -110,8 +109,8 @@
         }
     }
 
-    // On failure the row is refreshed first, so the next save starts from what was saved; the
-    // picker stays open with the error and the selection (R1).
+    // Success or failure, the row is refreshed, so the next save starts from what was saved. On
+    // failure the picker stays open with the error and the selection (R1).
     async function confirmImages(selectedIds: string[]) {
         const initial = currentImageIds;
         const added = selectedIds.filter((id) => !initial.includes(id));
@@ -123,6 +122,7 @@
             for (const id of added) {
                 await addSubTaskImage(row.id, id);
             }
+            await onchange();
         } catch (e) {
             await onchange();
             if (e instanceof ApiError && isOutOfDeclaration(e)) {
