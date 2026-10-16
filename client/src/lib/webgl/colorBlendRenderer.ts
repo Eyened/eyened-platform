@@ -3,7 +3,7 @@ import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { RenderTarget } from "./types";
 import type { WebGL } from "./webgl";
 import { getBaseUniforms, type ImageRenderer } from "./imageRenderer";
-import { colorBlendFragment } from "./colorBlendFragment";
+import { colorBlendFragment, colorBlendShaderKey } from "./colorBlendFragment";
 
 export type ColorBlendLayer = {
     texture: WebGLTexture;
@@ -23,10 +23,11 @@ export class ColorBlendRenderer implements ImageRenderer {
 
     setLayers(layers: ColorBlendLayer[]) {
         this.layers = layers;
-        const mappings = layers.slice(1).map((layer) => layer.mapping ?? "");
-        const key = mappings.join("\n---\n");
+        const overlayMappings = layers.slice(1).map((layer) => layer.mapping);
+        const key = colorBlendShaderKey(overlayMappings);
         if (key === this.shaderKey && this.shader) return;
         this.shaderKey = key;
+        const mappings = overlayMappings.map((mapping) => mapping ?? "");
         this.shader = new TextureShaderProgram(this.webgl, colorBlendFragment(mappings));
     }
 

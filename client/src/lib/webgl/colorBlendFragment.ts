@@ -1,3 +1,8 @@
+export function colorBlendShaderKey(mappings: readonly (string | null)[]): string {
+    const parts = mappings.map((mapping) => (mapping === null ? "null" : mapping));
+    return `${mappings.length}\n${parts.join("\n---\n")}`;
+}
+
 export function colorBlendFragment(mappings: readonly string[]): string {
     const renamed = mappings.map((mapping, index) =>
         mapping.replace(/vec2\s+mapping\s*\(/g, `vec2 mapping_${index}(`),
