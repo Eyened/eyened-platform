@@ -20,6 +20,7 @@ import MainViewer from "./MainViewer.svelte";
 import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
 import type { ViewerViewStateController } from "./viewerViewState";
 import { instanceIdFromImageId } from "./viewerViewState";
+import type { RegistrationEditorSession } from "./panelRegistration/registrationSession";
 
 export type MainPanelType = {
     component: any;
@@ -31,6 +32,9 @@ export class ViewerWindowContext {
     private bySOPInstanceUID = new Map<string, LoadedImages>();
 
     private viewers = new Set<ViewerContext>();
+
+    public registrationEditor: RegistrationEditorSession | null = null;
+    private editorViewers: Set<ViewerContext> | null = null;
 
     public instanceIds: string[] = $state([]);
 
@@ -97,7 +101,21 @@ export class ViewerWindowContext {
 
     addViewer(viewer: ViewerContext) {
         this.viewers.add(viewer);
-        return () => this.viewers.delete(viewer);
+        this.editorViewers?.add(viewer);
+        return () => {
+            this.viewers.delete(viewer);
+            this.editorViewers?.delete(viewer);
+        };
+    }
+
+    openRegistrationEditor(session: RegistrationEditorSession) {
+        this.editorViewers = new Set();
+        this.registrationEditor = session;
+    }
+
+    closeRegistrationEditor() {
+        this.registrationEditor = null;
+        this.editorViewers = null;
     }
 
     removeViewer(viewer: ViewerContext) {
@@ -111,7 +129,10 @@ export class ViewerWindowContext {
             width: this.webgl.canvas.width,
             height: this.webgl.canvas.height,
         });
-        this.viewers.forEach((viewer) => viewer.repaint());
+        const paint = this.editorViewers
+            ? [...this.viewers].filter((viewer) => this.editorViewers!.has(viewer))
+            : [...this.viewers];
+        for (const viewer of paint) viewer.repaint();
     }
 
     async setInstanceIDs(ids: string[]) {
