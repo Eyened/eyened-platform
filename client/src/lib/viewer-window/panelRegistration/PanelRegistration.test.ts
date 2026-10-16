@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { formAnnotations } from "$lib/data/stores.svelte";
-import type {
-    FormAnnotationGET,
-    FormSchemaGET,
-} from "../../../types/openapi_types";
+import type { FormSchemaGET } from "../../../types/openapi_types";
+
+const openRegistrationEditor = vi.fn();
 
 vi.mock("$lib/data", async () => {
     const stores = await import("$lib/data/stores.svelte");
@@ -17,137 +16,143 @@ vi.mock("$lib/data", async () => {
     };
 });
 
-const { createFormAnnotation, deleteFormAnnotation } = await import(
-    "$lib/data"
-);
+const { createFormAnnotation } = await import("$lib/data");
 const { default: PanelRegistration } = await import(
     "./PanelRegistration.svelte"
 );
 
-const schema = {
-    id: 4,
-    name: "Registration",
-    schema: {
-        type: "object",
-        additionalProperties: {
-            type: "array",
-            items: {
-                oneOf: [
-                    {
-                        type: "object",
-                        properties: {
-                            x: { type: "number" },
-                            y: { type: "number" },
-                            index: { type: ["number", "null"] },
-                        },
-                        required: ["x", "y"],
-                    },
-                    { type: "null" },
-                ],
-            },
+const schema = { id: 4, name: "Registration", schema: {} } as FormSchemaGET;
+
+function image(imageId: string, laterality: "L" | "R" | null) {
+    return {
+        image_id: imageId,
+        instance: {
+            id: imageId,
+            patient: { id: 100 },
+            study: { id: 50 },
+            laterality,
         },
-    },
-} as FormSchemaGET;
+    };
+}
 
-const annotation = {
-    id: 21,
-    form_schema_id: 4,
-    image_id: "img1",
-    patient_id: 100,
-    laterality: "R",
-    creator: { id: 5, name: "me" },
-    form_data: { img1: [{ x: 1, y: 2, index: null }] },
-} as FormAnnotationGET;
-
-const addOverlay = vi.fn(() => vi.fn());
+const rightA = image("imgA", "R");
+const rightB = image("imgB", "R");
+const left = image("imgL", "L");
 
 const contexts = new Map<string, unknown>([
-    [
-        "viewerContext",
-        {
-            image: {
-                instance: {
-                    id: "img1",
-                    patient: { id: 100 },
-                    study: { id: 50 },
-                    laterality: "R",
-                },
-            },
-            addOverlay,
-        },
-    ],
+    ["viewerContext", { image: { instance: rightA.instance } }],
     [
         "taskContext",
-        {
-            task: { task_definition: { config: {} } },
-            subTask: { id: 7 },
-        },
+        { task: { task_definition: { config: {} } }, subTask: { id: 7 } },
     ],
     ["globalContext", { canEdit: () => true }],
+    [
+        "viewerWindowContext",
+        {
+            topViewers: new Map([
+                [rightA, {}],
+                [left, {}],
+                [rightB, {}],
+            ]),
+            openRegistrationEditor,
+        },
+    ],
 ]);
 
 describe("PanelRegistration", () => {
     beforeEach(() => {
         formAnnotations.clear();
-        addOverlay.mockClear();
+        openRegistrationEditor.mockReset();
         vi.mocked(createFormAnnotation).mockReset();
-        vi.mocked(deleteFormAnnotation).mockReset();
-        formAnnotations.set(21, annotation);
-    });
-
-    it("lists annotations and arms a point tool", async () => {
-        render(PanelRegistration, {
-            props: { active: true, registrationSchema: schema },
-            context: contexts,
-        } as never);
-
-        expect(screen.getByText("me")).toBeInTheDocument();
-        await fireEvent.click(screen.getByText("me"));
-        expect(addOverlay).toHaveBeenCalled();
-        expect(screen.getByText(/\[1\]:/)).toBeInTheDocument();
-
-        await fireEvent.click(screen.getByText("me"));
-        expect(screen.queryByText(/\[1\]:/)).not.toBeInTheDocument();
-    });
-
-    it("creates a new annotation and activates it", async () => {
-        const created = {
-            ...annotation,
-            id: 22,
+        formAnnotations.set(21, {
+            id: 21,
+            form_schema_id: 4,
+            patient_id: 100,
+            laterality: "R",
+            image_id: null,
+            creator: { id: 5, name: "me" },
             form_data: {},
-        } as FormAnnotationGET;
-        vi.mocked(createFormAnnotation).mockImplementation(async () => {
-            formAnnotations.set(22, created);
-            return created;
-        });
+        } as never);
+    });
 
-        render(PanelRegistration, {
+    function renderPanel() {
+        return render(PanelRegistration, {
             props: { active: true, registrationSchema: schema },
             context: contexts,
         } as never);
+    }
 
-        await fireEvent.click(
-            screen.getByRole("button", { name: "Create new" }),
-        );
+    it("groups a known eye apart from the other eye", () => {
+        renderPanel();
+        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        const leftGroup = screen.getByRole("group", { name: "Patient 100 L" });
+        expect(right).toHaveTextContent("imgA");
+        expect(right).toHaveTextContent("imgB");
+        expect(leftGroup).toHaveTextContent("imgL");
+        expect(right).not.toHaveTextContent("imgL");
+    });
+
+    it("opens an existing annotation without creating one", async () => {
+        renderPanel();
+        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        const open = right.querySelector("button")!;
+        expect(open).toBeDisabled();
+        await fireEvent.click(screen.getByRole("checkbox", { name: "imgA" }));
+        await fireEvent.click(screen.getByRole("checkbox", { name: "imgB" }));
+        expect(open).toBeDisabled();
+        await fireEvent.change(right.querySelector("select")!, {
+            target: { value: "21" },
+        });
+        expect(open).toBeEnabled();
+        await fireEvent.click(open);
+        expect(createFormAnnotation).not.toHaveBeenCalled();
+        expect(openRegistrationEditor).toHaveBeenCalledWith({
+            imageIds: ["imgA", "imgB"],
+            annotationId: 21,
+        });
+    });
+
+    it("creates a new annotation only when Open is clicked", async () => {
+        vi.mocked(createFormAnnotation).mockResolvedValue({ id: 22 });
+        renderPanel();
+        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        await fireEvent.click(screen.getByRole("checkbox", { name: "imgB" }));
+        await fireEvent.click(screen.getByRole("checkbox", { name: "imgA" }));
+        expect(createFormAnnotation).not.toHaveBeenCalled();
+        await fireEvent.change(right.querySelector("select")!, {
+            target: { value: "new" },
+        });
+        await fireEvent.click(right.querySelector("button")!);
         await waitFor(() => {
             expect(createFormAnnotation).toHaveBeenCalledWith(
                 expect.objectContaining({
                     form_schema_id: 4,
-                    image_id: "img1",
+                    patient_id: 100,
+                    laterality: "R",
+                    image_id: "imgA",
+                    study_id: 50,
                     sub_task_id: 7,
+                    form_data: {},
                 }),
             );
         });
-        expect(addOverlay).toHaveBeenCalled();
+        expect(openRegistrationEditor).toHaveBeenCalledWith({
+            imageIds: ["imgA", "imgB"],
+            annotationId: 22,
+        });
     });
 
-    it("removes an annotation", async () => {
-        render(PanelRegistration, {
-            props: { active: true, registrationSchema: schema },
-            context: contexts,
-        } as never);
-
-        await fireEvent.click(document.querySelector("span.icon")!);
-        expect(deleteFormAnnotation).toHaveBeenCalledWith(21);
+    it("does not open the editor when create fails", async () => {
+        vi.mocked(createFormAnnotation).mockRejectedValue(new Error("nope"));
+        renderPanel();
+        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        await fireEvent.click(screen.getByRole("checkbox", { name: "imgA" }));
+        await fireEvent.click(screen.getByRole("checkbox", { name: "imgB" }));
+        await fireEvent.change(right.querySelector("select")!, {
+            target: { value: "new" },
+        });
+        await fireEvent.click(right.querySelector("button")!);
+        await waitFor(() => expect(createFormAnnotation).toHaveBeenCalled());
+        expect(openRegistrationEditor).not.toHaveBeenCalled();
     });
 });
