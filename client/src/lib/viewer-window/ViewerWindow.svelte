@@ -10,6 +10,7 @@ Keeps track of the main panels and the top row of images.
     import TopRowImages from "./TopRowImages.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
     import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
+    import RegistrationEditor from "./panelRegistration/RegistrationEditor.svelte";
     import { instances, patients } from "$lib/data";
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
@@ -97,6 +98,10 @@ Keeps track of the main panels and the top row of images.
         {/if}
     </div>
 </div>
+
+{#if viewerWindowContext.registrationEditor}
+    <RegistrationEditor />
+{/if}
 
 <style>
     div.row {
