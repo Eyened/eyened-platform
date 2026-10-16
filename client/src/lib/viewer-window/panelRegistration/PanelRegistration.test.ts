@@ -142,6 +142,34 @@ describe("PanelRegistration", () => {
         });
     });
 
+    it("ignores a second Open click while create is in flight", async () => {
+        let resolveCreate!: (value: { id: number }) => void;
+        const createPromise = new Promise<{ id: number }>((resolve) => {
+            resolveCreate = resolve;
+        });
+        vi.mocked(createFormAnnotation).mockReturnValue(createPromise);
+
+        renderPanel();
+        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        await fireEvent.click(screen.getByRole("checkbox", { name: "imgA" }));
+        await fireEvent.click(screen.getByRole("checkbox", { name: "imgB" }));
+        await fireEvent.change(right.querySelector("select")!, {
+            target: { value: "new" },
+        });
+        const open = right.querySelector("button")!;
+        await fireEvent.click(open);
+        expect(createFormAnnotation).toHaveBeenCalledTimes(1);
+
+        await fireEvent.click(open);
+        expect(createFormAnnotation).toHaveBeenCalledTimes(1);
+        expect(openRegistrationEditor).not.toHaveBeenCalled();
+
+        resolveCreate({ id: 22 });
+        await waitFor(() => {
+            expect(openRegistrationEditor).toHaveBeenCalledTimes(1);
+        });
+    });
+
     it("does not open the editor when create fails", async () => {
         vi.mocked(createFormAnnotation).mockRejectedValue(new Error("nope"));
         renderPanel();

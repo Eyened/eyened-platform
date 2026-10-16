@@ -58,6 +58,20 @@
         {},
     );
 
+    let openingGroups = $state(new Set<string>());
+
+    function markCreateInFlight(key: string) {
+        const next = new Set(openingGroups);
+        next.add(key);
+        openingGroups = next;
+    }
+
+    function clearCreateInFlight(key: string) {
+        const next = new Set(openingGroups);
+        next.delete(key);
+        openingGroups = next;
+    }
+
     function groupKey(patientId: number, laterality: EyeLaterality): string {
         return `${patientId}:${laterality ?? "unset"}`;
     }
@@ -107,8 +121,10 @@
 
         let annotationId: number;
         if (choice === "new") {
+            if (openingGroups.has(key)) return;
             const first = ordered[0];
             if (!first) return;
+            markCreateInFlight(key);
             try {
                 const created = await createFormAnnotation({
                     form_schema_id: registrationSchema.id,
@@ -124,6 +140,8 @@
                 annotationId = created.id;
             } catch {
                 return;
+            } finally {
+                clearCreateInFlight(key);
             }
         } else {
             annotationId = Number(choice);
@@ -172,7 +190,8 @@
             </select>
             <button
                 type="button"
-                disabled={!canOpenRegistration(checked.length, choice || null)}
+                disabled={!canOpenRegistration(checked.length, choice || null) ||
+                    openingGroups.has(key)}
                 onclick={() => openGroup(group)}
             >
                 Open
