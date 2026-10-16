@@ -30,6 +30,13 @@ describe("colorBlendFragment", () => {
         expect(source).not.toContain("vec2 mapping(vec2 uv)");
     });
 
+    it("renames null-overlay identity mapping for layer 1 sampling", () => {
+        const identity = `vec2 mapping(vec2 uv) { return uv; }`;
+        const source = colorBlendFragment([identity]);
+        expect(source).toContain("vec2 mapping_0(vec2 uv)");
+        expect(source).toContain("texture(u_layer1, mapping_0(v_uv))");
+    });
+
     it("emits an untinted fixed layer when there are no overlays", () => {
         const source = colorBlendFragment([]);
         expect(source).toContain("u_untinted0");

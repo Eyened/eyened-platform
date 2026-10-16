@@ -5,6 +5,8 @@ import type { WebGL } from "./webgl";
 import { getBaseUniforms, type ImageRenderer } from "./imageRenderer";
 import { colorBlendFragment, colorBlendShaderKey } from "./colorBlendFragment";
 
+const NULL_OVERLAY_MAPPING = `vec2 mapping(vec2 uv) { return uv; }`;
+
 export type ColorBlendLayer = {
     texture: WebGLTexture;
     width: number;
@@ -27,7 +29,7 @@ export class ColorBlendRenderer implements ImageRenderer {
         const key = colorBlendShaderKey(overlayMappings);
         if (key === this.shaderKey && this.shader) return;
         this.shaderKey = key;
-        const mappings = overlayMappings.map((mapping) => mapping ?? "");
+        const mappings = overlayMappings.map((mapping) => mapping ?? NULL_OVERLAY_MAPPING);
         this.shader = new TextureShaderProgram(this.webgl, colorBlendFragment(mappings));
     }
 
