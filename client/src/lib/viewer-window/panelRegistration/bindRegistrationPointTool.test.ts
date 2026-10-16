@@ -93,6 +93,31 @@ describe("bindRegistrationPointTool", () => {
         dispose();
     });
 
+    it("keys projection images by instance id", () => {
+        formAnnotations.set(21, {
+            id: 21,
+            form_data: { img: [{ x: 1, y: 2 }] },
+        } as never);
+        bindRegistrationPointTool({
+            viewerContext: {
+                image: { image_id: "img_proj", instance: { id: "img" } },
+                addOverlay: () => () => {},
+            } as never,
+            annotationId: 21,
+            schema: schema as never,
+            canEdit: true,
+            pointMarker: { style: "cross", radius: 4, color: "red" },
+        });
+        const tool = toolSpies.tools.at(-1)!;
+        expect(tool.points).toEqual([{ x: 1, y: 2 }]);
+        tool.opts.onPersist([{ x: 3, y: 4 }]);
+        const written = vi
+            .mocked(setFormAnnotationValue)
+            .mock.calls.at(-1)?.[1];
+        expect(written).toEqual({ img: [{ x: 3, y: 4 }] });
+        expect(written).not.toHaveProperty("img_proj");
+    });
+
     it("passes canEdit false through to the tool", () => {
         bindRegistrationPointTool({
             viewerContext: {

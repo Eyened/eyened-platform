@@ -53,7 +53,7 @@ export function bindRegistrationPointTool(args: {
 }): () => void {
     const analysis = registrationAnalysis(args.schema);
     if (!analysis) return () => {};
-    const publicId = args.viewerContext.image.image_id;
+    const publicId = args.viewerContext.image.instance.id;
     const annotationId = args.annotationId;
     const write = (
         points: ReturnType<typeof getPointsForImage>,

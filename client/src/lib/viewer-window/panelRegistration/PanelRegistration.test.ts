@@ -170,6 +170,33 @@ describe("PanelRegistration", () => {
         });
     });
 
+    it("omits non-2D images and keeps 2D images as checkboxes", () => {
+        const flat = { ...image("img2d", "R"), is2D: true };
+        const volume = { ...image("imgVol", "R"), is2D: false };
+        render(PanelRegistration, {
+            props: { active: true, registrationSchema: schema },
+            context: new Map([
+                ...contexts,
+                [
+                    "viewerWindowContext",
+                    {
+                        topViewers: new Map([
+                            [flat, {}],
+                            [volume, {}],
+                        ]),
+                        openRegistrationEditor,
+                    },
+                ],
+            ]),
+        } as never);
+        expect(
+            screen.getByRole("checkbox", { name: "img2d" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("checkbox", { name: "imgVol" }),
+        ).not.toBeInTheDocument();
+    });
+
     it("does not open the editor when create fails", async () => {
         vi.mocked(createFormAnnotation).mockRejectedValue(new Error("nope"));
         renderPanel();

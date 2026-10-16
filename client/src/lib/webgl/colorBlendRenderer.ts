@@ -28,9 +28,21 @@ export class ColorBlendRenderer implements ImageRenderer {
         const overlayMappings = layers.slice(1).map((layer) => layer.mapping);
         const key = colorBlendShaderKey(overlayMappings);
         if (key === this.shaderKey && this.shader) return;
+        this.shader?.dispose();
         this.shaderKey = key;
-        const mappings = overlayMappings.map((mapping) => mapping ?? NULL_OVERLAY_MAPPING);
-        this.shader = new TextureShaderProgram(this.webgl, colorBlendFragment(mappings));
+        const mappings = overlayMappings.map(
+            (mapping) => mapping ?? NULL_OVERLAY_MAPPING,
+        );
+        this.shader = new TextureShaderProgram(
+            this.webgl,
+            colorBlendFragment(mappings),
+        );
+    }
+
+    dispose() {
+        this.shader?.dispose();
+        this.shader = null;
+        this.shaderKey = "";
     }
 
     renderImage(viewerContext: ViewerContext, renderTarget: RenderTarget) {

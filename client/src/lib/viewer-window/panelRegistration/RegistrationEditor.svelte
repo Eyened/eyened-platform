@@ -79,34 +79,38 @@
 </script>
 
 {#if session && images}
-    <div
-        class="editor"
-        bind:this={root}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Registration editor"
-        tabindex="-1"
+    <svelte:boundary
+        onerror={() => viewerWindowContext.closeRegistrationEditor()}
     >
-        <button
-            type="button"
-            class="close"
-            onclick={() => viewerWindowContext.closeRegistrationEditor()}
+        <div
+            class="editor"
+            bind:this={root}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Registration editor"
+            tabindex="-1"
         >
-            Close
-        </button>
-        <div class="thumbs">
-            {#each images as image (image.image_id)}
-                <RegistrationThumbnail
-                    {image}
-                    annotationId={session.annotationId}
-                    schema={pointSchema}
-                    {canEdit}
-                    {pointMarker}
-                />
-            {/each}
+            <button
+                type="button"
+                class="close"
+                onclick={() => viewerWindowContext.closeRegistrationEditor()}
+            >
+                Close
+            </button>
+            <div class="thumbs">
+                {#each images as image (image.image_id)}
+                    <RegistrationThumbnail
+                        {image}
+                        annotationId={session.annotationId}
+                        schema={pointSchema}
+                        {canEdit}
+                        {pointMarker}
+                    />
+                {/each}
+            </div>
+            <RegistrationBlend {images} />
         </div>
-        <RegistrationBlend {images} />
-    </div>
+    </svelte:boundary>
 {/if}
 
 <style>

@@ -83,9 +83,11 @@
         });
 
         return () => {
+            const renderer = blendRenderer;
             blendRenderer = null;
             rendererEpoch += 1;
             unmount(mounted);
+            renderer?.dispose();
         };
     });
 
