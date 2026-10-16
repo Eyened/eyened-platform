@@ -1,24 +1,39 @@
-import { describe, expect, it, vi } from "vitest";
+import type { Registration } from "$lib/registration/registration.svelte";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
-function contextWith(viewers: { repaint: ReturnType<typeof vi.fn> }[]) {
-    const ctx = Object.create(ViewerWindowContext.prototype) as ViewerWindowContext & {
-        viewers: Set<unknown>;
-        editorViewers: Set<unknown> | null;
-        webgl: { clear: ReturnType<typeof vi.fn>; canvas: { width: number; height: number } };
+function createContext() {
+    const webgl = {
+        clear: vi.fn(),
+        canvas: { width: 8, height: 8 },
     };
-    ctx.viewers = new Set(viewers);
-    ctx.editorViewers = null;
-    ctx.registrationEditor = null;
-    ctx.webgl = { clear: vi.fn(), canvas: { width: 8, height: 8 } };
-    return ctx;
+    return new ViewerWindowContext(
+        webgl as never,
+        {} as Registration,
+        null,
+        [],
+    );
 }
 
 describe("ViewerWindowContext registration editor paint", () => {
+    let ctx: ViewerWindowContext | undefined;
+
+    beforeEach(() => {
+        vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+        vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    });
+
+    afterEach(() => {
+        ctx?.destroy();
+        ctx = undefined;
+        vi.unstubAllGlobals();
+    });
+
     it("paints only viewers added during the session, then resumes the others", () => {
         const background = { repaint: vi.fn() };
         const editorViewer = { repaint: vi.fn() };
-        const ctx = contextWith([background]);
+        ctx = createContext();
+        ctx.addViewer(background as never);
 
         ctx.openRegistrationEditor({ imageIds: ["a", "b"], annotationId: 21 });
         ctx.addViewer(editorViewer as never);

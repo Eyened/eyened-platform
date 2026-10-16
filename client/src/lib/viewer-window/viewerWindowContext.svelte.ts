@@ -33,7 +33,7 @@ export class ViewerWindowContext {
 
     private viewers = new Set<ViewerContext>();
 
-    public registrationEditor: RegistrationEditorSession | null = null;
+    public registrationEditor: RegistrationEditorSession | null = $state(null);
     private editorViewers: Set<ViewerContext> | null = null;
 
     public instanceIds: string[] = $state([]);
