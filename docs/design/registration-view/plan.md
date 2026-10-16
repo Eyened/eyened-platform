@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- The image list is the images already open in this viewer window (the current top row), not every image for the patient.
+- The image list is the images already open in this viewer window (the current top row), not every image for the patient. Skip every 3D image (`is2D === false`, volumes and slice stacks). Keep 2D images, including enface projections (`image_id` ending in `_proj`). The panel never offers a 3D image.
 - Images are grouped by patient and eye. A registration never mixes eyes. An image with no laterality is its own group for that patient and is never mixed with a known eye.
 - **New** creates the annotation when the editor opens, not when it is selected. Patient and laterality come from the group. Study and image id come from the first checked image.
 - The editor is a full-window layer in this same window. It reuses the existing graphics context. It does not open a browser popup.
@@ -56,7 +56,7 @@
 
 A hop `bakeHopGlsl` cannot bake (empty `glslMapping`, unknown item type) makes `glslPathBetween` return null. That overlay is not drawn. Do not add new registration bakers.
 
-The blend samples `image.texture` and is correct for 2D images. A 3D image is still listed and can hold landmarks. It is not drawn in the blend, because a volume texture is not a 2D sample. It still counts toward the palette when it is included.
+The registration panel and the editor list only 2D images. Enface projections are 2D and are shown. 3D volumes and slice stacks are omitted from the checkbox list, so they never enter the editor. `canSample` stays as a guard: a non-2D image is not drawn in the blend.
 
 ---
 
@@ -994,7 +994,7 @@ EOF
 
 Checkbox label is `image.imageId`. Choice value `"new"` or the annotation id as a string. Checked ids live in component state per group. **Open** calls `createFormAnnotation` only for `"new"`, then `openRegistrationEditor({ imageIds, annotationId })`. `imageIds` are the checked public ids in group order. Study and `image_id` on the create call come from the first checked image's `studyId` and `instanceId`. `laterality` is the group laterality, omitted when null. `sub_task_id` is `taskContext?.subTask?.id`.
 
-Images come from `viewerWindowContext.topViewers` in map order. Map each `AbstractImage` to `OpenImage`: `imageId = image.image_id`, `instanceId = image.instance.id`, `patientId = image.instance.patient.id`, `laterality = image.instance.laterality ?? null`, `studyId = image.instance.study?.id`.
+Images come from `viewerWindowContext.topViewers` in map order. Skip any image with `is2D === false`. Map each remaining `AbstractImage` to `OpenImage`: `imageId = image.image_id`, `instanceId = image.instance.id`, `patientId = image.instance.patient.id`, `laterality = image.instance.laterality ?? null`, `studyId = image.instance.study?.id`. An enface projection stays, because it is 2D and its `image_id` ends in `_proj`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1512,7 +1512,7 @@ EOF
 - Palette, including reassignment when an image is hidden: Task 2 and Task 3.
 - Fixed radio, overlay checkboxes, previous fixed stays checked: Task 3 and Task 8.
 - Missing path is not drawn and still has a colour: Task 3 and Task 5.
-- 3D images are not sampled in the blend: Task 3 `canSample` and Task 8.
+- 3D volumes and slice stacks are omitted from the panel and the editor. Enface projections stay. `canSample` still refuses a non-2D image in the blend: Task 7 and Task 8.
 - Points read and write through the existing annotation path, including read-only: Task 8.
 - Help text: Task 8.
 - Session is not stored in the view-state URL: Task 4 (`openRegistrationEditor` only sets fields).
