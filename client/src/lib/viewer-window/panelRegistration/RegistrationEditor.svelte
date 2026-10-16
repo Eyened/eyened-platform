@@ -113,7 +113,7 @@
     .editor {
         position: fixed;
         inset: 0;
-        z-index: 20;
+        z-index: 200;
         /* The window canvas is cleared black and sits under this layer.
            An opaque background here would cover the blended images. */
         background: transparent;
@@ -127,6 +127,16 @@
         top: 0.4em;
         right: 0.4em;
         z-index: 2;
+        background-color: rgba(0, 0, 0, 0.92);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 0.25em;
+        padding: 0.35em 0.65em;
+        cursor: pointer;
+    }
+
+    .editor :global(.blend .controls) {
+        background-color: rgba(0, 0, 0, 0.92);
     }
 
     .thumbs {
