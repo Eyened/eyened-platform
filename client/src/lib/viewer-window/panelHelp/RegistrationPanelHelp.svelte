@@ -6,8 +6,8 @@
     <h2>Workflow</h2>
     <ul>
         <li>
-            Images are grouped by patient and eye. Check at least two images in
-            one group.
+            Images are grouped by patient and eye. Under Fixed and Moving, click
+            one thumbnail in each.
         </li>
         <li>Choose an existing registration, or <strong>New</strong>.</li>
         <li>
@@ -24,14 +24,19 @@
 <section>
     <h2>Blend</h2>
     <ul>
-        <li>The radio chooses the fixed image. Its pixels stay in place.</li>
         <li>
-            Check another image to draw it on top, warped into the fixed image.
+            Drag the bar between the images and the blend to change their
+            height.
         </li>
-        <li>Two images are red and cyan. Three are red, green, and blue.</li>
         <li>
-            An image with no registration path yet is left out until the points
-            define one.
+            Each image is a block headed by its public id. The colour slider
+            goes from the original colours to luminosity times the picked
+            colour. Opacity fades that image out. Fixed starts red and moving
+            starts cyan.
+        </li>
+        <li>
+            That second image stays out until the points define an affine
+            between the two.
         </li>
     </ul>
 </section>

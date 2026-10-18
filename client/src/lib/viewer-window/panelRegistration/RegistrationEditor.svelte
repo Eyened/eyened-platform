@@ -5,7 +5,7 @@
     import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import { getContext, onMount } from "svelte";
+    import { getContext, onDestroy, onMount } from "svelte";
     import { CLIENT_DEFAULTS, mergeClientConfig } from "../taskConfigLayout";
     import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import RegistrationBlend from "./RegistrationBlend.svelte";
@@ -72,9 +72,34 @@
     });
 
     let root: HTMLDivElement | undefined = $state();
+    let isResizing = false;
+
+    function startResize(event: PointerEvent) {
+        isResizing = true;
+        event.preventDefault();
+    }
+
+    function stopResize() {
+        isResizing = false;
+    }
+
+    function doResize(event: PointerEvent) {
+        if (!isResizing || !root) return;
+        root.style.setProperty(
+            "grid-template-rows",
+            `${event.clientY}px 1px 1fr`,
+        );
+    }
 
     onMount(() => {
         root?.focus();
+        window.addEventListener("pointerup", stopResize);
+        window.addEventListener("pointermove", doResize);
+    });
+
+    onDestroy(() => {
+        window.removeEventListener("pointerup", stopResize);
+        window.removeEventListener("pointermove", doResize);
     });
 </script>
 
@@ -108,6 +133,11 @@
                     />
                 {/each}
             </div>
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="resizer" onpointerdown={startResize}>
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div class="handle" onpointerdown={startResize}><hr /></div>
+            </div>
             <RegistrationBlend {images} />
         </div>
     </svelte:boundary>
@@ -121,8 +151,8 @@
         /* The window canvas is cleared black and sits under this layer.
            An opaque background here would cover the blended images. */
         background: transparent;
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-rows: 34% 1px 1fr;
         outline: none;
     }
 
@@ -144,8 +174,33 @@
     }
 
     .thumbs {
-        height: 20%;
         min-height: 0;
         display: flex;
+        overflow: hidden;
+    }
+
+    .resizer {
+        position: relative;
+        background-color: gray;
+    }
+
+    .handle {
+        position: absolute;
+        top: -3px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 30px;
+        height: 6px;
+        background: #ccc;
+        border-radius: 2px;
+        border: 1px solid rgba(0, 0, 0, 0.3);
+        cursor: row-resize;
+        z-index: 2;
+    }
+
+    .handle hr {
+        margin: 2px;
+        border-top: 1px solid rgba(0, 0, 0, 0.4);
+        background-color: rgba(255, 255, 255, 0.9);
     }
 </style>

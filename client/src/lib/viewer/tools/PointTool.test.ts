@@ -195,25 +195,24 @@ describe("PointTool", () => {
         tool.points = [{ x: 10, y: 10, severity: "mild" }];
 
         tool.pointerdown(pointerEvent(viewer, { x: 10, y: 10 }));
-        tool.pointermove(pointerEvent(viewer, { x: 12, y: 11 }));
-        tool.pointerup(pointerEvent(viewer, { x: 12, y: 11 }));
+        tool.pointerup(pointerEvent(viewer, { x: 10, y: 10 }));
 
         expect(tool.points[0]).toEqual({ x: 10, y: 10, severity: "severe" });
         expect(onPersist).toHaveBeenCalledTimes(1);
     });
 
-    it("moves a point when the press exceeds the drag threshold and does not cycle", () => {
+    it("moves a point by the cursor delta, including a short grab off the marker", () => {
         const tool = new PointTool({
             enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
         });
         const viewer = mockViewer();
         tool.points = [{ x: 10, y: 10, severity: "mild" }];
 
-        tool.pointerdown(pointerEvent(viewer, { x: 10, y: 10 }));
-        tool.pointermove(pointerEvent(viewer, { x: 30, y: 40 }));
-        tool.pointerup(pointerEvent(viewer, { x: 30, y: 40 }));
+        tool.pointerdown(pointerEvent(viewer, { x: 14, y: 12 }));
+        tool.pointermove(pointerEvent(viewer, { x: 16, y: 13 }));
+        tool.pointerup(pointerEvent(viewer, { x: 16, y: 13 }));
 
-        expect(tool.points[0]).toEqual({ x: 30, y: 40, severity: "mild" });
+        expect(tool.points[0]).toEqual({ x: 12, y: 11, severity: "mild" });
     });
 
     it("ctrl-click stacks a point on an existing marker without cycling or dragging", () => {

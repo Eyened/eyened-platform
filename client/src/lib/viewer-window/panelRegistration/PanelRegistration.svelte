@@ -4,15 +4,17 @@
         formAnnotations,
         instances,
     } from "$lib/data";
+    import { getThumbUrl } from "$lib/data-loading/utils";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import { getContext } from "svelte";
-    import type { FormSchemaGET } from "../../../types/openapi_types";
+    import type { FormSchemaGET, ImageGET } from "../../../types/openapi_types";
     import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
     import {
         annotationMatchesEye,
         canOpenRegistration,
         groupOpenImages,
+        orderByInstanceIds,
         type EyeGroup,
         type EyeLaterality,
         type OpenImage,
@@ -34,7 +36,6 @@
     );
     const taskContext = getContext<TaskContext | undefined>("taskContext");
     const globalContext = getContext<GlobalContext>("globalContext");
-    void globalContext;
 
     const openImages = $derived.by(() => {
         const images: OpenImage[] = [];
@@ -49,14 +50,17 @@
                 studyId: image.instance.study?.id,
             });
         }
-        return images;
+        return orderByInstanceIds(
+            images,
+            viewerWindowContext.instanceIds ?? [],
+        );
     });
 
     const groups = $derived(groupOpenImages(openImages));
 
-    let groupUi = $state<Record<string, { checked: string[]; choice: string }>>(
-        {},
-    );
+    let groupUi = $state<
+        Record<string, { fixedId: string; movingId: string; choice: string }>
+    >({});
 
     let openingGroups = $state(new Set<string>());
 
@@ -76,61 +80,71 @@
         return `${patientId}:${laterality ?? "unset"}`;
     }
 
-    function checkedFor(key: string): string[] {
-        return groupUi[key]?.checked ?? [];
+    function selectionFor(key: string) {
+        return groupUi[key] ?? { fixedId: "", movingId: "", choice: "" };
     }
 
-    function choiceFor(key: string): string {
-        return groupUi[key]?.choice ?? "";
+    function setFixed(key: string, imageId: string) {
+        const current = selectionFor(key);
+        groupUi[key] = {
+            fixedId: imageId,
+            movingId: current.movingId === imageId ? "" : current.movingId,
+            choice: current.choice,
+        };
     }
 
-    function toggleImage(key: string, imageId: string) {
-        const current = checkedFor(key);
-        const checked = current.includes(imageId)
-            ? current.filter((id) => id !== imageId)
-            : [...current, imageId];
-        groupUi[key] = { checked, choice: choiceFor(key) };
+    function setMoving(key: string, imageId: string) {
+        const current = selectionFor(key);
+        groupUi[key] = {
+            fixedId: current.fixedId === imageId ? "" : current.fixedId,
+            movingId: imageId,
+            choice: current.choice,
+        };
     }
 
     function setChoice(key: string, choice: string) {
-        groupUi[key] = { checked: checkedFor(key), choice };
+        const current = selectionFor(key);
+        groupUi[key] = { ...current, choice };
     }
 
     function annotationsFor(group: EyeGroup) {
-        return formAnnotations.filter((annotation) =>
-            annotationMatchesEye(
-                annotation,
-                registrationSchema.id,
-                group.patientId,
-                group.laterality,
-                (imageId) => instances.get(imageId)?.laterality ?? null,
-            ),
+        return formAnnotations.filter(
+            (annotation) =>
+                annotationMatchesEye(
+                    annotation,
+                    registrationSchema.id,
+                    group.patientId,
+                    group.laterality,
+                    (imageId) => instances.get(imageId)?.laterality ?? null,
+                ) && globalContext.canEdit(annotation),
         );
     }
 
-    function checkedInGroupOrder(group: EyeGroup, key: string): OpenImage[] {
-        const checked = new Set(checkedFor(key));
-        return group.images.filter((image) => checked.has(image.imageId));
+    function imageInGroup(
+        group: EyeGroup,
+        imageId: string,
+    ): OpenImage | undefined {
+        return group.images.find((image) => image.imageId === imageId);
     }
 
     async function openGroup(group: EyeGroup) {
         const key = groupKey(group.patientId, group.laterality);
-        const choice = choiceFor(key);
-        const ordered = checkedInGroupOrder(group, key);
-        if (!canOpenRegistration(ordered.length, choice || null)) return;
+        const { fixedId, movingId, choice } = selectionFor(key);
+        if (!canOpenRegistration(fixedId, movingId, choice || null)) return;
+        const fixed = imageInGroup(group, fixedId);
+        const moving = imageInGroup(group, movingId);
+        if (!fixed || !moving) return;
 
         let annotationId: number;
         if (choice === "new") {
             if (openingGroups.has(key)) return;
-            const first = ordered[0];
-            if (!first) return;
             markCreateInFlight(key);
             try {
                 const created = await createFormAnnotation({
                     form_schema_id: registrationSchema.id,
                     patient_id: group.patientId,
-                    image_id: first.instanceId,
-                    study_id: first.studyId,
+                    image_id: fixed.instanceId,
+                    study_id: fixed.studyId,
                     sub_task_id: taskContext?.subTask?.id,
                     form_data: {},
                     ...(group.laterality != null
@@ -148,7 +162,7 @@
         }
 
         viewerWindowContext.openRegistrationEditor({
-            imageIds: ordered.map((image) => image.imageId),
+            imageIds: [fixed.imageId, moving.imageId],
             annotationId,
         });
     }
@@ -157,27 +171,63 @@
 <div class="main">
     {#each groups as group (groupKey(group.patientId, group.laterality))}
         {@const key = groupKey(group.patientId, group.laterality)}
-        {@const checked = checkedFor(key)}
-        {@const choice = choiceFor(key)}
+        {@const selection = selectionFor(key)}
         <fieldset>
             <legend>
                 Patient {group.patientId}
                 {group.laterality ?? "unset"}
             </legend>
-            {#each group.images as image (image.imageId)}
-                <label>
-                    {image.imageId}<input
-                        type="checkbox"
-                        checked={checked.includes(image.imageId)}
-                        onclick={(event) => {
-                            event.preventDefault();
-                            toggleImage(key, image.imageId);
-                        }}
-                    />
-                </label>
-            {/each}
+            <div class="role">
+                <div class="role-label">Fixed</div>
+                <div class="thumbs">
+                    {#each group.images as image (image.imageId)}
+                        <button
+                            type="button"
+                            class="thumb"
+                            class:selected={selection.fixedId === image.imageId}
+                            title={image.instanceId}
+                            aria-label="Fixed {image.instanceId}"
+                            onclick={() => setFixed(key, image.imageId)}
+                        >
+                            <img
+                                src={getThumbUrl(
+                                    { id: image.instanceId } as ImageGET,
+                                    144,
+                                )}
+                                alt=""
+                                draggable="false"
+                            />
+                        </button>
+                    {/each}
+                </div>
+            </div>
+            <div class="role">
+                <div class="role-label">Moving</div>
+                <div class="thumbs">
+                    {#each group.images as image (image.imageId)}
+                        <button
+                            type="button"
+                            class="thumb"
+                            class:selected={selection.movingId ===
+                                image.imageId}
+                            title={image.instanceId}
+                            aria-label="Moving {image.instanceId}"
+                            onclick={() => setMoving(key, image.imageId)}
+                        >
+                            <img
+                                src={getThumbUrl(
+                                    { id: image.instanceId } as ImageGET,
+                                    144,
+                                )}
+                                alt=""
+                                draggable="false"
+                            />
+                        </button>
+                    {/each}
+                </div>
+            </div>
             <select
-                value={choice}
+                value={selection.choice}
                 onchange={(event) => setChoice(key, event.currentTarget.value)}
             >
                 <option value=""></option>
@@ -190,8 +240,11 @@
             </select>
             <button
                 type="button"
-                disabled={!canOpenRegistration(checked.length, choice || null) ||
-                    openingGroups.has(key)}
+                disabled={!canOpenRegistration(
+                    selection.fixedId,
+                    selection.movingId,
+                    selection.choice || null,
+                ) || openingGroups.has(key)}
                 onclick={() => openGroup(group)}
             >
                 Open
@@ -212,10 +265,36 @@
         padding: 0.4em;
         border: 1px solid rgba(255, 255, 255, 0.25);
     }
-    label {
+    .role {
+        margin-top: 0.45em;
+    }
+    .role-label {
+        font-size: 0.75em;
+        opacity: 0.8;
+        margin-bottom: 0.25em;
+    }
+    .thumbs {
         display: flex;
-        align-items: center;
-        gap: 0.4em;
+        flex-direction: row;
+        gap: 0.35em;
+        overflow-x: auto;
+    }
+    button.thumb {
+        flex: 0 0 auto;
+        padding: 0;
+        border: 2px solid transparent;
+        background: black;
+        cursor: pointer;
+        line-height: 0;
+    }
+    button.thumb.selected {
+        border-color: white;
+    }
+    button.thumb img {
+        width: 3.2rem;
+        height: 3.2rem;
+        object-fit: contain;
+        display: block;
     }
     select,
     button {

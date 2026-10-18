@@ -54,6 +54,7 @@ const contexts = new Map<string, unknown>([
                 [left, {}],
                 [rightB, {}],
             ]),
+            instanceIds: ["imgB", "imgA", "imgL"],
             openRegistrationEditor,
         },
     ],
@@ -75,6 +76,20 @@ describe("PanelRegistration", () => {
         } as never);
     });
 
+    function openButton(group: HTMLElement) {
+        const button = [...group.querySelectorAll("button")].find(
+            (item) => item.textContent?.trim() === "Open",
+        );
+        if (!button) throw new Error("Open button missing");
+        return button;
+    }
+
+    async function pick(role: "Fixed" | "Moving", imageId: string) {
+        await fireEvent.click(
+            screen.getByRole("button", { name: `${role} ${imageId}` }),
+        );
+    }
+
     function renderPanel() {
         return render(PanelRegistration, {
             props: { active: true, registrationSchema: schema },
@@ -82,23 +97,44 @@ describe("PanelRegistration", () => {
         } as never);
     }
 
+    it("lists a group in top-row order with a thumbnail", () => {
+        renderPanel();
+        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        const fixedThumbs = [
+            ...right.querySelectorAll(".role:first-of-type button.thumb"),
+        ];
+        expect(
+            fixedThumbs.map((button) => button.getAttribute("aria-label")),
+        ).toEqual(["Fixed imgB", "Fixed imgA"]);
+        expect(fixedThumbs[0].querySelector("img")).toHaveAttribute(
+            "src",
+            "/api/images/imgB/thumbnail?size=144",
+        );
+        expect(fixedThumbs[0]).toHaveAttribute("title", "imgB");
+        expect(
+            screen.getByRole("button", { name: "Moving imgB" }),
+        ).toBeInTheDocument();
+    });
+
     it("groups a known eye apart from the other eye", () => {
         renderPanel();
         const right = screen.getByRole("group", { name: "Patient 100 R" });
         const leftGroup = screen.getByRole("group", { name: "Patient 100 L" });
-        expect(right).toHaveTextContent("imgA");
-        expect(right).toHaveTextContent("imgB");
-        expect(leftGroup).toHaveTextContent("imgL");
-        expect(right).not.toHaveTextContent("imgL");
+        expect(right.querySelector('[aria-label="Fixed imgA"]')).toBeTruthy();
+        expect(right.querySelector('[aria-label="Fixed imgB"]')).toBeTruthy();
+        expect(
+            leftGroup.querySelector('[aria-label="Fixed imgL"]'),
+        ).toBeTruthy();
+        expect(right.querySelector('[aria-label="Fixed imgL"]')).toBeNull();
     });
 
     it("opens an existing annotation without creating one", async () => {
         renderPanel();
         const right = screen.getByRole("group", { name: "Patient 100 R" });
-        const open = right.querySelector("button")!;
+        const open = openButton(right);
         expect(open).toBeDisabled();
-        await fireEvent.click(screen.getByRole("checkbox", { name: "imgA" }));
-        await fireEvent.click(screen.getByRole("checkbox", { name: "imgB" }));
+        await pick("Fixed", "imgA");
+        await pick("Moving", "imgB");
         expect(open).toBeDisabled();
         await fireEvent.change(right.querySelector("select")!, {
             target: { value: "21" },
@@ -116,13 +152,13 @@ describe("PanelRegistration", () => {
         vi.mocked(createFormAnnotation).mockResolvedValue({ id: 22 });
         renderPanel();
         const right = screen.getByRole("group", { name: "Patient 100 R" });
-        await fireEvent.click(screen.getByRole("checkbox", { name: "imgB" }));
-        await fireEvent.click(screen.getByRole("checkbox", { name: "imgA" }));
+        await pick("Fixed", "imgA");
+        await pick("Moving", "imgB");
         expect(createFormAnnotation).not.toHaveBeenCalled();
         await fireEvent.change(right.querySelector("select")!, {
             target: { value: "new" },
         });
-        await fireEvent.click(right.querySelector("button")!);
+        await fireEvent.click(openButton(right));
         await waitFor(() => {
             expect(createFormAnnotation).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -151,12 +187,12 @@ describe("PanelRegistration", () => {
 
         renderPanel();
         const right = screen.getByRole("group", { name: "Patient 100 R" });
-        await fireEvent.click(screen.getByRole("checkbox", { name: "imgA" }));
-        await fireEvent.click(screen.getByRole("checkbox", { name: "imgB" }));
+        await pick("Fixed", "imgA");
+        await pick("Moving", "imgB");
         await fireEvent.change(right.querySelector("select")!, {
             target: { value: "new" },
         });
-        const open = right.querySelector("button")!;
+        const open = openButton(right);
         await fireEvent.click(open);
         expect(createFormAnnotation).toHaveBeenCalledTimes(1);
 
@@ -170,7 +206,7 @@ describe("PanelRegistration", () => {
         });
     });
 
-    it("omits non-2D images and keeps 2D images as checkboxes", () => {
+    it("omits non-2D images and keeps 2D images as thumbnails", () => {
         const flat = { ...image("img2d", "R"), is2D: true };
         const volume = { ...image("imgVol", "R"), is2D: false };
         render(PanelRegistration, {
@@ -190,23 +226,51 @@ describe("PanelRegistration", () => {
             ]),
         } as never);
         expect(
-            screen.getByRole("checkbox", { name: "img2d" }),
+            screen.getByRole("button", { name: "Fixed img2d" }),
         ).toBeInTheDocument();
         expect(
-            screen.queryByRole("checkbox", { name: "imgVol" }),
+            screen.queryByRole("button", { name: "Fixed imgVol" }),
         ).not.toBeInTheDocument();
+    });
+
+    it("hides annotations the current user cannot edit", () => {
+        formAnnotations.set(22, {
+            id: 22,
+            form_schema_id: 4,
+            patient_id: 100,
+            laterality: "R",
+            image_id: null,
+            creator: { id: 9, name: "other" },
+            form_data: {},
+        } as never);
+        render(PanelRegistration, {
+            props: { active: true, registrationSchema: schema },
+            context: new Map([
+                ...contexts,
+                [
+                    "globalContext",
+                    {
+                        canEdit: (annotation: { creator: { id: number } }) =>
+                            annotation.creator.id === 5,
+                    },
+                ],
+            ]),
+        } as never);
+        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        expect(right).toHaveTextContent("me [21]");
+        expect(right).not.toHaveTextContent("other [22]");
     });
 
     it("does not open the editor when create fails", async () => {
         vi.mocked(createFormAnnotation).mockRejectedValue(new Error("nope"));
         renderPanel();
         const right = screen.getByRole("group", { name: "Patient 100 R" });
-        await fireEvent.click(screen.getByRole("checkbox", { name: "imgA" }));
-        await fireEvent.click(screen.getByRole("checkbox", { name: "imgB" }));
+        await pick("Fixed", "imgA");
+        await pick("Moving", "imgB");
         await fireEvent.change(right.querySelector("select")!, {
             target: { value: "new" },
         });
-        await fireEvent.click(right.querySelector("button")!);
+        await fireEvent.click(openButton(right));
         await waitFor(() => expect(createFormAnnotation).toHaveBeenCalled());
         expect(openRegistrationEditor).not.toHaveBeenCalled();
     });
