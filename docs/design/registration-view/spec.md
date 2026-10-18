@@ -26,7 +26,7 @@ Each image can fade between its original colours and luminosity times a picked c
 - The normal viewers stay mounted underneath and do not paint while the editor is open. Closing resumes them.
 - The editor uses the existing `Viewer`, point tool, loaded images, and registration graph. It does not reuse the top row, the side panels, or the main viewer.
 - The blend is one fixed shader for two images. The affine matrix, tint, and opacity are uniforms. Point drags do not recompile it.
-- Only a direct affine edge between the two images is used. The moving image stays out until that edge exists.
+- Only a direct affine edge between the two images is used. The moving image stays out until that edge exists, and it is not drawn where the warp falls outside that image.
 - The session is not written to the view-state URL.
 
 ## Editor

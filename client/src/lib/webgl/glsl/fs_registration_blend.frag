@@ -32,8 +32,11 @@ vec3 tinted(vec3 rgb, float amount, vec3 colour) {
 void main() {
     vec3 rgb = u_fixed_opacity * tinted(texture(u_fixed, v_uv).rgb, u_fixed_mix, u_fixed_colour);
 
-    vec3 overlay_rgb = texture(u_overlay, map_overlay(v_uv)).rgb;
-    rgb += u_has_overlay * u_overlay_opacity * tinted(overlay_rgb, u_overlay_mix, u_overlay_colour);
+    vec2 overlay_uv = map_overlay(v_uv);
+    float inside = step(0.0, overlay_uv.x) * step(overlay_uv.x, 1.0)
+        * step(0.0, overlay_uv.y) * step(overlay_uv.y, 1.0);
+    vec3 overlay_rgb = texture(u_overlay, overlay_uv).rgb;
+    rgb += u_has_overlay * u_overlay_opacity * inside * tinted(overlay_rgb, u_overlay_mix, u_overlay_colour);
 
     color_out.rgb = (255.0 * rgb - u_window_level.x) / (u_window_level.y - u_window_level.x);
     color_out.a = 1.0;

@@ -19,5 +19,7 @@ describe("registration blend shader", () => {
         expect(shader).toContain("mix(rgb, luma * colour, amount)");
         expect(shader).toContain("u_fixed_opacity *");
         expect(shader).toContain("u_overlay_opacity *");
+        expect(shader).toContain("step(overlay_uv.x, 1.0)");
+        expect(shader).toContain("step(overlay_uv.y, 1.0)");
     });
 });
