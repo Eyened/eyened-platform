@@ -2,7 +2,7 @@ import { Matrix } from "$lib/matrix";
 import { AffineRegistration } from "$lib/registration/affine";
 import { ParabolicRegistration } from "$lib/registration/parabolic";
 import { describe, expect, it } from "vitest";
-import { directAffineMatrix, firstBlendOverlay } from "./directAffine";
+import { directAffineMatrix } from "./directAffine";
 
 describe("directAffineMatrix", () => {
     it("returns the affine matrix and ignores other edge types", () => {
@@ -19,12 +19,5 @@ describe("directAffineMatrix", () => {
             ),
         ).toBeNull();
         expect(directAffineMatrix(undefined)).toBeNull();
-    });
-});
-
-describe("firstBlendOverlay", () => {
-    it("picks the first checked image in top-row order", () => {
-        expect(firstBlendOverlay(["a", "b", "c"], "b", ["c", "a"])).toBe("a");
-        expect(firstBlendOverlay(["a", "b"], "a", [])).toBeUndefined();
     });
 });

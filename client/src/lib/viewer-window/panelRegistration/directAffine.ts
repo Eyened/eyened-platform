@@ -9,15 +9,3 @@ export function directAffineMatrix(
     if (item instanceof AffineRegistration) return item.M;
     return null;
 }
-
-/** First checked image in top-row order, other than the fixed image. */
-export function firstBlendOverlay(
-    orderedImageIds: readonly string[],
-    fixedImageId: string,
-    overlayImageIds: readonly string[],
-): string | undefined {
-    const selected = new Set(overlayImageIds);
-    return orderedImageIds.find(
-        (id) => id !== fixedImageId && selected.has(id),
-    );
-}
