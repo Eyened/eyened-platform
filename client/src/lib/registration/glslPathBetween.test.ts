@@ -2,8 +2,10 @@ import { Matrix } from "$lib/matrix";
 import { describe, expect, it } from "vitest";
 import { AffineRegistration } from "./affine";
 import { CompositeRegistration } from "./composite";
+import { EnfaceToProjPhotolocations } from "./enfaceToProj";
 import { glslPathBetween } from "./glslPathBetween";
 import { ParabolicRegistration } from "./parabolic";
+import { LinePhotoLocator } from "./photoLocators";
 import type { Registration } from "./registration.svelte";
 import type { RegistrationItem } from "./registrationItem";
 
@@ -99,6 +101,37 @@ describe("glslPathBetween", () => {
         expect(glsl).toContain("10.0");
         expect(glsl).toContain("30.0");
         expect(glsl).not.toContain("50.0");
+    });
+
+    it("falls back to per-hop baking when the path is not a pixel-space chain", () => {
+        const glsl = glslPathBetween(
+            registration({
+                path: ["a", "b"],
+                items: {
+                    "a>b": new EnfaceToProjPhotolocations(
+                        "a",
+                        "b",
+                        [
+                            new LinePhotoLocator(
+                                "a",
+                                "b",
+                                { x: 0, y: 0 },
+                                { x: 10, y: 0 },
+                                0,
+                                10,
+                            ),
+                        ],
+                        10,
+                        1,
+                    ),
+                },
+            }),
+            "a",
+            "b",
+            (id) => sizes[id],
+        );
+        expect(glsl).toContain("vec2 mapping(vec2 uv)");
+        expect(glsl).toContain("map_0");
     });
 
     it("returns null when the path or a size is missing", () => {

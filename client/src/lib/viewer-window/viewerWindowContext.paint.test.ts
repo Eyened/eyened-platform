@@ -99,6 +99,44 @@ describe("ViewerWindowContext registration editor paint", () => {
         expect(background.repaint).toHaveBeenCalledOnce();
         expect(foreground.repaint).toHaveBeenCalledOnce();
     });
+
+    it("drops a viewer from the paint list when it unregisters", () => {
+        const foreground = { repaint: vi.fn() };
+        ctx = createContext();
+        const stop = ctx.addViewer(foreground as never, true);
+        ctx.openSeriesBlend({ imageIds: ["a", "b"] });
+        stop();
+        ctx.repaint();
+        expect(foreground.repaint).not.toHaveBeenCalled();
+
+        ctx.addViewer(foreground as never, true);
+        ctx.removeViewer(foreground as never);
+        ctx.repaint();
+        expect(foreground.repaint).not.toHaveBeenCalled();
+    });
+
+    it("reads a foreground volume index when syncing open viewers", () => {
+        const setOpenViewers = vi.fn();
+        const viewState = {
+            prune: vi.fn(),
+            enableRecording: vi.fn(),
+            flush: vi.fn(),
+            getViewers: () => [{ id: "vol", index: 2 }],
+            setOpenViewers,
+        };
+        ctx = new ViewerWindowContext(
+            { clear: vi.fn(), canvas: { width: 8, height: 8 } } as never,
+            {} as Registration,
+            null,
+            [],
+            viewState as never,
+        );
+        const image = { image_id: "vol", is3D: true, depth: 12 };
+        ctx.mainPanels = [{ component: {}, props: { image } }];
+        ctx.addViewer({ image, index: 7, repaint: vi.fn() } as never, true);
+        ctx.syncMainPanelsToViewState();
+        expect(setOpenViewers).toHaveBeenCalledWith([{ id: "vol", index: 7 }]);
+    });
 });
 
 vi.mock("cornerstone-wado-image-loader", () => ({

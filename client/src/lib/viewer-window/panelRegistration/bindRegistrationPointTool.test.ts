@@ -4,7 +4,13 @@ import { formAnnotations } from "$lib/data/stores.svelte";
 const toolSpies = vi.hoisted(() => ({
     tools: [] as {
         points: { x: number; y: number }[];
-        opts: { onPersist: (points: unknown) => void; canEdit: boolean };
+        opts: {
+            onPersist: (points: unknown) => void;
+            onChange: (points: unknown) => void;
+            canEdit: boolean;
+            coordinateSpace: string;
+            dragThresholdPx: number;
+        };
         destroy: () => void;
     }[],
 }));
@@ -85,7 +91,9 @@ describe("bindRegistrationPointTool", () => {
         expect(addOverlay).toHaveBeenCalledOnce();
         const tool = toolSpies.tools[0]!;
         expect(tool.points).toEqual([{ x: 1, y: 2 }]);
+        tool.opts.onChange([{ x: 3, y: 4 }]);
         tool.opts.onPersist([{ x: 3, y: 4 }]);
+        expect(tool.opts.dragThresholdPx).toBe(0);
         expect(setFormAnnotationValue).toHaveBeenCalledWith(
             21,
             expect.objectContaining({ img: [{ x: 3, y: 4 }] }),
@@ -116,6 +124,27 @@ describe("bindRegistrationPointTool", () => {
             .mock.calls.at(-1)?.[1];
         expect(written).toEqual({ img: [{ x: 3, y: 4 }] });
         expect(written).not.toHaveProperty("img_proj");
+    });
+
+    it("treats a schema with no index as an OCT registration", () => {
+        bindRegistrationPointTool({
+            viewerContext: {
+                image: { image_id: "img", instance: { id: "img" } },
+                addOverlay: () => () => {},
+            } as never,
+            annotationId: 21,
+            schema: {
+                type: "object",
+                properties: {
+                    x: { type: "number" },
+                    y: { type: "number" },
+                },
+                required: ["x", "y"],
+            } as never,
+            canEdit: true,
+            pointMarker: { style: "cross", radius: 4, color: "red" },
+        });
+        expect(toolSpies.tools.at(-1)?.opts.coordinateSpace).toBe("oct");
     });
 
     it("passes canEdit false through to the tool", () => {

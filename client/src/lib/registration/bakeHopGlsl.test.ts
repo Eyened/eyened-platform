@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { AffineRegistration } from "./affine";
 import { CompositeRegistration } from "./composite";
 import { ParabolicRegistration } from "./parabolic";
-import { bakeHopGlsl, bakeParabolicHop } from "./enfaceToProj";
+import { bakeHopGlsl, bakeParabolicHop, bakePixelSteps } from "./enfaceToProj";
 import { Matrix } from "$lib/matrix";
 import { composeGlslPath } from "./composeGlslPath";
 
@@ -76,6 +76,33 @@ describe("bakeHopGlsl parabolic", () => {
         expect(hop).toContain("dx_val");
         const composed = composeGlslPath([hop!]);
         expect(composed).toContain("map_0");
+    });
+
+    it("folds an all-affine composite into one step", () => {
+        const step = bakePixelSteps(
+            new CompositeRegistration("a", "b", [
+                new AffineRegistration("a", "mid", Matrix.identity),
+                new AffineRegistration("mid", "b", Matrix.identity),
+            ]),
+        );
+        expect(step).toHaveLength(1);
+        expect(step![0]).toContain("mat3");
+    });
+
+    it("rejects a composite that contains a step with no pixel bake", () => {
+        expect(
+            bakePixelSteps(new CompositeRegistration("a", "b", [])),
+        ).toBeNull();
+        expect(
+            bakePixelSteps(
+                new CompositeRegistration("a", "b", [
+                    { mapping: () => undefined } as never,
+                ]),
+            ),
+        ).toBeNull();
+        expect(
+            bakePixelSteps({ mapping: () => undefined } as never),
+        ).toBeNull();
     });
 
     it("bakes mixed affine+parabolic composites in pixel space", () => {
