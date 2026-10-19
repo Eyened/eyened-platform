@@ -1,252 +1,324 @@
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button";
     import {
         createFormAnnotation,
-        deleteFormAnnotation,
         formAnnotations,
         instances,
-        setFormAnnotationValue,
     } from "$lib/data";
+    import { getThumbUrl } from "$lib/data-loading/utils";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import {
-        CLIENT_DEFAULTS,
-        mergeClientConfig,
-    } from "$lib/config/clientDefaults";
-    import {
-        analyzePointSchema,
-        getPointsForImage,
-        setPointsForImage,
-    } from "$lib/forms/pointSchema";
-    import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { SvelteSet } from "svelte/reactivity";
     import { getContext } from "svelte";
-    import type {
-        FormAnnotationGET,
-        FormSchemaGET,
-    } from "../../../types/openapi_types";
-    import RegistrationItem from "./RegistrationItem.svelte";
+    import type { FormSchemaGET, ImageGET } from "../../../types/openapi_types";
+    import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
+    import {
+        annotationMatchesEye,
+        canOpenRegistration,
+        groupOpenImages,
+        orderByInstanceIds,
+        type EyeGroup,
+        type EyeLaterality,
+        type OpenImage,
+    } from "./groupOpenImages";
 
-    const viewerContext = getContext<ViewerContext>("viewerContext");
-    const taskContext = getContext<TaskContext>("taskContext");
-    const globalContext = getContext<GlobalContext>("globalContext");
-
-    const pointMarker = $derived(
-        mergeClientConfig(
-            CLIENT_DEFAULTS,
-            taskContext?.task.task_definition.config,
-        ).point_marker,
-    );
-
-    interface props {
+    interface Props {
         active: boolean;
         registrationSchema: FormSchemaGET;
     }
-    const { active: panelActive, registrationSchema }: props = $props();
+    const { active, registrationSchema }: Props = $props();
+    // `active` stays in the panel contract. Read it in an effect so Svelte
+    // does not treat the prop as captured once at init.
+    $effect(() => {
+        void active;
+    });
 
-    const {
-        image: { instance },
-    } = viewerContext;
-
-    const filtered = $derived(
-        formAnnotations
-            .filter((formAnnotation) => {
-                if (formAnnotation.form_schema_id !== registrationSchema.id)
-                    return false;
-                if (formAnnotation.patient_id !== instance.patient.id)
-                    return false;
-                const formLaterality =
-                    formAnnotation.laterality ??
-                    (formAnnotation.image_id
-                        ? instances.get(formAnnotation.image_id)?.laterality
-                        : undefined);
-                if (
-                    formLaterality &&
-                    instance.laterality &&
-                    formLaterality !== instance.laterality
-                ) {
-                    return false;
-                }
-                return true;
-            })
-            .sort((a, b) => a.id - b.id),
+    const viewerWindowContext = getContext<ViewerWindowContext>(
+        "viewerWindowContext",
     );
+    const taskContext = getContext<TaskContext | undefined>("taskContext");
+    const globalContext = getContext<GlobalContext>("globalContext");
 
-    const REGISTRATION_POINTS: JSONSchema = {
-        type: "array",
-        items: {
-            oneOf: [
-                {
-                    type: "object",
-                    properties: {
-                        x: { type: "number" },
-                        y: { type: "number" },
-                        index: { type: ["number", "null"] },
-                    },
-                    required: ["x", "y"],
-                },
-                { type: "null" },
-            ],
-        },
+    const openImages = $derived.by(() => {
+        const images: OpenImage[] = [];
+        for (const image of viewerWindowContext.topViewers.keys()) {
+            // Skip only real volumes and slice stacks. Missing is2D stays.
+            if (image.is2D === false) continue;
+            images.push({
+                imageId: image.image_id,
+                instanceId: image.instance.id,
+                patientId: image.instance.patient.id,
+                laterality: image.instance.laterality ?? null,
+                studyId: image.instance.study?.id,
+            });
+        }
+        return orderByInstanceIds(
+            images,
+            viewerWindowContext.instanceIds ?? [],
+        );
+    });
+
+    const groups = $derived(groupOpenImages(openImages));
+
+    type GroupSelection = {
+        fixedId: string;
+        movingId: string;
+        choice: string;
+        blendIds: string[];
     };
 
-    function registrationAnalysis() {
-        const fromApi = (registrationSchema.schema ?? {}) as JSONSchema;
-        const withMarker = (schema: JSONSchema): JSONSchema => ({
-            ...schema,
-            type: "object",
-            "x-eyened-widget": "keypoint",
-        });
+    let groupUi = $state<Record<string, GroupSelection>>({});
 
-        const analyzed =
-            analyzePointSchema(withMarker(fromApi)) ??
-            analyzePointSchema(
-                withMarker({ additionalProperties: REGISTRATION_POINTS }),
-            );
-        // Registration stores landmarks on fundus, OCT volumes, and enface
-        // `*_proj`. Older seeded schemas omitted `index`; still treat as oct.
-        if (analyzed && analyzed.coordinateSpace === "enface2d") {
-            return { ...analyzed, coordinateSpace: "oct" as const };
-        }
-        return analyzed;
+    const openingGroups = new SvelteSet<string>();
+
+    function markCreateInFlight(key: string) {
+        openingGroups.add(key);
     }
 
-    async function create() {
-        const formAnnotation = await createFormAnnotation({
-            form_schema_id: registrationSchema.id,
-            patient_id: instance.patient.id,
-            study_id: instance.study?.id ?? undefined,
-            image_id: instance.id,
-            laterality: instance.laterality ?? undefined,
-            sub_task_id: taskContext?.subTask?.id,
-            form_data: {},
-        });
-        onactivate(formAnnotation);
+    function clearCreateInFlight(key: string) {
+        openingGroups.delete(key);
     }
 
-    /** Per-viewer tool — other MainViewers can arm the same annotation independently. */
-    let activeID: number | undefined = $state(undefined);
-    let removeTool: (() => void) | undefined;
-
-    function deactivate() {
-        removeTool?.();
-        removeTool = undefined;
-        activeID = undefined;
+    function groupKey(patientId: number, laterality: EyeLaterality): string {
+        return `${patientId}:${laterality ?? "unset"}`;
     }
 
-    function onactivate(formAnnotation: FormAnnotationGET) {
-        const stillExists = filtered.some((f) => f.id === formAnnotation.id);
-        if (!stillExists) {
-            console.log("Annotation no longer exists, ignoring onactivate");
-            return;
-        }
+    function selectionFor(key: string): GroupSelection {
+        return (
+            groupUi[key] ?? {
+                fixedId: "",
+                movingId: "",
+                choice: "",
+                blendIds: [],
+            }
+        );
+    }
 
-        if (activeID === formAnnotation.id) {
-            deactivate();
-            return;
-        }
-
-        const analysis = registrationAnalysis();
-        if (!analysis) {
-            console.error(
-                "Pointset registration schema could not be analyzed",
-                registrationSchema.schema,
-            );
-            return;
-        }
-
-        deactivate();
-
-        const annotationId = formAnnotation.id;
-        const canEdit = globalContext.canEdit(formAnnotation);
-        const publicId = () => viewerContext.image.instance.id;
-
-        const tool = new PointTool({
-            canEdit,
-            label: "registration",
-            pointStyle: pointMarker.style,
-            radius: pointMarker.radius,
-            color: pointMarker.color,
-            cardinality: analysis.cardinality,
-            sparse: analysis.sparse,
-            coordinateSpace: analysis.coordinateSpace,
-            onChange: (points) => {
-                const existing =
-                    formAnnotations.get(annotationId) ?? formAnnotation;
-                const next = setPointsForImage(
-                    existing.form_data,
-                    publicId(),
-                    points,
-                    analysis,
-                );
-                formAnnotations.set(annotationId, {
-                    ...existing,
-                    form_data: next,
-                });
-            },
-            onPersist: (points) => {
-                const existing =
-                    formAnnotations.get(annotationId) ?? formAnnotation;
-                const next = setPointsForImage(
-                    existing.form_data,
-                    publicId(),
-                    points,
-                    analysis,
-                );
-                formAnnotations.set(annotationId, {
-                    ...existing,
-                    form_data: next,
-                });
-                setFormAnnotationValue(annotationId, next);
-            },
-        });
-
-        const existing =
-            formAnnotations.get(annotationId)?.form_data ??
-            formAnnotation.form_data;
-        tool.points = getPointsForImage(existing, publicId(), analysis);
-
-        const dispose = viewerContext.addOverlay(tool);
-        removeTool = () => {
-            tool.destroy();
-            dispose();
+    function setFixed(key: string, imageId: string) {
+        const current = selectionFor(key);
+        groupUi[key] = {
+            ...current,
+            fixedId: imageId,
+            movingId: current.movingId === imageId ? "" : current.movingId,
         };
-        activeID = annotationId;
     }
 
-    function onremove(formAnnotation: FormAnnotationGET) {
-        if (activeID === formAnnotation.id) deactivate();
-        deleteFormAnnotation(formAnnotation.id);
+    function setMoving(key: string, imageId: string) {
+        const current = selectionFor(key);
+        groupUi[key] = {
+            ...current,
+            fixedId: current.fixedId === imageId ? "" : current.fixedId,
+            movingId: imageId,
+        };
     }
 
-    $effect(() => {
-        if (!panelActive) deactivate();
-    });
+    function toggleBlend(key: string, imageId: string) {
+        const current = selectionFor(key);
+        const blendIds = current.blendIds.includes(imageId)
+            ? current.blendIds.filter((id) => id !== imageId)
+            : [...current.blendIds, imageId];
+        groupUi[key] = { ...current, blendIds };
+    }
 
-    // Unmount when the armed annotation is deleted (this viewer or another).
-    $effect(() => {
-        if (activeID === undefined) return;
-        if (!formAnnotations.has(activeID)) deactivate();
-    });
+    function selectedBlendIds(
+        group: EyeGroup,
+        blendIds: readonly string[],
+    ): string[] {
+        const selected = new Set(blendIds);
+        return group.images
+            .filter((image) => selected.has(image.imageId))
+            .map((image) => image.imageId);
+    }
+
+    function viewBlend(group: EyeGroup) {
+        const key = groupKey(group.patientId, group.laterality);
+        const imageIds = selectedBlendIds(group, selectionFor(key).blendIds);
+        if (imageIds.length < 2) return;
+        viewerWindowContext.openSeriesBlend({ imageIds });
+    }
+
+    function setChoice(key: string, choice: string) {
+        const current = selectionFor(key);
+        groupUi[key] = { ...current, choice };
+    }
+
+    function annotationsFor(group: EyeGroup) {
+        return formAnnotations.filter(
+            (annotation) =>
+                annotationMatchesEye(
+                    annotation,
+                    registrationSchema.id,
+                    group.patientId,
+                    group.laterality,
+                    (imageId) => instances.get(imageId)?.laterality ?? null,
+                ) && globalContext.canEdit(annotation),
+        );
+    }
+
+    function imageInGroup(
+        group: EyeGroup,
+        imageId: string,
+    ): OpenImage | undefined {
+        return group.images.find((image) => image.imageId === imageId);
+    }
+
+    async function openGroup(group: EyeGroup) {
+        const key = groupKey(group.patientId, group.laterality);
+        const { fixedId, movingId, choice } = selectionFor(key);
+        if (!canOpenRegistration(fixedId, movingId, choice || null)) return;
+        const fixed = imageInGroup(group, fixedId);
+        const moving = imageInGroup(group, movingId);
+        if (!fixed || !moving) return;
+
+        let annotationId: number;
+        if (choice === "new") {
+            if (openingGroups.has(key)) return;
+            markCreateInFlight(key);
+            try {
+                const created = await createFormAnnotation({
+                    form_schema_id: registrationSchema.id,
+                    patient_id: group.patientId,
+                    image_id: fixed.instanceId,
+                    study_id: fixed.studyId,
+                    sub_task_id: taskContext?.subTask?.id,
+                    form_data: {},
+                    ...(group.laterality != null
+                        ? { laterality: group.laterality }
+                        : {}),
+                });
+                annotationId = created.id;
+            } catch {
+                return;
+            } finally {
+                clearCreateInFlight(key);
+            }
+        } else {
+            annotationId = Number(choice);
+        }
+
+        viewerWindowContext.openRegistrationEditor({
+            imageIds: [fixed.imageId, moving.imageId],
+            annotationId,
+        });
+    }
 </script>
 
 <div class="main">
-    <div class="available">
-        <ul>
-            {#each filtered as formAnnotation (formAnnotation.id)}
-                <RegistrationItem
-                    {formAnnotation}
-                    active={activeID === formAnnotation.id}
-                    {onactivate}
-                    {onremove}
-                />
-            {/each}
-        </ul>
-    </div>
-    <div class="new">
-        <Button variant="outline" onclick={create}>Create new</Button>
-    </div>
+    {#each groups as group (groupKey(group.patientId, group.laterality))}
+        {@const key = groupKey(group.patientId, group.laterality)}
+        {@const selection = selectionFor(key)}
+        {@const blendIds = selectedBlendIds(group, selection.blendIds)}
+        <fieldset>
+            <legend>
+                Patient {group.patientId}
+                {group.laterality ?? "unset"}
+            </legend>
+            <div class="role">
+                <div class="role-label">Fixed</div>
+                <div class="thumbs">
+                    {#each group.images as image (image.imageId)}
+                        <button
+                            type="button"
+                            class="thumb"
+                            class:selected={selection.fixedId === image.imageId}
+                            title={image.instanceId}
+                            aria-label="Fixed {image.instanceId}"
+                            onclick={() => setFixed(key, image.imageId)}
+                        >
+                            <img
+                                src={getThumbUrl(
+                                    { id: image.instanceId } as ImageGET,
+                                    144,
+                                )}
+                                alt=""
+                                draggable="false"
+                            />
+                        </button>
+                    {/each}
+                </div>
+            </div>
+            <div class="role">
+                <div class="role-label">Moving</div>
+                <div class="thumbs">
+                    {#each group.images as image (image.imageId)}
+                        <button
+                            type="button"
+                            class="thumb"
+                            class:selected={selection.movingId ===
+                                image.imageId}
+                            title={image.instanceId}
+                            aria-label="Moving {image.instanceId}"
+                            onclick={() => setMoving(key, image.imageId)}
+                        >
+                            <img
+                                src={getThumbUrl(
+                                    { id: image.instanceId } as ImageGET,
+                                    144,
+                                )}
+                                alt=""
+                                draggable="false"
+                            />
+                        </button>
+                    {/each}
+                </div>
+            </div>
+            <select
+                value={selection.choice}
+                onchange={(event) => setChoice(key, event.currentTarget.value)}
+            >
+                <option value=""></option>
+                <option value="new">New</option>
+                {#each annotationsFor(group) as annotation (annotation.id)}
+                    <option value={String(annotation.id)}>
+                        {annotation.creator.name} [{annotation.id}]
+                    </option>
+                {/each}
+            </select>
+            <button
+                type="button"
+                disabled={!canOpenRegistration(
+                    selection.fixedId,
+                    selection.movingId,
+                    selection.choice || null,
+                ) || openingGroups.has(key)}
+                onclick={() => openGroup(group)}
+            >
+                Open
+            </button>
+            <div class="role">
+                <div class="role-label">Blend</div>
+                <div class="thumbs">
+                    {#each group.images as image (image.imageId)}
+                        <button
+                            type="button"
+                            class="thumb"
+                            class:selected={selection.blendIds.includes(
+                                image.imageId,
+                            )}
+                            title={image.instanceId}
+                            aria-label="Blend {image.instanceId}"
+                            onclick={() => toggleBlend(key, image.imageId)}
+                        >
+                            <img
+                                src={getThumbUrl(
+                                    { id: image.instanceId } as ImageGET,
+                                    144,
+                                )}
+                                alt=""
+                                draggable="false"
+                            />
+                        </button>
+                    {/each}
+                </div>
+                <button
+                    type="button"
+                    disabled={blendIds.length < 2}
+                    onclick={() => viewBlend(group)}
+                >
+                    View blend
+                </button>
+            </div>
+        </fieldset>
+    {/each}
 </div>
 
 <style>
@@ -255,15 +327,45 @@
         min-height: 0;
         flex: 1 1 auto;
         overflow-y: auto;
-        min-height: 0px;
     }
-    div.new,
-    div.available {
-        padding: 0.2em;
-        margin-bottom: 0.5em;
+    fieldset {
+        margin: 0 0 0.5em;
+        padding: 0.4em;
+        border: 1px solid rgba(255, 255, 255, 0.25);
     }
-    ul {
-        list-style-type: none;
-        padding-inline-start: 0em;
+    .role {
+        margin-top: 0.45em;
+    }
+    .role-label {
+        font-size: 0.75em;
+        opacity: 0.8;
+        margin-bottom: 0.25em;
+    }
+    .thumbs {
+        display: flex;
+        flex-direction: row;
+        gap: 0.35em;
+        overflow-x: auto;
+    }
+    button.thumb {
+        flex: 0 0 auto;
+        padding: 0;
+        border: 2px solid transparent;
+        background: black;
+        cursor: pointer;
+        line-height: 0;
+    }
+    button.thumb.selected {
+        border-color: white;
+    }
+    button.thumb img {
+        width: 3.2rem;
+        height: 3.2rem;
+        object-fit: contain;
+        display: block;
+    }
+    select,
+    button {
+        margin-top: 0.4em;
     }
 </style>
