@@ -14,36 +14,37 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# PascalCase. For a lowercase database, comment these and uncomment the next line.
+# PascalCase. Comment this block and uncomment the lowercase block below.
 ImageInstance = "ImageInstance"
-# ImageInstance = "imageinstance"
 Series = "Series"
-# Series = "series"
 Study = "Study"
-# Study = "study"
 Patient = "Patient"
-# Patient = "patient"
 ProjectID = "ProjectID"
-# ProjectID = "projectid"
 ImageInstanceID = "ImageInstanceID"
-# ImageInstanceID = "imageinstanceid"
 SeriesID = "SeriesID"
-# SeriesID = "seriesid"
 StudyID = "StudyID"
-# StudyID = "studyid"
 PatientID = "PatientID"
+
+# ImageInstance = "imageinstance"
+# Series = "series"
+# Study = "study"
+# Patient = "patient"
+# ProjectID = "projectid"
+# ImageInstanceID = "imageinstanceid"
+# SeriesID = "seriesid"
+# StudyID = "studyid"
 # PatientID = "patientid"
 
 
 def upgrade() -> None:
     op.execute(f"ALTER TABLE {ImageInstance} ADD COLUMN {ProjectID} INT NULL")
-    op.execute(
-        f"UPDATE {ImageInstance} i "
-        f"JOIN {Series} se ON se.{SeriesID} = i.{SeriesID} "
-        f"JOIN {Study} sy ON sy.{StudyID} = se.{StudyID} "
-        f"JOIN {Patient} p ON p.{PatientID} = sy.{PatientID} "
-        f"SET i.{ProjectID} = p.{ProjectID}"
-    )
+    op.execute(f"""
+        UPDATE {ImageInstance} i
+        JOIN {Series} se ON se.{SeriesID} = i.{SeriesID}
+        JOIN {Study} sy ON sy.{StudyID} = se.{StudyID}
+        JOIN {Patient} p ON p.{PatientID} = sy.{PatientID}
+        SET i.{ProjectID} = p.{ProjectID}
+    """)
     # Fails, or writes 0, if any row did not get a project. Assumes a strict
     # SQL mode and that every image reaches a patient.
     op.execute(f"ALTER TABLE {ImageInstance} MODIFY {ProjectID} INT NOT NULL")

@@ -14,39 +14,40 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# PascalCase. For a lowercase database, comment these and uncomment the next line.
+# PascalCase. Comment this block and uncomment the lowercase block below.
 Study = "Study"
-# Study = "study"
 Series = "Series"
-# Series = "series"
 Patient = "Patient"
-# Patient = "patient"
 ProjectID = "ProjectID"
-# ProjectID = "projectid"
 StudyID = "StudyID"
-# StudyID = "studyid"
 SeriesID = "SeriesID"
-# SeriesID = "seriesid"
 PatientID = "PatientID"
+
+# Study = "study"
+# Series = "series"
+# Patient = "patient"
+# ProjectID = "projectid"
+# StudyID = "studyid"
+# SeriesID = "seriesid"
 # PatientID = "patientid"
 
 
 def upgrade() -> None:
     op.execute(f"ALTER TABLE {Study} ADD COLUMN {ProjectID} INT NULL")
-    op.execute(
-        f"UPDATE {Study} t "
-        f"JOIN {Patient} p ON p.{PatientID} = t.{PatientID} "
-        f"SET t.{ProjectID} = p.{ProjectID}"
-    )
+    op.execute(f"""
+        UPDATE {Study} t
+        JOIN {Patient} p ON p.{PatientID} = t.{PatientID}
+        SET t.{ProjectID} = p.{ProjectID}
+    """)
     # Fails, or writes 0, if any row did not get a project. Assumes a strict SQL mode.
     op.execute(f"ALTER TABLE {Study} MODIFY {ProjectID} INT NOT NULL")
 
     op.execute(f"ALTER TABLE {Series} ADD COLUMN {ProjectID} INT NULL")
-    op.execute(
-        f"UPDATE {Series} t "
-        f"JOIN {Study} s ON s.{StudyID} = t.{StudyID} "
-        f"SET t.{ProjectID} = s.{ProjectID}"
-    )
+    op.execute(f"""
+        UPDATE {Series} t
+        JOIN {Study} s ON s.{StudyID} = t.{StudyID}
+        SET t.{ProjectID} = s.{ProjectID}
+    """)
     # Fails, or writes 0, if Study.ProjectID was not filled. Assumes a strict SQL mode.
     op.execute(f"ALTER TABLE {Series} MODIFY {ProjectID} INT NOT NULL")
 
