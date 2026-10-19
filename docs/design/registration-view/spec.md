@@ -48,10 +48,24 @@ A drag moves a point by the cursor delta from where the press started, including
 
 If the user cannot edit the annotation, the points still show and the point tool does not move them.
 
+## Series blend
+
+A separate section in the same panel opens a second full-window view. It is not the two-image editor.
+
+- Thumbnails for that eye can be selected in any number. The outline shows the selection. **View blend** needs at least two.
+- The series order is top-row order among the selected images.
+- The overlay shows those images on top and the blend below, with the same draggable separator, starting at 34%.
+- The side panel has one opacity slider per image, and one series slider. The series slider at the left shows only the first image. Moving it right blends into the next image, then the one after that, one consecutive pair at a time, until the last image is the only one shown.
+- Per-image opacity multiplies that pair weight.
+- The first image is the coordinate space. Each other image is warped by a baked path from the registration graph. That path can be affine, parabolic, composite, or enface. The shader is compiled when those paths change. The sliders only update weight uniforms.
+- An image with no bakeable path from the first image adds nothing.
+- Samples that fall outside an image are not drawn.
+- Opening either overlay closes the other. Background viewers stay mounted and do not paint until the overlay closes.
+
 ## Out of scope
 
-- More than two images in one blend
-- Multi-hop or non-affine warps in this blend
-- Invert, reset, and blend modes other than this additive tint
+- Multi-hop or non-affine warps in the two-image editor
+- Colour tint in the series blend
+- Invert, reset, and blend modes other than these two
 - A separate browser window
 - Changing point storage or the registration math

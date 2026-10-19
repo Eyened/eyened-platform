@@ -4,6 +4,7 @@ import { formAnnotations } from "$lib/data/stores.svelte";
 import type { FormSchemaGET } from "../../../types/openapi_types";
 
 const openRegistrationEditor = vi.fn();
+const openSeriesBlend = vi.fn();
 
 vi.mock("$lib/data", async () => {
     const stores = await import("$lib/data/stores.svelte");
@@ -56,6 +57,7 @@ const contexts = new Map<string, unknown>([
             ]),
             instanceIds: ["imgB", "imgA", "imgL"],
             openRegistrationEditor,
+            openSeriesBlend,
         },
     ],
 ]);
@@ -64,6 +66,7 @@ describe("PanelRegistration", () => {
     beforeEach(() => {
         formAnnotations.clear();
         openRegistrationEditor.mockReset();
+        openSeriesBlend.mockReset();
         vi.mocked(createFormAnnotation).mockReset();
         formAnnotations.set(21, {
             id: 21,
@@ -259,6 +262,33 @@ describe("PanelRegistration", () => {
         const right = screen.getByRole("group", { name: "Patient 100 R" });
         expect(right).toHaveTextContent("me [21]");
         expect(right).not.toHaveTextContent("other [22]");
+    });
+
+    function viewBlendButton(group: HTMLElement) {
+        const button = [...group.querySelectorAll("button")].find(
+            (item) => item.textContent?.trim() === "View blend",
+        );
+        if (!button) throw new Error("View blend button missing");
+        return button;
+    }
+
+    it("opens a series blend in top-row order", async () => {
+        renderPanel();
+        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        const view = viewBlendButton(right);
+        expect(view).toBeDisabled();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Blend imgA" }),
+        );
+        expect(view).toBeDisabled();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Blend imgB" }),
+        );
+        expect(view).toBeEnabled();
+        await fireEvent.click(view);
+        expect(openSeriesBlend).toHaveBeenCalledWith({
+            imageIds: ["imgB", "imgA"],
+        });
     });
 
     it("does not open the editor when create fails", async () => {

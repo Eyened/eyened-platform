@@ -20,7 +20,10 @@ import MainViewer from "./MainViewer.svelte";
 import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
 import type { ViewerViewStateController } from "./viewerViewState";
 import { instanceIdFromImageId } from "./viewerViewState";
-import type { RegistrationEditorSession } from "./panelRegistration/registrationSession";
+import type {
+    RegistrationEditorSession,
+    SeriesBlendSession,
+} from "./panelRegistration/registrationSession";
 
 export type MainPanelType = {
     component: any;
@@ -34,6 +37,7 @@ export class ViewerWindowContext {
     private viewers = new Set<ViewerContext>();
 
     public registrationEditor: RegistrationEditorSession | null = $state(null);
+    public seriesBlend: SeriesBlendSession | null = $state(null);
     private editorViewers: Set<ViewerContext> | null = null;
 
     public instanceIds: string[] = $state([]);
@@ -109,13 +113,25 @@ export class ViewerWindowContext {
     }
 
     openRegistrationEditor(session: RegistrationEditorSession) {
+        this.seriesBlend = null;
         this.editorViewers = new Set();
         this.registrationEditor = session;
     }
 
     closeRegistrationEditor() {
         this.registrationEditor = null;
-        this.editorViewers = null;
+        if (!this.seriesBlend) this.editorViewers = null;
+    }
+
+    openSeriesBlend(session: SeriesBlendSession) {
+        this.registrationEditor = null;
+        this.editorViewers = new Set();
+        this.seriesBlend = session;
+    }
+
+    closeSeriesBlend() {
+        this.seriesBlend = null;
+        if (!this.registrationEditor) this.editorViewers = null;
     }
 
     removeViewer(viewer: ViewerContext) {
@@ -130,7 +146,9 @@ export class ViewerWindowContext {
             height: this.webgl.canvas.height,
         });
         const paint = this.editorViewers
-            ? [...this.viewers].filter((viewer) => this.editorViewers!.has(viewer))
+            ? [...this.viewers].filter((viewer) =>
+                  this.editorViewers!.has(viewer),
+              )
             : [...this.viewers];
         for (const viewer of paint) viewer.repaint();
     }

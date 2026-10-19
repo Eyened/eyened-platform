@@ -58,9 +58,14 @@
 
     const groups = $derived(groupOpenImages(openImages));
 
-    let groupUi = $state<
-        Record<string, { fixedId: string; movingId: string; choice: string }>
-    >({});
+    type GroupSelection = {
+        fixedId: string;
+        movingId: string;
+        choice: string;
+        blendIds: string[];
+    };
+
+    let groupUi = $state<Record<string, GroupSelection>>({});
 
     let openingGroups = $state(new Set<string>());
 
@@ -80,26 +85,58 @@
         return `${patientId}:${laterality ?? "unset"}`;
     }
 
-    function selectionFor(key: string) {
-        return groupUi[key] ?? { fixedId: "", movingId: "", choice: "" };
+    function selectionFor(key: string): GroupSelection {
+        return (
+            groupUi[key] ?? {
+                fixedId: "",
+                movingId: "",
+                choice: "",
+                blendIds: [],
+            }
+        );
     }
 
     function setFixed(key: string, imageId: string) {
         const current = selectionFor(key);
         groupUi[key] = {
+            ...current,
             fixedId: imageId,
             movingId: current.movingId === imageId ? "" : current.movingId,
-            choice: current.choice,
         };
     }
 
     function setMoving(key: string, imageId: string) {
         const current = selectionFor(key);
         groupUi[key] = {
+            ...current,
             fixedId: current.fixedId === imageId ? "" : current.fixedId,
             movingId: imageId,
-            choice: current.choice,
         };
+    }
+
+    function toggleBlend(key: string, imageId: string) {
+        const current = selectionFor(key);
+        const blendIds = current.blendIds.includes(imageId)
+            ? current.blendIds.filter((id) => id !== imageId)
+            : [...current.blendIds, imageId];
+        groupUi[key] = { ...current, blendIds };
+    }
+
+    function selectedBlendIds(
+        group: EyeGroup,
+        blendIds: readonly string[],
+    ): string[] {
+        const selected = new Set(blendIds);
+        return group.images
+            .filter((image) => selected.has(image.imageId))
+            .map((image) => image.imageId);
+    }
+
+    function viewBlend(group: EyeGroup) {
+        const key = groupKey(group.patientId, group.laterality);
+        const imageIds = selectedBlendIds(group, selectionFor(key).blendIds);
+        if (imageIds.length < 2) return;
+        viewerWindowContext.openSeriesBlend({ imageIds });
     }
 
     function setChoice(key: string, choice: string) {
@@ -172,6 +209,7 @@
     {#each groups as group (groupKey(group.patientId, group.laterality))}
         {@const key = groupKey(group.patientId, group.laterality)}
         {@const selection = selectionFor(key)}
+        {@const blendIds = selectedBlendIds(group, selection.blendIds)}
         <fieldset>
             <legend>
                 Patient {group.patientId}
@@ -249,6 +287,39 @@
             >
                 Open
             </button>
+            <div class="role">
+                <div class="role-label">Blend</div>
+                <div class="thumbs">
+                    {#each group.images as image (image.imageId)}
+                        <button
+                            type="button"
+                            class="thumb"
+                            class:selected={selection.blendIds.includes(
+                                image.imageId,
+                            )}
+                            title={image.instanceId}
+                            aria-label="Blend {image.instanceId}"
+                            onclick={() => toggleBlend(key, image.imageId)}
+                        >
+                            <img
+                                src={getThumbUrl(
+                                    { id: image.instanceId } as ImageGET,
+                                    144,
+                                )}
+                                alt=""
+                                draggable="false"
+                            />
+                        </button>
+                    {/each}
+                </div>
+                <button
+                    type="button"
+                    disabled={blendIds.length < 2}
+                    onclick={() => viewBlend(group)}
+                >
+                    View blend
+                </button>
+            </div>
         </fieldset>
     {/each}
 </div>

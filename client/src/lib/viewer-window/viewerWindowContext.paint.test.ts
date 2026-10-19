@@ -19,7 +19,10 @@ describe("ViewerWindowContext registration editor paint", () => {
     let ctx: ViewerWindowContext | undefined;
 
     beforeEach(() => {
-        vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+        vi.stubGlobal(
+            "requestAnimationFrame",
+            vi.fn(() => 1),
+        );
         vi.stubGlobal("cancelAnimationFrame", vi.fn());
     });
 
@@ -46,6 +49,25 @@ describe("ViewerWindowContext registration editor paint", () => {
         ctx.repaint();
         expect(background.repaint).toHaveBeenCalledOnce();
         expect(ctx.registrationEditor).toBeNull();
+    });
+
+    it("paints only viewers added during a series blend, then resumes the others", () => {
+        const background = { repaint: vi.fn() };
+        const blendViewer = { repaint: vi.fn() };
+        ctx = createContext();
+        ctx.addViewer(background as never);
+
+        ctx.openSeriesBlend({ imageIds: ["a", "b", "c"] });
+        ctx.addViewer(blendViewer as never);
+
+        ctx.repaint();
+        expect(background.repaint).not.toHaveBeenCalled();
+        expect(blendViewer.repaint).toHaveBeenCalledOnce();
+
+        ctx.closeSeriesBlend();
+        ctx.repaint();
+        expect(background.repaint).toHaveBeenCalledOnce();
+        expect(ctx.seriesBlend).toBeNull();
     });
 });
 

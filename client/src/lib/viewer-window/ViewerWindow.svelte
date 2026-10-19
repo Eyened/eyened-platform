@@ -11,6 +11,7 @@ Keeps track of the main panels and the top row of images.
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
     import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
     import RegistrationEditor from "./panelRegistration/RegistrationEditor.svelte";
+    import SeriesBlendEditor from "./panelRegistration/SeriesBlendEditor.svelte";
     import { instances, patients } from "$lib/data";
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
@@ -83,7 +84,8 @@ Keeps track of the main panels and the top row of images.
     id="main"
     bind:this={main}
     class="dark"
-    class:main-hidden={viewerWindowContext.registrationEditor}
+    class:main-hidden={viewerWindowContext.registrationEditor ||
+        viewerWindowContext.seriesBlend}
 >
     <div id="top" class="row">
         <TopRowImages />
@@ -106,6 +108,10 @@ Keeps track of the main panels and the top row of images.
 
 {#if viewerWindowContext.registrationEditor}
     <RegistrationEditor />
+{/if}
+
+{#if viewerWindowContext.seriesBlend}
+    <SeriesBlendEditor />
 {/if}
 
 <style>

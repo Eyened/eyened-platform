@@ -40,10 +40,20 @@ describe("bakeHopGlsl parabolic", () => {
         expect(glsl).not.toContain("u_size_secondary");
     });
 
-    it("rejects malformed coefficient arrays", () => {
-        expect(
-            bakeParabolicHop([0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [1, 1], [1, 1]),
-        ).toBeNull();
+    it("bakes a shorter coefficient list the same way the CPU dots it", () => {
+        const glsl = bakeParabolicHop(
+            [0.5, 0.25, 1],
+            [0, 0, 0],
+            [8, 8],
+            [8, 8],
+        );
+        expect(glsl).toContain("0.5 * 1.0");
+        expect(glsl).toContain("1.0 * x");
+        expect(glsl).not.toContain("x * x");
+    });
+
+    it("rejects an empty coefficient list", () => {
+        expect(bakeParabolicHop([], [], [1, 1], [1, 1])).toBeNull();
     });
 
     it("bakes ParabolicRegistration via bakeHopGlsl", () => {

@@ -41,6 +41,24 @@
     </ul>
 </section>
 <section>
+    <h2>Series blend</h2>
+    <ul>
+        <li>
+            Under Blend, outline any number of thumbnails from that eye, then
+            click <strong>View blend</strong>.
+        </li>
+        <li>
+            The selected images sit above the blend. The slider walks from the
+            first image to the last, blending one consecutive pair at a time.
+            Each image has its own opacity.
+        </li>
+        <li>
+            This blend follows the registration graph, including a polynomial
+            warp. An image with no path from the first one stays out.
+        </li>
+    </ul>
+</section>
+<section>
     <h2>Editing points</h2>
     <ul>
         <li>Left click on empty space to add a point.</li>
