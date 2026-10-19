@@ -14,18 +14,20 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# PascalCase. For a lowercase database, comment these and uncomment the next line.
+# PascalCase. Comment this block and uncomment the lowercase block below.
 AnnotationData = "AnnotationData"
-# AnnotationData = "annotationdata"
 DateModified = "DateModified"
+
+# AnnotationData = "annotationdata"
 # DateModified = "datemodified"
 
 
 def upgrade() -> None:
-    op.execute(
-        f"ALTER TABLE {AnnotationData} MODIFY {DateModified} DATETIME NULL "
-        f"DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
-    )
+    op.execute(f"""
+        ALTER TABLE {AnnotationData}
+        MODIFY {DateModified} DATETIME NULL
+            DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    """)
 
 
 def downgrade() -> None:

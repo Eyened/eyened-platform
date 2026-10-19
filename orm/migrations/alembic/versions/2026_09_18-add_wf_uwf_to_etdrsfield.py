@@ -14,10 +14,11 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# PascalCase. For a lowercase database, comment these and uncomment the next line.
+# PascalCase. Comment this block and uncomment the lowercase block below.
 ImageInstance = "ImageInstance"
-# ImageInstance = "imageinstance"
 ETDRSField = "ETDRSField"
+
+# ImageInstance = "imageinstance"
 # ETDRSField = "etdrsfield"
 
 _OLD_ENUM = "'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7'"
@@ -25,15 +26,17 @@ _NEW_ENUM = "'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'WF', 'UWF'"
 
 
 def upgrade() -> None:
-    op.execute(
-        f"ALTER TABLE {ImageInstance} MODIFY {ETDRSField} ENUM({_NEW_ENUM}) NULL, "
-        "ALGORITHM=INSTANT"
-    )
+    op.execute(f"""
+        ALTER TABLE {ImageInstance}
+        MODIFY {ETDRSField} ENUM({_NEW_ENUM}) NULL,
+        ALGORITHM=INSTANT
+    """)
 
 
 def downgrade() -> None:
     # Fails outright if any row already stores WF or UWF.
-    op.execute(
-        f"ALTER TABLE {ImageInstance} MODIFY {ETDRSField} ENUM({_OLD_ENUM}) NULL, "
-        "ALGORITHM=COPY, LOCK=SHARED"
-    )
+    op.execute(f"""
+        ALTER TABLE {ImageInstance}
+        MODIFY {ETDRSField} ENUM({_OLD_ENUM}) NULL,
+        ALGORITHM=COPY, LOCK=SHARED
+    """)
