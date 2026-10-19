@@ -81,6 +81,7 @@ export function bindRegistrationPointTool(args: {
         coordinateSpace: analysis.coordinateSpace,
         onChange: (points) => write(points, false),
         onPersist: (points) => write(points, true),
+        dragThresholdPx: 0,
     });
     const existing = formAnnotations.get(annotationId)?.form_data;
     tool.points = getPointsForImage(existing, publicId, analysis);

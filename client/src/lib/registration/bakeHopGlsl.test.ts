@@ -40,16 +40,25 @@ describe("bakeHopGlsl parabolic", () => {
         expect(glsl).not.toContain("u_size_secondary");
     });
 
-    it("bakes a shorter coefficient list the same way the CPU dots it", () => {
+    it("dots each coefficient list on its own", () => {
         const glsl = bakeParabolicHop(
-            [0.5, 0.25, 1],
+            [0.5, 0.25, 1, 0, 0.01],
             [0, 0, 0],
             [8, 8],
             [8, 8],
         );
-        expect(glsl).toContain("0.5 * 1.0");
-        expect(glsl).toContain("1.0 * x");
-        expect(glsl).not.toContain("x * x");
+        const dx = glsl!.match(/float dx_val = ([^;]+);/)?.[1];
+        const dy = glsl!.match(/float dy_val = ([^;]+);/)?.[1];
+        expect(dx).toContain("0.5 * 1.0");
+        expect(dx).toContain("0.01 * x * x");
+        expect(dy).toBe("0.0 * 1.0 + 0.0 * 1.0 + 0.0 * x");
+        expect(dy).not.toContain("x * x");
+    });
+
+    it("bakes an empty side as zero", () => {
+        const glsl = bakeParabolicHop([1], [], [8, 8], [8, 8]);
+        expect(glsl).toContain("float dy_val = 0.0;");
+        expect(glsl).toContain("1.0 * 1.0");
     });
 
     it("rejects an empty coefficient list", () => {

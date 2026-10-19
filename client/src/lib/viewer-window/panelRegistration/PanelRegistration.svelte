@@ -7,6 +7,7 @@
     import { getThumbUrl } from "$lib/data-loading/utils";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+    import { SvelteSet } from "svelte/reactivity";
     import { getContext } from "svelte";
     import type { FormSchemaGET, ImageGET } from "../../../types/openapi_types";
     import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
@@ -67,18 +68,14 @@
 
     let groupUi = $state<Record<string, GroupSelection>>({});
 
-    let openingGroups = $state(new Set<string>());
+    const openingGroups = new SvelteSet<string>();
 
     function markCreateInFlight(key: string) {
-        const next = new Set(openingGroups);
-        next.add(key);
-        openingGroups = next;
+        openingGroups.add(key);
     }
 
     function clearCreateInFlight(key: string) {
-        const next = new Set(openingGroups);
-        next.delete(key);
-        openingGroups = next;
+        openingGroups.delete(key);
     }
 
     function groupKey(patientId: number, laterality: EyeLaterality): string {

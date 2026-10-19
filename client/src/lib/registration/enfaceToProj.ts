@@ -34,7 +34,7 @@ export function bakeHopGlsl(
         return bakeParabolicHop(item.dx, item.dy, srcSize, dstSize);
     }
     if (item instanceof CompositeRegistration) {
-        return bakeCompositeHop(item, srcSize, dstSize);
+        return bakePixelPath([item], srcSize, dstSize);
     }
     if (item instanceof EnfaceToProjPhotolocations) {
         return bakeEnfaceToProjHop(
@@ -64,21 +64,24 @@ const PARABOLIC_TERMS = ["1.0", "1.0", "x", "y", "x * x", "x * y", "y * y"];
 
 /**
  * Pixel-space displacement matching ParabolicRegistration.mapping.
- * The CPU dots whatever coefficients are present against
- * `[1, 1, x, y, x², xy, y²]`, so a shorter list still bakes.
+ * Each side is dotted on its own against `[1, 1, x, y, x², xy, y²]`,
+ * up to the coefficients that side has. An empty side contributes 0.
  */
+function parabolicExpr(coeffs: number[]): string {
+    const n = Math.min(coeffs.length, PARABOLIC_TERMS.length);
+    if (n === 0) return "0.0";
+    return PARABOLIC_TERMS.slice(0, n)
+        .map((term, i) => `${f(coeffs[i]!)} * ${term}`)
+        .join(" + ");
+}
+
 function bakeParabolicPixelStep(dx: number[], dy: number[]): string | null {
-    const n = Math.min(dx.length, dy.length, PARABOLIC_TERMS.length);
-    if (n === 0) return null;
-    const expr = (coeffs: number[]) =>
-        PARABOLIC_TERMS.slice(0, n)
-            .map((term, i) => `${f(coeffs[i]!)} * ${term}`)
-            .join(" + ");
+    if (dx.length === 0 && dy.length === 0) return null;
     return `{
                 float x = p.x;
                 float y = p.y;
-                float dx_val = ${expr(dx)};
-                float dy_val = ${expr(dy)};
+                float dx_val = ${parabolicExpr(dx)};
+                float dy_val = ${parabolicExpr(dy)};
                 p = vec2(x - dx_val, y - dy_val);
             }`;
 }
@@ -154,14 +157,8 @@ export function bakeParabolicHop(
     dstSize: [number, number],
 ): string | null {
     const step = bakeParabolicPixelStep(dx, dy);
-    if (!step) {
-        return null;
-    }
-    return `vec2 map_hop(vec2 uv) {
-            vec2 p = uv * vec2(${f(srcSize[0])}, ${f(srcSize[1])});
-            ${step}
-            return p / vec2(${f(dstSize[0])}, ${f(dstSize[1])});
-        }`;
+    if (!step) return null;
+    return wrapPixelSteps([step], srcSize, dstSize);
 }
 
 function bakeAffinePixelStep(M: Matrix): string {
@@ -170,14 +167,6 @@ function bakeAffinePixelStep(M: Matrix): string {
                 vec3 tp = transform * vec3(p, 1.0);
                 p = tp.xy / tp.z;
             }`;
-}
-
-function bakeCompositeHop(
-    item: CompositeRegistration,
-    srcSize: [number, number],
-    dstSize: [number, number],
-): string | null {
-    return bakePixelPath([item], srcSize, dstSize);
 }
 
 /** Direct enface → `{oct}_proj` edge derived from photo locators (for GPU sampling). */

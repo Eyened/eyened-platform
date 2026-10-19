@@ -1,6 +1,5 @@
 <script lang="ts">
     import { instances } from "$lib/data";
-    import { composeGlslPath } from "$lib/registration/composeGlslPath";
     import { glslPathBetween } from "$lib/registration/glslPathBetween";
     import Viewer from "$lib/viewer/Viewer.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -68,7 +67,7 @@
                 renderer as unknown as typeof viewerContext.imageRenderer;
             const app = mount(Viewer, {
                 target: node,
-                props: { showInfo: false },
+                props: { showInfo: false, foreground: true },
                 intro: false,
                 context: new Map<string, unknown>([
                     ["viewerContext", viewerContext],
@@ -89,33 +88,42 @@
         };
     });
 
+    // Paths follow registration. Weights follow the slider and opacities.
     $effect(() => {
         const epoch = rendererEpoch;
         const renderer = blendRenderer;
         const layers = images;
         const revision = viewerWindowContext.registration.revision;
-        const seriesPosition = position;
         void epoch;
         void revision;
         if (!renderer || layers.length === 0) return;
 
         const anchorId = layers[0]!.image_id;
-        const mappings = layers.map((image) => {
-            if (image.image_id === anchorId) return composeGlslPath([]);
-            return (
+        const mappings = layers.map(
+            (image) =>
                 glslPathBetween(
                     viewerWindowContext.registration,
                     anchorId,
                     image.image_id,
                     imageSize,
-                ) ?? UNMAPPED_LAYER
-            );
-        });
-        const weights = seriesBlendWeights(seriesPosition, layers.length).map(
-            (weight, index) => weight * opacityFor(layers[index]!.image_id),
+                ) ?? UNMAPPED_LAYER,
         );
         renderer.setLayers(layers, mappings);
-        renderer.setWeights(weights);
+    });
+
+    $effect(() => {
+        const epoch = rendererEpoch;
+        const renderer = blendRenderer;
+        const layers = images;
+        const seriesPosition = position;
+        void epoch;
+        if (!renderer || layers.length === 0) return;
+
+        renderer.setWeights(
+            seriesBlendWeights(seriesPosition, layers.length).map(
+                (weight, index) => weight * opacityFor(layers[index]!.image_id),
+            ),
+        );
     });
 </script>
 

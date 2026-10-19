@@ -48,7 +48,7 @@
 </script>
 
 <div class="thumb">
-    <Viewer showInfo={false} />
+    <Viewer showInfo={false} foreground />
 </div>
 
 <style>

@@ -51,7 +51,7 @@
                 renderer as unknown as typeof viewerContext.imageRenderer;
             const app = mount(Viewer, {
                 target: node,
-                props: { showInfo: false },
+                props: { showInfo: false, foreground: true },
                 intro: false,
                 context: new Map<string, unknown>([
                     ["viewerContext", viewerContext],

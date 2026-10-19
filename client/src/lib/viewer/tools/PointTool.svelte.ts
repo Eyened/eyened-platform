@@ -22,6 +22,8 @@ import { toast } from "svelte-sonner";
 
 const defaultStroke = "rgba(0, 255, 0, 1)";
 const fillStyle = "rgba(255, 255, 255, 0.6)";
+/** Viewer-pixel movement before a press on a point becomes a drag. */
+const CLICK_DRAG_THRESHOLD_PX = 4;
 
 export type PointToolOptions = {
     canEdit?: boolean;
@@ -48,6 +50,12 @@ export type PointToolOptions = {
     /** Keyboard shortcut → place into that index (also sets placementIndex). */
     slotKeys?: readonly { index: number; key: string }[];
     enumExtras?: readonly PointEnumExtra[];
+    /**
+     * Viewer-pixel movement before a press on an existing point becomes a drag.
+     * A shorter move stays a click and can cycle a grade. Default 4.
+     * Registration passes 0 so a short move still drags.
+     */
+    dragThresholdPx?: number;
     /**
      * Fired after every local mutation of `points` (including drag moves).
      * Use for in-memory / UI sync. Prefer `onPersist` for server writes.
@@ -88,6 +96,8 @@ export class PointTool implements Overlay {
     private dragAnchor:
         | { cursorX: number; cursorY: number; x: number; y: number }
         | undefined;
+    /** Viewer position where the press on an existing point started. */
+    private pressOrigin: Position2D | undefined;
     private dragged = false;
 
     toolName: ToolName = "point";
@@ -107,6 +117,7 @@ export class PointTool implements Overlay {
     private readonly enumExtras: readonly PointEnumExtra[];
     private readonly onChange: ((points: PointList) => void) | undefined;
     private readonly onPersist: ((points: PointList) => void) | undefined;
+    private readonly dragThresholdPx: number;
     /** True while a place/drag gesture may need a persist on pointerup. */
     private persistOnRelease = false;
 
@@ -124,6 +135,8 @@ export class PointTool implements Overlay {
         this.enumExtras = options.enumExtras ?? [];
         this.onChange = options.onChange;
         this.onPersist = options.onPersist;
+        this.dragThresholdPx =
+            options.dragThresholdPx ?? CLICK_DRAG_THRESHOLD_PX;
     }
 
     destroy() {}
@@ -249,6 +262,7 @@ export class PointTool implements Overlay {
         const wasDragging = this.activePointIndex !== undefined;
         this.activePointIndex = undefined;
         this.dragAnchor = undefined;
+        this.pressOrigin = undefined;
         this.hoverPointIndex = this.findHit(cursor, viewerContext);
         if (wasDragging) viewerContext.resetCursor();
         if (this.persistOnRelease) {
@@ -318,6 +332,13 @@ export class PointTool implements Overlay {
         this.setPoints(points, { persist: true });
     }
 
+    private pointerMoved(cursor: Position2D): boolean {
+        if (!this.pressOrigin) return false;
+        const dx = cursor.x - this.pressOrigin.x;
+        const dy = cursor.y - this.pressOrigin.y;
+        return dx * dx + dy * dy > this.dragThresholdPx ** 2;
+    }
+
     private applyDrag(viewerContext: ViewerContext, cursor: Position2D) {
         const anchor = this.dragAnchor;
         if (this.activePointIndex === undefined || !anchor) return;
@@ -359,6 +380,7 @@ export class PointTool implements Overlay {
                 if (this.placementIndex !== undefined) {
                     this.placementIndex = hit;
                 }
+                this.pressOrigin = { x: cursor.x, y: cursor.y };
                 const point = this.points[hit];
                 const image = viewerContext.viewerToImageCoordinates(cursor);
                 this.dragAnchor = point
@@ -403,7 +425,9 @@ export class PointTool implements Overlay {
             !this.dragged &&
             this.activePointIndex !== undefined
         ) {
-            this.applyDrag(viewerContext, cursor);
+            if (this.pointerMoved(cursor)) {
+                this.applyDrag(viewerContext, cursor);
+            }
             if (!this.dragged) this.cycleGradeAt(this.activePointIndex);
         }
 
@@ -415,6 +439,8 @@ export class PointTool implements Overlay {
         const { cursor, viewerContext } = e;
 
         if (this.activePointIndex !== undefined && this.canEdit) {
+            // Hold still on a graded point: pointerup cycles instead of moving.
+            if (this.pressedExisting && !this.pointerMoved(cursor)) return;
             this.applyDrag(viewerContext, cursor);
         } else {
             this.hoverPointIndex = this.findHit(cursor, viewerContext);

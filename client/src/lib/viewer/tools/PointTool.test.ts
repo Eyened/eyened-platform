@@ -201,8 +201,37 @@ describe("PointTool", () => {
         expect(onPersist).toHaveBeenCalledTimes(1);
     });
 
-    it("moves a point by the cursor delta, including a short grab off the marker", () => {
+    it("cycles a graded point when the press stays inside the drag threshold", () => {
         const tool = new PointTool({
+            enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
+        });
+        const viewer = mockViewer();
+        tool.points = [{ x: 10, y: 10, severity: "mild" }];
+
+        tool.pointerdown(pointerEvent(viewer, { x: 14, y: 12 }));
+        tool.pointermove(pointerEvent(viewer, { x: 16, y: 13 }));
+        tool.pointerup(pointerEvent(viewer, { x: 16, y: 13 }));
+
+        expect(tool.points[0]).toEqual({ x: 10, y: 10, severity: "severe" });
+    });
+
+    it("moves a point by the cursor delta once the drag passes the threshold", () => {
+        const tool = new PointTool({
+            enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
+        });
+        const viewer = mockViewer();
+        tool.points = [{ x: 10, y: 10, severity: "mild" }];
+
+        tool.pointerdown(pointerEvent(viewer, { x: 14, y: 12 }));
+        tool.pointermove(pointerEvent(viewer, { x: 20, y: 18 }));
+        tool.pointerup(pointerEvent(viewer, { x: 20, y: 18 }));
+
+        expect(tool.points[0]).toEqual({ x: 16, y: 16, severity: "mild" });
+    });
+
+    it("treats a short move as a drag when the threshold is zero", () => {
+        const tool = new PointTool({
+            dragThresholdPx: 0,
             enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
         });
         const viewer = mockViewer();
