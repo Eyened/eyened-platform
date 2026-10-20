@@ -16,7 +16,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 # PascalCase. Comment this block and uncomment the lowercase block below.
 SubTask = "SubTask"
-Task = "Task"
 SubTaskImageLink = "SubTaskImageLink"
 ImageInstance = "ImageInstance"
 TaskProject = "TaskProject"
@@ -24,12 +23,10 @@ SubTaskID = "SubTaskID"
 TaskID = "TaskID"
 ProjectID = "ProjectID"
 ImageInstanceID = "ImageInstanceID"
-FK_SUBTASK_TASK = "SubTask_ibfk_1"
 FK_LINK_IMAGE = "SubTaskImageLink_ibfk_1"
 FK_LINK_SUBTASK = "SubTaskImageLink_ibfk_2"
 
 # SubTask = "subtask"
-# Task = "task"
 # SubTaskImageLink = "subtaskimagelink"
 # ImageInstance = "imageinstance"
 # TaskProject = "taskproject"
@@ -37,22 +34,11 @@ FK_LINK_SUBTASK = "SubTaskImageLink_ibfk_2"
 # TaskID = "taskid"
 # ProjectID = "projectid"
 # ImageInstanceID = "imageinstanceid"
-# FK_SUBTASK_TASK = "subtask_ibfk_1"
 # FK_LINK_IMAGE = "subtaskimagelink_ibfk_1"
 # FK_LINK_SUBTASK = "subtaskimagelink_ibfk_2"
-# A database built from orm_baseline stored SubTask's key as SubTask_ibfk_2.
 
 
 def upgrade() -> None:
-    # subtask_ibfk_1 sorts after fk_TaskProject_Task, and DELETE FROM Task then
-    # fails with error 1451. SubTask_ibfk_1 already sorts first; this rename is
-    # still run so both databases end on the same name. Error 1091: wrong constant.
-    op.execute(f"""
-        ALTER TABLE {SubTask}
-            DROP FOREIGN KEY `{FK_SUBTASK_TASK}`,
-            ADD CONSTRAINT fk_SubTask_Task
-                FOREIGN KEY ({TaskID}) REFERENCES {Task} ({TaskID}) ON DELETE CASCADE
-    """)
     op.execute(f"""
         ALTER TABLE {SubTaskImageLink}
             ADD COLUMN {TaskID} INT NULL,

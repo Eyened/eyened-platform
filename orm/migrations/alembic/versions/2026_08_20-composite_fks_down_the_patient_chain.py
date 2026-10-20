@@ -26,7 +26,9 @@ ImageInstanceID = "ImageInstanceID"
 ProjectID = "ProjectID"
 FK_STUDY_PATIENT = "Study_ibfk_1"
 FK_SERIES_STUDY = "Series_ibfk_1"
-FK_IMAGE_SERIES = "fk_ImageInstance_Series1"
+FK_IMAGE_SERIES = "ImageInstance_ibfk_4"
+# A database this repo did not build named that key fk_ImageInstance_Series1.
+# FK_IMAGE_SERIES = "fk_ImageInstance_Series1"
 
 # Patient = "patient"
 # Study = "study"
@@ -39,7 +41,9 @@ FK_IMAGE_SERIES = "fk_ImageInstance_Series1"
 # ProjectID = "projectid"
 # FK_STUDY_PATIENT = "study_ibfk_1"
 # FK_SERIES_STUDY = "series_ibfk_1"
-# FK_IMAGE_SERIES = "fk_imageinstance_series1"
+# FK_IMAGE_SERIES = "imageinstance_ibfk_4"
+# An explicit name is not folded. Uncomment this instead of the line above.
+# FK_IMAGE_SERIES = "fk_ImageInstance_Series1"
 
 
 def upgrade() -> None:
@@ -47,8 +51,7 @@ def upgrade() -> None:
         ALTER TABLE {Patient}
         ADD UNIQUE INDEX uq_Patient_Patient_Project ({PatientID}, {ProjectID})
     """)
-    # Error 1091 on a DROP: that constant is not the stored name. A database
-    # built from orm_baseline names the image key ImageInstance_ibfk_4.
+    # Error 1091 on a DROP: that constant is not the stored name.
     # The ADD CONSTRAINT fails if a child's ProjectID does not equal its parent's.
     op.execute(f"""
         ALTER TABLE {Study}
