@@ -24,12 +24,14 @@ const { default: PanelRegistration } = await import(
 
 const schema = { id: 4, name: "Registration", schema: {} } as FormSchemaGET;
 
-function image(imageId: string, laterality: "L" | "R" | null) {
+const CREATE_NEW = "Create new registration";
+
+function image(imageId: string, laterality: "L" | "R" | null, patientId = 100) {
     return {
         image_id: imageId,
         instance: {
             id: imageId,
-            patient: { id: 100 },
+            patient: { id: patientId, identifier: `P-${patientId}` },
             study: { id: 50 },
             laterality,
         },
@@ -79,11 +81,11 @@ describe("PanelRegistration", () => {
         } as never);
     });
 
-    function openButton(group: HTMLElement) {
+    function namedButton(group: HTMLElement, name: string) {
         const button = [...group.querySelectorAll("button")].find(
-            (item) => item.textContent?.trim() === "Open",
+            (item) => item.textContent?.trim() === name,
         );
-        if (!button) throw new Error("Open button missing");
+        if (!button) throw new Error(`${name} button missing`);
         return button;
     }
 
@@ -100,11 +102,17 @@ describe("PanelRegistration", () => {
         } as never);
     }
 
+    function eyeGroup(identifier: string, laterality: string) {
+        return screen.getByRole("region", {
+            name: `${identifier} ${laterality}`,
+        });
+    }
+
     it("lists a group in top-row order with a thumbnail", () => {
         renderPanel();
-        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        const right = eyeGroup("P-100", "R");
         const fixedThumbs = [
-            ...right.querySelectorAll(".role:first-of-type button.thumb"),
+            ...right.querySelectorAll('[aria-label^="Fixed "]'),
         ];
         expect(
             fixedThumbs.map((button) => button.getAttribute("aria-label")),
@@ -121,8 +129,8 @@ describe("PanelRegistration", () => {
 
     it("groups a known eye apart from the other eye", () => {
         renderPanel();
-        const right = screen.getByRole("group", { name: "Patient 100 R" });
-        const leftGroup = screen.getByRole("group", { name: "Patient 100 L" });
+        const right = eyeGroup("P-100", "R");
+        const leftGroup = eyeGroup("P-100", "L");
         expect(right.querySelector('[aria-label="Fixed imgA"]')).toBeTruthy();
         expect(right.querySelector('[aria-label="Fixed imgB"]')).toBeTruthy();
         expect(
@@ -131,18 +139,82 @@ describe("PanelRegistration", () => {
         expect(right.querySelector('[aria-label="Fixed imgL"]')).toBeNull();
     });
 
+    it("does not wrap a lone group in a section", () => {
+        render(PanelRegistration, {
+            props: { active: true, registrationSchema: schema },
+            context: new Map([
+                ...contexts,
+                [
+                    "viewerWindowContext",
+                    {
+                        topViewers: new Map([
+                            [rightA, {}],
+                            [rightB, {}],
+                        ]),
+                        instanceIds: ["imgB", "imgA"],
+                        openRegistrationEditor,
+                        openSeriesBlend,
+                    },
+                ],
+            ]),
+        } as never);
+        expect(screen.queryByRole("region")).toBeNull();
+        expect(
+            screen.getByRole("button", { name: "Fixed imgA" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Fixed imgB" }),
+        ).toBeInTheDocument();
+    });
+
+    it("puts each group in a section when there are several", () => {
+        renderPanel();
+        expect(eyeGroup("P-100", "R")).toBeInTheDocument();
+        expect(eyeGroup("P-100", "L")).toBeInTheDocument();
+        expect(
+            screen.queryByRole("region", { name: "Patient 100 R" }),
+        ).toBeNull();
+        expect(screen.queryByRole("region", { name: "100 R" })).toBeNull();
+    });
+
+    it("shows the existing annotation picker only when one is available", () => {
+        renderPanel();
+        const right = eyeGroup("P-100", "R");
+        const leftGroup = eyeGroup("P-100", "L");
+        expect(right).toHaveTextContent("Existing registrations");
+        expect(
+            [...right.querySelectorAll("select option")].map(
+                (option) => option.getAttribute("value") ?? option.value,
+            ),
+        ).toEqual(["21"]);
+        expect(namedButton(right, "Open")).toBeInTheDocument();
+        expect(namedButton(right, CREATE_NEW)).toBeInTheDocument();
+        expect(leftGroup).not.toHaveTextContent("Existing registrations");
+        expect(leftGroup.querySelector("select")).toBeNull();
+        expect(leftGroup.textContent).not.toContain("Open");
+        expect(namedButton(leftGroup, CREATE_NEW)).toBeInTheDocument();
+    });
+
+    it("hides the existing picker when there are no editable annotations", () => {
+        formAnnotations.clear();
+        renderPanel();
+        const right = eyeGroup("P-100", "R");
+        expect(right).not.toHaveTextContent("Existing registrations");
+        expect(right.querySelector("select")).toBeNull();
+        expect(namedButton(right, CREATE_NEW)).toBeInTheDocument();
+    });
+
     it("opens an existing annotation without creating one", async () => {
         renderPanel();
-        const right = screen.getByRole("group", { name: "Patient 100 R" });
-        const open = openButton(right);
+        const right = eyeGroup("P-100", "R");
+        const open = namedButton(right, "Open");
+        const createNew = namedButton(right, CREATE_NEW);
         expect(open).toBeDisabled();
+        expect(createNew).toBeDisabled();
         await pick("Fixed", "imgA");
         await pick("Moving", "imgB");
-        expect(open).toBeDisabled();
-        await fireEvent.change(right.querySelector("select")!, {
-            target: { value: "21" },
-        });
         expect(open).toBeEnabled();
+        expect(createNew).toBeEnabled();
         await fireEvent.click(open);
         expect(createFormAnnotation).not.toHaveBeenCalled();
         expect(openRegistrationEditor).toHaveBeenCalledWith({
@@ -151,17 +223,14 @@ describe("PanelRegistration", () => {
         });
     });
 
-    it("creates a new annotation only when Open is clicked", async () => {
+    it("creates a new annotation only when New is clicked", async () => {
         vi.mocked(createFormAnnotation).mockResolvedValue({ id: 22 });
         renderPanel();
-        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        const right = eyeGroup("P-100", "R");
         await pick("Fixed", "imgA");
         await pick("Moving", "imgB");
         expect(createFormAnnotation).not.toHaveBeenCalled();
-        await fireEvent.change(right.querySelector("select")!, {
-            target: { value: "new" },
-        });
-        await fireEvent.click(openButton(right));
+        await fireEvent.click(namedButton(right, CREATE_NEW));
         await waitFor(() => {
             expect(createFormAnnotation).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -181,7 +250,7 @@ describe("PanelRegistration", () => {
         });
     });
 
-    it("ignores a second Open click while create is in flight", async () => {
+    it("ignores a second New click while create is in flight", async () => {
         let resolveCreate!: (value: { id: number }) => void;
         const createPromise = new Promise<{ id: number }>((resolve) => {
             resolveCreate = resolve;
@@ -189,17 +258,14 @@ describe("PanelRegistration", () => {
         vi.mocked(createFormAnnotation).mockReturnValue(createPromise);
 
         renderPanel();
-        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        const right = eyeGroup("P-100", "R");
         await pick("Fixed", "imgA");
         await pick("Moving", "imgB");
-        await fireEvent.change(right.querySelector("select")!, {
-            target: { value: "new" },
-        });
-        const open = openButton(right);
-        await fireEvent.click(open);
+        const createNew = namedButton(right, CREATE_NEW);
+        await fireEvent.click(createNew);
         expect(createFormAnnotation).toHaveBeenCalledTimes(1);
 
-        await fireEvent.click(open);
+        await fireEvent.click(createNew);
         expect(createFormAnnotation).toHaveBeenCalledTimes(1);
         expect(openRegistrationEditor).not.toHaveBeenCalled();
 
@@ -259,9 +325,9 @@ describe("PanelRegistration", () => {
                 ],
             ]),
         } as never);
-        const right = screen.getByRole("group", { name: "Patient 100 R" });
-        expect(right).toHaveTextContent("me [21]");
-        expect(right).not.toHaveTextContent("other [22]");
+        const right = eyeGroup("P-100", "R");
+        expect(right).toHaveTextContent("[21]");
+        expect(right).not.toHaveTextContent("[22]");
     });
 
     function viewBlendButton(group: HTMLElement) {
@@ -274,7 +340,7 @@ describe("PanelRegistration", () => {
 
     it("opens a series blend in top-row order", async () => {
         renderPanel();
-        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        const right = eyeGroup("P-100", "R");
         const view = viewBlendButton(right);
         expect(view).toBeDisabled();
         await fireEvent.click(
@@ -294,13 +360,10 @@ describe("PanelRegistration", () => {
     it("does not open the editor when create fails", async () => {
         vi.mocked(createFormAnnotation).mockRejectedValue(new Error("nope"));
         renderPanel();
-        const right = screen.getByRole("group", { name: "Patient 100 R" });
+        const right = eyeGroup("P-100", "R");
         await pick("Fixed", "imgA");
         await pick("Moving", "imgB");
-        await fireEvent.change(right.querySelector("select")!, {
-            target: { value: "new" },
-        });
-        await fireEvent.click(openButton(right));
+        await fireEvent.click(namedButton(right, CREATE_NEW));
         await waitFor(() => expect(createFormAnnotation).toHaveBeenCalled());
         expect(openRegistrationEditor).not.toHaveBeenCalled();
     });

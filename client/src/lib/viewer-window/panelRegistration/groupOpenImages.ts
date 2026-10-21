@@ -4,12 +4,14 @@ export type OpenImage = {
     imageId: string;
     instanceId: string;
     patientId: number;
+    patientIdentifier: string;
     laterality: EyeLaterality;
     studyId: number | undefined;
 };
 
 export type EyeGroup = {
     patientId: number;
+    patientIdentifier: string;
     laterality: EyeLaterality;
     images: OpenImage[];
 };
@@ -33,6 +35,16 @@ export function orderByInstanceIds<T extends { instanceId: string }>(
         .map(({ image }) => image);
 }
 
+export function groupKey(patientId: number, laterality: EyeLaterality): string {
+    return `${patientId}:${laterality ?? "unset"}`;
+}
+
+export function groupLabel(
+    group: Pick<EyeGroup, "patientIdentifier" | "laterality">,
+): string {
+    return `${group.patientIdentifier} ${group.laterality ?? "unset"}`;
+}
+
 export function groupOpenImages(images: readonly OpenImage[]): EyeGroup[] {
     const groups: EyeGroup[] = [];
     for (const image of images) {
@@ -44,6 +56,7 @@ export function groupOpenImages(images: readonly OpenImage[]): EyeGroup[] {
         if (!group) {
             group = {
                 patientId: image.patientId,
+                patientIdentifier: image.patientIdentifier,
                 laterality: image.laterality,
                 images: [],
             };
@@ -57,15 +70,8 @@ export function groupOpenImages(images: readonly OpenImage[]): EyeGroup[] {
 export function canOpenRegistration(
     fixedId: string | null,
     movingId: string | null,
-    annotationChoice: string | null,
 ): boolean {
-    return (
-        !!fixedId &&
-        !!movingId &&
-        fixedId !== movingId &&
-        annotationChoice !== null &&
-        annotationChoice !== ""
-    );
+    return !!fixedId && !!movingId && fixedId !== movingId;
 }
 
 export function annotationMatchesEye(

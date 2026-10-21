@@ -1,23 +1,13 @@
 <script lang="ts">
-    import {
-        createFormAnnotation,
-        formAnnotations,
-        instances,
-    } from "$lib/data";
-    import { getThumbUrl } from "$lib/data-loading/utils";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import { SvelteSet } from "svelte/reactivity";
+    import type { FormSchemaGET } from "../../../types/openapi_types";
     import { getContext } from "svelte";
-    import type { FormSchemaGET, ImageGET } from "../../../types/openapi_types";
     import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
+    import RegistrationEyeGroup from "./RegistrationEyeGroup.svelte";
     import {
-        annotationMatchesEye,
-        canOpenRegistration,
+        groupKey,
+        groupLabel,
         groupOpenImages,
         orderByInstanceIds,
-        type EyeGroup,
-        type EyeLaterality,
         type OpenImage,
     } from "./groupOpenImages";
 
@@ -35,8 +25,6 @@
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
     );
-    const taskContext = getContext<TaskContext | undefined>("taskContext");
-    const globalContext = getContext<GlobalContext>("globalContext");
 
     const openImages = $derived.by(() => {
         const images: OpenImage[] = [];
@@ -47,6 +35,7 @@
                 imageId: image.image_id,
                 instanceId: image.instance.id,
                 patientId: image.instance.patient.id,
+                patientIdentifier: image.instance.patient.identifier,
                 laterality: image.instance.laterality ?? null,
                 studyId: image.instance.study?.id,
             });
@@ -58,266 +47,20 @@
     });
 
     const groups = $derived(groupOpenImages(openImages));
-
-    type GroupSelection = {
-        fixedId: string;
-        movingId: string;
-        choice: string;
-        blendIds: string[];
-    };
-
-    let groupUi = $state<Record<string, GroupSelection>>({});
-
-    const openingGroups = new SvelteSet<string>();
-
-    function markCreateInFlight(key: string) {
-        openingGroups.add(key);
-    }
-
-    function clearCreateInFlight(key: string) {
-        openingGroups.delete(key);
-    }
-
-    function groupKey(patientId: number, laterality: EyeLaterality): string {
-        return `${patientId}:${laterality ?? "unset"}`;
-    }
-
-    function selectionFor(key: string): GroupSelection {
-        return (
-            groupUi[key] ?? {
-                fixedId: "",
-                movingId: "",
-                choice: "",
-                blendIds: [],
-            }
-        );
-    }
-
-    function setFixed(key: string, imageId: string) {
-        const current = selectionFor(key);
-        groupUi[key] = {
-            ...current,
-            fixedId: imageId,
-            movingId: current.movingId === imageId ? "" : current.movingId,
-        };
-    }
-
-    function setMoving(key: string, imageId: string) {
-        const current = selectionFor(key);
-        groupUi[key] = {
-            ...current,
-            fixedId: current.fixedId === imageId ? "" : current.fixedId,
-            movingId: imageId,
-        };
-    }
-
-    function toggleBlend(key: string, imageId: string) {
-        const current = selectionFor(key);
-        const blendIds = current.blendIds.includes(imageId)
-            ? current.blendIds.filter((id) => id !== imageId)
-            : [...current.blendIds, imageId];
-        groupUi[key] = { ...current, blendIds };
-    }
-
-    function selectedBlendIds(
-        group: EyeGroup,
-        blendIds: readonly string[],
-    ): string[] {
-        const selected = new Set(blendIds);
-        return group.images
-            .filter((image) => selected.has(image.imageId))
-            .map((image) => image.imageId);
-    }
-
-    function viewBlend(group: EyeGroup) {
-        const key = groupKey(group.patientId, group.laterality);
-        const imageIds = selectedBlendIds(group, selectionFor(key).blendIds);
-        if (imageIds.length < 2) return;
-        viewerWindowContext.openSeriesBlend({ imageIds });
-    }
-
-    function setChoice(key: string, choice: string) {
-        const current = selectionFor(key);
-        groupUi[key] = { ...current, choice };
-    }
-
-    function annotationsFor(group: EyeGroup) {
-        return formAnnotations.filter(
-            (annotation) =>
-                annotationMatchesEye(
-                    annotation,
-                    registrationSchema.id,
-                    group.patientId,
-                    group.laterality,
-                    (imageId) => instances.get(imageId)?.laterality ?? null,
-                ) && globalContext.canEdit(annotation),
-        );
-    }
-
-    function imageInGroup(
-        group: EyeGroup,
-        imageId: string,
-    ): OpenImage | undefined {
-        return group.images.find((image) => image.imageId === imageId);
-    }
-
-    async function openGroup(group: EyeGroup) {
-        const key = groupKey(group.patientId, group.laterality);
-        const { fixedId, movingId, choice } = selectionFor(key);
-        if (!canOpenRegistration(fixedId, movingId, choice || null)) return;
-        const fixed = imageInGroup(group, fixedId);
-        const moving = imageInGroup(group, movingId);
-        if (!fixed || !moving) return;
-
-        let annotationId: number;
-        if (choice === "new") {
-            if (openingGroups.has(key)) return;
-            markCreateInFlight(key);
-            try {
-                const created = await createFormAnnotation({
-                    form_schema_id: registrationSchema.id,
-                    patient_id: group.patientId,
-                    image_id: fixed.instanceId,
-                    study_id: fixed.studyId,
-                    sub_task_id: taskContext?.subTask?.id,
-                    form_data: {},
-                    ...(group.laterality != null
-                        ? { laterality: group.laterality }
-                        : {}),
-                });
-                annotationId = created.id;
-            } catch {
-                return;
-            } finally {
-                clearCreateInFlight(key);
-            }
-        } else {
-            annotationId = Number(choice);
-        }
-
-        viewerWindowContext.openRegistrationEditor({
-            imageIds: [fixed.imageId, moving.imageId],
-            annotationId,
-        });
-    }
+    const boxed = $derived(groups.length > 1);
 </script>
 
 <div class="main">
     {#each groups as group (groupKey(group.patientId, group.laterality))}
-        {@const key = groupKey(group.patientId, group.laterality)}
-        {@const selection = selectionFor(key)}
-        {@const blendIds = selectedBlendIds(group, selection.blendIds)}
-        <fieldset>
-            <legend>
-                Patient {group.patientId}
-                {group.laterality ?? "unset"}
-            </legend>
-            <div class="role">
-                <div class="role-label">Fixed</div>
-                <div class="thumbs">
-                    {#each group.images as image (image.imageId)}
-                        <button
-                            type="button"
-                            class="thumb"
-                            class:selected={selection.fixedId === image.imageId}
-                            title={image.instanceId}
-                            aria-label="Fixed {image.instanceId}"
-                            onclick={() => setFixed(key, image.imageId)}
-                        >
-                            <img
-                                src={getThumbUrl(
-                                    { id: image.instanceId } as ImageGET,
-                                    144,
-                                )}
-                                alt=""
-                                draggable="false"
-                            />
-                        </button>
-                    {/each}
-                </div>
-            </div>
-            <div class="role">
-                <div class="role-label">Moving</div>
-                <div class="thumbs">
-                    {#each group.images as image (image.imageId)}
-                        <button
-                            type="button"
-                            class="thumb"
-                            class:selected={selection.movingId ===
-                                image.imageId}
-                            title={image.instanceId}
-                            aria-label="Moving {image.instanceId}"
-                            onclick={() => setMoving(key, image.imageId)}
-                        >
-                            <img
-                                src={getThumbUrl(
-                                    { id: image.instanceId } as ImageGET,
-                                    144,
-                                )}
-                                alt=""
-                                draggable="false"
-                            />
-                        </button>
-                    {/each}
-                </div>
-            </div>
-            <select
-                value={selection.choice}
-                onchange={(event) => setChoice(key, event.currentTarget.value)}
-            >
-                <option value=""></option>
-                <option value="new">New</option>
-                {#each annotationsFor(group) as annotation (annotation.id)}
-                    <option value={String(annotation.id)}>
-                        {annotation.creator.name} [{annotation.id}]
-                    </option>
-                {/each}
-            </select>
-            <button
-                type="button"
-                disabled={!canOpenRegistration(
-                    selection.fixedId,
-                    selection.movingId,
-                    selection.choice || null,
-                ) || openingGroups.has(key)}
-                onclick={() => openGroup(group)}
-            >
-                Open
-            </button>
-            <div class="role">
-                <div class="role-label">Blend</div>
-                <div class="thumbs">
-                    {#each group.images as image (image.imageId)}
-                        <button
-                            type="button"
-                            class="thumb"
-                            class:selected={selection.blendIds.includes(
-                                image.imageId,
-                            )}
-                            title={image.instanceId}
-                            aria-label="Blend {image.instanceId}"
-                            onclick={() => toggleBlend(key, image.imageId)}
-                        >
-                            <img
-                                src={getThumbUrl(
-                                    { id: image.instanceId } as ImageGET,
-                                    144,
-                                )}
-                                alt=""
-                                draggable="false"
-                            />
-                        </button>
-                    {/each}
-                </div>
-                <button
-                    type="button"
-                    disabled={blendIds.length < 2}
-                    onclick={() => viewBlend(group)}
-                >
-                    View blend
-                </button>
-            </div>
-        </fieldset>
+        {#if boxed}
+            {@const label = groupLabel(group)}
+            <section class="group" aria-label={label}>
+                <div class="group-label">{label}</div>
+                <RegistrationEyeGroup {group} {registrationSchema} />
+            </section>
+        {:else}
+            <RegistrationEyeGroup {group} {registrationSchema} />
+        {/if}
     {/each}
 </div>
 
@@ -328,44 +71,12 @@
         flex: 1 1 auto;
         overflow-y: auto;
     }
-    fieldset {
-        margin: 0 0 0.5em;
-        padding: 0.4em;
-        border: 1px solid rgba(255, 255, 255, 0.25);
+    section.group {
+        margin: 0 0 0.75em;
     }
-    .role {
-        margin-top: 0.45em;
-    }
-    .role-label {
+    .group-label {
         font-size: 0.75em;
         opacity: 0.8;
-        margin-bottom: 0.25em;
-    }
-    .thumbs {
-        display: flex;
-        flex-direction: row;
-        gap: 0.35em;
-        overflow-x: auto;
-    }
-    button.thumb {
-        flex: 0 0 auto;
-        padding: 0;
-        border: 2px solid transparent;
-        background: black;
-        cursor: pointer;
-        line-height: 0;
-    }
-    button.thumb.selected {
-        border-color: white;
-    }
-    button.thumb img {
-        width: 3.2rem;
-        height: 3.2rem;
-        object-fit: contain;
-        display: block;
-    }
-    select,
-    button {
-        margin-top: 0.4em;
+        margin-bottom: 0.35em;
     }
 </style>

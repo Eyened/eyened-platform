@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
     annotationMatchesEye,
     canOpenRegistration,
+    groupLabel,
     groupOpenImages,
     orderByInstanceIds,
     type OpenImage,
@@ -12,6 +13,7 @@ const img = (
 ): OpenImage => ({
     instanceId: patch.imageId,
     patientId: 1,
+    patientIdentifier: `P-${patch.patientId ?? 1}`,
     laterality: "R",
     studyId: 9,
     ...patch,
@@ -72,15 +74,25 @@ describe("groupOpenImages", () => {
     });
 });
 
+describe("groupLabel", () => {
+    it("uses the patient identifier and laterality without a Patient prefix", () => {
+        expect(
+            groupLabel({ patientIdentifier: "P-ABC", laterality: "R" }),
+        ).toBe("P-ABC R");
+        expect(
+            groupLabel({ patientIdentifier: "P-ABC", laterality: null }),
+        ).toBe("P-ABC unset");
+    });
+});
+
 describe("canOpenRegistration", () => {
-    it("requires a fixed image, a different reference image, and a choice", () => {
-        expect(canOpenRegistration("a", "b", "new")).toBe(true);
-        expect(canOpenRegistration("a", "b", "21")).toBe(true);
-        expect(canOpenRegistration("a", "", "new")).toBe(false);
-        expect(canOpenRegistration("", "b", "new")).toBe(false);
-        expect(canOpenRegistration("a", "a", "new")).toBe(false);
-        expect(canOpenRegistration("a", "b", null)).toBe(false);
-        expect(canOpenRegistration("a", "b", "")).toBe(false);
+    it("requires a fixed image and a different reference image", () => {
+        expect(canOpenRegistration("a", "b")).toBe(true);
+        expect(canOpenRegistration("a", "")).toBe(false);
+        expect(canOpenRegistration("", "b")).toBe(false);
+        expect(canOpenRegistration("a", "a")).toBe(false);
+        expect(canOpenRegistration("a", null)).toBe(false);
+        expect(canOpenRegistration(null, "b")).toBe(false);
     });
 });
 

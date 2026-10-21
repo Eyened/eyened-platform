@@ -9,10 +9,13 @@
             Images are grouped by patient and eye. Under Fixed and Moving, click
             one thumbnail in each.
         </li>
-        <li>Choose an existing registration, or <strong>New</strong>.</li>
         <li>
-            Click <strong>Open</strong>. The editor covers the window. Close
-            returns to this viewer.
+            Click <strong>Create new registration</strong> to start. The editor covers
+            the window. Close returns to this viewer.
+        </li>
+        <li>
+            If a form annotation already exists for that eye, pick it and click
+            <strong>Open</strong>.
         </li>
         <li>
             Each image in the editor already has the point tool on. Place
