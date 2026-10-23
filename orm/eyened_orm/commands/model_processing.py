@@ -58,7 +58,7 @@ def _device_for_cfi_slug(model_slug: str, device: str | None):
     return _get_device(device)
 
 
-CFI_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("cfi-amd",)
+CFI_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("cfi-amd", "cfi-drusen")
 
 OCT_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("layer-segmentation",)
 
@@ -69,6 +69,7 @@ SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = (
 
 SEGMENTATION_SLUG_MODALITIES: dict[str, tuple[Modality, ...]] = {
     "cfi-amd": (Modality.ColorFundus,),
+    "cfi-drusen": (Modality.ColorFundus,),
     "layer-segmentation": (Modality.OCT,),
 }
 
@@ -561,6 +562,7 @@ def run_segmentation(
 
     Supported models:
     - cfi-amd: CFI AMD segmentation (ColorFundus)
+    - cfi-drusen: CFI drusen segmentation (ColorFundus)
     - layer-segmentation: OCT retinal layer segmentation (nnU-Net)
     """
     spec = target_spec_from_cli(
@@ -598,6 +600,20 @@ def run_segmentation(
             )
             if slug == "cfi-amd":
                 from eyened_orm.inference.cfi_amd_segmentation import run_for_image_ids
+
+                run_for_image_ids(
+                    session,
+                    slug_ids,
+                    device=device_obj,
+                    batch_size=batch_size,
+                    n_workers=n_workers,
+                    overwrite=not skip_existing,
+                    upscale=upscale,
+                )
+            elif slug == "cfi-drusen":
+                from eyened_orm.inference.cfi_drusen_segmentation import (
+                    run_for_image_ids,
+                )
 
                 run_for_image_ids(
                     session,
