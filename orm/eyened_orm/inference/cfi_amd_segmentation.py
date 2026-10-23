@@ -384,9 +384,8 @@ def run_for_image_ids(
     upscale: bool = False,
 ) -> None:
     """Entry point for CLI and RQ worker (``cfi-amd`` queue)."""
-    from eyened_orm.commands.targets import iter_image_id_chunks
+    from eyened_orm.inference.segmentation_runner import run_segmentation_batches
 
-    image_ids = set(image_ids)
     processor = CFI_AMD(
         session,
         device=device,
@@ -395,28 +394,13 @@ def run_for_image_ids(
         undo_transform=upscale,
         overwrite=overwrite,
     )
-    total_processed = 0
-    chunks = list(iter_image_id_chunks(image_ids))
-    for chunk_idx, chunk in enumerate(chunks, start=1):
-        if overwrite:
-            filtered = chunk
-        else:
-            filtered = processor.filter_image_ids(chunk)
-        if not filtered:
-            continue
-        print(
-            f"Processing {len(filtered)} images "
-            f"(chunk {chunk_idx}/{len(chunks)}"
-            f"{', overwrite' if overwrite else ', after filtering existing'})"
-        )
-        processor.run(filtered)
-        session.commit()
-        total_processed += len(filtered)
-
-    if total_processed == 0:
-        print("No images to process")
-        return
-    print(f"Completed processing {total_processed} images")
+    run_segmentation_batches(
+        session,
+        image_ids,
+        processor,
+        overwrite=overwrite,
+        commit_after_chunk=True,
+    )
 
 
 def predict_image(
