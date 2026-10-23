@@ -58,20 +58,14 @@ def _device_for_cfi_slug(model_slug: str, device: str | None):
     return _get_device(device)
 
 
-CFI_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("cfi-amd", "cfi-drusen")
-
-OCT_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("layer-segmentation",)
-
-SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = (
-    *CFI_SEGMENTATION_MODEL_SLUGS,
-    *OCT_SEGMENTATION_MODEL_SLUGS,
+from eyened_orm.inference.segmentation_registry import (
+    CFI_SEGMENTATION_MODEL_SLUGS,
+    OCT_SEGMENTATION_MODEL_SLUGS,
+    SEGMENTATION_MODEL_SLUGS,
+    SEGMENTATION_REGISTRY,
+    SEGMENTATION_SLUG_MODALITIES,
+    run_registered_segmentation,
 )
-
-SEGMENTATION_SLUG_MODALITIES: dict[str, tuple[Modality, ...]] = {
-    "cfi-amd": (Modality.ColorFundus,),
-    "cfi-drusen": (Modality.ColorFundus,),
-    "layer-segmentation": (Modality.OCT,),
-}
 
 
 def _cfi_pipeline_class(model_name: str):
@@ -598,43 +592,20 @@ def run_segmentation(
                 f"Running {slug} on {len(slug_ids)} "
                 f"{'/'.join(m.name for m in modalities)} images"
             )
-            if slug == "cfi-amd":
-                from eyened_orm.inference.cfi_amd_segmentation import run_for_image_ids
-
-                run_for_image_ids(
-                    session,
-                    slug_ids,
-                    device=device_obj,
-                    batch_size=batch_size,
-                    n_workers=n_workers,
-                    overwrite=not skip_existing,
-                    upscale=upscale,
-                )
-            elif slug == "cfi-drusen":
-                from eyened_orm.inference.cfi_drusen_segmentation import (
-                    run_for_image_ids,
-                )
-
-                run_for_image_ids(
-                    session,
-                    slug_ids,
-                    device=device_obj,
-                    batch_size=batch_size,
-                    n_workers=n_workers,
-                    overwrite=not skip_existing,
-                    upscale=upscale,
-                )
-            elif slug == "layer-segmentation":
-                from eyened_orm.inference.layer_segmentation import run_for_image_ids
-
-                run_for_image_ids(
-                    session,
-                    slug_ids,
-                    device=device_obj,
-                    overwrite=not skip_existing,
-                )
-            else:
-                raise ValueError(f"Unknown segmentation model: {slug!r}")
+            try:
+                spec = SEGMENTATION_REGISTRY[slug]
+            except KeyError:
+                raise ValueError(f"Unknown segmentation model: {slug!r}") from None
+            run_registered_segmentation(
+                spec,
+                session,
+                slug_ids,
+                device=device_obj,
+                batch_size=batch_size,
+                n_workers=n_workers,
+                overwrite=not skip_existing,
+                upscale=upscale,
+            )
 
 
 @click.command(name="run-registration")
