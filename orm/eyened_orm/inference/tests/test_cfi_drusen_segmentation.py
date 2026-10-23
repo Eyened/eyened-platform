@@ -86,6 +86,24 @@ def test_registers_drusen_feature_and_model_version_4(session):
     assert session.query(Feature).filter_by(FeatureName="Drusen").count() == 1
 
 
+def test_run_loads_pixels_through_orm_not_raw_path(session, monkeypatch):
+    """DICOM and other formats are decoded via ``ImageInstance.pixel_array``."""
+    _proj, images = _import_images(session, count=1)
+    image = images[0]
+    _prepare_image(image, height=8, width=8)
+    session.commit()
+
+    seen: list[int] = []
+    monkeypatch.setattr(
+        "eyened_orm.inference.utils.load_fundus_rgb",
+        lambda inst: seen.append(inst.ImageInstanceID)
+        or np.zeros((8, 8, 3), dtype=np.uint8),
+    )
+    pipeline = _pipeline(session, _NativeProcessor(), undo_transform=False)
+    pipeline.run([image.ImageInstanceID])
+    assert seen == [image.ImageInstanceID]
+
+
 def test_run_stores_field_of_view_mask_and_transform(session, monkeypatch):
     _proj, images = _import_images(session, count=1)
     image = images[0]
@@ -96,8 +114,8 @@ def test_run_stores_field_of_view_mask_and_transform(session, monkeypatch):
     processor = _NativeProcessor()
     rgb = np.zeros((32, 32, 3), dtype=np.uint8)
     monkeypatch.setattr(
-        "eyened_orm.inference.cfi_drusen_segmentation._load_rgb",
-        lambda path: rgb,
+        "eyened_orm.inference.utils.load_fundus_rgb",
+        lambda _image: rgb,
     )
     pipeline = _pipeline(session, processor, undo_transform=False)
     pipeline.run([image.ImageInstanceID])
@@ -127,8 +145,8 @@ def test_run_upscale_stores_original_size_without_matrix(session, monkeypatch):
     written = _capture_writes(monkeypatch)
     processor = _UpscaleProcessor()
     monkeypatch.setattr(
-        "eyened_orm.inference.cfi_drusen_segmentation._load_rgb",
-        lambda path: np.zeros((16, 20, 3), dtype=np.uint8),
+        "eyened_orm.inference.utils.load_fundus_rgb",
+        lambda _image: np.zeros((16, 20, 3), dtype=np.uint8),
     )
     pipeline = _pipeline(session, processor, undo_transform=True)
     pipeline.run([image.ImageInstanceID])
@@ -160,8 +178,8 @@ def test_run_skips_pixels_below_threshold(session, monkeypatch):
 
     pipeline = _pipeline(session, _Quiet(), undo_transform=False)
     monkeypatch.setattr(
-        "eyened_orm.inference.cfi_drusen_segmentation._load_rgb",
-        lambda path: np.zeros((8, 8, 3), dtype=np.uint8),
+        "eyened_orm.inference.utils.load_fundus_rgb",
+        lambda _image: np.zeros((8, 8, 3), dtype=np.uint8),
     )
     pipeline.run([image.ImageInstanceID])
     assert written == []
@@ -182,8 +200,8 @@ def test_run_for_image_ids_skips_images_that_already_have_drusen(
         lambda device: processor,
     )
     monkeypatch.setattr(
-        "eyened_orm.inference.cfi_drusen_segmentation._load_rgb",
-        lambda path: np.zeros((16, 16, 3), dtype=np.uint8),
+        "eyened_orm.inference.utils.load_fundus_rgb",
+        lambda _image: np.zeros((16, 16, 3), dtype=np.uint8),
     )
 
     run_for_image_ids(session, [image.ImageInstanceID], device="cpu", upscale=False)
@@ -206,8 +224,8 @@ def test_run_for_image_ids_upscale_flag_uses_full_resolution(session, monkeypatc
         lambda device: processor,
     )
     monkeypatch.setattr(
-        "eyened_orm.inference.cfi_drusen_segmentation._load_rgb",
-        lambda path: np.zeros((12, 12, 3), dtype=np.uint8),
+        "eyened_orm.inference.utils.load_fundus_rgb",
+        lambda _image: np.zeros((12, 12, 3), dtype=np.uint8),
     )
 
     run_for_image_ids(session, [image.ImageInstanceID], device="cpu", upscale=True)

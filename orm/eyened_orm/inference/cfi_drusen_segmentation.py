@@ -14,8 +14,6 @@ from eyened_orm import (
     ModelSegmentation,
     SegmentationModel,
 )
-from eyened_orm.inference.utils import as_uint8_rgb
-
 FEATURE_NAME = "Drusen"
 MODEL_NAME = "Drusen"
 MODEL_VERSION = "4"
@@ -31,14 +29,6 @@ def _make_processor(device):
 
         device = auto_device()
     return Processor(device)
-
-
-def _load_rgb(path) -> np.ndarray:
-    """RGB uint8 ``(H, W, 3)`` from an image file."""
-    from PIL import Image
-
-    with Image.open(path) as im:
-        return np.ascontiguousarray(as_uint8_rgb(np.asarray(im)))
 
 
 def _projection_matrix(transform: dict) -> list:
@@ -198,6 +188,8 @@ class CFI_Drusen:
 
     def run(self, image_ids: Iterable[int]) -> None:
         """Run inference and store one drusen mask per image."""
+        from eyened_orm.inference.utils import load_fundus_rgb
+
         self._ensure_models_loaded()
         image_ids_set = set(image_ids)
         if not image_ids_set:
@@ -205,7 +197,7 @@ class CFI_Drusen:
 
         images = ImageInstance.by_ids(self.session, image_ids_set)
         for image in images:
-            rgb = _load_rgb(image.path)
+            rgb = load_fundus_rgb(image)
             try:
                 mask, matrix = self._predict(rgb)
                 self._save_result(image.ImageInstanceID, mask, matrix)
