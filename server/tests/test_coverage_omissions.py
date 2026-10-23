@@ -60,9 +60,7 @@ KNOWN_UNIMPORTABLE = frozenset(
 # Grandfathered `# pragma: no cover`, as a per-file count -- the same shape as
 # client/eslint-suppressions.json. A line anchor would break on any edit above
 # the pragma; a whole-file exemption would hide a second one in the same file.
-KNOWN_PRAGMA_SITES = {
-    "orm/eyened_orm/inference/attribute_inference.py": 1,
-}
+KNOWN_PRAGMA_SITES: dict[str, int] = {}
 
 
 def _omit_globs() -> list[str]:
