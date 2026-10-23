@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable, Iterator
 
 import numpy as np
 
-from eyened_orm import (
-    DataRepresentation,
-    Datatype,
-    Feature,
-    ImageInstance,
-    ModelSegmentation,
-    SegmentationModel,
+from eyened_orm import Feature, SegmentationModel
+from eyened_orm.inference.fundus_probability_segmentation import (
+    FundusProbabilitySegmentationPipeline,
 )
+
 FEATURE_NAME = "Drusen"
 MODEL_NAME = "Drusen"
 MODEL_VERSION = "4"
@@ -38,17 +35,13 @@ def _projection_matrix(transform: dict) -> list:
     return matrix
 
 
-class CFI_Drusen:
+class CFI_Drusen(FundusProbabilitySegmentationPipeline):
     """Drusen probabilities for color fundus photos.
 
     ``undo_transform=False`` stores the 1024×1024 field of view and the
     transform back to the photo. ``undo_transform=True`` stores the mask in
     the original photo (no projection matrix).
     """
-
-    data_representation = DataRepresentation.Probability
-    datatype = Datatype.R8
-    threshold = 0.5
 
     def __init__(
         self,
@@ -59,11 +52,13 @@ class CFI_Drusen:
         undo_transform: bool = False,
         overwrite: bool = False,
     ):
-        self.session = session
-        self.device = device
-        self.save_only_above_threshold = save_only_above_threshold
+        super().__init__(
+            session,
+            device,
+            save_only_above_threshold=save_only_above_threshold,
+            overwrite=overwrite,
+        )
         self.undo_transform = undo_transform
-        self.overwrite = overwrite
         self._models_loaded = False
         self.processor = None
         self.feature: Feature | None = None
@@ -83,6 +78,9 @@ class CFI_Drusen:
                 update_values={"Description": MODEL_DESCRIPTION},
             )
 
+    def segmentation_models(self):
+        return (self.model,) if self.model is not None else ()
+
     def _load_models(self) -> None:
         self.processor = _make_processor(self.device)
 
@@ -91,32 +89,9 @@ class CFI_Drusen:
             self._load_models()
             self._models_loaded = True
 
-    def _get_model_segmentation(
-        self,
-        instance_id: int,
-        h: int,
-        w: int,
-        image_projection_matrix: list | None,
-    ) -> ModelSegmentation:
-        return ModelSegmentation.get_or_create(
-            self.session,
-            match_by={
-                "ImageInstanceID": instance_id,
-                "ModelID": self.model.ModelID,
-            },
-            create_kwargs={
-                "Depth": 1,
-                "Width": w,
-                "Height": h,
-                "SparseAxis": 0,
-                "DataType": self.datatype,
-                "DataRepresentation": self.data_representation,
-                "Threshold": self.threshold,
-                "ImageProjectionMatrix": image_projection_matrix,
-            },
-        )
-
-    def _predict(self, rgb: np.ndarray) -> tuple[np.ndarray, list | None]:
+    def _predict_for_image(
+        self, rgb: np.ndarray
+    ) -> Iterator[tuple[SegmentationModel, np.ndarray, list | None]]:
         if self.undo_transform:
             mask = self.processor.process(rgb)
             matrix = None
@@ -128,85 +103,7 @@ class CFI_Drusen:
             mask = np.squeeze(mask)
         if mask.ndim != 2:
             raise ValueError(f"Drusen mask must be 2D, got shape {mask.shape}")
-        return mask, matrix
-
-    def _save_result(
-        self,
-        image_id: int,
-        segmentation_array: np.ndarray,
-        image_projection_matrix: list | None,
-    ) -> None:
-        existing = ModelSegmentation.by_column(
-            self.session,
-            ImageInstanceID=image_id,
-            ModelID=self.model.ModelID,
-        )
-        if existing is not None and not self.overwrite:
-            return
-
-        h, w = segmentation_array.shape
-        if existing is not None and (existing.Height, existing.Width) != (h, w):
-            attr = "Height" if existing.Height != h else "Width"
-            raise ValueError(f"Cannot modify {attr} of a Segmentation once created.")
-
-        m = self._get_model_segmentation(
-            image_id,
-            h=h,
-            w=w,
-            image_projection_matrix=image_projection_matrix,
-        )
-        try:
-            if not self.save_only_above_threshold or np.any(
-                segmentation_array >= self.threshold
-            ):
-                if existing is not None:
-                    m.ImageProjectionMatrix = image_projection_matrix
-                data = (255 * segmentation_array).astype(np.uint8)
-                m.write_data(data, axis=0)
-        finally:
-            self.session.flush()
-            self.session.expunge(m)
-
-        self.session.commit()
-
-    def filter_image_ids(self, image_ids: Iterable[int]) -> set[int]:
-        """Drop images that already have a drusen segmentation for this model."""
-        if self.session is None or self.model is None:
-            return set(image_ids)
-        image_ids_set = set(image_ids)
-        processed = set(
-            ModelSegmentation.select(
-                self.session,
-                "ImageInstanceID",
-                ImageInstanceID=image_ids_set,
-                ModelID=self.model.ModelID,
-            )
-        )
-        if processed:
-            print(f"Skipping {len(processed)} complete images")
-        return image_ids_set - processed
-
-    def run(self, image_ids: Iterable[int]) -> None:
-        """Run inference and store one drusen mask per image."""
-        from eyened_orm.inference.utils import load_fundus_rgb
-
-        self._ensure_models_loaded()
-        image_ids_set = set(image_ids)
-        if not image_ids_set:
-            return
-
-        images = ImageInstance.by_ids(self.session, image_ids_set)
-        for image in images:
-            rgb = load_fundus_rgb(image)
-            try:
-                mask, matrix = self._predict(rgb)
-                self._save_result(image.ImageInstanceID, mask, matrix)
-            except ValueError as exc:
-                self.session.rollback()
-                print(
-                    f"ImageInstanceID {image.ImageInstanceID}: {exc}",
-                    flush=True,
-                )
+        yield self.model, mask, matrix
 
 
 def run_for_image_ids(
