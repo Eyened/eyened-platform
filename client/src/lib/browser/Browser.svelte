@@ -269,10 +269,19 @@
                 </Button>
             </div>
         </form>
-        <div class="col-start-1 row-start-1 max-w-page min-w-0">
+        <!-- isolate keeps the results' own z-index layers under the scrim and the column. -->
+        <div class="isolate col-start-1 row-start-1 max-w-page min-w-0">
             <BrowserContent {mode} />
             <footer></footer>
         </div>
+        <!-- Dims the results under the open column; the picker's modal already dims the page. -->
+        {#if mode === "full" && filtersOpen}
+            <div
+                aria-hidden="true"
+                class="z-0 col-start-1 row-start-1 bg-overlay"
+                onclick={closeOverlay}
+            ></div>
+        {/if}
     </div>
     {#if mode !== "overlay" && browserContext.selectedIds.length > 0}
         <Selection />
