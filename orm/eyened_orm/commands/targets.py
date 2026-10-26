@@ -458,7 +458,7 @@ def image_target_options(*, require_one: bool = True) -> Callable:
             default=None,
             help=(
                 "Filter by modality (applied in SQL). "
-                "run-cfi-models defaults to ColorFundus when omitted."
+                "run-model always restricts each model to the modalities it supports."
             ),
         )(f)
         f = click.option(

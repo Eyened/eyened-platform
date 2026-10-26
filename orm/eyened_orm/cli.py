@@ -14,8 +14,8 @@ Command utilities for the eyened ORM.
 The following commands are available:
 - update-thumbnails: Update thumbnails for all images in the database.
 - clean-thumbnails: Remove dangling thumbnail files and report broken ThumbnailPath refs.
-- run-cfi-models: Run CFI attribute inference models (cfi-roi, cfi-keypoints, cfi-odfd, cfi-quality).
-- run-models: Deprecated alias for run-cfi-models.
+- run-model: Run registered inference models (attributes and segmentations; see inference/registry.py).
+- run-models: Deprecated alias for run-model.
 - run-etdrs-model: Run ETDRS model processing on segmentations.
 - run-registration: Pairwise CFI/AF/IR registration per patient; scope with --patient or --project.
 - seed-form-schemas: Insert builtin viewer FormSchema rows (ETDRS grid, registration).

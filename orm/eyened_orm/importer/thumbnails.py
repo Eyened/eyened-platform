@@ -191,13 +191,13 @@ def _needs_cfi_roi(im: ImageInstance) -> bool:
 
 def ensure_cfi_roi_for_thumbnails(session: Session, images: list[ImageInstance]) -> None:
     """Run CFI ROI on ColorFundus images missing a usable ``CFI_ROI`` attribute."""
-    from eyened_orm.commands.model_processing import run_cfi_attribute_pipeline
+    from eyened_orm.inference.runner import run_model
 
     image_ids = [im.ImageInstanceID for im in images if _needs_cfi_roi(im)]
     if not image_ids:
         return
-    # overwrite=True so previously failed ROI detections are retried
-    run_cfi_attribute_pipeline(session, image_ids, "cfi-roi", overwrite=True)
+    # overwrite so previously failed ROI detections are retried
+    run_model(session, "cfi-roi", image_ids, mode="overwrite")
 
 
 def update_thumbnails(

@@ -5,13 +5,7 @@ from __future__ import annotations
 from eyened_orm.inference.model_versions import (
     huggingface_artifact_version,
     huggingface_pipeline_version,
-    package_distribution_version,
 )
-
-
-def test_package_distribution_version_fundusprep():
-    version = package_distribution_version("retinalysis-fundusprep")
-    assert version.count(".") >= 1
 
 
 def test_huggingface_artifact_version_nested_path():

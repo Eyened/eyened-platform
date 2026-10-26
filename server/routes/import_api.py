@@ -2,7 +2,6 @@ import traceback
 from typing import Any, Dict, Literal, Optional
 
 from eyened_orm import ImageInstance
-from eyened_orm.commands.model_processing import CFI_ATTRIBUTE_MODEL_SLUGS
 from eyened_orm.importer import ImportRow, plan_image_import
 from eyened_orm.importer.import_run import ImportCreate
 from fastapi import APIRouter, Depends, Query
@@ -25,11 +24,11 @@ from ..services.image_instance_service import (
     ImageInstanceService,
     get_image_instance_service,
 )
+from eyened_orm.inference.outputs import MODES
+from eyened_orm.inference.registry import MODEL_SLUGS, MODELS
+
 from ..utils.tasks import (
-    layer_segmentation_job_timeout,
-    run_cfi_amd_for_image_ids,
-    run_cfi_model_for_image_ids,
-    run_layer_segmentation_for_image_ids,
+    run_model_job,
     run_thumbnail_update_for_image_ids_job,
     run_thumbnail_update_job,
 )
@@ -73,12 +72,8 @@ class TaskResponse(BaseModel):
     error: Optional[str] = None
 
 
-CfiModelName = Literal[
-    "cfi-roi",
-    "cfi-keypoints",
-    "cfi-odfd",
-    "cfi-quality",
-]
+ModelName = Literal[*MODEL_SLUGS]
+RunMode = Literal[*MODES]
 
 
 class UpdateThumbnailsForImageIdsRequest(BaseModel):
@@ -94,24 +89,31 @@ class UpdateThumbnailsForImageIdsRequest(BaseModel):
     )
 
 
-class RunCfiModelsRequest(BaseModel):
-    """Queue a model job for the given image instance IDs (CFI attributes or segmentation)."""
+class RunModelRequest(BaseModel):
+    """Queue one job per model for the given image instance IDs."""
 
     image_ids: list[int] = Field(
         ...,
         min_length=1,
-        description="ImageInstance IDs to process (e.g. ColorFundus IDs from a completed import).",
+        description="ImageInstance IDs; each model only processes images of its modalities.",
     )
-    model: Optional[CfiModelName] = Field(
-        None,
-        description="Single CFI attribute pipeline, or omit to run all attribute models.",
+    models: Optional[list[ModelName]] = Field(
+        None, description="Models to run, or omit to run every registered model."
     )
-    overwrite: bool = Field(
-        False, description="If true, re-run even when results already exist."
+    mode: RunMode = Field(
+        "default",
+        description=(
+            "default: skip images with output from any version; upgrade: run the current "
+            "version where it has no output; failed: retry failed attempts (attribute "
+            "models only); overwrite: reprocess everything."
+        ),
     )
-    commit_interval: int = 100
-    batch_size: int = 8
-    n_workers: int = 16
+    upscale: bool = Field(
+        False, description="CFI segmentations: store masks in original image space."
+    )
+    batch_size: Optional[int] = Field(None, description="Default: per model.")
+    n_workers: Optional[int] = Field(None, description="Default: per model.")
+    commit_interval: Optional[int] = Field(None, description="Default: per output type.")
 
 
 @router.post("/import/image", response_model=ImportResponse)
@@ -177,43 +179,13 @@ def import_single_image(
     )
 
 
-class RunImageIdsJobRequest(BaseModel):
-    image_ids: list[int] = Field(..., min_length=1)
-    overwrite: bool = False
-
-
-class RunCfiAmdRequest(RunImageIdsJobRequest):
-    batch_size: int = 8
-    n_workers: int = 12
-
-
-def _queue_rq_job(
-    queue_name: str,
-    func,
-    *args,
-    ok_message: str,
-    job_timeout: int | None = None,
-) -> TaskResponse:
-    from ..main import get_rq_queue
-
-    try:
-        task_id = str(uuid.uuid4())
-        enqueue_kwargs: dict = {"job_id": task_id}
-        if job_timeout is not None:
-            enqueue_kwargs["job_timeout"] = job_timeout
-        get_rq_queue(queue_name).enqueue(func, *args, **enqueue_kwargs)
-        return TaskResponse(success=True, message=ok_message, task_id=task_id)
-    except Exception as e:
-        return TaskResponse(success=False, message=f"Failed to queue {queue_name}", error=str(e))
-
-
-@router.post("/import/run_cfi_models", response_model=TaskResponse)
-def enqueue_run_cfi_models(
-    body: RunCfiModelsRequest,
+@router.post("/import/run_model", response_model=TaskResponse)
+def enqueue_run_model(
+    body: RunModelRequest,
     current_user: CurrentUser = Depends(get_current_user),
     images: ImageInstanceService = Depends(get_image_instance_service),
 ):
-    """Queue one RQ job per CFI attribute model (``cfi-roi``, ``cfi-quality``, ...)."""
+    """Queue one RQ job per model; each model's queue is named after its slug."""
     # Before the try:, never inside it -- the except below turns any raise into
     # a 200 with success=False, so a gate moved in there would report a denial
     # as a queue failure and the status assertions would pass for the wrong
@@ -223,72 +195,32 @@ def enqueue_run_cfi_models(
     from ..main import get_rq_queue
 
     try:
-        models = [body.model] if body.model else list(CFI_ATTRIBUTE_MODEL_SLUGS)
         task_ids: list[str] = []
-        for m in models:
+        for slug in body.models or MODEL_SLUGS:
             task_id = str(uuid.uuid4())
-            get_rq_queue(m).enqueue(
-                run_cfi_model_for_image_ids,
+            get_rq_queue(slug).enqueue(
+                run_model_job,
                 body.image_ids,
-                m,
-                body.overwrite,
-                body.commit_interval,
+                slug,
+                body.mode,
+                body.upscale,
                 body.batch_size,
                 body.n_workers,
+                body.commit_interval,
                 job_id=task_id,
+                job_timeout=MODELS[slug].job_timeout(len(body.image_ids)),
             )
             task_ids.append(task_id)
         return TaskResponse(
             success=True,
-            message="CFI attribute task(s) queued successfully",
+            message=f"{len(task_ids)} model task(s) queued successfully",
             task_id=task_ids[0],
             task_ids=task_ids,
         )
     except Exception as e:
         return TaskResponse(
-            success=False,
-            message="Failed to queue CFI models task",
-            error=str(e),
+            success=False, message="Failed to queue model task(s)", error=str(e)
         )
-
-
-@router.post("/import/run_cfi_amd", response_model=TaskResponse)
-def enqueue_run_cfi_amd(
-    body: RunCfiAmdRequest,
-    current_user: CurrentUser = Depends(get_current_user),
-    images: ImageInstanceService = Depends(get_image_instance_service),
-):
-    images.require_grader_on_images(body.image_ids)
-    return _queue_rq_job(
-        "cfi-amd",
-        run_cfi_amd_for_image_ids,
-        body.image_ids,
-        body.overwrite,
-        body.batch_size,
-        body.n_workers,
-        ok_message="CFI AMD task queued successfully",
-    )
-
-
-@router.post("/import/run_layer_segmentation", response_model=TaskResponse)
-def enqueue_run_layer_segmentation(
-    body: RunImageIdsJobRequest,
-    current_user: CurrentUser = Depends(get_current_user),
-    images: ImageInstanceService = Depends(get_image_instance_service),
-):
-    images.require_grader_on_images(body.image_ids)
-    job_timeout = layer_segmentation_job_timeout(len(body.image_ids))
-    return _queue_rq_job(
-        "layer-segmentation",
-        run_layer_segmentation_for_image_ids,
-        body.image_ids,
-        body.overwrite,
-        ok_message=(
-            f"Layer segmentation task queued successfully "
-            f"(job_timeout={job_timeout}s for {len(body.image_ids)} image(s))"
-        ),
-        job_timeout=job_timeout,
-    )
 
 
 @router.post("/import/update_thumbnails", response_model=TaskResponse)

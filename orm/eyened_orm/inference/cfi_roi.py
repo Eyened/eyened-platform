@@ -1,38 +1,26 @@
-from typing import Any, Dict, Optional
-
-import numpy as np
-
-from eyened_orm import AttributeDataType, Modality
-from eyened_orm.inference.attribute_inference import (
-    CFIAttributeInferencePipeline,
-    InferenceItem,
-)
-from eyened_orm.inference.model_versions import package_distribution_version
+from typing import Any, Dict
 
 from rtnls_fundusprep.mask_extraction import get_cfi_bounds
+
+from eyened_orm import AttributeDataType
+from eyened_orm.inference.model_versions import package_distribution_version
+from eyened_orm.inference.outputs import AttributeOutput
+from eyened_orm.inference.pipeline import InferenceItem, Pipeline
 
 FUNDUSPREP_DISTRIBUTION = "retinalysis-fundusprep"
 
 
-class CFI_ROI(CFIAttributeInferencePipeline):
-    """CFI ROI detection pipeline - extracts CFI bounds from fundus images."""
+class CFI_ROI(Pipeline):
+    """CFI ROI detection: fundus circle bounds (OpenCV, no torch)."""
 
-    model_name = "CFI_ROI"
-    model_description = "https://github.com/Eyened/retinalysis-fundusprep"
-    attribute_name = "CFI_ROI"
-    attribute_data_type = AttributeDataType.JSON
-    supported_modalities = (Modality.ColorFundus,)
+    output = AttributeOutput(
+        model_name="CFI_ROI",
+        attribute_name="CFI_ROI",
+        data_type=AttributeDataType.JSON,
+        version=package_distribution_version(FUNDUSPREP_DISTRIBUTION),
+        description="https://github.com/Eyened/retinalysis-fundusprep",
+    )
+    needs_torch = False
 
-    def __init__(self, session, n_workers: int = 8, **kwargs):
-        self.model_version = package_distribution_version(FUNDUSPREP_DISTRIBUTION)
-        super().__init__(session, n_workers=n_workers)
-
-    def preprocess(self, item: InferenceItem | None) -> Optional[Dict[str, Any]]:
-        if item is None or item.image_rgb is None:
-            return None
-        try:
-            bounds = get_cfi_bounds(item.image_rgb)
-            return bounds.to_dict_all()
-        except Exception as exc:
-            print(f"CFI_ROI preprocessing failed: {exc}")
-            return None
+    def preprocess(self, item: InferenceItem) -> Dict[str, Any]:
+        return get_cfi_bounds(item.image).to_dict_all()

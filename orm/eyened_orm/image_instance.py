@@ -526,7 +526,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
         return Image.open(io.BytesIO(raw))
 
     def _cfi_attribute_value(self, spec) -> Any | None:
-        """Latest available value for a ``run-cfi-models`` attribute (version-aware)."""
+        """Latest available value for a ``run-model`` attribute (version-aware)."""
         return self.get_attribute_value(
             attribute_name=spec.attribute_name,
             producing_model_name=spec.model_name,

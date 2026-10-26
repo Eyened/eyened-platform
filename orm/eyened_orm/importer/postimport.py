@@ -6,25 +6,16 @@ from typing import TYPE_CHECKING, Literal
 
 from sqlalchemy.orm import Session
 
-from eyened_orm.commands.model_processing import (
-    CFI_ATTRIBUTE_MODEL_SLUGS,
-    CFI_SEGMENTATION_MODEL_SLUGS,
-    OCT_SEGMENTATION_MODEL_SLUGS,
-)
 from eyened_orm.api_client import get_api_client
-from eyened_orm.image_instance import ImageInstance, Modality
+from eyened_orm.image_instance import ImageInstance
 from eyened_orm.importer.thumbnails import (
     THUMBNAIL_SIZES,
     run_update_thumbnails_for_image_ids,
     thumbnails_folder,
 )
+from eyened_orm.inference.registry import MODEL_SLUGS, MODELS
 
-SLUG = Literal[
-    "thumbnails",
-    *CFI_ATTRIBUTE_MODEL_SLUGS,
-    *CFI_SEGMENTATION_MODEL_SLUGS,
-    *OCT_SEGMENTATION_MODEL_SLUGS,
-]
+SLUG = Literal["thumbnails", *MODEL_SLUGS]
 
 if TYPE_CHECKING:
     from eyened_orm.api_client import APIClient
@@ -34,50 +25,6 @@ class ProcessMode(StrEnum):
     SKIP = "skip"
     ENQUEUE = "enqueue"  # API / worker
     LOCAL = "local"  # same functions as RQ, same process
-
-
-def _local_cfi_attribute(
-    session: Session,
-    image_ids: list[int],
-    model_slug: str,
-    *,
-    device: str | None,
-) -> None:
-    from eyened_orm.commands.model_processing import (
-        _device_for_cfi_slug,
-        run_cfi_attribute_pipeline,
-    )
-
-    run_cfi_attribute_pipeline(
-        session,
-        image_ids,
-        model_slug,
-        device=_device_for_cfi_slug(model_slug, device),
-    )
-
-
-def _local_cfi_amd(
-    session: Session,
-    image_ids: list[int],
-    *,
-    device: str | None,
-) -> None:
-    from eyened_orm.commands.model_processing import _get_device
-    from eyened_orm.inference.cfi_amd_segmentation import run_for_image_ids
-
-    run_for_image_ids(session, image_ids, device=_get_device(device))
-
-
-def _local_layer_segmentation(
-    session: Session,
-    image_ids: list[int],
-    *,
-    device: str | None,
-) -> None:
-    from eyened_orm.commands.model_processing import _get_device
-    from eyened_orm.inference.layer_segmentation import run_for_image_ids
-
-    run_for_image_ids(session, image_ids, device=_get_device(device))
 
 
 class PostImport:
@@ -123,18 +70,9 @@ class PostImport:
         local()
 
     def run(self, session: Session | None = None, device: str | None = None) -> None:
-        all_image_ids = [image.ImageInstanceID for image in self.images]
-        cfi_image_ids = [
-            image.ImageInstanceID
-            for image in self.images
-            if image.Modality == Modality.ColorFundus
-        ]
-        oct_image_ids = [
-            image.ImageInstanceID
-            for image in self.images
-            if image.Modality == Modality.OCT
-        ]
+        from eyened_orm.inference.runner import run_model
 
+        all_image_ids = [image.ImageInstanceID for image in self.images]
         self._run_step(
             "thumbnails",
             self._mode("thumbnails"),
@@ -153,38 +91,19 @@ class PostImport:
             ),
         )
 
-        for slug in CFI_ATTRIBUTE_MODEL_SLUGS:
+        for slug, spec in MODELS.items():
+            ids = [
+                image.ImageInstanceID
+                for image in self.images
+                if image.Modality in spec.modalities
+            ]
             self._run_step(
                 slug,
                 self._mode(slug),
-                cfi_image_ids,
+                ids,
                 session=session,
-                enqueue=lambda s=slug: self.client.enqueue_run_cfi_models(
-                    image_ids=cfi_image_ids, model=s
+                enqueue=lambda s=slug, ids=ids: self.client.enqueue_run_model(
+                    ids, models=[s]
                 ),
-                local=lambda s=slug: _local_cfi_attribute(
-                    session, cfi_image_ids, s, device=device
-                ),
+                local=lambda s=slug, ids=ids: run_model(session, s, ids, device=device),
             )
-
-        self._run_step(
-            "cfi-amd",
-            self._mode("cfi-amd"),
-            cfi_image_ids,
-            session=session,
-            enqueue=lambda: self.client.enqueue_run_cfi_amd(image_ids=cfi_image_ids),
-            local=lambda: _local_cfi_amd(session, cfi_image_ids, device=device),
-        )
-
-        self._run_step(
-            "layer-segmentation",
-            self._mode("layer-segmentation"),
-            oct_image_ids,
-            session=session,
-            enqueue=lambda: self.client.enqueue_run_layer_segmentation(
-                image_ids=oct_image_ids
-            ),
-            local=lambda: _local_layer_segmentation(
-                session, oct_image_ids, device=device
-            ),
-        )

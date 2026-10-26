@@ -20,12 +20,12 @@ from eyened_orm.utils.factories import (
     scope_for,
 )
 
-# All four by-id enqueue routes share one gate helper. The behaviour is tested
-# once, on a representative route; what proves the other three are gated is
+# Both by-id enqueue routes share one gate helper. The behaviour is tested
+# once, on a representative route; what proves the other is gated is
 # test_every_route_enqueueing_over_caller_supplied_ids_is_gated below, which
-# asserts the *set*. Parametrizing the three behaviour tests over all four
-# would run the same helper twelve times and still not catch a fifth route.
-_GATED = "/import/run_cfi_models"
+# asserts the *set*. Parametrizing the three behaviour tests over both would
+# run the same helper six times and still not catch a third route.
+_GATED = "/import/run_model"
 
 # FastAPI's default 404 handler answers an unrouted path with "Not Found"
 # (capital F); an authz denial answers with "Not found" (_AUTHZ_BODY in
@@ -45,12 +45,10 @@ _DENIAL_BODY = {"detail": "Not found"}
 # green while the denial turns into a 200 with success=False. Ordering is
 # per-route, and post_import_update_thumbnails_for_image_ids holds a `try:` of
 # its own, so only a behaviour test on that route can catch it. The 404 case
-# is parametrized over all four for that reason; the 200 and 403 cases stay on
+# is parametrized over both for that reason; the 200 and 403 cases stay on
 # _GATED, where a second copy would only re-run the same helper.
 _BY_IDS_ROUTES = [
-    "/import/run_cfi_models",
-    "/import/run_cfi_amd",
-    "/import/run_layer_segmentation",
+    "/import/run_model",
     "/import/update_thumbnails_for_image_ids",
 ]
 
@@ -135,7 +133,7 @@ def test_one_out_of_scope_id_refuses_the_whole_batch(
     cannot see. Recorded so a later reviewer applying the general pattern does
     not "fix" it.
 
-    Parametrized over all four by-ids routes rather than run on _GATED alone:
+    Parametrized over both by-ids routes rather than run on _GATED alone:
     this is the case that pins gate *ordering*, which the AST set test below
     structurally cannot see.
     """
@@ -146,8 +144,8 @@ def test_one_out_of_scope_id_refuses_the_whole_batch(
         json={"image_ids": [two_projects["A"]["image"], two_projects["B"]["image"]]},
     )
     assert resp.status_code == 404
-    # Body, not just status: see _DENIAL_BODY. Without this, three of these
-    # four cases pass against a route that does not exist.
+    # Body, not just status: see _DENIAL_BODY. Without this, these cases
+    # pass against a route that does not exist.
     assert resp.json() == _DENIAL_BODY
     assert queue_spy.enqueued == []
 
@@ -208,6 +206,45 @@ def test_a_grader_on_every_id_may_enqueue(client_scoped, two_projects, queue_spy
     assert queue_spy.enqueued
 
 
+def test_run_model_queues_every_model_on_its_own_queue_by_default(
+    client_scoped, two_projects, queue_spy
+):
+    from eyened_orm.inference.registry import MODEL_SLUGS
+
+    client, set_scope = client_scoped
+    set_scope(scope_for(two_projects["A"]["project"], role=ProjectRole.grader))
+    image_id = two_projects["A"]["image"]
+    resp = client.post(_GATED, json={"image_ids": [image_id]})
+
+    assert resp.json()["success"] is True
+    assert queue_spy.queue_names == list(MODEL_SLUGS)
+    assert len(resp.json()["task_ids"]) == len(MODEL_SLUGS)
+    jobs = {args[1]: (name, args, kwargs) for name, args, kwargs in queue_spy.enqueued}
+    assert {name for name, _, _ in jobs.values()} == {"run_model_job"}
+    assert jobs["cfi-roi"][1] == ([image_id], "cfi-roi", "default", False, None, None, None)
+    assert jobs["cfi-roi"][2]["job_timeout"] is None
+    assert jobs["layer-segmentation"][2]["job_timeout"] == 600
+
+
+def test_run_model_passes_selected_models_and_mode(client_scoped, two_projects, queue_spy):
+    client, set_scope = client_scoped
+    set_scope(scope_for(two_projects["A"]["project"], role=ProjectRole.grader))
+    resp = client.post(
+        _GATED,
+        json={
+            "image_ids": [two_projects["A"]["image"]],
+            "models": ["cfi-amd"],
+            "mode": "overwrite",
+            "upscale": True,
+        },
+    )
+
+    assert resp.status_code == 200
+    assert queue_spy.queue_names == ["cfi-amd"]
+    (_name, args, _kwargs), = queue_spy.enqueued
+    assert args[1:4] == ("cfi-amd", "overwrite", True)
+
+
 def test_a_read_only_member_may_not_enqueue(client_scoped, two_projects, queue_spy):
     """v0.3: run model inference on accessible project images -- grader role."""
     client, set_scope = client_scoped
@@ -242,9 +279,9 @@ def test_importing_an_image_is_admin_only(client_scoped, two_projects):
 
 
 def test_every_route_enqueueing_over_caller_supplied_ids_is_gated():
-    """Asserts the *set*, not a hand-written list of three.
+    """Asserts the *set*, not a hand-written list.
 
-    A fifth such route added later fails the suite instead of shipping open --
+    A new such route added later fails the suite instead of shipping open --
     which is exactly how the two thumbnail routes were nearly missed.
     """
     source = pathlib.Path(__file__).resolve().parents[1] / "routes" / "import_api.py"
@@ -261,7 +298,7 @@ def test_every_route_enqueueing_over_caller_supplied_ids_is_gated():
             isinstance(n, ast.Attribute) and n.attr == "image_ids"
             for n in ast.walk(node)
         )
-        enqueues = "enqueue" in body_names or "_queue_rq_job" in body_names
+        enqueues = "enqueue" in body_names
         if not (takes_ids and enqueues):
             continue
         discovered.append(node.name)
@@ -271,12 +308,10 @@ def test_every_route_enqueueing_over_caller_supplied_ids_is_gated():
     # below: `ungated == []` also passes when discovery finds nothing at all, and
     # import_api.py is slated for deprecation -- an enqueue route moved to a new
     # module would leave this hardcoded path empty and the suite green. A name-set
-    # floor rather than a count: the four names are stable, and a rename that
+    # floor rather than a count: the names are stable, and a rename that
     # relocates a gate is itself worth a failure.
     assert set(discovered) >= {
-        "enqueue_run_cfi_models",
-        "enqueue_run_cfi_amd",
-        "enqueue_run_layer_segmentation",
+        "enqueue_run_model",
         "post_import_update_thumbnails_for_image_ids",
     }
     assert ungated == []
@@ -367,12 +402,11 @@ def test_every_rq_entrypoint_returns_a_bare_bool():
 
     Entrypoints are found by the `run_*` convention rather than derived from
     the enqueue call sites, which is the weaker of the two and is a deliberate
-    choice: `_queue_rq_job` (import_api.py) takes the function as a parameter,
-    so an AST walk over `.enqueue(...)` resolves the local name `func` for two
-    of the five and would silently cover only three. The floor assertion below
-    is what keeps the convention honest; the rule itself is written into the
-    module docstring of tasks.py, where an author adding a sixth job will read
-    it.
+    choice: a route that takes the function as a parameter would make an AST
+    walk over `.enqueue(...)` resolve a local name and silently cover fewer
+    entrypoints. The floor assertion below is what keeps the convention
+    honest; the rule itself is written into the module docstring of tasks.py,
+    where an author adding a new job will read it.
     """
     source = pathlib.Path(__file__).resolve().parents[1] / "utils" / "tasks.py"
     tree = ast.parse(source.read_text(), filename=str(source))
@@ -386,9 +420,7 @@ def test_every_rq_entrypoint_returns_a_bare_bool():
     assert {node.name for node in entrypoints} >= {
         "run_thumbnail_update_job",
         "run_thumbnail_update_for_image_ids_job",
-        "run_cfi_model_for_image_ids",
-        "run_cfi_amd_for_image_ids",
-        "run_layer_segmentation_for_image_ids",
+        "run_model_job",
     }
     # `ast.walk` descends into nested defs, so a future closure returning a
     # non-bool flags its enclosing entrypoint. That is a false positive, but it
