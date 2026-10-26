@@ -137,7 +137,8 @@
         </div>
     </div>
     <div class:hidden={collapse} class="flex flex-col">
-        <div class="flex">
+        <!-- Below md the eyes stack so each fits its Open all button. -->
+        <div class="flex max-md:flex-col">
             <Eye laterality="R" {study} />
             <Eye laterality="L" {study} />
         </div>
