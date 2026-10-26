@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Select, case, func, select, update
+from sqlalchemy import Select, case, delete, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import (
@@ -40,7 +40,9 @@ class TaskRepository:
         self._session.flush()
 
     def delete(self, task: Task) -> None:
-        """Delete a task and flush within the request transaction."""
+        """Delete a task and its subtasks."""
+        # Subtasks first: their image links must be gone before TaskProject rows.
+        self._session.execute(delete(SubTask).where(SubTask.TaskID == task.TaskID))
         self._session.delete(task)
         self._session.flush()
 
