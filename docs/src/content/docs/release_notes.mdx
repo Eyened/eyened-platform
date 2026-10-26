@@ -182,7 +182,8 @@ database.
   its features), and reject `--failed` because they record no failure rows; a run of all
   models skips them in `--failed` mode.
 - **A segmentation run that fails on some images now fails the command and the RQ job**
-  after saving the rest, instead of only printing the errors.
+  after saving the rest. Layer segmentation already did this; `cfi-amd` only printed the
+  errors.
 - **Native `cfi-amd` takes its projection matrix from the `CFI_ROI` input**, so images
   without a ROI are skipped (run `cfi-roi` first, or run all models). `--upscale` needs
   no ROI.
