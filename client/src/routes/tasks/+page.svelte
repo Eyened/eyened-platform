@@ -18,7 +18,7 @@
     {:then tasks}
         <div style="display:flex; justify-content:center; padding: 40px;">
             <div style="width: 100%; max-width: 1440px;">
-                <h2 class="mb-6 text-2xl font-bold">Tasks</h2>
+                <h2 class="text-2xl font-bold mb-6">Tasks</h2>
                 <Tooltip.Provider>
                     <TasksTable rows={tasks} />
                 </Tooltip.Provider>
@@ -27,11 +27,11 @@
     {:catch error}
         <div style="display:flex; justify-content:center; padding: 40px;">
             <div style="width: 100%; max-width: 1440px;">
-                <h2 class="mb-6 text-2xl font-bold">Tasks</h2>
+                <h2 class="text-2xl font-bold mb-6">Tasks</h2>
                 <p class="text-red-600">
                     Failed to load tasks: {error.message}
                 </p>
-                <p class="mt-2 text-sm text-gray-600">
+                <p class="text-sm text-gray-600 mt-2">
                     If you were redirected to login, please log in and try
                     again.
                 </p>

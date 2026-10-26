@@ -163,7 +163,7 @@
                             const target = e.target as HTMLTextAreaElement;
                             await updateComments(target.value);
                         }}
-                        class="min-h-[48px] w-full rounded border p-1 text-xs"
+                        class="rounded text-xs min-h-[48px] w-full border p-1"
                         placeholder="Add comments..."
                     ></textarea>
                 </div>

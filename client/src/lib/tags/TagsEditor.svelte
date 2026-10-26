@@ -102,7 +102,7 @@
     {#each filtered_tags as tag}
         <div
             class:!bg-orange-200={favouriteTagIDs.has(tag.id)}
-            class="relative m-1 inline-flex items-center rounded-lg border-1 border-gray-500 bg-gray-200 px-2 py-2"
+            class="rounded-lg border-gray-500 bg-gray-200 relative m-1 inline-flex items-center border-1 px-2 py-2"
         >
             <button
                 class="inline-block"

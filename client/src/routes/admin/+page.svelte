@@ -32,10 +32,10 @@
     }
 </script>
 
-<h2 class="mb-6 text-2xl font-bold">Users</h2>
+<h2 class="text-2xl font-bold mb-6">Users</h2>
 
 {#if error}
-    <p class="mb-4 text-red-600">{error}</p>
+    <p class="text-red-600 mb-4">{error}</p>
 {/if}
 
 <form onsubmit={create} class="mb-2 flex items-end gap-2">
@@ -61,7 +61,7 @@
     </label>
     <Button type="submit">Create user</Button>
 </form>
-<p id="password-hint" class="mb-6 text-gray-600">
+<p id="password-hint" class="text-gray-600 mb-6">
     At least 15 characters. Must not contain the username or "eyened".
 </p>
 
