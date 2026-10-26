@@ -14,41 +14,23 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# PascalCase. Comment this block and uncomment the lowercase block below.
-ImageInstance = "ImageInstance"
-Series = "Series"
-Study = "Study"
-Patient = "Patient"
-ProjectID = "ProjectID"
-ImageInstanceID = "ImageInstanceID"
-SeriesID = "SeriesID"
-StudyID = "StudyID"
-PatientID = "PatientID"
-
-# ImageInstance = "imageinstance"
-# Series = "series"
-# Study = "study"
-# Patient = "patient"
-# ProjectID = "projectid"
-# ImageInstanceID = "imageinstanceid"
-# SeriesID = "seriesid"
-# StudyID = "studyid"
-# PatientID = "patientid"
-
-
 def upgrade() -> None:
-    op.execute(f"ALTER TABLE {ImageInstance} ADD COLUMN {ProjectID} INT NULL")
-    op.execute(f"""
-        UPDATE {ImageInstance} i
-        JOIN {Series} se ON se.{SeriesID} = i.{SeriesID}
-        JOIN {Study} sy ON sy.{StudyID} = se.{StudyID}
-        JOIN {Patient} p ON p.{PatientID} = sy.{PatientID}
-        SET i.{ProjectID} = p.{ProjectID}
+    op.execute("SET SESSION foreign_key_checks = 1")
+    op.execute(
+        "SET SESSION sql_mode = "
+        "CONCAT_WS(',', NULLIF(@@SESSION.sql_mode, ''), 'STRICT_ALL_TABLES')"
+    )
+    op.execute("ALTER TABLE ImageInstance ADD COLUMN ProjectID INT NULL")
+    op.execute("""
+        UPDATE ImageInstance i
+        JOIN Series se ON se.SeriesID = i.SeriesID
+        JOIN Study sy ON sy.StudyID = se.StudyID
+        JOIN Patient p ON p.PatientID = sy.PatientID
+        SET i.ProjectID = p.ProjectID
     """)
-    # Fails, or writes 0, if any row did not get a project. Assumes a strict
-    # SQL mode and that every image reaches a patient.
-    op.execute(f"ALTER TABLE {ImageInstance} MODIFY {ProjectID} INT NOT NULL")
+    # Fails if any image did not reach a patient.
+    op.execute("ALTER TABLE ImageInstance MODIFY ProjectID INT NOT NULL")
 
 
 def downgrade() -> None:
-    op.execute(f"ALTER TABLE {ImageInstance} DROP COLUMN {ProjectID}")
+    op.execute("ALTER TABLE ImageInstance DROP COLUMN ProjectID")
