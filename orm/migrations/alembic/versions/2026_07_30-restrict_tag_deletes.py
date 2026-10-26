@@ -37,7 +37,7 @@ LINK_TABLES = (
 def _tagid_fk_name(inspector: sa.Inspector, table: str) -> str:
     """Return the name of ``table``'s TagID -> Tag foreign key."""
     for fk in inspector.get_foreign_keys(table):
-        if fk["referred_table"] == "Tag" and fk["constrained_columns"] == ["TagID"]:
+        if fk["referred_table"].lower() == "tag" and fk["constrained_columns"] == ["TagID"]:
             name = fk.get("name")
             if not name:
                 raise RuntimeError(
