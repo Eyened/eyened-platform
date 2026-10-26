@@ -83,10 +83,6 @@ class TaskProject(Base):
         Index("ix_TaskProject_Project", "ProjectID"),
     )
 
-    # `fk_TaskProject_Task` is named, and the name is load-bearing: InnoDB walks
-    # a parent's referencing constraints in constraint-id order, and this name
-    # is chosen to lose that race against SubTask's key to `Task`. A guard in
-    # the containment migration refuses to run if that ordering stops holding.
     TaskID: Mapped[int] = mapped_column(
         ForeignKey("Task.TaskID", ondelete="CASCADE", name="fk_TaskProject_Task"),
         primary_key=True,

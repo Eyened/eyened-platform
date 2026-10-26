@@ -32,3 +32,4 @@ Keep entries short. When an item is picked up, link the PR/commit and mark it do
 - [The segmentation zarr store has no write lock](2026-08-24-zarr-storage-write-lock.md)
 - [API pool sizing assumes one connection per thread; a request takes several](2026-08-24-api-pool-sizing-multi-hop-checkout.md)
 - [Cross-project data cleaning has no safe path, and the ORM actively misleads](2026-08-25-cross-project-data-cleaning-has-no-safe-path.md)
+- [`alembic check` lists every table on `lower_case_table_names=1` servers](2026-10-26-alembic-check-lowercase-servers.md)

@@ -191,7 +191,7 @@ class TaskService:
         return task, counts, projects
 
     def delete_task(self, task_id: int) -> None:
-        """Delete a task (its subtasks cascade at the DB level).
+        """Delete a task and its subtasks.
 
         Requires ``project_admin`` in every project the task touches, resolved
         before the delete: afterwards the subtask/link join path the resolution
