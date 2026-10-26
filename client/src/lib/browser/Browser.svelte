@@ -10,7 +10,7 @@
     import * as Table from "$lib/components/ui/table/index.js";
     import { cn } from "$lib/utils.js";
     import Filter from "carbon-icons-svelte/lib/Filter.svelte";
-    import { onMount, setContext, tick } from "svelte";
+    import { onMount, setContext, tick, untrack } from "svelte";
     import AdvancedFilters from "./AdvancedFilters.svelte";
     import BrowserContent from "./BrowserContent.svelte";
     import {
@@ -57,26 +57,32 @@
 
     let patientInput = $state<HTMLInputElement | null>(null);
 
-    // Carbon lg. Open from lg up, collapsed below (UI shell left panel); not remembered.
-    const LG = "(min-width: 66rem)";
-    let filtersOpen = $state(matchMedia(LG).matches);
+    // The column overlays the results (Carbon slide-over side panel); not remembered.
+    // Open on load only when no search starts, so it covers nothing.
+    let filtersOpen = $state(
+        untrack(
+            () =>
+                !(syncUrl
+                    ? page.url.searchParams.get("conditions")
+                    : initialConditions?.length),
+        ),
+    );
     let toggle = $state<HTMLButtonElement | null>(null);
     const filterCount = $derived(browserContext.activeConditions.length);
 
-    // Notifications live in the column; open it so they are seen below lg.
+    // Notifications live in the column; open it so they are seen.
     $effect(() => {
         if (browserContext.notification) filtersOpen = true;
     });
 
-    // Below lg the open column overlays the results: Escape and Search close it.
+    // Escape and Search close the open column.
     function closeOverlay() {
-        if (matchMedia(LG).matches) return;
         filtersOpen = false;
         toggle?.focus();
     }
 
     function onFiltersKeydown(e: KeyboardEvent) {
-        if (e.key !== "Escape" || matchMedia(LG).matches) return;
+        if (e.key !== "Escape") return;
         // A Select keeps focus on its trigger while open; let Escape close the menu first.
         if ((e.target as Element).closest('[aria-expanded="true"]')) return;
         // The picker's modal closes on Escape; its document listener skips a stopped event.
@@ -215,9 +221,9 @@
         </div>
     </Table.Toolbar>
 
-    <!-- From lg the column pushes the results; below lg it overlays them, stacked in one grid cell
-         so the container grows to fit the open column. -->
-    <div class="relative flex gap-4 max-lg:grid max-lg:grid-cols-1">
+    <!-- The column overlays the results, stacked in one grid cell so the container grows to fit
+         the open column. -->
+    <div class="relative grid grid-cols-1">
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <!-- Escape bubbles up from the fields inside this form. -->
         <form
@@ -227,7 +233,7 @@
             hidden={!filtersOpen}
             onsubmit={submit}
             onkeydown={onFiltersKeydown}
-            class="z-10 flex w-80 shrink-0 flex-col gap-6 border-e border-border-subtle-00 bg-background py-6 pe-4 max-lg:col-start-1 max-lg:row-start-1 max-lg:self-start max-lg:justify-self-start in-dialog:border-border-subtle-01 in-dialog:bg-layer-01"
+            class="z-10 col-start-1 row-start-1 flex w-80 flex-col gap-6 self-start justify-self-start border-e border-border-subtle-00 bg-background py-6 pe-4 in-dialog:border-border-subtle-01 in-dialog:bg-layer-01"
         >
             <h2 class="text-heading-compact-02 text-text-primary">Filters</h2>
             <FilterShorcuts bind:patientInput />
@@ -263,9 +269,7 @@
                 </Button>
             </div>
         </form>
-        <div
-            class="max-w-page min-w-0 flex-1 max-lg:col-start-1 max-lg:row-start-1"
-        >
+        <div class="col-start-1 row-start-1 max-w-page min-w-0">
             <BrowserContent {mode} />
             <footer></footer>
         </div>
