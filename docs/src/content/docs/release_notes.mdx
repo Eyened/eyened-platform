@@ -13,11 +13,11 @@ Changes merged since v2026.09.0. This section is renamed to the version heading 
 
 Fixes the upgrade from v2026.08.0 on MySQL servers with `lower_case_table_names=1`
 and on databases with older foreign key names. Also fixes deleting tasks on those servers.
-Also keeps `alembic check` clean under SQLAlchemy 2.1.
+Also keeps `alembic check` clean under SQLAlchemy 2.1. `eyened_orm` now requires SQLAlchemy 2.1.
 
 If your v2026.09.0 upgrade failed, restore the backup from step 3 and follow
 [Upgrading to v2026.09.0](/eyened-platform/guides/upgrading_to_v2026_09_0/) again.
-Sites already on v2026.09.0 need no action.
+Sites already on v2026.09.0 need no database steps; deploy v2026.09.1 as a normal update.
 
 ## v2026.09.0
 
