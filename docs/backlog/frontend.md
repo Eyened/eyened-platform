@@ -119,10 +119,10 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** in `client/src/lib/components/ui/condition-builder/condition-row.svelte` the gridcell and its button both carry `aria-label="Delete condition"`, so it is read twice. Matches the IBM ConditionBuilder source.
 - **Fix:** label only the button.
 
-### Contain focus in the open filter overlay below lg
+### Contain focus in the open filter overlay
 - **Status:** open
-- **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) Task 3 review, 2026-10-13
-- **Problem:** below `lg` the open filter column in `client/src/lib/browser/Browser.svelte` is a 20rem `max-lg:absolute` overlay. Tab from its last button moves into the results it covers, so the focused element is hidden (WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)). Clicking outside does not close it.
+- **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) Task 3 review, 2026-10-13; at every width since the slide-over change, 2026-10-26
+- **Problem:** the open filter column in `client/src/lib/browser/Browser.svelte` is a 20rem overlay stacked over the results at every width. Tab from its last button moves into the results it covers, so the focused element is hidden (WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)). Clicking outside does not close it.
 - **Fix:** trap focus in the overlay while open, or move it into a Carbon side-panel pattern; close on outside click.
 
 ### Find the cause of the intermittent `npm run test` error
@@ -136,3 +136,16 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** client Carbon PR 4 demo, 2026-10-13
 - **Problem:** in the viewer overlay, condition-builder popovers (and other portalled menus, such as the picker's menus noted in PR 3) render behind `div#panel` (`position: fixed; z-index: 1000` in `client/src/lib/viewer-window/TopRowImages.svelte:121-123`), because portal content uses `z-50` (`client/src/lib/components/ui/popover/popover-content.svelte:24`). Pointer clicks can't reach them; the keyboard still works. It predates the filter-column change.
 - **Fix:** one shared layer order for overlays and portalled menus.
+
+### Add a scroll-to-top button to the browser results
+- **Status:** open
+- **Source:** client Carbon PR 4 slide-over filter change, 2026-10-26
+- **Problem:** the toolbar with the Filters button is not sticky and the filter column scrolls with the results (`client/src/lib/browser/Browser.svelte`), so far down a long result list the user scrolls all the way back up to change filters.
+- **Fix:** a sticky bottom-right button that scrolls the results' scroll container (`Main.svelte` on `/`, the modal body in the picker) to the top; place it above the fixed `Selection` bar when images are selected.
+
+### Open the image picker in a new tab
+- **Status:** open
+- **Source:** client Carbon PR 4 slide-over filter change, 2026-10-26
+- **Problem:** the picker (`client/src/lib/browser/BrowserPicker.svelte`) puts the whole browser in a Modal lg: a second scroll container, a top `Selection` bar, and the form-in-form `stopPropagation` and Escape workarounds in `Browser.svelte`.
+- **Fix:** "Browse images" in `SubTaskRow.svelte` opens `/` in a new tab with the subtask id and the patient condition; that tab pre-selects the set's images, saves with `addSubTaskImage`/`removeSubTaskImage` (move `confirmImages` to a shared module) and tells the task tab to refresh via `BroadcastChannel`. Then delete `BrowserPicker` and the Browser's `mode="overlay"` branch.
+- **Note:** save in the new tab, not the opener: the task tab may have been reloaded or closed, and the error must show where the user is.
