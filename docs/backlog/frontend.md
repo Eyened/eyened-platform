@@ -149,3 +149,9 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** the picker (`client/src/lib/browser/BrowserPicker.svelte`) puts the whole browser in a Modal lg: a second scroll container, a top `Selection` bar, and the form-in-form `stopPropagation` and Escape workarounds in `Browser.svelte`.
 - **Fix:** "Browse images" in `SubTaskRow.svelte` opens `/` in a new tab with the subtask id and the patient condition; that tab pre-selects the set's images, saves with `addSubTaskImage`/`removeSubTaskImage` (move `confirmImages` to a shared module) and tells the task tab to refresh via `BroadcastChannel`. Then delete `BrowserPicker` and the Browser's `mode="overlay"` branch.
 - **Note:** save in the new tab, not the opener: the task tab may have been reloaded or closed, and the error must show where the user is.
+
+### Guard logged-in pages with a route group
+- **Status:** open
+- **Source:** signup-redirect fix on the Carbon branch, 2026-10-26
+- **Problem:** which pages need a login is decided by path strings (`isPublicPath` in `client/src/lib/publicPaths.ts`) plus a separate redirect in `client/src/lib/components/Main.svelte`; a new public page must be added to the list or it bounces to login.
+- **Fix:** move login, signup and oidc-callback under `routes/(public)/` and the rest under `routes/(app)/`, whose `+layout.ts` `load` checks the session and calls `redirect()`; then delete `publicPaths.ts` and the `Main.svelte` redirect.

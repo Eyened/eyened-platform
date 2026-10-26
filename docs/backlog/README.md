@@ -81,3 +81,4 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | One date format across the client | [frontend](frontend.md) | open |
 | Add a scroll-to-top button to the browser results | [frontend](frontend.md) | open |
 | Open the image picker in a new tab | [frontend](frontend.md) | open |
+| Guard logged-in pages with a route group | [frontend](frontend.md) | open |
