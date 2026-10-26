@@ -28,7 +28,6 @@
     // The overlay owns the context so it can read the selection back out on close.
     const browserContext = new BrowserContext();
     browserContext.urlSync = false;
-    browserContext.limit = 100;
 
     const initialInstanceIds = viewerWindowContext.instanceIds.slice();
 

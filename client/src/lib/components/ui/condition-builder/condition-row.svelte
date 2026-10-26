@@ -150,12 +150,15 @@
         });
     }
 
+    // Picking the current choice again keeps the rest of the row.
     function pickProperty(id: string) {
+        if (id === row.property) return closeThen(null);
         onchange({ id: row.id, property: id });
         closeThen("operator");
     }
 
     function pickOperator(id: string) {
+        if (id === row.operator) return closeThen(null);
         const next = property?.operators.find((o) => o.id === id);
         onchange({
             id: row.id,

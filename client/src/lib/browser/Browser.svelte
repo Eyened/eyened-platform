@@ -101,6 +101,10 @@
 
     onMount(async () => {
         browserContext.urlSync = syncUrl;
+        // Before any await: a Save while the fields load would otherwise unlink every image.
+        if (!syncUrl && initialSelectedIds?.length) {
+            browserContext.selectedIds = [...initialSelectedIds];
+        }
         await browserContext.loadSignatures();
 
         if (syncUrl) {
@@ -114,9 +118,6 @@
             // Only a URL with conditions searches; no params means no request (B9).
             if (hasConditions) await browserContext.search();
         } else {
-            if (initialSelectedIds?.length) {
-                browserContext.selectedIds = [...initialSelectedIds];
-            }
             if (initialConditions?.length) {
                 browserContext.applyInitialConditions(initialConditions, {
                     queryMode: "studies",
@@ -247,8 +248,10 @@
                 />
             {/if}
             <div class="flex">
+                <!-- In a dialog the dialog's own action is the one primary. -->
                 <Button
                     type="submit"
+                    variant={mode === "overlay" ? "secondary" : "default"}
                     aria-disabled={!browserContext.canSearch ||
                         browserContext.loading ||
                         undefined}

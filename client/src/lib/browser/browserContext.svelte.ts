@@ -392,6 +392,8 @@ export class BrowserContext {
     }
 
     private async runSearch() {
+        // Without the search fields the builder rows are dropped, so the query would be broader.
+        if (!this.signaturesLoaded) return;
         const query = this.activeConditions;
         if (query.length === 0) return;
         const seq = ++this.searchSeq;
