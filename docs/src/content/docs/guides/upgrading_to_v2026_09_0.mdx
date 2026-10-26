@@ -43,6 +43,8 @@ Run `alembic` from `orm/migrations` with `-x env_file=<env>`, and `eorm` with `-
 
     On servers with `lower_case_table_names=1`, `alembic check` lists every table. Ignore it and check that `alembic current` shows `(head)`.
 
+    If `alembic upgrade head` fails, restore the backup from step 3. Do not re-run it.
+
 6. Bootstrap access control:
 
     ```bash
