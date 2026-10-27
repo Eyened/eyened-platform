@@ -162,9 +162,9 @@
         <Selection placement="top" />
     {/if}
 
-    <!-- Carbon table-toolbar strip; below md it wraps to two lines. -->
+    <!-- Carbon table-toolbar strip; it wraps when narrow. -->
     <Table.Toolbar
-        class={cn("h-auto flex-wrap md:h-12", mode === "full" && "mt-8")}
+        class={cn("h-auto min-h-12 flex-wrap", mode === "full" && "mt-8")}
     >
         <Button
             bind:ref={toggle}
@@ -197,13 +197,13 @@
         >
             {countText}
         </p>
-        <div class="flex h-12 items-center gap-4">
+        <div class="flex min-h-12 flex-wrap items-center gap-x-4">
             <!-- Manual: an arrow key moves focus without searching. -->
             <ContentSwitcher
                 label="Results"
                 size="lg"
                 selectionMode="manual"
-                class="w-fit"
+                class="w-fit shrink-0"
                 items={[
                     { id: "studies", text: "Studies" },
                     { id: "instances", text: "Images" },
@@ -234,7 +234,7 @@
             hidden={!filtersOpen}
             onsubmit={submit}
             onkeydown={onFiltersKeydown}
-            class="z-10 col-start-1 row-start-1 flex w-80 flex-col gap-6 self-start justify-self-start border-e border-border-subtle-00 bg-background py-6 pe-4 in-dialog:border-border-subtle-01 in-dialog:bg-layer-01"
+            class="z-10 col-start-1 row-start-1 flex w-full max-w-80 flex-col gap-6 self-start justify-self-start border-e border-border-subtle-00 bg-background py-6 pe-4 in-dialog:border-border-subtle-01 in-dialog:bg-layer-01"
         >
             <h2 class="text-heading-compact-02 text-text-primary">Filters</h2>
             <FilterShorcuts bind:patientInput />
