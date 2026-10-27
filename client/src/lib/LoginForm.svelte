@@ -94,7 +94,7 @@
 
 <!-- Carbon Login pattern, one step, centred. -->
 <main class="flex flex-1 justify-center overflow-y-auto px-4">
-    <div class="my-auto w-80 py-16">
+    <div class="my-auto w-full max-w-80 py-16">
         <h1 class="mb-8 text-heading-03">Log in to EyeNED</h1>
 
         {#if passwordEnabled}
