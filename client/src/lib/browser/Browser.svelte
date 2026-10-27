@@ -274,7 +274,7 @@
         </form>
         <!-- isolate keeps the results' own z-index layers under the scrim and the column. -->
         <div class="isolate col-start-1 row-start-1 max-w-page min-w-0">
-            <BrowserContent {mode} />
+            <BrowserContent />
             <footer></footer>
         </div>
         <!-- Dims everything below the header under the open column; the picker's modal already dims the page. -->

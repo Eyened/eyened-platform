@@ -1,35 +1,28 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { tagStudy, untagStudy, updateTagStudy } from "$lib/data/helpers";
     import extensions from "$lib/extensions";
     import Tagger from "$lib/tags/Tagger.svelte";
+    import { cn } from "$lib/utils.js";
+    import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
     import { getContext } from "svelte";
-    import type { BrowserContext } from "./browserContext.svelte";
-    import Eye from "./Eye.svelte";
-
-    import { tagStudy, untagStudy, updateTagStudy } from "$lib/data/helpers";
     import type { StudyGET } from "../../types/openapi_types";
     import AdditionalDataSources from "./AdditionalDataSources.svelte";
+    import type { BrowserContext } from "./browserContext.svelte";
+    import Eye from "./Eye.svelte";
+    import { eyeImages } from "./images";
     import StudyBlockForms from "./StudyBlockForms.svelte";
-    interface Props {
-        study: StudyGET;
-        mode?: "full" | "overlay";
-    }
 
-    let { study, mode = "full" }: Props = $props();
+    let { study }: { study: StudyGET } = $props();
 
-    // Reactive: updates when study in store changes!
-    // const study = $derived(studies.get(studyId)!);
-
-    let collapse = $state(false);
-    // The browse popup lists every visit for image picking. Keep grading
-    // available there, but folded so the image rows stay in view.
-    let gradingOpen = $state(false);
-    const gradingCollapsed = $derived(mode === "overlay" && !gradingOpen);
+    const uid = $props.id();
+    let expanded = $state(true);
 
     const globalContext = getContext<GlobalContext>("globalContext");
-    const browserContext = getContext<BrowserContext>("browserContext");
+    const browserContext = getContext<BrowserContext | undefined>(
+        "browserContext",
+    );
 
-    // Derived URLs for links
     const urlByPatient = $derived(
         study.patient.identifier
             ? globalContext.makeStudiesBrowserURL({
@@ -39,7 +32,6 @@
               })
             : undefined,
     );
-
     const urlByDate = $derived(
         globalContext.makeStudiesBrowserURL({
             variable: "Study Date",
@@ -48,118 +40,103 @@
         }),
     );
 
+    const sexAge = $derived(
+        [study.patient.sex, study.age ? `${Math.round(study.age)} years` : ""]
+            .filter(Boolean)
+            .join(", "),
+    );
+    const meta = $derived(
+        [
+            study.project.name,
+            sexAge,
+            study.round != null ? `Round ${study.round}` : "",
+            study.description ?? "",
+            `Study ID ${study.id}`,
+        ]
+            .filter(Boolean)
+            .join(" · "),
+    );
+
+    const right = $derived(eyeImages(study, "R"));
+    const left = $derived(eyeImages(study, "L"));
+    const unknown = $derived(eyeImages(study, null));
+
     const { additional_data_sources } = extensions.browser.study;
-    const dataSourceContext = {
+    const dataSourceContext = $derived({
         study,
         patient: study.patient,
         project: study.project,
-    };
+    });
+
+    const link =
+        "text-link-primary hover:text-link-primary-hover hover:underline";
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-    class="main mb-4 block flex flex-col rounded-[2px] border border-[rgb(181,188,206)] p-[0.3em] shadow-[0_6px_12px_rgba(149,157,165,0.2)]"
+<!-- Carbon ExpandableTile, interactive: the chevron is its own button at the bottom right. -->
+<section
+    data-slot="study-block"
+    aria-labelledby="{uid}-heading"
+    class="relative bg-layer-01 p-4 pb-12 in-dialog:bg-layer-02"
 >
-    <div
-        class="header text-lg font-bold hover:bg-gray-300/50 relative flex cursor-pointer items-center"
-        onclick={() => (collapse = !collapse)}
+    <h2
+        id="{uid}-heading"
+        class="flex flex-wrap gap-x-2 text-heading-compact-02"
     >
-        <span
-            class="rounded bg-gray-100 font-mono text-gray-600 absolute top-1 right-1 z-10 px-1.5 py-0.5 text-[10px]"
-        >
-            {study.id}
-        </span>
-        {#if !collapse}
-            ▼
+        <!-- eslint-disable svelte/no-navigation-without-resolve -- both URLs are built by globalContext.makeStudiesBrowserURL(), which calls resolve() internally -->
+        {#if urlByPatient}
+            <a href={urlByPatient} class={link}>{study.patient.identifier}</a>
         {:else}
-            ►
+            <span>{study.patient.identifier}</span>
         {/if}
-        <div class="date-age m-[0.1em] flex items-center">
-            <div>
-                <div class="text-base">
-                    <span>{study.project.name}</span>
-                    &nbsp;/&nbsp;
-                    {#if urlByPatient}
-                        <!-- eslint-disable svelte/no-navigation-without-resolve -- urlByPatient is built by globalContext.makeStudiesBrowserURL(), which calls resolve() internally; static analysis can't trace through the helper -->
-                        <a
-                            href={urlByPatient}
-                            onclick={(e) => e.stopPropagation()}
-                            class="hover:text-blue-600 hover:underline"
-                        >
-                            {study.patient.identifier}
-                        </a>
-                        <!-- eslint-enable svelte/no-navigation-without-resolve -->
-                    {:else}
-                        <span>{study.patient.identifier}</span>
-                    {/if}
-                    &nbsp;/&nbsp;
-                    <!-- eslint-disable svelte/no-navigation-without-resolve -- urlByDate is built by globalContext.makeStudiesBrowserURL(), which calls resolve() internally; static analysis can't trace through the helper -->
-                    <a
-                        href={urlByDate}
-                        onclick={(e) => e.stopPropagation()}
-                        class="hover:text-blue-600 hover:underline"
-                    >
-                        {study.date}
-                    </a>
-                    <!-- eslint-enable svelte/no-navigation-without-resolve -->
-                    <span class="ml-1">
-                        [{study.patient.sex}
-                        {study.age ? Math.round(study.age) : "?"} years]
-                    </span>
-                </div>
-                {#if study.round !== undefined || study.description !== undefined}
-                    <div class="info text-[12px]">
-                        <span
-                            class="rounded bg-gray-100 text-gray-600 z-10 px-1.5 py-0.5"
-                        >
-                            {#if study.round !== undefined}Round {study.round}
-                            {/if}
-                            {#if study.description !== undefined}{study.description}{/if}
-                        </span>
-                    </div>
-                {/if}
-            </div>
-
-            <div class="ml-4">
-                <Tagger
-                    tagType="Study"
-                    tags={study.tags ?? []}
-                    tag={(id) => {
-                        tagStudy(study, id);
-                        browserContext?.refreshSignatures();
-                    }}
-                    untag={(id) => untagStudy(study, id)}
-                    onUpdate={(tagId, comment) =>
-                        updateTagStudy(study.id, tagId, comment)}
-                />
-            </div>
-        </div>
+        <a href={urlByDate} class={link}>{study.date}</a>
+        <!-- eslint-enable svelte/no-navigation-without-resolve -->
+    </h2>
+    <p class="mt-1 text-label-01 text-text-secondary">{meta}</p>
+    <div class="mt-4">
+        <Tagger
+            tagType="Study"
+            tags={study.tags ?? []}
+            tag={async (id) => {
+                await tagStudy(study, id);
+                browserContext?.refreshSignatures();
+            }}
+            untag={(id) => untagStudy(study, id)}
+            onUpdate={(tagId, comment) =>
+                updateTagStudy(study.id, tagId, comment)}
+        />
     </div>
-    <div class:hidden={collapse} class="flex flex-col">
-        <!-- Below md the eyes stack so each fits its Open all button. -->
+    <div
+        id="{uid}-details"
+        hidden={!expanded}
+        class="mt-4 border-t border-border-subtle-01 pt-4 in-dialog:border-border-subtle-02"
+    >
         <div class="flex max-md:flex-col">
-            <Eye laterality="R" {study} />
-            <Eye laterality="L" {study} />
+            <Eye laterality="R" images={right} />
+            <Eye laterality="L" images={left} />
+            {#if unknown.length > 0}
+                <Eye laterality={null} images={unknown} />
+            {/if}
         </div>
-        <Eye laterality={null} {study} />
-
-        {#if mode === "overlay"}
-            <button
-                type="button"
-                class="text-sm font-semibold hover:bg-gray-300/50 mt-1 cursor-pointer pl-2 text-left"
-                onclick={() => (gradingOpen = !gradingOpen)}
-            >
-                {#if gradingCollapsed}►{:else}▼{/if}
-                Grading
-            </button>
-        {/if}
-        {#if !gradingCollapsed}
-            <StudyBlockForms {study} />
-            <AdditionalDataSources
-                context={dataSourceContext}
-                {additional_data_sources}
-            />
-        {/if}
+        <StudyBlockForms {study} />
+        <AdditionalDataSources
+            context={dataSourceContext}
+            {additional_data_sources}
+        />
     </div>
-</div>
+    <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="{uid}-details"
+        aria-label={expanded ? "Collapse study" : "Expand study"}
+        class="absolute right-0 bottom-0 flex size-12 cursor-pointer items-center justify-center hover:bg-layer-hover-01 in-dialog:hover:bg-layer-hover-02"
+        onclick={() => (expanded = !expanded)}
+    >
+        <ChevronDown
+            aria-hidden="true"
+            class={cn(
+                "text-icon-primary transition-transform duration-110",
+                expanded && "rotate-180",
+            )}
+        />
+    </button>
+</section>

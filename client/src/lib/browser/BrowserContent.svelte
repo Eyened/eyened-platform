@@ -1,14 +1,16 @@
 <script lang="ts">
     import * as Empty from "$lib/components/ui/empty/index.js";
     import * as Table from "$lib/components/ui/table/index.js";
+    import { skeleton } from "$lib/components/ui/table/skeleton.js";
+    import { cn } from "$lib/utils.js";
     import { getContext } from "svelte";
     import type { BrowserContext } from "./browserContext.svelte";
     import InstanceComponent from "./InstanceComponent.svelte";
+    import SkeletonStudyBlock from "./SkeletonStudyBlock.svelte";
     import StudyBlock from "./StudyBlock.svelte";
 
-    // Empty states, results (styled in PR 5) and one Pagination below them.
+    // Empty states, skeletons, results and one Pagination below them.
     const browserContext = getContext<BrowserContext>("browserContext");
-    let { mode = "full" }: { mode?: "full" | "overlay" } = $props();
 
     const imagesMode = $derived(
         browserContext.queryMode === "instances" &&
@@ -33,8 +35,28 @@
     </Empty.Root>
 {:else if browserContext.failed}
     <!-- The notification in the search form says what failed. -->
-{:else if browserContext.count === 0}
-    {#if !browserContext.loading}
+{:else}
+    {#if browserContext.loading}
+        <!-- Carbon Loading, progressive: every search, page and page-size change shows skeletons. -->
+        <div aria-busy="true" class="py-4">
+            {#if imagesMode}
+                <div class="flex gap-2 overflow-hidden">
+                    {#each { length: 12 }, i (i)}
+                        <span
+                            class={cn(skeleton, "shrink-0")}
+                            style="width: {browserContext.thumbnailSize}; height: {browserContext.thumbnailSize};"
+                        ></span>
+                    {/each}
+                </div>
+            {:else}
+                <div class="flex flex-col gap-4">
+                    {#each { length: 3 }, i (i)}
+                        <SkeletonStudyBlock />
+                    {/each}
+                </div>
+            {/if}
+        </div>
+    {:else if browserContext.count === 0}
         <Empty.Root>
             <Empty.Header>
                 <Empty.Title>No results found</Empty.Title>
@@ -43,27 +65,31 @@
                 </Empty.Description>
             </Empty.Header>
         </Empty.Root>
+    {:else}
+        <div class="py-4">
+            {#if imagesMode}
+                <div class="flex flex-wrap gap-2">
+                    {#each browserContext.orderedInstances as instance (instance.id)}
+                        <InstanceComponent {instance} />
+                    {/each}
+                </div>
+            {:else}
+                <div class="flex flex-col gap-4">
+                    {#each browserContext.orderedStudies as study (study.id)}
+                        <StudyBlock {study} />
+                    {/each}
+                </div>
+            {/if}
+        </div>
     {/if}
-{:else}
-    <div aria-busy={browserContext.loading || undefined} class="py-4">
-        {#if imagesMode}
-            <div class="flex flex-wrap gap-2">
-                {#each browserContext.orderedInstances as instance (instance.id)}
-                    <InstanceComponent {instance} />
-                {/each}
-            </div>
-        {:else}
-            {#each browserContext.orderedStudies as study (study.id)}
-                <StudyBlock {study} {mode} />
-            {/each}
-        {/if}
-    </div>
-    <Table.Pagination
-        class="border-t border-border-subtle-01 in-dialog:border-border-subtle-02"
-        page={browserContext.page + 1}
-        pageSize={browserContext.limit}
-        pageSizes={browserContext.limitOptions}
-        totalItems={browserContext.count}
-        onchange={changePage}
-    />
+    {#if browserContext.count > 0}
+        <Table.Pagination
+            class="border-t border-border-subtle-01 in-dialog:border-border-subtle-02"
+            page={browserContext.page + 1}
+            pageSize={browserContext.limit}
+            pageSizes={browserContext.limitOptions}
+            totalItems={browserContext.count}
+            onchange={changePage}
+        />
+    {/if}
 {/if}

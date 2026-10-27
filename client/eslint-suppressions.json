@@ -2,19 +2,6 @@
   "src/lib/browser/AdditionalDataSources.svelte": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    },
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/browser/ExternalData.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/browser/StudyBlockForm.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
     }
   },
   "src/lib/browser/StudyBlockForms.svelte": {
