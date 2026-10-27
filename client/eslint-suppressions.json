@@ -196,11 +196,6 @@
       "count": 1
     }
   },
-  "src/lib/usermanager.svelte.ts": {
-    "svelte/prefer-svelte-reactivity": {
-      "count": 1
-    }
-  },
   "src/lib/utils.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
