@@ -230,6 +230,20 @@ describe("BrowserContext", () => {
         expect(ctx.selectedIds).toEqual(["7"]);
     });
 
+    it("keeps the selection across a new search and a page change", async () => {
+        vi.mocked(api.searchStudies).mockResolvedValue(response([1]));
+        const ctx = await makeContext();
+        ctx.urlSync = true;
+        ctx.basic.patientIdentifier = "P1";
+        ctx.selectedIds = ["7"];
+
+        await ctx.submitSearch();
+        await ctx.setPage(1);
+
+        expect(api.searchStudies).toHaveBeenCalledTimes(2);
+        expect(ctx.selectedIds).toEqual(["7"]);
+    });
+
     it("applies only the latest of overlapping searches", async () => {
         let resolveFirst: (value: unknown) => void = () => {};
         vi.mocked(api.searchStudies)
