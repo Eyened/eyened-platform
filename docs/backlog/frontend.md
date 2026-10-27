@@ -81,3 +81,77 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** client Carbon PR 1 (`ui/carbon-1-login`) final review, 2026-10-09
 - **Problem:** `client/src/lib/LoginForm.svelte` `onMount` awaits `authClient.options()` without a catch; on failure neither the password form nor the OIDC button renders, leaving only the logo and title. v1 behaved the same.
 - **Fix:** catch the rejection and show an `InlineNotification` with title "Log in failed" and the error message.
+
+### One date format across the client
+- **Status:** open
+- **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) review, 2026-10-13
+- **Problem:** the date picker types and shows ISO yyyy-mm-dd (P4 spec decision D8: the stored format, unambiguous in Dutch and English). A dd-mm-yyyy input was requested as more intuitive, but the client already shows dates in mixed formats: ISO in `browser/StudyBlock.svelte` (study header), `viewer-window/panelVisits/PanelVisits.svelte` and the `browser/dataSources.ts` results; "3 Oct 2026" in `lib/utils.ts` (en-GB); "Oct 3, 2026" in `viewer-window/panelForm/FormItem.svelte` (en-US); the browser locale in `viewer-window/panelForm/FormItemContent.svelte`.
+- **Fix:** pick one display/input format: fixed dd-mm-yyyy, `Intl` locale-based, or unambiguous "13 Oct 2026" with lenient input. Amend D8 first. Keep ISO on the wire and in URLs; change only display and input. Show the format as visible helper text (Carbon date picker guidance), not only as a placeholder.
+- **Note:** about 5-8 files, plus the tests `StudyBlock.test.ts`, `PanelVisits.test.ts` and `patientStudies.test.ts`.
+
+### Rank exact property matches first in the ConditionBuilder search
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** typing "Study Date" in the property search lists "Study Tag Name" first; `ui/command` (bits-ui Command) scores with its default fuzzy filter.
+- **Fix:** pass a custom `filter` that ranks exact, then prefix matches above fuzzy ones.
+
+### Drop a stale search response after a Studies/Images switch
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** `resetForQueryModeChange` in `client/src/lib/browser/browserContext.svelte.ts` does not bump `searchSeq`, so an in-flight Studies response can be processed as Images. When the switch removes every condition no new search starts, so that response lands as Images and `loading` stays true until it does.
+- **Fix:** `this.searchSeq++` in the reset.
+
+### Skip the hover background on disabled calendar days
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** `client/src/lib/components/ui/calendar/calendar-day.svelte` applies `hover:bg-layer-hover-01` to disabled days too.
+- **Fix:** apply the hover background only to enabled days.
+
+### Round-trip a comma inside an "is one of" value
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** the value parser in `client/src/lib/browser/conditionConfig.ts` splits "is one of" text on commas and `condition-row.svelte` joins list values with ", ", so `["a,b"]` comes back as `["a","b"]`. Inherited v1 encoding.
+- **Fix:** an escape or quoting rule for commas in the text, or a multi-value input instead of comma-separated text.
+
+### Announce Delete condition once
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** in `client/src/lib/components/ui/condition-builder/condition-row.svelte` the gridcell and its button both carry `aria-label="Delete condition"`, so it is read twice. Matches the IBM ConditionBuilder source.
+- **Fix:** label only the button.
+
+### Contain focus in the open filter overlay
+- **Status:** open
+- **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) Task 3 review, 2026-10-13; at every width since the slide-over change, 2026-10-26
+- **Problem:** the open filter column in `client/src/lib/browser/Browser.svelte` is a 20rem overlay stacked over the results at every width. Tab from its last button moves into the results it covers, so the focused element is hidden (WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)). Clicking outside does not close it.
+- **Fix:** trap focus in the overlay while open, or move it into a Carbon side-panel pattern; close on outside click.
+
+### Find the cause of the intermittent `npm run test` error
+- **Status:** open
+- **Source:** client Carbon PR 4 Task 3 review, 2026-10-13
+- **Problem:** `npm run test` (client) intermittently reports "Errors 1 error" (or 2) with all 401 tests passing; it exited 0 in some runs and 1 in others. It predates the filter-column change. Captured: `ReferenceError: document is not defined` in `bits-ui/dist/internal/body-scroll-lock.svelte.js:34` (`resetBodyStyle`, from a `setTimeout` cleanup), attributed to `ui/modal/modal.test.ts` and `tasks/SubtasksTable.test.ts`: the timer fires after the jsdom environment is torn down.
+- **Fix:** await or flush the modal's scroll-lock cleanup (or unmount) before each of those tests ends; confirm with repeated runs.
+
+### Show portalled menus above the viewer overlay panel
+- **Status:** open
+- **Source:** client Carbon PR 4 demo, 2026-10-13
+- **Problem:** in the viewer overlay, condition-builder popovers (and other portalled menus, such as the picker's menus noted in PR 3) render behind `div#panel` (`position: fixed; z-index: 1000` in `client/src/lib/viewer-window/TopRowImages.svelte:121-123`), because portal content uses `z-50` (`client/src/lib/components/ui/popover/popover-content.svelte:24`). Pointer clicks can't reach them; the keyboard still works. It predates the filter-column change.
+- **Fix:** one shared layer order for overlays and portalled menus.
+
+### Add a scroll-to-top button to the browser results
+- **Status:** open
+- **Source:** client Carbon PR 4 slide-over filter change, 2026-10-26
+- **Problem:** the toolbar with the Filters button is not sticky and the filter column scrolls with the results (`client/src/lib/browser/Browser.svelte`), so far down a long result list the user scrolls all the way back up to change filters.
+- **Fix:** a sticky bottom-right button that scrolls the results' scroll container (`Main.svelte` on `/`, the modal body in the picker) to the top; place it above the fixed `Selection` bar when images are selected.
+
+### Open the image picker in a new tab
+- **Status:** open
+- **Source:** client Carbon PR 4 slide-over filter change, 2026-10-26
+- **Problem:** the picker (`client/src/lib/browser/BrowserPicker.svelte`) puts the whole browser in a Modal lg: a second scroll container, a top `Selection` bar, and the form-in-form `stopPropagation` and Escape workarounds in `Browser.svelte`.
+- **Fix:** "Browse images" in `SubTaskRow.svelte` opens `/` in a new tab with the subtask id and the patient condition; that tab pre-selects the set's images, saves with `addSubTaskImage`/`removeSubTaskImage` (move `confirmImages` to a shared module) and tells the task tab to refresh via `BroadcastChannel`. Then delete `BrowserPicker` and the Browser's `mode="overlay"` branch.
+- **Note:** save in the new tab, not the opener: the task tab may have been reloaded or closed, and the error must show where the user is.
+
+### Guard logged-in pages with a route group
+- **Status:** open
+- **Source:** signup-redirect fix on the Carbon branch, 2026-10-26
+- **Problem:** which pages need a login is decided by path strings (`isPublicPath` in `client/src/lib/publicPaths.ts`) plus a separate redirect in `client/src/lib/components/Main.svelte`; a new public page must be added to the list or it bounces to login.
+- **Fix:** move login, signup and oidc-callback under `routes/(public)/` and the rest under `routes/(app)/`, whose `+layout.ts` `load` checks the session and calls `redirect()`; then delete `publicPaths.ts` and the `Main.svelte` redirect.

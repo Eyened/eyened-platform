@@ -68,5 +68,17 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Re-audit navigation if `kit.paths.base` is ever set | [frontend](frontend.md) | open, conditional |
 | Reload the admin user page when its `id` param changes | [frontend](frontend.md) | open |
 | Show an error when the login options fail to load | [frontend](frontend.md) | open |
+| Rank exact property matches first in the ConditionBuilder search | [frontend](frontend.md) | open |
+| Drop a stale search response after a Studies/Images switch | [frontend](frontend.md) | open |
+| Skip the hover background on disabled calendar days | [frontend](frontend.md) | open |
+| Round-trip a comma inside an "is one of" value | [frontend](frontend.md) | open |
+| Announce Delete condition once | [frontend](frontend.md) | open |
+| Contain focus in the open filter overlay | [frontend](frontend.md) | open |
+| Find the cause of the intermittent `npm run test` error | [frontend](frontend.md) | open |
+| Show portalled menus above the viewer overlay panel | [frontend](frontend.md) | open |
 | Send per-task `can_edit_status` / `can_edit_details` / `can_delete` on `TaskGET` | [rbac-authz](rbac-authz.md) | open |
 | Validate task names on the server | [data-integrity](data-integrity.md) | open |
+| One date format across the client | [frontend](frontend.md) | open |
+| Add a scroll-to-top button to the browser results | [frontend](frontend.md) | open |
+| Open the image picker in a new tab | [frontend](frontend.md) | open |
+| Guard logged-in pages with a route group | [frontend](frontend.md) | open |

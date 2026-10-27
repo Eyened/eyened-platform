@@ -1,11 +1,12 @@
 <script lang="ts">
+    import { cn } from "$lib/utils.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import * as NativeSelect from "$lib/components/ui/native-select/index.js";
     import CaretLeft from "carbon-icons-svelte/lib/CaretLeft.svelte";
     import CaretRight from "carbon-icons-svelte/lib/CaretRight.svelte";
     import { tick } from "svelte";
 
-    // Carbon Pagination, size lg, directly below a data table (so no top border). Prop names from
+    // Carbon Pagination, size lg, directly below a data table (so no top border). Outside a table, pass a top border (class="border-t border-border-subtle-01 in-dialog:border-border-subtle-02"), as Carbon draws one. Prop names from
     // carbon-components-svelte; strings and focus moves from @carbon/react 1.118.0 Pagination;
     // values from @carbon/styles 1.117.0 pagination/_pagination.scss.
     const uid = $props.id();
@@ -15,12 +16,14 @@
         pageSizes,
         totalItems,
         onchange,
+        class: className,
     }: {
         page: number;
         pageSize: number;
         pageSizes: number[];
         totalItems: number;
         onchange: (detail: { page: number; pageSize: number }) => void;
+        class?: string;
     } = $props();
 
     let root = $state<HTMLElement | null>(null);
@@ -50,13 +53,18 @@
         }
     }
 
-    const select = "h-12 border-0 bg-transparent pe-9 hover:bg-layer-hover-01";
-    const button = "size-12 border-s-border-subtle-01 hover:bg-layer-hover-01";
+    const select =
+        "h-12 border-0 bg-transparent pe-9 hover:bg-layer-hover-01 in-dialog:hover:bg-layer-hover-02";
+    const button =
+        "size-12 border-s-border-subtle-01 hover:bg-layer-hover-01 in-dialog:border-s-border-subtle-02 in-dialog:hover:bg-layer-hover-02";
 </script>
 
 <div
     bind:this={root}
-    class="@container flex h-12 items-center justify-between bg-layer-01 text-body-compact-01"
+    class={cn(
+        "@container flex h-12 items-center justify-between bg-layer-01 text-body-compact-01 in-dialog:bg-layer-02",
+        className,
+    )}
 >
     <div class="flex h-full items-center ps-4">
         <label
@@ -66,7 +74,7 @@
             Items per page:
         </label>
         <div
-            class="h-full border-e border-border-subtle-01 @max-[42rem]:hidden"
+            class="h-full border-e border-border-subtle-01 @max-[42rem]:hidden in-dialog:border-border-subtle-02"
         >
             <NativeSelect.Root
                 id="{uid}-size"
@@ -92,7 +100,7 @@
         </span>
     </div>
     <div
-        class="flex h-full items-center border-s border-border-subtle-01 @max-[42rem]:border-s-0"
+        class="flex h-full items-center border-s border-border-subtle-01 @max-[42rem]:border-s-0 in-dialog:border-border-subtle-02"
     >
         <label for="{uid}-page" class="sr-only">Page of {pagesText}</label>
         <div class="h-full @max-[42rem]:hidden">

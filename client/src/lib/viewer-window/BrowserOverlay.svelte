@@ -28,7 +28,6 @@
     // The overlay owns the context so it can read the selection back out on close.
     const browserContext = new BrowserContext();
     browserContext.urlSync = false;
-    browserContext.limit = 100;
 
     const initialInstanceIds = viewerWindowContext.instanceIds.slice();
 
@@ -127,7 +126,7 @@
     onDestroy(close);
 </script>
 
-<div id="browser-overlay" class="browser-light-surface">
+<div id="browser-overlay" class="bg-background text-text-primary">
     <div class="header">
         <span class="title">Browse images</span>
         {#if subTask}
@@ -165,7 +164,6 @@
         width: min(95vw, 100%);
         height: min(95vh, 100%);
         margin: auto;
-        background-color: var(--background);
         border-radius: 12px;
         box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
         overflow: hidden;

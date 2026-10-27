@@ -119,8 +119,8 @@ const twMergeConfig = {
                 "heading-03",
                 "heading-04",
             ],
-            shadow: ["popover", "button-focus"],
-            radius: ["checkbox", "tooltip"],
+            shadow: ["popover", "button-focus", "content-switcher-selected"],
+            radius: ["checkbox", "tooltip", "content-switcher"],
         },
     },
 };

@@ -15,7 +15,7 @@
     bind:this={ref}
     data-slot="table-toolbar"
     class={cn(
-        "relative flex min-h-12 w-full flex-wrap items-center bg-layer-01",
+        "relative flex min-h-12 w-full flex-wrap items-center bg-layer-01 in-dialog:bg-layer-02",
         className,
     )}
     {...restProps}

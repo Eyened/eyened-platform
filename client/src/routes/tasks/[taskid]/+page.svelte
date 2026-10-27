@@ -216,7 +216,7 @@
 
     function rowChanged() {
         notice = null;
-        refresh();
+        return refresh();
     }
 
     function rowFailed(title: string, subtitle?: string) {

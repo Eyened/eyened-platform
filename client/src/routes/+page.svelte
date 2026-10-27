@@ -7,7 +7,7 @@
     <title>Eyened browser</title>
 </svelte:head>
 
-<Main>
+<Main wide>
     <Browser />
 </Main>
 

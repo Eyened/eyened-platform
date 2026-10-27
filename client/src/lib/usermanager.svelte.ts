@@ -1,6 +1,7 @@
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import { authClient, type UserResponse } from "../auth";
+import { isPublicPath } from "./publicPaths";
 
 export class UserManager {
     public user = $state<UserResponse>({
@@ -18,16 +19,16 @@ export class UserManager {
             return;
         }
 
-        const onLoginPage = pathname.startsWith("/users/login");
-        // Logged out, me() rejects once the session refresh fails; on the
-        // login page that just means: show the form.
-        const user = onLoginPage
+        const onPublicPage = isPublicPath(pathname);
+        // Logged out, me() rejects once the session refresh fails; on a
+        // public page that just means: show the page.
+        const user = onPublicPage
             ? await authClient.me().catch(() => null)
             : await authClient.me();
         if (user === null) {
             console.log("User is not logged in");
-            // Only redirect if we're not already on the login page
-            if (!pathname.startsWith("/users/login")) {
+            // Only redirect if we're not already on a public page
+            if (!onPublicPage) {
                 console.log(
                     "redirecting to",
                     encodeURIComponent(window.location.href),

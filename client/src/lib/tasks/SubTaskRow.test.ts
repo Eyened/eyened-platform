@@ -62,7 +62,7 @@ function renderRow(props: Record<string, unknown>) {
         onerror: vi.fn(),
         onchange: vi.fn(),
     };
-    render(SubTaskRow, {
+    const { rerender } = render(SubTaskRow, {
         props: {
             taskId: 9,
             headingId: "task-heading",
@@ -72,7 +72,7 @@ function renderRow(props: Record<string, unknown>) {
         },
         context: new Map([["globalContext", { user: { id: 5 } }]]),
     } as never);
-    return callbacks;
+    return { ...callbacks, rerender };
 }
 
 beforeEach(() => {
@@ -137,45 +137,64 @@ const refusal = new ApiError(409, "conflict", {
 });
 
 // A subtask with no images yet, so confirming a selection is purely an add.
-async function confirmSelection() {
-    const callbacks = renderRow({
+async function openPicker() {
+    const rendered = renderRow({
         subtask: makeRow({ id: 31, index: 0 }),
         taskId: 7,
         expanded: true,
     });
-
     await fireEvent.click(
         screen.getByRole("button", { name: "Browse images" }),
     );
-
     const props = pickerProps.at(-1);
     if (!props) throw new Error("the picker never mounted");
-    await props.onConfirm([REFUSED_ID]);
-    return callbacks;
+    return { ...rendered, props };
 }
 
 describe("SubTaskRow image selection", () => {
-    it("tells the grader which earlier changes were kept when one is refused", async () => {
+    it("keeps the picker open and says which changes were kept when an image is refused", async () => {
         vi.mocked(addSubTaskImage).mockRejectedValue(refusal);
+        const { props, onchange, onerror } = await openPicker();
 
-        const { onerror } = await confirmSelection();
-
-        expect(addSubTaskImage).toHaveBeenCalledWith(31, REFUSED_ID);
-        expect(onerror).toHaveBeenCalledWith(
-            "Image 88213 is in a project this task does not declare.",
-            "Image project 17; task declares 4, 9. " +
+        await expect(props.onConfirm([REFUSED_ID])).rejects.toThrow(
+            "Image 88213 is in a project this task does not declare. " +
+                "Image project 17; task declares 4, 9. " +
                 "Earlier changes were saved; the rest were not applied.",
         );
+        expect(onchange).toHaveBeenCalled();
+        expect(onerror).not.toHaveBeenCalled();
     });
 
-    it("reports a failure that is not the declaration refusal", async () => {
-        vi.mocked(addSubTaskImage).mockRejectedValue(new Error("Network down"));
+    it("refreshes after a failed save, so a retry sends only what was not saved", async () => {
+        const { props, onchange, rerender } = await openPicker();
+        onchange.mockImplementation(() =>
+            rerender({
+                subtask: makeRow({
+                    id: 31,
+                    index: 0,
+                    images: [{ id: 1 }] as never,
+                }),
+            }),
+        );
+        vi.mocked(addSubTaskImage)
+            .mockResolvedValueOnce(undefined)
+            .mockRejectedValueOnce(new Error("Network down"));
 
-        const { onerror } = await confirmSelection();
-
-        expect(onerror).toHaveBeenCalledWith(
-            "Images for set 0 could not be saved",
+        await expect(props.onConfirm(["1", "2"])).rejects.toThrow(
             "Network down",
         );
+
+        vi.mocked(addSubTaskImage).mockReset().mockResolvedValue(undefined);
+        await props.onConfirm(["1", "2"]);
+        expect(addSubTaskImage).toHaveBeenCalledTimes(1);
+        expect(addSubTaskImage).toHaveBeenCalledWith(31, "2");
+    });
+
+    it("refreshes after a successful save", async () => {
+        vi.mocked(addSubTaskImage).mockReset().mockResolvedValue(undefined);
+        const { props, onchange } = await openPicker();
+
+        await props.onConfirm(["1"]);
+        expect(onchange).toHaveBeenCalled();
     });
 });

@@ -1,15 +1,16 @@
 import createClient from "openapi-fetch";
 import type { paths } from "../../types/openapi";
 import { authClient } from "../../auth";
+import { isPublicPath } from "../publicPaths";
 // Token refresh state - prevents multiple simultaneous refresh attempts
 let refreshPromise: Promise<void> | null = null;
 
 // Redirect to login when authentication fails permanently
 function redirectToLogin() {
-    // Only redirect if not already on login page
+    // Only redirect if not already on a public page
     if (
         typeof window !== "undefined" &&
-        !window.location.pathname.startsWith("/users/login")
+        !isPublicPath(window.location.pathname)
     ) {
         const currentUrl = encodeURIComponent(window.location.href);
         window.location.href = `/users/login?next=${currentUrl}`;
