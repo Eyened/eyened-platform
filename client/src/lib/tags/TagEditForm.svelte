@@ -1,93 +1,95 @@
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
+    import { TextInput } from "$lib/components/ui/text-input/index.js";
     import type { TagType } from "../../types/openapi_types";
 
-    // icons from: https://fontawesome.com/v6/icons?o=r&m=free&s=solid
     let {
         tagType,
         initTagName = "",
         initTagDescription = "",
+        submitText = "Add",
         add,
+        oncancel,
     }: {
         tagType: TagType;
         initTagName?: string;
         initTagDescription?: string;
+        submitText?: string;
         add: (payload: {
             name: string;
             description: string;
             tagType: TagType;
-        }) => void;
+        }) => void | Promise<unknown>;
+        oncancel?: () => void;
     } = $props();
 
-    let newTagName = $state(initTagName);
-    let newTagDescription = $state(initTagDescription);
-    console.log("TagEditForm", tagType, initTagName, initTagDescription);
+    let name = $state(initTagName);
+    let description = $state(initTagDescription);
+    let invalid = $state(false);
+    let pending = $state(false);
 
-    function addTag() {
-        if (newTagName.trim() !== "") {
-            add({
-                name: newTagName,
-                description: newTagDescription,
-                tagType: tagType,
-            });
-            newTagName = "";
-            newTagDescription = "";
+    async function submit(e: SubmitEvent) {
+        e.preventDefault();
+        // In the picker an outer form would save.
+        e.stopPropagation();
+        if (pending) return;
+        if (!name.trim()) {
+            invalid = true;
+            return;
+        }
+        pending = true;
+        try {
+            await add({ name: name.trim(), description, tagType });
+            name = "";
+            description = "";
+        } catch {
+            // The caller shows the error; the fields keep their text.
+        } finally {
+            pending = false;
         }
     }
 </script>
 
-<div class="new-tag-input">
-    <input
-        type="text"
-        placeholder="New tag name"
-        maxlength="256"
-        bind:value={newTagName}
-        onkeydown={(e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                e.stopPropagation();
-                addTag();
-            }
-        }}
+<form class="flex flex-col gap-4" novalidate onsubmit={submit}>
+    <TextInput
+        labelText="Name"
+        maxlength={256}
+        bind:value={name}
+        invalidText={invalid ? "Enter a tag name" : undefined}
+        oninput={() => (invalid = false)}
     />
-    <input
-        type="text"
-        placeholder="Short tag description"
-        maxlength="256"
-        bind:value={newTagDescription}
-        onkeydown={(e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                e.stopPropagation();
-                addTag();
-            }
-        }}
+    <TextInput
+        labelText="Description"
+        maxlength={256}
+        bind:value={description}
     />
-    <button onclick={addTag}>Add</button>
-</div>
-
-<style>
-    .new-tag-input {
-        margin-top: 1em;
-        display: flex;
-    }
-    .new-tag-input input {
-        flex-grow: 1;
-        padding: 0.5em;
-        font-size: 1em;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        margin-right: 0.5em;
-    }
-    .new-tag-input button {
-        padding: 0.5em 1em;
-        font-size: 1em;
-        border: none;
-        background-color: #007bff;
-        color: white;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    .new-tag-input button:hover {
-        background-color: #0056b3;
-    }
-</style>
+    <div class="flex">
+        {#if oncancel}
+            <Button
+                variant="secondary"
+                size="sm"
+                class="flex-1"
+                onclick={oncancel}
+            >
+                Cancel
+            </Button>
+        {/if}
+        <Button
+            type="submit"
+            size="sm"
+            class="flex-1"
+            aria-disabled={pending || undefined}
+        >
+            {#if pending}
+                <InlineLoading
+                    class="text-inherit"
+                    status="active"
+                    description="Creating…"
+                />
+            {:else}
+                {submitText}
+            {/if}
+        </Button>
+    </div>
+</form>
