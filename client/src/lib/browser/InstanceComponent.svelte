@@ -15,8 +15,8 @@
     import { instanceLabel } from "./images";
     import InstanceInfoLazy from "./InstanceInfoLazy.svelte";
 
-    // Carbon SelectableTile (multi-select), values from @carbon/styles 1.117.0
-    // tile; the image-info button is its own click target (a CTA inside a selectable tile).
+    // A selectable image item: the whole item toggles the selection, the checkbox sits over the
+    // image's top-left corner, and the image-info button is its own click target.
     const browserContext = getContext<BrowserContext>("browserContext");
 
     interface Props {
@@ -49,9 +49,9 @@
 
 <div
     class={cn(
-        "relative flex flex-col border border-transparent bg-layer-01 p-4 in-dialog:bg-layer-02 in-study:bg-layer-02 in-dialog:in-study:bg-layer-03",
+        "relative flex flex-col border border-transparent bg-layer-01 in-dialog:bg-layer-02 in-study:bg-layer-02 in-dialog:in-study:bg-layer-03",
         selectable &&
-            "pe-12 hover:bg-layer-hover-01 in-dialog:hover:bg-layer-hover-02 in-study:hover:bg-layer-hover-02 in-dialog:in-study:hover:bg-layer-hover-03",
+            "hover:bg-layer-hover-01 in-dialog:hover:bg-layer-hover-02 in-study:hover:bg-layer-hover-02 in-dialog:in-study:hover:bg-layer-hover-03",
         selected && "border-layer-selected-inverse",
     )}
 >
@@ -65,19 +65,8 @@
             onclick={() => browserContext.toggleInstance(instance)}
             {onkeydown}
         ></div>
-        {#if selected}
-            <CheckboxCheckedFilled
-                aria-hidden="true"
-                class="pointer-events-none absolute top-4 right-4 text-icon-primary"
-            />
-        {:else}
-            <Checkbox
-                aria-hidden="true"
-                class="pointer-events-none absolute top-4 right-4 text-icon-secondary"
-            />
-        {/if}
     {/if}
-    <!-- Empty tile area until the image loads. -->
+    <!-- Empty item area until the image loads. -->
     <img
         src={getThumbUrl(instance)}
         alt=""
@@ -86,7 +75,25 @@
         class="pointer-events-none object-contain"
         style="width: {size}; height: {size};"
     />
-    <div class="mt-2 flex items-center justify-between gap-2">
+    {#if selectable}
+        <!-- A backing keeps the checkbox readable on bright images. -->
+        <span
+            class="pointer-events-none absolute top-2 left-2 flex bg-layer-01 p-0.5 in-dialog:bg-layer-02 in-study:bg-layer-02 in-dialog:in-study:bg-layer-03"
+        >
+            {#if selected}
+                <CheckboxCheckedFilled
+                    aria-hidden="true"
+                    class="text-icon-primary"
+                />
+            {:else}
+                <Checkbox aria-hidden="true" class="text-icon-secondary" />
+            {/if}
+        </span>
+    {/if}
+    <div
+        class="flex items-center justify-between gap-2 py-1 ps-2 pe-1"
+        style="width: {size};"
+    >
         <span
             class="pointer-events-none truncate text-label-01 text-text-secondary"
         >

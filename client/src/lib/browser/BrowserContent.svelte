@@ -44,7 +44,7 @@
                     {#each { length: 12 }, i (i)}
                         <span
                             class={cn(skeleton, "shrink-0")}
-                            style="width: {browserContext.thumbnailSize}; height: {browserContext.thumbnailSize};"
+                            style="width: calc({browserContext.thumbnailSize} + 2px); height: calc({browserContext.thumbnailSize} + 2rem + 2px);"
                         ></span>
                     {/each}
                 </div>
