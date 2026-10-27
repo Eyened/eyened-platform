@@ -277,11 +277,11 @@
             <BrowserContent {mode} />
             <footer></footer>
         </div>
-        <!-- Dims the results under the open column; the picker's modal already dims the page. -->
+        <!-- Dims everything below the header under the open column; the picker's modal already dims the page. -->
         {#if mode === "full" && filtersOpen}
             <div
                 aria-hidden="true"
-                class="z-0 col-start-1 row-start-1 bg-overlay"
+                class="fixed inset-x-0 top-12 bottom-0 z-0 bg-overlay"
                 onclick={closeOverlay}
             ></div>
         {/if}
