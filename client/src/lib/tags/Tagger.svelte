@@ -107,7 +107,7 @@
                 <ul class="mb-4 flex flex-col">
                     {#each itemTags as t (t.id)}
                         <li
-                            class="flex flex-col gap-1 border-b border-border-subtle-01 py-3 first:pt-0 in-dialog:border-border-subtle-02"
+                            class="flex flex-col gap-1 border-b border-border-subtle-01 py-3 first:pt-0"
                         >
                             <p class="text-heading-compact-01">{t.name}</p>
                             {#if editing === t.id}

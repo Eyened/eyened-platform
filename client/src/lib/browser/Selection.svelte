@@ -19,16 +19,20 @@
     } = $props();
 
     const browserContext = getContext<BrowserContext>("browserContext");
-    const action = "min-h-12 px-4 [&>svg]:static";
+    const action = "min-h-12 px-4 whitespace-nowrap [&>svg]:static";
 </script>
 
-<div class="sticky top-0 z-20 flex h-12 items-center bg-background-brand">
-    <p class="flex-1 truncate px-4 text-body-compact-01 text-text-on-color">
+<div
+    class="sticky top-0 z-10 flex h-12 items-center overflow-x-auto bg-background-brand"
+>
+    <p
+        class="sticky start-0 z-10 shrink-0 bg-background-brand px-4 text-body-compact-01 whitespace-nowrap text-text-on-color"
+    >
         {imageCount(browserContext.selectedIds.length)} selected
     </p>
     <Button
         size="lg"
-        class={action}
+        class="{action} ms-auto"
         aria-expanded={panelOpen}
         aria-controls="selected-images"
         onclick={onviewselected}

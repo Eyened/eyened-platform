@@ -44,7 +44,4 @@
         display: flex;
         flex-direction: column;
     }
-    :root {
-        --icon-hover: rgba(110, 164, 189, 0.43);
-    }
 </style>

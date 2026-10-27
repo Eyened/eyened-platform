@@ -32,11 +32,6 @@
         }
         return condition.value === value;
     }
-    async function loadAdditionalData(source: AdditionalDataSource) {
-        const url = resolveURL(source.url, context);
-        return loadDataSource(url);
-    }
-
     const sources = $derived(
         additional_data_sources.filter((s) =>
             s.conditions.every(condition_applies),
@@ -52,10 +47,12 @@
     <!-- ASSUMPTION: source names are unique in the extensions config. -->
     <Accordion.Root bind:value={open} class="mt-4">
         {#each sources as source (source.name)}
+            <!-- The await depends on the URL string only, so a study update that leaves the URL alone does not reload. -->
+            {@const url = resolveURL(source.url, context)}
             <Accordion.Item value={source.name}>
                 <Accordion.Trigger>{source.name}</Accordion.Trigger>
                 <Accordion.Content>
-                    {#await loadAdditionalData(source)}
+                    {#await loadDataSource(url)}
                         <InlineLoading status="active" description="Loading…" />
                     {:then data}
                         <ExternalData {data} />
