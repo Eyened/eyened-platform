@@ -23,3 +23,10 @@
 - **Source:** RBAC admin P1 review, 2026-09-17
 - **Problem:** the route passes `ActingUser(current_user)` although the subject from `authenticate()` is the same row, so the parameter is untestable and carries the `_ACTOR_PARAMETER_ALLOWED` exemption in `server/tests/test_scope_is_constructor_state.py`.
 - **Fix:** if admin-driven resets of another user's password via this method are never built, derive the actor from the subject and delete the exemption; otherwise keep it.
+
+### Send per-task `can_edit_status` / `can_edit_details` / `can_delete` on `TaskGET`
+- **Status:** open
+- **Source:** client Carbon PR 2 (#267) scoping, 2026-10-12
+- **Problem:** `client/src/lib/tasks/TasksTable.svelte` shows Edit and Delete on every row; the server refuses most of them for non-admins (`task_service.update_task` needs project_admin for name/description, grader for status; `delete_task` needs project_admin; a task with no project is 404 for non-admins), so users open a modal only to get an error.
+- **Fix:** add a non-raising `AccessScope.allows(project_ids, floor)` that `require` calls; name the two floors as constants used by `update_task`, `delete_task` and the flags; fill the three flags in list/get/patch via the batched `projects_for_tasks`; client hides unavailable actions and makes Name/Description read-only when `!can_edit_details`. Test that `allows` and `require` agree, and that `GET /task` stays one query per list.
+- **Note:** open product question first: should a task's creator be able to delete it (today only project_admin)? About 4–6 h.

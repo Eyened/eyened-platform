@@ -16,7 +16,7 @@ Run in the worktree `eyened-platform-worktrees/client-carbon`, from `client/` un
     - **Behaviour checklist:** one line per v1 behaviour of the screen, from the current code.
     - **Other importers:** for each `ui/` component the layer restyles,
       `git grep -l 'components/ui/<name>' -- src`, minus the file set.
-3. Restyle. Check each component against
+3. Restyle. Sources, in this order: Carbon guidelines (the rules), `@carbon/styles` SCSS at the version in `DESIGN.md` (values), Carbon React source (behaviour, ARIA), carbon-components-svelte (Svelte prop names and markup only; it is Svelte 4, never copy it). Check each component against
    `https://www.carbondesignsystem.com/building-blocks/core/components/<slug>/guidelines` (and its
    Style and Accessibility tabs) and each pattern against
    `https://www.carbondesignsystem.com/building-blocks/core/patterns/<slug>`. A deviation needs a
@@ -52,11 +52,19 @@ Run in the worktree `eyened-platform-worktrees/client-carbon`, from `client/` un
     ```
 
 8. On the demo: tick the behaviour checklist; open each other importer's screen and check it
-   still works.
+   still works. Then, in the browser's responsive mode, open each screen at 320, 672, 1056, 1312
+   and 1584 px, including its dialogs, open menus, popovers and the calendar. Pass: nothing is cut
+   off or overlapping; no information or action is lost (truncated text follows the Carbon
+   component's overflow guidance); no box other than the image canvas or a data table's grid
+   scrolls horizontally; every action can be reached by scrolling vertically only. The `<body>`
+   never scrolls, so look for clipping and inner scrollbars, not a page scrollbar. Then show the
+   user each screen live in the browser at the five widths and get their go-ahead; save no
+   screenshots.
 9. Open the PR with `gh stack submit`. The body has:
     - the behaviour checklist;
     - the Carbon conformance table (Element · Carbon page · Result). The Result cell names the
-      values compared, for example "✓ 40 px rows; header `layer-accent-01`; Tab/Enter";
+      values compared, for example "✓ 40 px rows; header `layer-accent-01`; Tab/Enter". It
+      includes the row "Reflow 320 px · WCAG 1.4.10 · ✓ 320/672/1056/1312/1584";
     - the other importers checked;
     - what still looks unstyled and why.
 10. In the same PR: `DESIGN.md` entries for each component touched, and this file updated.
@@ -81,8 +89,8 @@ git grep -nE -e '(^|[[:space:]"'"'"'{:])(bg|text|border|ring|outline|fill|stroke
 # Tailwind default type, weight, radius, shadow, width, outline removal
 git grep -nE -e '(^|[[:space:]"'"'"'{:])(text-(xs|sm|base|lg|[2-9]?xl)|font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)|rounded(-(xs|sm|md|lg|xl|[2-4]xl))?|shadow(-(2xs|xs|sm|md|lg|xl|2xl))?|max-w-(xs|sm|md|lg|xl|[2-7]xl)|outline-(none|hidden))([[:space:]"'"'"'}]|$)' -- $FILES
 
-# Breakpoint prefixes (tv size keys like `sm: "…"` pass)
-git grep -nE -e '(^|[[:space:]"'"'"'{])(sm|md|lg|xl|2xl):[a-z-]' -- $FILES
+# Tailwind's own breakpoint prefixes (Carbon's md: lg: xlg: pass; tv size keys like `sm: "…"` pass)
+git grep -nE -e '(^|[[:space:]"'"'"'{])(sm|xl|2xl):[a-z-]' -- $FILES
 
 # Colour literals, fonts and old variables in <style> blocks and style= attributes
 git grep -nE -e '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|font-family|var\(--(background|foreground|popover|muted|border|input|ring|primary|secondary|accent|destructive|card|sidebar|chart)|var\(--color-(foreground|popover|muted|border|input|ring|primary|secondary|accent|destructive|card|sidebar|chart)(-[a-z-]*foreground)?[),]' -- $FILES ':!src/app.css'
@@ -119,26 +127,30 @@ git grep -nE -e 'dark:' -e '-\[[^]]*\]([^:]|$)' -- $FILES
 | PR 0's unlayered `:focus-visible` rule beats `outline-offset-*` utilities                                                              | A ring outside the element needs its own unlayered rule in `app.css` (see the checkbox)                               |
 | `carbon-icons-svelte` components are Svelte 4 (legacy mode)                                                                            | Don't force runes globally                                                                                            |
 | Importing `carbon-icons-svelte` from the package index slows the dev server                                                            | Import `carbon-icons-svelte/lib/<Name>.svelte`                                                                        |
+| A focused element that becomes `disabled` loses focus, which then falls out of a modal                                                 | Use `aria-disabled` on buttons; move focus to the primary before disabling fields                                     |
+| A field inside a dialog sits on `layer-01`, the same colour as `field-01`                                                              | Primitives carry `in-dialog:` 02-set classes; a new field primitive adds them too                                     |
+| Tailwind's `group-data-[…]/x:` and other arbitrary variants fail the old-token check                                                   | Add a named `@custom-variant` in `app.css` (`in-dialog:`, `table-xl:`)                                                |
+| A bits-ui `child` snippet spread over a caller's handlers replaces them                                                                | Merge with `mergeProps` from `bits-ui`                                                                                |
 
 ## Known problems on screens still to port
 
-| File                                                                                                    | Problem after PR 0                                                                                                 | Layer                                       |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| `src/lib/Dialogue.svelte`                                                                               | `var(--popover)`, `var(--popover-foreground)`: the segmentation dialogue over the image is transparent             | Viewer                                      |
-| `src/lib/viewer-window/BrowserOverlay.svelte`                                                           | `var(--background)`, `var(--border)`, `.browser-light-surface` (class removed)                                     | Viewer                                      |
-| `src/lib/browser/BrowserPicker.svelte`                                                                  | `var(--background)`, `var(--border)`, `.browser-light-surface` (class removed)                                     | Browser                                     |
-| `src/lib/forms/SchemaForm.svelte`                                                                       | `hsl(var(--muted))` (was already invalid on oklch values)                                                          | Viewer forms                                |
-| `src/lib/viewer-window/ViewerWindowLoader.svelte`                                                       | Adds and removes `dark` on `<html>`; the class no longer means anything                                            | Viewer                                      |
-| `src/routes/+layout.svelte`                                                                             | Body keeps `height: 100vh`, flex column, `overflow: hidden` for the viewer's `flex: 1` chain (`MainViewer.svelte`) | Viewer: move to the viewer root if possible |
-| `src/lib/tasks/TaskPanel.svelte`                                                                        | `ui/button-group`; black/white `rgba(…)` in `<style>`; `outline` buttons                                           | Viewer                                      |
-| `src/lib/browser/AdvancedFilters.svelte`                                                                | shadcn colour classes                                                                                              | Browser                                     |
-| `src/lib/browser/Browser.svelte`, `src/lib/components/FeaturesTable.svelte`                             | `variant="link"` callers (the second typed through `renderComponent`); the variant stays, mapped to Link classes   | —                                           |
-| `src/lib/components/ui/calendar/calendar.svelte`                                                        | `[--cell-size:--spacing(8)]` fails the arbitrary-value check                                                       | Whichever layer first uses the calendar     |
-| `src/lib/Popup.svelte`, `src/lib/browser/SeriesComponent.svelte`, `src/lib/browser/ExternalData.svelte` | White / `--browser-background` fills under `text-primary`: near-white text on white                                | Browser                                     |
-| `src/lib/components/UserMenu.svelte`                                                                    | Opens a `dialog`, transparent until Modal is restyled                                                              | PR 2                                        |
-| Viewer side panels (`TaskPanel.svelte` etc.)                                                            | Carbon's 63 px right button padding may overflow narrow panels                                                     | Viewer                                      |
-| Unconverted shadcn `ui/` components                                                                     | `bg-popover`/`bg-background` gone: menus, popovers and dialogs are transparent                                     | The layer that first restyles each          |
-| `src/lib/components/ui/field/` `legend`, `separator`, `title`, `content`, `set`, `group`, `description` | shadcn tokens; only `field`, `field-label`, `field-error` are restyled                                             | The layer that first uses each              |
+| File                                                                                                    | Problem after PR 0                                                                                                                                                                | Layer                                       |
+| ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `src/lib/Dialogue.svelte`                                                                               | `var(--popover)`, `var(--popover-foreground)`: the segmentation dialogue over the image is transparent                                                                            | Viewer                                      |
+| `src/lib/viewer-window/BrowserOverlay.svelte`                                                           | `var(--background)`, `var(--border)`, `.browser-light-surface` (class removed)                                                                                                    | Viewer                                      |
+| `src/lib/browser/BrowserPicker.svelte`                                                                  | `var(--background)`, `var(--border)`, `.browser-light-surface` (class removed)                                                                                                    | Browser                                     |
+| `src/lib/forms/SchemaForm.svelte`                                                                       | `hsl(var(--muted))` (was already invalid on oklch values)                                                                                                                         | Viewer forms                                |
+| `src/lib/viewer-window/ViewerWindowLoader.svelte`                                                       | Adds and removes `dark` on `<html>`; the class no longer means anything                                                                                                           | Viewer                                      |
+| `src/routes/+layout.svelte`                                                                             | Body keeps `height: 100vh`, flex column, `overflow: hidden` for the viewer's `flex: 1` chain (`MainViewer.svelte`)                                                                | Viewer: move to the viewer root if possible |
+| `src/lib/tasks/TaskPanel.svelte`                                                                        | `ui/button-group`; black/white `rgba(…)` in `<style>`; `outline` buttons                                                                                                          | Viewer                                      |
+| `src/lib/browser/AdvancedFilters.svelte`                                                                | shadcn colour classes                                                                                                                                                             | Browser                                     |
+| `src/lib/browser/InstanceComponent.svelte`                                                              | `Dialog.Content` now sets Carbon modal widths at `md:`/`lg:`/`xlg:`, which override its `sm:max-w-[85vw] max-h-[85vh]`: the image-info popup is 48% wide at `xlg` instead of ~85% | Browser                                     |
+| `src/lib/browser/Browser.svelte`, `src/lib/components/FeaturesTable.svelte`                             | `variant="link"` callers (the second typed through `renderComponent`); the variant stays, mapped to Link classes                                                                  | —                                           |
+| `src/lib/components/ui/calendar/calendar.svelte`                                                        | `[--cell-size:--spacing(8)]` fails the arbitrary-value check                                                                                                                      | Whichever layer first uses the calendar     |
+| `src/lib/Popup.svelte`, `src/lib/browser/SeriesComponent.svelte`, `src/lib/browser/ExternalData.svelte` | White / `--browser-background` fills under `text-primary`: near-white text on white                                                                                               | Browser                                     |
+| Viewer side panels (`TaskPanel.svelte` etc.)                                                            | Carbon's 63 px right button padding may overflow narrow panels                                                                                                                    | Viewer                                      |
+| Unconverted shadcn `ui/` components                                                                     | `bg-popover`/`bg-background` gone: menus and popovers are transparent                                                                                                             | The layer that first restyles each          |
+| `src/lib/components/ui/field/` `legend`, `separator`, `title`, `content`, `set`, `group`, `description` | shadcn tokens; only `field`, `field-label`, `field-error` are restyled                                                                                                            | The layer that first uses each              |
 
 Viewer decisions already taken: the image area is `#000000`, and image drawings (segmentations,
 points, grids) keep their own colours outside the theme.
