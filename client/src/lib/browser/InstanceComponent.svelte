@@ -49,8 +49,9 @@
 
 <div
     class={cn(
-        "relative flex flex-col border border-transparent bg-layer-01 p-4 hover:bg-layer-hover-01 in-dialog:bg-layer-02 in-dialog:hover:bg-layer-hover-02 in-study:bg-layer-02 in-study:hover:bg-layer-hover-02 in-dialog:in-study:bg-layer-03 in-dialog:in-study:hover:bg-layer-hover-03",
-        selectable && "pe-12",
+        "relative flex flex-col border border-transparent bg-layer-01 p-4 in-dialog:bg-layer-02 in-study:bg-layer-02 in-dialog:in-study:bg-layer-03",
+        selectable &&
+            "pe-12 hover:bg-layer-hover-01 in-dialog:hover:bg-layer-hover-02 in-study:hover:bg-layer-hover-02 in-dialog:in-study:hover:bg-layer-hover-03",
         selected && "border-layer-selected-inverse",
     )}
 >

@@ -256,7 +256,7 @@
             hidden={!filtersOpen}
             onsubmit={submit}
             onkeydown={onFiltersKeydown}
-            class="z-10 col-start-1 row-start-1 flex w-full max-w-80 flex-col gap-6 self-start justify-self-start border-e border-border-subtle-00 bg-background py-6 pe-4 in-dialog:border-border-subtle-01 in-dialog:bg-layer-01"
+            class="z-30 col-start-1 row-start-1 flex w-full max-w-80 flex-col gap-6 self-start justify-self-start border-e border-border-subtle-00 bg-background py-6 pe-4 in-dialog:border-border-subtle-01 in-dialog:bg-layer-01"
         >
             <h2 class="text-heading-compact-02 text-text-primary">Filters</h2>
             <FilterShorcuts bind:patientInput />
@@ -294,7 +294,7 @@
                 </Button>
             </div>
         </form>
-        <!-- isolate keeps the results' own z-index layers under the scrim and the column. -->
+        <!-- isolate keeps the results' own z-index layers under the batch bar (z-10), the scrim (z-20) and the column (z-30). -->
         <div class="isolate col-start-1 row-start-1 max-w-page min-w-0">
             <BrowserContent />
         </div>
@@ -302,7 +302,7 @@
         {#if mode === "full" && filtersOpen}
             <div
                 aria-hidden="true"
-                class="fixed inset-x-0 top-12 bottom-0 z-0 bg-overlay"
+                class="fixed inset-x-0 top-12 bottom-0 z-20 bg-overlay"
                 onclick={closeOverlay}
             ></div>
         {/if}

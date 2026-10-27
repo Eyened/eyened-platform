@@ -114,7 +114,7 @@ one class sets size, line height, letter spacing and weight (`text-body-compact-
 
 ## Shapes
 
-Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popover (2 px each), rounded-content-switcher (4 px) and rounded-tag (16 px), Carbon's; the tag close button is a circle (`rounded-full`). Shadows: `shadow-popover` for menus and popovers (Carbon tooltips have none); `shadow-button-focus` for Button focus; `shadow-content-switcher-selected` (an inset 1 px `border-inverse` ring) for the selected content switcher option. Popovers use `drop-shadow-popover` (Carbon's `drop-shadow(0 2px 2px rgba(0,0,0,0.2))`). Motion: `animate-loading-rotate` (690 ms) for the loading spinner; `animate-skeleton` (3000 ms) for skeletons.
+Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popover (2 px each), rounded-content-switcher (4 px) and rounded-tag (16 px), Carbon's; the tag close button is a circle (`rounded-full`). Shadows: `shadow-popover` for menus (Carbon tooltips have none); `shadow-button-focus` for Button focus; `shadow-content-switcher-selected` (an inset 1 px `border-inverse` ring) for the selected content switcher option. The tag popovers use `drop-shadow-popover` (Carbon's `drop-shadow(0 2px 2px rgba(0,0,0,0.2))`). Motion: `animate-loading-rotate` (690 ms) for the loading spinner; `animate-skeleton` (3000 ms) for skeletons.
 
 ## Components
 

@@ -186,4 +186,35 @@ describe("Browser", () => {
             screen.queryByRole("dialog", { name: "Selected images" }),
         ).toBeNull();
     });
+
+    it("moves focus to the next row's Remove button when a selected image is removed", async () => {
+        for (const id of ["img-a", "img-b"]) {
+            instances.set(id, {
+                id,
+                modality: "ColorFundus",
+                patient: { identifier: "P1" },
+                study: { date: "2020-01-01" },
+                tags: [],
+            } as unknown as ImageGET);
+        }
+        const context = new BrowserContext();
+        context.selectedIds = ["img-a", "img-b"];
+        render(Browser, { props: { context } });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "View selected" }),
+        );
+        const [first, second] = await screen.findAllByRole("button", {
+            name: "Remove CFI from selection",
+        });
+        expect(second).toBeTruthy();
+
+        await fireEvent.click(first);
+
+        await waitFor(() => {
+            const [only] = screen.getAllByRole("button", {
+                name: "Remove CFI from selection",
+            });
+            expect(document.activeElement).toBe(only);
+        });
+    });
 });
