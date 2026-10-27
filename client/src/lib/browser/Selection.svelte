@@ -103,6 +103,7 @@
                 tags={intersectionTags}
                 tag={bulkTagSelection}
                 untag={bulkUntagSelection}
+                onUpdate={async () => {}}
             />
         </div>
 

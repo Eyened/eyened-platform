@@ -7,6 +7,7 @@ import type {
     SegmentationGET,
     StudyGET,
     SubTaskWithImagesGET,
+    TagGET,
     TagType,
     TaskGET,
     TaskPATCH,
@@ -431,7 +432,7 @@ export async function createTag(
     name: string,
     tagType: TagType,
     description?: string,
-) {
+): Promise<TagGET> {
     const res = await apiInvoke(() =>
         api.POST("/tags" as any, {
             body: {
@@ -442,14 +443,10 @@ export async function createTag(
         }),
     );
 
-    // Ingest the newly created tag
-    if (res.data) {
-        const newTag = res.data as any;
-        tags.set(newTag.id, newTag);
-        return newTag;
-    }
-
-    return null;
+    if (!res.data) throw new Error(`Tag ${name} was not created`);
+    const newTag = res.data as TagGET;
+    tags.set(newTag.id, newTag);
+    return newTag;
 }
 
 export async function deleteTag(tagId: number) {
