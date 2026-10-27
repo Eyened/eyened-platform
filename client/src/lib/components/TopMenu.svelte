@@ -131,7 +131,7 @@
     <button
         type="button"
         aria-haspopup="dialog"
-        class="ml-auto h-12 px-4 text-body-compact-01 text-text-primary hover:bg-background-hover active:bg-background-active"
+        class="ml-auto h-12 min-w-0 truncate px-4 text-body-compact-01 text-text-primary hover:bg-background-hover active:bg-background-active"
         onclick={() => (globalContext.showUserMenu = true)}
     >
         {globalContext.userManager.user?.username}
