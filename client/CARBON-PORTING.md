@@ -52,11 +52,19 @@ Run in the worktree `eyened-platform-worktrees/client-carbon`, from `client/` un
     ```
 
 8. On the demo: tick the behaviour checklist; open each other importer's screen and check it
-   still works.
+   still works. Then, in the browser's responsive mode, open each screen at 320, 672, 1056, 1312
+   and 1584 px, including its dialogs, open menus, popovers and the calendar. Pass: nothing is cut
+   off or overlapping; no information or action is lost (truncated text follows the Carbon
+   component's overflow guidance); no box other than the image canvas or a data table's grid
+   scrolls horizontally; every action can be reached by scrolling vertically only. The `<body>`
+   never scrolls, so look for clipping and inner scrollbars, not a page scrollbar. Then show the
+   user each screen live in the browser at the five widths and get their go-ahead; save no
+   screenshots.
 9. Open the PR with `gh stack submit`. The body has:
     - the behaviour checklist;
     - the Carbon conformance table (Element · Carbon page · Result). The Result cell names the
-      values compared, for example "✓ 40 px rows; header `layer-accent-01`; Tab/Enter";
+      values compared, for example "✓ 40 px rows; header `layer-accent-01`; Tab/Enter". It
+      includes the row "Reflow 320 px · WCAG 1.4.10 · ✓ 320/672/1056/1312/1584";
     - the other importers checked;
     - what still looks unstyled and why.
 10. In the same PR: `DESIGN.md` entries for each component touched, and this file updated.

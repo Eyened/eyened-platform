@@ -26,7 +26,10 @@
     }
 </script>
 
-<div role="search" class="relative flex h-12 min-w-0 flex-1 items-center">
+<div
+    role="search"
+    class="relative flex h-12 min-w-0 flex-1 basis-40 items-center"
+>
     <Label for={id} class="sr-only">{labelText}</Label>
     <Search
         aria-hidden="true"

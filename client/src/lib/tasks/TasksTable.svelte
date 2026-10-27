@@ -163,7 +163,9 @@
                 }
             }
         />
-        <div class="flex shrink-0 items-center gap-2 px-4">
+        <div
+            class="flex h-12 w-full shrink-0 items-center gap-2 px-4 md:w-auto"
+        >
             <Checkbox
                 id={archivedId}
                 bind:checked={
