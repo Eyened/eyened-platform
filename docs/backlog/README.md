@@ -43,6 +43,7 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Check for oversized `IN` lists on `ImageInstance` | [performance](performance.md) | open |
 | Size the API pool for multi-hop connection checkout | [performance](performance.md) | open |
 | Pick one eager-loading convention and drop dead loads | [performance](performance.md) | open |
+| Cap `limit` on `GET /task/{task_id}/subtasks` | [performance](performance.md) | open |
 | Give the segmentation zarr store a cross-process write lock | [data-integrity](data-integrity.md) | open |
 | Add `eorm move-patient` / `move-images` for cross-project data cleaning | [data-integrity](data-integrity.md) | open |
 | Make the database the only maintainer of `DateModified` | [data-integrity](data-integrity.md) | open |

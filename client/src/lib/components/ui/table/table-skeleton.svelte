@@ -2,11 +2,12 @@
     import { cn } from "$lib/utils.js";
     import type { HTMLTableAttributes } from "svelte/elements";
     import Body from "./table-body.svelte";
-    import Cell from "./table-cell.svelte";
     import Head from "./table-head.svelte";
     import Header from "./table-header.svelte";
     import Root from "./table.svelte";
     import Row from "./table-row.svelte";
+    import { skeleton } from "./skeleton.js";
+    import SkeletonRows from "./table-skeleton-rows.svelte";
     import Toolbar from "./table-toolbar.svelte";
 
     // Carbon DataTableSkeleton (@carbon/react 1.118.0); values from @carbon/styles 1.117.0
@@ -21,13 +22,9 @@
     }: HTMLTableAttributes & {
         headers: string[];
         rowCount?: number;
-        size?: "md" | "xl";
+        size?: "md" | "lg" | "xl";
         showToolbar?: boolean;
     } = $props();
-
-    // Carbon's skeleton mixin: skeleton-background with an animated skeleton-element sweep.
-    const skeleton =
-        "relative block overflow-hidden bg-skeleton-background before:absolute before:inset-0 before:animate-skeleton before:bg-skeleton-element motion-reduce:before:animate-none";
 </script>
 
 {#if showToolbar}
@@ -49,12 +46,6 @@
         </Row>
     </Header>
     <Body>
-        {#each { length: rowCount }, r (r)}
-            <Row class="hover:bg-layer-01">
-                {#each headers as _, c (c)}
-                    <Cell><span class={cn(skeleton, "h-4 w-16")}></span></Cell>
-                {/each}
-            </Row>
-        {/each}
+        <SkeletonRows columns={headers.length} {rowCount} />
     </Body>
 </Root>

@@ -9,6 +9,8 @@ const { pickerProps } = vi.hoisted(() => ({
     pickerProps: [] as { onConfirm: (ids: string[]) => Promise<void> }[],
 }));
 
+vi.mock("$app/paths", () => ({ resolve: (path: string) => path }));
+
 vi.mock("$lib/browser/BrowserPicker.svelte", () => ({
     default: (
         _anchor: unknown,
@@ -19,18 +21,7 @@ vi.mock("$lib/browser/BrowserPicker.svelte", () => ({
 }));
 
 vi.mock("$lib/browser/InstanceComponent.svelte", () => ({
-    default: {
-        name: "InstanceComponent",
-        render: () => ({ $$slots: {}, $$events: {} }),
-    },
-}));
-
-vi.mock("svelte-sonner", () => ({
-    toast: {
-        success: vi.fn(),
-        error: vi.fn(),
-        message: vi.fn(),
-    },
+    default: () => null,
 }));
 
 vi.mock("$lib/data/api", () => ({
@@ -45,7 +36,6 @@ vi.mock("$lib/data/helpers", () => ({
 
 const { updateSubTask } = await import("$lib/data/api");
 const { addSubTaskImage } = await import("$lib/data/helpers");
-const { toast } = await import("svelte-sonner");
 const { default: SubTaskRow } = await import("./SubTaskRow.svelte");
 
 function makeRow(
@@ -55,7 +45,7 @@ function makeRow(
         id: 11,
         index: 2,
         task_id: 9,
-        task_state: "todo",
+        task_state: "NotStarted",
         comments: "",
         images: [],
         creator: null,
@@ -66,60 +56,74 @@ function makeRow(
 
 // The row reads the signed-in user out of context to decide whose claim it is.
 function renderRow(props: Record<string, unknown>) {
-    return render(SubTaskRow, {
-        props,
+    const callbacks = {
+        ontoggle: vi.fn(),
+        onedit: vi.fn(),
+        onerror: vi.fn(),
+        onchange: vi.fn(),
+    };
+    render(SubTaskRow, {
+        props: {
+            taskId: 9,
+            headingId: "task-heading",
+            expanded: false,
+            ...callbacks,
+            ...props,
+        },
         context: new Map([["globalContext", { user: { id: 5 } }]]),
     } as never);
+    return callbacks;
 }
 
 beforeEach(() => {
     pickerProps.length = 0;
     vi.mocked(updateSubTask).mockReset();
     vi.mocked(addSubTaskImage).mockReset();
-    vi.mocked(toast.success).mockClear();
-    vi.mocked(toast.error).mockClear();
 });
 
 describe("SubTaskRow", () => {
-    it("claims an unassigned subtask", async () => {
+    it("claims an unassigned set, then refreshes", async () => {
         vi.mocked(updateSubTask).mockResolvedValue({});
-        const onAssignmentChange = vi.fn();
-        renderRow({ subtask: makeRow(), taskId: 9, onAssignmentChange });
+        const { onchange } = renderRow({ subtask: makeRow() });
 
-        await fireEvent.click(screen.getByRole("button", { name: "Claim" }));
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Claim set 2" }),
+        );
         expect(updateSubTask).toHaveBeenCalledWith(11, { claim: true });
-        expect(toast.success).toHaveBeenCalledWith("Subtask claimed");
-        expect(onAssignmentChange).toHaveBeenCalled();
+        expect(onchange).toHaveBeenCalled();
     });
 
-    it("unclaims a subtask assigned to the current user", async () => {
+    it("unclaims a set assigned to the current user", async () => {
         vi.mocked(updateSubTask).mockResolvedValue({});
         renderRow({
             subtask: makeRow({
                 creator: { id: 5, name: "me" } as never,
                 creator_id: 5,
             }),
-            taskId: 9,
         });
 
-        expect(screen.getByText("me")).toBeInTheDocument();
-        await fireEvent.click(screen.getByRole("button", { name: "Unclaim" }));
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Unclaim set 2" }),
+        );
         expect(updateSubTask).toHaveBeenCalledWith(11, { claim: false });
-        expect(toast.success).toHaveBeenCalledWith("Subtask unclaimed");
     });
 
-    it("toasts and refreshes when claim fails", async () => {
+    it("reports a failed claim", async () => {
         vi.mocked(updateSubTask).mockRejectedValue(
             new ApiError(409, "SubTask is already assigned", {
                 code: "subtask_already_claimed",
             }),
         );
-        const onAssignmentChange = vi.fn();
-        renderRow({ subtask: makeRow(), taskId: 9, onAssignmentChange });
+        const { onerror, onchange } = renderRow({ subtask: makeRow() });
 
-        await fireEvent.click(screen.getByRole("button", { name: "Claim" }));
-        expect(toast.error).toHaveBeenCalledWith("SubTask is already assigned");
-        expect(onAssignmentChange).toHaveBeenCalled();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Claim set 2" }),
+        );
+        expect(onerror).toHaveBeenCalledWith(
+            "Set 2 could not be claimed",
+            "SubTask is already assigned",
+        );
+        expect(onchange).not.toHaveBeenCalled();
     });
 });
 
@@ -134,41 +138,44 @@ const refusal = new ApiError(409, "conflict", {
 
 // A subtask with no images yet, so confirming a selection is purely an add.
 async function confirmSelection() {
-    renderRow({ subtask: makeRow({ id: 31, index: 0 }), taskId: 7 });
+    const callbacks = renderRow({
+        subtask: makeRow({ id: 31, index: 0 }),
+        taskId: 7,
+        expanded: true,
+    });
 
     await fireEvent.click(
-        screen.getByRole("button", { name: /Browse images/i }),
+        screen.getByRole("button", { name: "Browse images" }),
     );
 
     const props = pickerProps.at(-1);
     if (!props) throw new Error("the picker never mounted");
     await props.onConfirm([REFUSED_ID]);
+    return callbacks;
 }
 
 describe("SubTaskRow image selection", () => {
     it("tells the grader which earlier changes were kept when one is refused", async () => {
         vi.mocked(addSubTaskImage).mockRejectedValue(refusal);
 
-        await confirmSelection();
+        const { onerror } = await confirmSelection();
 
         expect(addSubTaskImage).toHaveBeenCalledWith(31, REFUSED_ID);
-        expect(toast.error).toHaveBeenCalledWith(
+        expect(onerror).toHaveBeenCalledWith(
             "Image 88213 is in a project this task does not declare.",
-            {
-                description:
-                    "Image project 17; task declares 4, 9. " +
-                    "Earlier changes were saved; the rest were not applied.",
-            },
+            "Image project 17; task declares 4, 9. " +
+                "Earlier changes were saved; the rest were not applied.",
         );
     });
 
     it("reports a failure that is not the declaration refusal", async () => {
         vi.mocked(addSubTaskImage).mockRejectedValue(new Error("Network down"));
 
-        await confirmSelection();
+        const { onerror } = await confirmSelection();
 
-        // One argument, not two: the refusal's description names projects the
-        // server never sent for this error.
-        expect(toast.error).toHaveBeenCalledWith("Error: Network down");
+        expect(onerror).toHaveBeenCalledWith(
+            "Images for set 0 could not be saved",
+            "Network down",
+        );
     });
 });
