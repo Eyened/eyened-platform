@@ -1,184 +1,125 @@
 <script lang="ts">
-    import * as Dialog from "$lib/components/ui/dialog";
-    import CopyIconButton from "$lib/components/CopyIconButton.svelte";
+    import * as Dialog from "$lib/components/ui/dialog/index.js";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import { modalSizeClasses } from "$lib/components/ui/modal/sizes.js";
     import { getThumbUrl } from "$lib/data-loading/utils";
     import { cn } from "$lib/utils.js";
-
+    import { copyToClipboard } from "$lib/utils/copyToClipboard";
+    import Checkbox from "carbon-icons-svelte/lib/Checkbox.svelte";
+    import CheckboxCheckedFilled from "carbon-icons-svelte/lib/CheckboxCheckedFilled.svelte";
+    import Copy from "carbon-icons-svelte/lib/Copy.svelte";
+    import Information from "carbon-icons-svelte/lib/Information.svelte";
     import { getContext } from "svelte";
     import type { ImageGET } from "../../types/openapi_types";
     import type { BrowserContext } from "./browserContext.svelte";
+    import { instanceLabel } from "./images";
     import InstanceInfoLazy from "./InstanceInfoLazy.svelte";
 
+    // Carbon SelectableTile (multi-select), values from @carbon/styles 1.117.0
+    // tile; the image-info button is its own click target (a CTA inside a selectable tile).
     const browserContext = getContext<BrowserContext>("browserContext");
 
     interface Props {
         instance: ImageGET;
-        showSegmentationInfo?: boolean;
-        // false: a click does not toggle the browser selection, and no selection border shows.
+        // false: no checkbox and no toggle (task page thumbnails).
         selectable?: boolean;
     }
+    let { instance, selectable = true }: Props = $props();
 
-    let {
-        instance,
-        showSegmentationInfo: _showSegmentationInfo = false,
-        selectable = true,
-    }: Props = $props();
-    let size = $derived(browserContext.thumbnailSize);
-    let popupOpen = $state(false);
-
-    const image_url = $derived(getThumbUrl(instance));
-
+    let infoOpen = $state(false);
+    let copied = $state(false);
+    const label = $derived(instanceLabel(instance));
+    const size = $derived(browserContext.thumbnailSize);
     const selected = $derived(
-        browserContext.selectedIds.includes(instance!.id),
+        selectable && browserContext.selectedIds.includes(instance.id),
     );
 
-    function toggleSelect() {
+    function onkeydown(e: KeyboardEvent) {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
         browserContext.toggleInstance(instance);
     }
-    const name_map = {
-        AdaptiveOptics: "AO",
-        ColorFundus: "CFI",
-        ColorFundusStereo: "CF Stereo",
-        RedFreeFundus: "Red Free",
-        ExternalEye: "External",
-        LensPhotograph: "Lens",
-        Ophthalmoscope: "OS",
-        Autofluorescence: "AF",
-        FluoresceinAngiography: "FA",
-        ICGA: "ICGA",
-        InfraredReflectance: "IR",
-        BlueReflectance: "BR",
-        GreenReflectance: "GR",
-        OCT: "OCT",
-        OCTA: "OCTA",
-    };
 
-    let name = "";
-    if (instance.modality && name_map[instance.modality]) {
-        name += name_map[instance.modality];
-    }
-    if (instance.etdrs_field) {
-        name += ` ${instance.etdrs_field}`;
-    }
-    if (instance.modality == "OCT") {
-        name += ` [${instance.nr_of_frames}]`;
-    }
-
-    const publicId = $derived(instance.id);
-
-    function openInfoPanel() {
-        popupOpen = true;
+    // Carbon CopyButton feedback: "Copied!" for 2 s.
+    async function copy() {
+        copied = await copyToClipboard(instance.id);
+        setTimeout(() => (copied = false), 2000);
     }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class={cn(
-        "main flex flex-col border border-transparent p-0.5",
-        selectable && selected && "border-layer-selected-inverse",
+        "relative flex flex-col border border-transparent bg-layer-01 p-4 hover:bg-layer-hover-01 in-dialog:bg-layer-02 in-dialog:hover:bg-layer-hover-02 in-study:bg-layer-02 in-study:hover:bg-layer-hover-02 in-dialog:in-study:bg-layer-03 in-dialog:in-study:hover:bg-layer-hover-03",
+        selectable && "pe-12",
+        selected && "border-layer-selected-inverse",
     )}
 >
-    <div
-        class="title group cursor-pointer text-label-01 text-text-secondary hover:text-text-primary"
-        onclick={openInfoPanel}
-    >
-        <div class="title-flip">
-            <div class="title-face title-face-default">{name}</div>
-            <div class="title-face title-face-hover">
-                <span class="public-id truncate">{publicId}</span>
-                <CopyIconButton
-                    text={publicId}
-                    ariaLabel="Copy public ID"
-                    class="shrink-0"
-                />
-            </div>
-        </div>
-    </div>
-    <div
-        class="tile flex flex-1 flex-col items-center justify-center"
-        onpointerdown={selectable ? toggleSelect : undefined}
-    >
+    {#if selectable}
         <div
-            class="thumbnail-container bg-background"
-            style="width: {size}; height: {size};"
+            role="checkbox"
+            aria-checked={selected}
+            aria-label="{label} {instance.id}"
+            tabindex="0"
+            class="absolute inset-0 cursor-pointer"
+            onclick={() => browserContext.toggleInstance(instance)}
+            {onkeydown}
+        ></div>
+        {#if selected}
+            <CheckboxCheckedFilled
+                aria-hidden="true"
+                class="pointer-events-none absolute top-4 right-4 text-icon-primary"
+            />
+        {:else}
+            <Checkbox
+                aria-hidden="true"
+                class="pointer-events-none absolute top-4 right-4 text-icon-secondary"
+            />
+        {/if}
+    {/if}
+    <!-- Empty tile area until the image loads. -->
+    <img
+        src={getThumbUrl(instance)}
+        alt=""
+        loading="lazy"
+        draggable="false"
+        class="pointer-events-none object-contain"
+        style="width: {size}; height: {size};"
+    />
+    <div class="mt-2 flex items-center justify-between gap-2">
+        <span
+            class="pointer-events-none truncate text-label-01 text-text-secondary"
         >
-            {#if image_url}
-                <img
-                    src={image_url}
-                    alt="Thumbnail"
-                    loading="lazy"
-                    class="thumbnail"
-                    draggable="false"
-                />
-            {/if}
-        </div>
+            {label}
+        </span>
+        <IconButton
+            label="Image information"
+            class="size-6"
+            onclick={() => (infoOpen = true)}
+        >
+            <Information />
+        </IconButton>
     </div>
-
-    <Dialog.Root bind:open={popupOpen}>
-        <Dialog.Content>
-            <InstanceInfoLazy instanceId={instance.id} />
-        </Dialog.Content>
-    </Dialog.Root>
 </div>
 
-<style>
-    .title {
-        width: 100%;
-        min-height: 1.25rem;
-    }
-
-    .title-flip {
-        position: relative;
-        width: 100%;
-        min-height: 1.25rem;
-        transform-style: preserve-3d;
-        transition: transform 0.2s ease;
-    }
-
-    .group:hover .title-flip {
-        transform: rotateX(180deg);
-    }
-
-    .title-face {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        min-height: 1.25rem;
-        backface-visibility: hidden;
-    }
-
-    .title-face-hover {
-        position: absolute;
-        inset: 0;
-        gap: 0.15rem;
-        padding-inline: 0.1rem;
-        transform: rotateX(180deg) translateZ(1px);
-        pointer-events: none;
-    }
-
-    .group:hover .title-face-default {
-        pointer-events: none;
-    }
-
-    .group:hover .title-face-hover {
-        pointer-events: auto;
-    }
-
-    .public-id {
-        min-width: 0;
-    }
-
-    .thumbnail-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    img.thumbnail {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-    }
-</style>
+<!-- Carbon Modal lg, passive: no footer, ✕ only; an outside click closes it. -->
+<Dialog.Root bind:open={infoOpen}>
+    <Dialog.Content class={cn("gap-0 p-0", modalSizeClasses.lg)}>
+        <Dialog.Header class="mb-2 pt-4 pr-12 pl-4">
+            <p class="text-label-01 text-text-secondary">Image</p>
+            <div class="flex min-w-0 items-center gap-2">
+                <Dialog.Title class="truncate">{instance.id}</Dialog.Title>
+                <IconButton
+                    label={copied ? "Copied!" : "Copy public ID"}
+                    onclick={copy}
+                >
+                    <Copy />
+                </IconButton>
+            </div>
+        </Dialog.Header>
+        <div
+            class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-2 pb-12 md:overflow-hidden"
+        >
+            <InstanceInfoLazy instanceId={instance.id} />
+        </div>
+    </Dialog.Content>
+</Dialog.Root>

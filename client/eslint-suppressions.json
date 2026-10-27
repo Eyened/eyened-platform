@@ -12,11 +12,6 @@
       "count": 1
     }
   },
-  "src/lib/browser/InstanceInfo.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
   "src/lib/browser/StudyBlockForm.svelte": {
     "svelte/require-each-key": {
       "count": 1

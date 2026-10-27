@@ -180,7 +180,8 @@ export class BrowserContext {
     instancesSignature: SignatureField[] = $state([]);
     studiesSignature: SignatureField[] = $state([]);
 
-    thumbnailSize: string = $state("8em");
+    // 128 px; em would resolve against the surrounding text size.
+    thumbnailSize: string = $state("8rem");
 
     // Derived: depends on queryMode + signatures
     activeSignature: SignatureField[] = $derived(
