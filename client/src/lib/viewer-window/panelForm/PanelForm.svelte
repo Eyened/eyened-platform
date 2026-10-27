@@ -15,6 +15,7 @@
     } from "../../../types/openapi_types";
     import { HIDE_FROM_FORM_PANEL_NAMES } from "$lib/config/builtinFormSchemas";
     import FormItem from "./FormItem.svelte";
+    import FormDeleteModal from "./FormDeleteModal.svelte";
     import {
         buildFormAnnotationCreatePayload,
         matchesFormEntityScope,
@@ -33,6 +34,14 @@
     const taskContext = getContext<TaskContext>("taskContext");
 
     let selectedSchema: FormSchemaGET | undefined = $state();
+    let deleting = $state<FormAnnotationGET | null>(null);
+    let deleteOpen = $state(false);
+    let schemaSelect = $state<HTMLElement>();
+
+    function openDelete(form: FormAnnotationGET) {
+        deleting = form;
+        deleteOpen = true;
+    }
 
     const taskConfig = mergeClientConfig(
         CLIENT_DEFAULTS,
@@ -105,7 +114,11 @@
 <div class="main">
     <div class="new-form">
         <div>
-            <select class="schema-select" bind:value={selectedSchema}>
+            <select
+                class="schema-select"
+                bind:value={selectedSchema}
+                bind:this={schemaSelect}
+            >
                 <option value={undefined} disabled
                     >-- select form type --</option
                 >
@@ -132,12 +145,18 @@
             </div>
         {/if}
     </div>
-    <div>
+    <div class="flex flex-col gap-2">
         {#each forms as form (form.id)}
-            <FormItem {form} />
+            <FormItem {form} ondelete={openDelete} />
         {/each}
     </div>
 </div>
+
+<FormDeleteModal
+    form={deleting}
+    bind:open={deleteOpen}
+    fallback={schemaSelect}
+/>
 
 <style>
     .main {
