@@ -8,6 +8,7 @@
     import { formAnnotations } from "$lib/data/stores.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
+    import FormDeleteModal from "$lib/viewer-window/panelForm/FormDeleteModal.svelte";
     import { Button } from "$lib/components/ui/button";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
     import { getContext } from "svelte";
@@ -28,6 +29,15 @@
     }: Props = $props();
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
+
+    let deleting = $state<FormAnnotationGET | null>(null);
+    let deleteOpen = $state(false);
+    let heading = $state<HTMLElement>();
+
+    function openDelete(form: FormAnnotationGET) {
+        deleting = form;
+        deleteOpen = true;
+    }
 
     const forms = $derived(
         formAnnotations
@@ -77,13 +87,16 @@
 
     {#each forms as form (form.id)}
         <div class="flex w-full max-w-80 flex-col">
-            <FormItem {form} theme="light" />
+            <FormItem {form} ondelete={openDelete} />
         </div>
     {/each}
 {/snippet}
 
 <div class="flex flex-col gap-2 pt-4">
-    <h3 class="text-heading-compact-01">{title}</h3>
+    <!-- tabindex=-1: focus lands here after a delete -->
+    <h3 bind:this={heading} tabindex="-1" class="text-heading-compact-01">
+        {title}
+    </h3>
     {#if split_laterality}
         <div class="flex gap-4 max-md:flex-col">
             <div class="flex flex-1 flex-col gap-2">
@@ -99,3 +112,5 @@
         </div>
     {/if}
 </div>
+
+<FormDeleteModal form={deleting} bind:open={deleteOpen} fallback={heading} />
