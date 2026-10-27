@@ -4,6 +4,7 @@
     import type { Snippet } from "svelte";
     import * as Dialog from "./index.js";
     import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
+    import { setDialogContentElement } from "./dialog-context.js";
 
     let {
         ref = $bindable(null),
@@ -17,6 +18,8 @@
         children: Snippet;
         showCloseButton?: boolean;
     } = $props();
+
+    setDialogContentElement(() => ref);
 </script>
 
 <Dialog.Portal {...portalProps}>

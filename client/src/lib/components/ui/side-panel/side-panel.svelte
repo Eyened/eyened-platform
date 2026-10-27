@@ -1,12 +1,13 @@
 <script lang="ts">
+    import { getDialogContentElement } from "$lib/components/ui/dialog/dialog-context.js";
     import { cn } from "$lib/utils.js";
     import { Dialog as DialogPrimitive } from "bits-ui";
     import Close from "carbon-icons-svelte/lib/Close.svelte";
     import type { Snippet } from "svelte";
 
     // IBM Products SidePanel (@carbon/ibm-products 2.99.0, styles 2.95.0), slide-over with an overlay.
-    // bits-ui Dialog gives the focus trap, Escape (topmost layer only) and focus return. Rendered in
-    // place: inside a modal its translated box is the containing block, so the panel stays in the modal.
+    // bits-ui Dialog gives the focus trap, Escape (topmost layer only) and focus return. Inside a modal
+    // it is mounted on the modal's box, so a masked scrolling body cannot clip it; elsewhere it renders in place.
     let {
         open = $bindable(false),
         title,
@@ -22,10 +23,15 @@
         onCloseAutoFocus?: (event: Event) => void;
         children: Snippet;
     } = $props();
+
+    const dialogContent = $derived(getDialogContentElement());
 </script>
 
 <DialogPrimitive.Root bind:open>
-    <DialogPrimitive.Portal disabled>
+    <DialogPrimitive.Portal
+        to={dialogContent ?? undefined}
+        disabled={!dialogContent}
+    >
         <DialogPrimitive.Overlay
             class="fixed inset-0 z-50 bg-overlay duration-150 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
         />
