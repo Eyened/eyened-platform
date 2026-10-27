@@ -95,7 +95,7 @@ one class sets size, line height, letter spacing and weight (`text-body-compact-
 
 - Spacing: Carbon's [scale](https://www.carbondesignsystem.com/building-blocks/foundations/spacing/overview)
   only — `0.5 1 2 3 4 6 8 10 12 16 20 24 40`. Exceptions: Button padding `1.5 2.5 3.5 3.75 15.75`
-  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's 3 px current-item bar `0.75`, and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), and the modal widths and heights (Carbon's percentages as fractions).
+  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's and side nav's 3 px current-item bar `0.75`, the side nav `w-64` (Carbon's 256 px), and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), and the modal widths and heights (Carbon's percentages as fractions).
 - Header 48 px (`h-12`), fixed; content below it (`mt-12`) in `<main class="max-w-page px-4">`,
   left-aligned with the wordmark.
 - Breakpoints: Carbon's `md` 42rem, `lg` 66rem, `xlg` 82rem ([Carbon](https://www.carbondesignsystem.com/building-blocks/foundations/2x-grid/overview)); use them only where a Carbon component page specifies breakpoint behaviour (Modal). Carbon's `max` (99rem) is `max-w-page`.
@@ -116,7 +116,8 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
 | `link`           | Link        |     |               |                  |
 
 - **UI shell header** (`TopMenu.svelte`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/ui-shell-header/guidelines),
-  [Global header](https://www.carbondesignsystem.com/building-blocks/core/patterns/global-header).
+  [Global header](https://www.carbondesignsystem.com/building-blocks/core/patterns/global-header). Below `lg` the links move
+  to a side nav behind a menu button ([UI shell left panel](https://www.carbondesignsystem.com/building-blocks/core/components/ui-shell-left-panel/guidelines)); Escape, the overlay, a link or moving focus out closes it.
 - **Button** (`ui/button`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/button/guidelines).
 - **Link** (`ui/button` `variant="link"`, or `<a>` with `text-link-primary hover:text-link-primary-hover`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/link/guidelines).
@@ -154,7 +155,6 @@ Square corners; the radii are rounded-checkbox and rounded-tooltip (2 px each, C
 | ------------------- | ------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
 | Header text         | Wordmark `body-compact-01` at 600 / 0.1 px; nav 0 px letter spacing | `heading-compact-01` / `body-compact-01` (0.16 px) | Weights and spacing come only from type tokens         |
 | Header user action  | Icon-only                                                           | Username as text                                   | A grader on a shared workstation sees who is logged in |
-| Header nav          | Hidden below `lg`                                                   | Always shown                                       | Few items; no side nav yet                             |
 | Login flow          | Two steps: username, then password or SSO                           | One step; OIDC button shown up front               | Our provider is fixed; nothing to route                |
 | Field validation    | On blur                                                             | On submit; cleared once the field has text         | Blur validation flashes an error when tabbing to OIDC  |
 | Filled status icons | Inner mark (`!`, `×`) filled                                        | Transparent; the background shows through          | `carbon-icons-svelte` ships the inner path unfilled    |
