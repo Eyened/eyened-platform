@@ -6,9 +6,8 @@
     interface Props {
         series: SeriesGET;
         laterality: "L" | "R" | null;
-        showSegmentationInfo?: boolean;
     }
-    let { series, laterality, showSegmentationInfo = true }: Props = $props();
+    let { series, laterality }: Props = $props();
 
     const images =
         series.instance_ids
@@ -25,7 +24,7 @@
     >
         <div class="items flex flex-1 flex-row flex-wrap gap-[0.3em]">
             {#each images as instance (instance.id)}
-                <InstanceComponent {instance} {showSegmentationInfo} />
+                <InstanceComponent {instance} />
             {/each}
         </div>
     </div>

@@ -5,6 +5,7 @@
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { cn } from "$lib/utils.js";
     import type { Snippet } from "svelte";
+    import { modalSizeClasses } from "./sizes.js";
 
     // Carbon transactional Modal over ui/dialog; prop names from carbon-components-svelte.
     // Values from @carbon/styles 1.117.0 modal/_modal.scss; loading flow from Carbon React Modal.tsx.
@@ -101,16 +102,7 @@
 
 <Dialog.Root bind:open={() => open, setOpen}>
     <Dialog.Content
-        class={cn(
-            "gap-0 p-0",
-            // Carbon modal/_modal.scss at md / lg / xlg: xs 48% / 32% / 24%, sm 60% / 42% / 36%,
-            // lg 96% / 84% / 72% (max height 90% at md from ui/dialog, 96% from lg).
-            size === "xs"
-                ? "md:w-12/25 lg:max-h-12/25 lg:w-8/25 xlg:w-6/25"
-                : size === "lg"
-                  ? "md:w-24/25 lg:max-h-24/25 lg:w-21/25 xlg:w-18/25"
-                  : "md:w-3/5 lg:max-h-18/25 lg:w-21/50 xlg:w-9/25",
-        )}
+        class={cn("gap-0 p-0", modalSizeClasses[size])}
         interactOutsideBehavior="ignore"
         onOpenAutoFocus={(e) => {
             // Carbon: a danger modal focuses Cancel; others their first field.
