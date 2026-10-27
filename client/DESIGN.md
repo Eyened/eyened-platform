@@ -183,9 +183,8 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
   option lists on `ui/command`; ARIA grid with one Tab stop): no guidelines page; references are
   `@carbon/ibm-products` 2.99.0 ([source and Storybook docs](https://github.com/carbon-design-system/ibm-products/tree/main/packages/ibm-products/src/components/ConditionBuilder))
   and `@carbon/ibm-products-styles` 2.95.0.
-- **Tile** (`InstanceComponent`: selectable, multi-select; `StudyBlock`: expandable, interactive, chevron button bottom right):
-  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/tile/usage). The image-info button is its own click
-  target beside the checkbox element.
+- **Tile** (`StudyBlock`: expandable, interactive, chevron button bottom right):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/tile/usage).
 - **Tag** (`ui/tag`: `Tag` read-only, `DismissibleTag`; gray, md):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/tag/usage). Read-only tags list an item's tags; Edit tags
   opens a popover with each tag's comment, Edit comment and Remove; bulk tags are dismissible, after a confirm.

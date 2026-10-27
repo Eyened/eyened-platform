@@ -14,7 +14,9 @@
         class="mt-4 flex gap-2 border-t border-border-subtle-01 pt-4 in-dialog:border-border-subtle-02"
     >
         {#each { length: 3 }, i (i)}
-            <span class={skeleton} style="width: {size}; height: {size};"
+            <span
+                class={skeleton}
+                style="width: calc({size} + 2px); height: calc({size} + 2rem + 2px);"
             ></span>
         {/each}
     </div>
