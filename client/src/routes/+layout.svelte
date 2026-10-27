@@ -45,9 +45,6 @@
         flex-direction: column;
     }
     :root {
-        --browser-background: #f4f4f8;
-        --browser-color: #000010;
-        --browser-border: #e3e3e3;
         --icon-hover: rgba(110, 164, 189, 0.43);
     }
 </style>

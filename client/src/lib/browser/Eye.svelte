@@ -1,52 +1,48 @@
 <script lang="ts">
-    import { getContext } from "svelte";
-    import type { SeriesGET, StudyGET } from "../../types/openapi_types";
-    import type { BrowserContext } from "./browserContext.svelte";
-    import SeriesComponent from "./SeriesComponent.svelte";
-    import { Button } from "$lib/components/ui/button";
-    import { instances } from "$lib/data";
+    import { resolve } from "$app/paths";
+    import Launch from "carbon-icons-svelte/lib/Launch.svelte";
+    import type { ImageGET } from "../../types/openapi_types";
+    import { eyeName, type Laterality } from "./images";
+    import InstanceComponent from "./InstanceComponent.svelte";
 
-    interface Props {
-        study: StudyGET;
-        laterality: "L" | "R" | null;
-    }
+    let { laterality, images }: { laterality: Laterality; images: ImageGET[] } =
+        $props();
 
-    let { study, laterality }: Props = $props();
-
-    const eye = laterality ? { L: "OS", R: "OD" }[laterality] : "OD/OS?";
-
-    const browserContext = getContext<BrowserContext>("browserContext");
-
-    function open() {
-        const allInstanceIds =
-            study.series?.flatMap((series) => series.instance_ids ?? []) ?? [];
-        const allInstances = allInstanceIds.map((id) => instances.get(id));
-        const eyeInstanceIds = allInstances
-            .filter((instance) => instance?.laterality == laterality)
-            .map((instance) => instance!.id);
-
-        browserContext.openTab(eyeInstanceIds);
-    }
-    function hasLaterality(series: SeriesGET) {
-        const images = series.instance_ids?.map((id) => instances.get(id));
-        return images?.some((i) => i?.laterality == laterality);
-    }
-
-    const eyeSeries = study.series?.filter(hasLaterality) ?? [];
+    const name = $derived(eyeName(laterality));
+    const linkText = $derived(
+        laterality
+            ? `Open all ${name} images`
+            : "Open all images with unknown laterality",
+    );
+    const href = $derived(
+        `${resolve("/view")}?instances=${images.map((i) => i.id).join(",")}`,
+    );
 </script>
 
-<div class="outer flex flex-1 flex-col p-2">
-    <h3 class="text-base m-0 flex items-center gap-4">
-        {eye}
-        {#if eyeSeries?.length > 0}
-            <Button variant="outline" onclick={open}>
-                Open all {eye} images
-            </Button>
-        {/if}
-    </h3>
-    <div class="series-container flex flex-1 flex-row flex-wrap content-start">
-        {#each eyeSeries as series (series.id)}
-            <SeriesComponent {series} {laterality} />
-        {/each}
-    </div>
+<!-- Columns are split by border-subtle lines (Carbon's dividers); they stack below md. -->
+<div
+    class="flex min-w-0 flex-1 flex-col gap-4 not-first:border-border-subtle-01 max-md:py-4 max-md:not-first:border-t max-md:first:pt-0 md:px-4 md:not-first:border-s md:first:ps-0 md:last:pe-0 in-dialog:not-first:border-border-subtle-02"
+>
+    <h3 class="text-heading-compact-01">{name}</h3>
+    {#if images.length > 0}
+        <div class="flex flex-wrap gap-2">
+            {#each images as instance (instance.id)}
+                <InstanceComponent {instance} />
+            {/each}
+        </div>
+        <!-- Carbon standalone Link with Launch (opens another tab); a link, not a button (D8). -->
+        <!-- eslint-disable svelte/no-navigation-without-resolve -- href is resolve("/view") plus a query string -->
+        <a
+            {href}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 self-start text-body-compact-01 text-link-primary hover:text-link-primary-hover hover:underline"
+        >
+            {linkText}
+            <Launch aria-hidden="true" />
+        </a>
+        <!-- eslint-enable svelte/no-navigation-without-resolve -->
+    {:else}
+        <p class="text-body-01 text-text-secondary">No images for this eye</p>
+    {/if}
 </div>

@@ -1,4 +1,5 @@
-import type { ImageGET } from "../../types/openapi_types";
+import { instances } from "$lib/data/stores.svelte";
+import type { ImageGET, StudyGET } from "../../types/openapi_types";
 
 const MODALITY_LABELS: Record<string, string> = {
     AdaptiveOptics: "AO",
@@ -32,4 +33,23 @@ export function instanceLabel(instance: ImageGET): string {
 
 export function imageCount(n: number): string {
     return `${n} ${n === 1 ? "image" : "images"}`;
+}
+
+export type Laterality = "L" | "R" | null;
+
+export function eyeName(laterality: Laterality): string {
+    if (laterality === "R") return "OD";
+    if (laterality === "L") return "OS";
+    return "Laterality unknown";
+}
+
+/** A study's images of one eye, in series order; null is the unknown-laterality eye. */
+export function eyeImages(study: StudyGET, laterality: Laterality): ImageGET[] {
+    return (study.series ?? [])
+        .flatMap((series) => series.instance_ids ?? [])
+        .map((id) => instances.get(id))
+        .filter(
+            (i): i is ImageGET =>
+                i !== undefined && (i.laterality ?? null) === laterality,
+        );
 }

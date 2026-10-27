@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
-import { formSchemas } from "$lib/data/stores.svelte";
-import type { FormSchemaGET, StudyGET } from "../../types/openapi_types";
+import { render, screen } from "@testing-library/svelte";
+import { formSchemas, instances } from "$lib/data/stores.svelte";
+import type {
+    FormSchemaGET,
+    ImageGET,
+    StudyGET,
+} from "../../types/openapi_types";
+
+vi.mock("$app/paths", () => ({ resolve: (path: string) => path }));
 
 vi.mock("$lib/extensions", () => ({
     default: {
@@ -57,23 +63,33 @@ const study = {
 
 const context = new Map<string, unknown>([
     ["globalContext", { makeStudiesBrowserURL: () => "/studies" }],
+    [
+        "browserContext",
+        { selectedIds: [], thumbnailSize: "8rem", toggleInstance: vi.fn() },
+    ],
 ]);
 
-function renderBlock(mode: "full" | "overlay") {
-    return render(StudyBlock, { props: { study, mode }, context });
+const image = (id: string, laterality: "L" | "R" | null) =>
+    ({ id, laterality, tags: [] }) as unknown as ImageGET;
+
+function renderStudy(images: ImageGET[] = []) {
+    instances.clear();
+    for (const i of images) instances.set(i.id, i);
+    const withSeries = {
+        ...study,
+        series: [{ id: 1, instance_ids: images.map((i) => i.id) }],
+    } as unknown as StudyGET;
+    return render(StudyBlock, { props: { study: withSeries }, context });
 }
 
-describe("StudyBlock grading", () => {
-    beforeEach(() => {
-        formSchemas.clear();
-        formSchemas.set(1, {
-            id: 1,
-            name: "Visit grades",
-        } as FormSchemaGET);
-    });
+beforeEach(() => {
+    formSchemas.clear();
+    formSchemas.set(1, { id: 1, name: "Visit grades" } as FormSchemaGET);
+});
 
-    it("shows visit grading in the study browser", async () => {
-        renderBlock("full");
+describe("StudyBlock", () => {
+    it("shows visit grading and the data sources", async () => {
+        renderStudy();
         expect(
             await screen.findByRole("heading", { name: "Visit grades" }),
         ).toBeInTheDocument();
@@ -82,24 +98,25 @@ describe("StudyBlock grading", () => {
         ).toBeInTheDocument();
     });
 
-    it("keeps visit grading collapsed in the viewer browse popup", async () => {
-        renderBlock("overlay");
+    it("shows the unknown-laterality column only when it has images", () => {
+        const { unmount } = renderStudy([image("a", "R")]);
         expect(
-            screen.queryByRole("heading", { name: "Visit grades" }),
-        ).not.toBeInTheDocument();
-        expect(
-            screen.queryByRole("heading", { name: /External grades/ }),
-        ).not.toBeInTheDocument();
+            screen.queryByRole("heading", { name: "Laterality unknown" }),
+        ).toBeNull();
+        unmount();
 
-        await fireEvent.click(screen.getByRole("button", { name: /Grading/ }));
-
+        renderStudy([image("a", "R"), image("b", null)]);
         expect(
-            await screen.findByRole("heading", { name: "Visit grades" }),
+            screen.getByRole("heading", { name: "Laterality unknown" }),
         ).toBeInTheDocument();
-        await waitFor(() => {
-            expect(
-                screen.getByRole("heading", { name: /External grades/ }),
-            ).toBeInTheDocument();
-        });
+    });
+
+    it("links each eye's images to the viewer", () => {
+        renderStudy([image("a", "R"), image("b", "L"), image("c", "R")]);
+        expect(
+            screen
+                .getByRole("link", { name: "Open all OD images" })
+                .getAttribute("href"),
+        ).toBe("/view?instances=a,c");
     });
 });
