@@ -4,15 +4,10 @@
     import { Toaster } from "$lib/components/ui/sonner";
     import { GlobalContext } from "$lib/data/globalContext.svelte";
     import Dialogue from "$lib/Dialogue.svelte";
-    import Popup from "$lib/Popup.svelte";
     import { setContext, type Snippet } from "svelte";
     import "../app.css";
 
     let { children }: { children: Snippet } = $props();
-
-    function closePopup() {
-        globalContext.popupComponent = null;
-    }
 
     function closeDialogue() {
         globalContext.dialogue = null;
@@ -25,9 +20,6 @@
     const init = globalContext.init(page.url.pathname);
 </script>
 
-{#if globalContext.popupComponent}
-    <Popup componentDef={globalContext.popupComponent} close={closePopup} />
-{/if}
 {#if globalContext.dialogue}
     <Dialogue content={globalContext.dialogue} close={closeDialogue} />
 {/if}
