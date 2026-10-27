@@ -22,6 +22,7 @@
         type SortDirection,
     } from "./browserContext.svelte";
     import FilterShorcuts from "./FilterShorcuts.svelte";
+    import SelectedPanel from "./SelectedPanel.svelte";
 
     interface Props {
         // Optionally reuse an externally owned context (e.g. to read the
@@ -69,6 +70,25 @@
     );
     let toggle = $state<HTMLButtonElement | null>(null);
     const filterCount = $derived(browserContext.activeConditions.length);
+    let panelOpen = $state(false);
+
+    // The panel closes when its last image is removed (or the selection is cleared).
+    $effect(() => {
+        if (browserContext.selectedIds.length === 0) panelOpen = false;
+    });
+
+    // Opening the panel closes the filter column.
+    function viewSelected() {
+        filtersOpen = false;
+        panelOpen = !panelOpen;
+    }
+
+    // bits-ui returns focus to View selected; when the bar has gone, to Filters.
+    function onPanelCloseAutoFocus(e: Event) {
+        if (browserContext.selectedIds.length > 0) return;
+        e.preventDefault();
+        toggle?.focus();
+    }
 
     // Notifications live in the column; open it so they are seen.
     $effect(() => {
@@ -154,18 +174,20 @@
     }
 </script>
 
-<div class="flex flex-col">
+<div class={cn("flex flex-col", mode === "full" && "pt-8")}>
     {#if mode === "full"}
         <h1 tabindex="-1" class="sr-only">Browser</h1>
     {/if}
-    {#if mode === "overlay" && browserContext.selectedIds.length > 0}
-        <Selection placement="top" />
+    {#if browserContext.selectedIds.length > 0}
+        <Selection {mode} {panelOpen} onviewselected={viewSelected} />
     {/if}
+    <SelectedPanel
+        bind:open={panelOpen}
+        onCloseAutoFocus={onPanelCloseAutoFocus}
+    />
 
     <!-- Carbon table-toolbar strip; it wraps when narrow. -->
-    <Table.Toolbar
-        class={cn("h-auto min-h-12 flex-wrap", mode === "full" && "mt-8")}
-    >
+    <Table.Toolbar class="h-auto min-h-12 flex-wrap">
         <Button
             bind:ref={toggle}
             variant="ghost"
@@ -275,7 +297,6 @@
         <!-- isolate keeps the results' own z-index layers under the scrim and the column. -->
         <div class="isolate col-start-1 row-start-1 max-w-page min-w-0">
             <BrowserContent />
-            <footer></footer>
         </div>
         <!-- Dims everything below the header under the open column; the picker's modal already dims the page. -->
         {#if mode === "full" && filtersOpen}
@@ -286,13 +307,4 @@
             ></div>
         {/if}
     </div>
-    {#if mode !== "overlay" && browserContext.selectedIds.length > 0}
-        <Selection />
-    {/if}
 </div>
-
-<style>
-    footer {
-        height: 200px;
-    }
-</style>

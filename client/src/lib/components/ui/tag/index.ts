@@ -1,3 +1,4 @@
+import DismissibleTag from "./dismissible-tag.svelte";
 import Tag from "./tag.svelte";
 
-export { Tag };
+export { DismissibleTag, Tag };
