@@ -77,11 +77,9 @@ class CFI_Quality(TorchAttributeInferencePipeline):
     ) -> Iterable[np.ndarray]:
         """Process batch: ensemble averaging."""
         x_in = self._prepare_torch_batch(prep_batch)
-        result = self._run_torch_forward(x_in, self.ensemble.forward)
-
-        # Ensemble averaging: result is (num_models, batch_size, num_classes)
-        # Average over ensemble dimension (dim=0) to get (batch_size, num_classes)
-        return result.mean(axis=0)
+        predictions = self.ensemble.predict_batch({"image": x_in}, fields=("prediction",))
+        # NMC member logits; retain NumPy averaging for existing stored scores.
+        return predictions["prediction"].cpu().numpy().mean(axis=1)
 
     def postprocess(
         self, prep_item: Tuple[Any, np.ndarray], batch_output: np.ndarray
