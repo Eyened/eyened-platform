@@ -1,6 +1,7 @@
 <script lang="ts">
     import { resolve } from "$app/paths";
     import { page } from "$app/state";
+    import { accountStatus, PASSWORD_HINT } from "$lib/admin/accountStatus";
     import {
         grantMembership,
         listMemberships,
@@ -12,9 +13,22 @@
         type RoleName,
     } from "$lib/admin/api";
     import { ApiError } from "$lib/api/client";
-    import * as AlertDialog from "$lib/components/ui/alert-dialog";
-    import { Button } from "$lib/components/ui/button";
-    import * as Table from "$lib/components/ui/table";
+    import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
+    import { Button } from "$lib/components/ui/button/index.js";
+    import * as Empty from "$lib/components/ui/empty/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
+    import { Modal } from "$lib/components/ui/modal/index.js";
+    import {
+        SelectInput,
+        SelectItem,
+    } from "$lib/components/ui/select-input/index.js";
+    import { StatusIndicator } from "$lib/components/ui/status-indicator/index.js";
+    import * as Table from "$lib/components/ui/table/index.js";
+    import { Tag } from "$lib/components/ui/tag/index.js";
+    import { PasswordInput } from "$lib/components/ui/text-input/index.js";
+    import { cn } from "$lib/utils.js";
+    import Add from "carbon-icons-svelte/lib/Add.svelte";
+    import Subtract from "carbon-icons-svelte/lib/Subtract.svelte";
     import type {
         AdminProjectResponse,
         AdminUserResponse,
@@ -26,6 +40,10 @@
         { value: "grader", label: "Grader" },
         { value: "project_admin", label: "Project admin" },
     ];
+    const HEADERS = ["Project", "Role", ""];
+    const headingId = "user-heading";
+    const membershipsId = "memberships-heading";
+    const hintId = "set-password-hint";
 
     const userId = Number(page.params.id);
 
@@ -35,15 +53,18 @@
         projects: AdminProjectResponse[];
     } | null>(null);
     let notFound = $state(false);
-    let error = $state("");
-    let grantProject = $state<number | undefined>(undefined);
-    let grantRole = $state<RoleName>("read_only");
+    let loadError = $state("");
+    let notice = $state<{ title: string; subtitle: string } | null>(null);
 
     const available = $derived.by(() => {
         if (!data) return [];
         const held = new Set(data.memberships.map((m) => m.project_id));
         return data.projects.filter((p) => !held.has(p.id));
     });
+
+    function roleLabel(role: RoleName): string {
+        return ROLES.find((r) => r.value === role)?.label ?? role;
+    }
 
     async function load() {
         try {
@@ -59,200 +80,359 @@
             }
             data = { user, memberships, projects };
         } catch (e) {
+            const message = (e as Error).message;
             if (e instanceof ApiError && e.status === 404) notFound = true;
-            else error = (e as Error).message;
+            else if (data)
+                notice = {
+                    title: "User could not be reloaded",
+                    subtitle: message,
+                };
+            else loadError = message;
         }
     }
     load();
 
-    async function run(action: () => Promise<unknown>): Promise<boolean> {
-        error = "";
-        let ok = true;
+    // An action without a modal: a failure shows above the memberships.
+    async function run(title: string, action: () => Promise<unknown>) {
+        notice = null;
         try {
             await action();
         } catch (e) {
-            error = (e as Error).message;
-            ok = false;
+            notice = { title, subtitle: (e as Error).message };
         }
         await load();
-        return ok;
     }
 
-    async function grant(event: SubmitEvent) {
-        event.preventDefault();
-        if (grantProject === undefined) return;
-        const projectId = grantProject;
-        grantProject = undefined;
-        await run(() => grantMembership(projectId, userId, grantRole));
+    // A modal's write: a rejection stays in the modal; success reloads the page.
+    async function save(write: Promise<unknown>) {
+        await write;
+        notice = null;
+        await load();
     }
 
-    let pending = $state<{ text: string; run: () => Promise<unknown> } | null>(
-        null,
-    );
+    // The trigger is gone after a remove or a deactivate, so focus goes to the heading.
+    function focusHeadingIf(gone: () => boolean) {
+        return (event: Event) => {
+            if (gone()) {
+                event.preventDefault();
+                document.getElementById(headingId)?.focus();
+            }
+        };
+    }
+
+    let removing = $state<MembershipResponse | null>(null);
+    let removeOpen = $state(false);
+
+    let addOpen = $state(false);
+    let addProject = $state("");
+    let addRole = $state<string>("read_only");
+
+    let deactivateOpen = $state(false);
+
+    let passwordOpen = $state(false);
     let newPassword = $state("");
-    let passwordSet = $state(false);
+    let passwordMissing = $state(false);
 
-    function confirmThen(text: string, action: () => Promise<unknown>) {
-        pending = { text, run: action };
+    function openRemove(m: MembershipResponse) {
+        removing = m;
+        removeOpen = true;
     }
 
-    async function confirmed() {
-        const action = pending?.run;
-        pending = null;
-        if (action) await run(action);
+    function openAdd() {
+        if (available.length === 0) return;
+        addProject = String(available[0].id);
+        addRole = "read_only";
+        addOpen = true;
     }
 
-    async function changePassword(event: SubmitEvent) {
-        event.preventDefault();
-        passwordSet = await run(() => setPassword(userId, newPassword));
-        if (passwordSet) newPassword = "";
+    function openPassword() {
+        newPassword = "";
+        passwordMissing = false;
+        passwordOpen = true;
+    }
+
+    function submitPassword() {
+        if (!newPassword) {
+            passwordMissing = true;
+            return false;
+        }
+        return save(setPassword(userId, newPassword));
     }
 </script>
 
-<a class="underline" href={resolve("/admin")}>← Users</a>
+<Breadcrumb.Root>
+    <Breadcrumb.List>
+        <Breadcrumb.Item>
+            <Breadcrumb.Link href={resolve("/admin")}>Users</Breadcrumb.Link>
+        </Breadcrumb.Item>
+    </Breadcrumb.List>
+</Breadcrumb.Root>
 
-{#if error}
-    <p class="text-red-600 mt-4">{error}</p>
-{/if}
+{#if loadError}
+    <InlineNotification
+        class="mt-6"
+        title="User could not be loaded"
+        subtitle={loadError}
+    />
+{:else if notFound}
+    <Empty.Root class="mt-6">
+        <Empty.Header>
+            <Empty.Title>User not found</Empty.Title>
+        </Empty.Header>
+    </Empty.Root>
+{:else if !data}
+    <span class={cn(Table.skeleton, "mt-2 mb-6 h-6 w-40")}></span>
+    <Table.Skeleton headers={HEADERS} />
+{:else}
+    {@const user = data.user}
+    {@const status = accountStatus(user)}
+    <div class="mt-2 mb-10">
+        <div class="flex flex-wrap items-center gap-4">
+            <!-- tabindex=-1: focus lands here when a removed row's, Deactivate's or Reactivate's button is gone -->
+            <h1
+                id={headingId}
+                tabindex="-1"
+                class="text-heading-04 text-text-primary"
+            >
+                {user.username}
+            </h1>
+            {#if user.is_admin}<Tag>Admin</Tag>{/if}
+            <StatusIndicator
+                icon={status.icon}
+                iconClass={status.iconClass}
+                label={status.label}
+            />
+        </div>
+        {#if !user.has_credential}
+            <p class="mt-2 text-body-01 text-text-secondary">No password</p>
+        {/if}
+    </div>
 
-{#if notFound}
-    <p class="mt-6">User not found</p>
-{:else if data}
-    <h2 class="text-2xl font-bold mt-4 mb-6">
-        {data.user.username}
-        {#if data.user.is_admin}<span class="text-sm">Admin</span>{/if}
-        <span class="text-sm">{data.user.active ? "Active" : "Inactive"}</span>
-        {#if !data.user.has_credential}<span class="text-sm">No password</span
-            >{/if}
-    </h2>
+    {#if notice}
+        <InlineNotification
+            class="mb-4"
+            title={notice.title}
+            subtitle={notice.subtitle}
+        />
+    {/if}
 
-    <h3 class="text-lg font-semibold mb-2">Memberships</h3>
-    {#key data}
-        <Table.Root>
-            <Table.Header>
-                <Table.Row>
-                    <Table.Head>Project</Table.Head>
-                    <Table.Head>Role</Table.Head>
-                    <Table.Head></Table.Head>
-                </Table.Row>
-            </Table.Header>
-            <Table.Body>
-                {#each data.memberships as m (m.project_id)}
+    <!-- Carbon data table header: layer background, 16 / 24 px block padding, heading-03 -->
+    <div class="bg-layer-01 px-4 pt-4 pb-6">
+        <h2 id={membershipsId} class="text-heading-03 text-text-primary">
+            Memberships
+        </h2>
+    </div>
+    <Table.Toolbar>
+        <Button
+            size="lg"
+            class="ms-auto"
+            aria-disabled={available.length === 0 || undefined}
+            onclick={openAdd}
+        >
+            Add to project <Add />
+        </Button>
+    </Table.Toolbar>
+    {#if data.memberships.length === 0}
+        <Empty.Root>
+            <Empty.Header>
+                <Empty.Title>No memberships</Empty.Title>
+                <Empty.Description>
+                    Add {user.username} to a project to give them access.
+                </Empty.Description>
+            </Empty.Header>
+        </Empty.Root>
+    {:else}
+        <!-- Rerendered on every load, so a refused role change shows the saved role again. -->
+        {#key data}
+            <Table.Root aria-labelledby={membershipsId}>
+                <Table.Header>
                     <Table.Row>
-                        <Table.Cell>{m.project_name}</Table.Cell>
-                        <Table.Cell>
-                            <select
-                                aria-label={`Role in ${m.project_name}`}
-                                value={m.role}
-                                onchange={(e) =>
-                                    run(() =>
-                                        grantMembership(
-                                            m.project_id,
-                                            userId,
-                                            e.currentTarget.value as RoleName,
-                                        ),
-                                    )}
-                            >
-                                {#each ROLES as role (role.value)}
-                                    <option value={role.value}
-                                        >{role.label}</option
-                                    >
-                                {/each}
-                            </select>
-                        </Table.Cell>
-                        <Table.Cell>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onclick={() =>
-                                    confirmThen(
-                                        `Remove ${data?.user.username} from ${m.project_name}?`,
-                                        () =>
-                                            revokeMembership(
+                        <Table.Head>Project</Table.Head>
+                        <Table.Head>Role</Table.Head>
+                        <Table.Head
+                            ><span class="sr-only">Actions</span></Table.Head
+                        >
+                    </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                    {#each data.memberships as m (m.project_id)}
+                        <Table.Row>
+                            <Table.Cell>{m.project_name}</Table.Cell>
+                            <Table.Cell class="py-0">
+                                <SelectInput
+                                    inline
+                                    hideLabel
+                                    labelText="Role in {m.project_name}"
+                                    value={m.role}
+                                    onchange={(e) => {
+                                        const role = e.currentTarget
+                                            .value as RoleName;
+                                        run("Role could not be changed", () =>
+                                            grantMembership(
                                                 m.project_id,
                                                 userId,
+                                                role,
                                             ),
-                                    )}>Revoke</Button
-                            >
-                        </Table.Cell>
-                    </Table.Row>
-                {/each}
-            </Table.Body>
-        </Table.Root>
-    {/key}
-
-    {#if available.length > 0}
-        <form onsubmit={grant} class="mt-4 flex items-end gap-2">
-            <div class="flex flex-col">
-                <label for="grant-project">Project</label>
-                <select id="grant-project" bind:value={grantProject} required>
-                    {#each available as p (p.id)}
-                        <option value={p.id}>{p.name}</option>
+                                        );
+                                    }}
+                                >
+                                    {#each ROLES as role (role.value)}
+                                        <SelectItem
+                                            value={role.value}
+                                            text={role.label}
+                                        />
+                                    {/each}
+                                </SelectInput>
+                            </Table.Cell>
+                            <!-- Carbon inline row action: ghost button in a trailing column. -->
+                            <Table.Cell class="text-end whitespace-nowrap">
+                                <Button
+                                    variant="ghost"
+                                    aria-label="Remove from {m.project_name}"
+                                    onclick={() => openRemove(m)}
+                                >
+                                    Remove <Subtract />
+                                </Button>
+                            </Table.Cell>
+                        </Table.Row>
                     {/each}
-                </select>
-            </div>
-            <div class="flex flex-col">
-                <label for="grant-role">Role</label>
-                <select id="grant-role" bind:value={grantRole}>
-                    {#each ROLES as role (role.value)}
-                        <option value={role.value}>{role.label}</option>
-                    {/each}
-                </select>
-            </div>
-            <Button type="submit">Grant</Button>
-        </form>
+                </Table.Body>
+            </Table.Root>
+        {/key}
     {/if}
 
-    <h3 class="text-lg font-semibold mt-8 mb-2">Account</h3>
-    {#if data.user.active}
-        <Button
-            variant="destructive"
-            onclick={() =>
-                confirmThen(
-                    `Deactivate ${data?.user.username}? They are signed out at their next token refresh.`,
-                    () => setActive(userId, false),
-                )}>Deactivate</Button
-        >
-    {:else}
-        <Button onclick={() => run(() => setActive(userId, true))}
-            >Reactivate</Button
-        >
-    {/if}
+    <h2 class="mt-10 mb-4 text-heading-compact-02 text-text-primary">
+        Account
+    </h2>
+    <div class="flex flex-wrap gap-4">
+        {#if user.active}
+            <Button
+                variant="destructive"
+                onclick={() => (deactivateOpen = true)}
+            >
+                Deactivate
+            </Button>
+        {:else}
+            <Button
+                variant="secondary"
+                onclick={() =>
+                    run("User could not be reactivated", () =>
+                        setActive(userId, true),
+                    ).then(() => {
+                        if (data?.user.active)
+                            document.getElementById(headingId)?.focus();
+                    })}
+            >
+                Reactivate
+            </Button>
+        {/if}
+        <Button variant="secondary" onclick={openPassword}>Set password</Button>
+    </div>
 
-    <form onsubmit={changePassword} class="mt-4 flex items-end gap-2">
-        <label class="flex flex-col">
-            New password
-            <input
-                class="rounded border px-2 py-1"
-                type="password"
-                autocomplete="new-password"
-                bind:value={newPassword}
-                aria-describedby="password-hint"
-                required
-            />
-        </label>
-        <Button type="submit">Set password</Button>
-        {#if passwordSet}<span>Password set.</span>{/if}
-    </form>
-    <p id="password-hint" class="text-gray-600">
-        At least 15 characters. Must not contain the username or "eyened".
-    </p>
-
-    <AlertDialog.Root
-        open={pending !== null}
-        onOpenChange={(open) => {
-            if (!open) pending = null;
-        }}
+    <Modal
+        bind:open={removeOpen}
+        danger
+        size="xs"
+        modalHeading={removing
+            ? `Remove ${user.username} from ${removing.project_name}?`
+            : ""}
+        primaryButtonText="Remove"
+        primaryButtonLoadingDescription="Removing…"
+        successDescription="Removed"
+        errorTitle="Membership could not be removed"
+        onsubmit={() =>
+            removing
+                ? save(revokeMembership(removing.project_id, userId))
+                : false}
+        onCloseAutoFocus={focusHeadingIf(
+            () =>
+                removing !== null &&
+                !data?.memberships.some(
+                    (m) => m.project_id === removing?.project_id,
+                ),
+        )}
     >
-        <AlertDialog.Content>
-            <AlertDialog.Title>Are you sure?</AlertDialog.Title>
-            <AlertDialog.Description>{pending?.text}</AlertDialog.Description>
-            <div class="flex justify-end gap-2">
-                <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-                <AlertDialog.Action onclick={confirmed}
-                    >Confirm</AlertDialog.Action
-                >
-            </div>
-        </AlertDialog.Content>
-    </AlertDialog.Root>
+        {#if removing}
+            <p>
+                They lose their {roleLabel(removing.role)} role in {removing.project_name}.
+            </p>
+        {/if}
+    </Modal>
+
+    <Modal
+        bind:open={addOpen}
+        modalHeading="Add to project"
+        modalLabel={user.username}
+        primaryButtonText="Add"
+        primaryButtonLoadingDescription="Adding…"
+        successDescription="Added"
+        errorTitle="Membership could not be added"
+        onsubmit={() =>
+            save(
+                grantMembership(
+                    Number(addProject),
+                    userId,
+                    addRole as RoleName,
+                ),
+            )}
+    >
+        <div class="flex flex-col gap-6">
+            <SelectInput labelText="Project" bind:value={addProject}>
+                {#each available as p (p.id)}
+                    <SelectItem value={String(p.id)} text={p.name} />
+                {/each}
+            </SelectInput>
+            <SelectInput labelText="Role" bind:value={addRole}>
+                {#each ROLES as role (role.value)}
+                    <SelectItem value={role.value} text={role.label} />
+                {/each}
+            </SelectInput>
+        </div>
+    </Modal>
+
+    <Modal
+        bind:open={deactivateOpen}
+        danger
+        size="xs"
+        modalHeading="Deactivate {user.username}?"
+        primaryButtonText="Deactivate"
+        primaryButtonLoadingDescription="Deactivating…"
+        successDescription="Deactivated"
+        errorTitle="User could not be deactivated"
+        onsubmit={() => save(setActive(userId, false))}
+        onCloseAutoFocus={focusHeadingIf(() => data?.user.active === false)}
+    >
+        <p>They are signed out at their next token refresh.</p>
+    </Modal>
+
+    <Modal
+        bind:open={passwordOpen}
+        modalHeading="Set password"
+        modalLabel={user.username}
+        primaryButtonText="Set password"
+        primaryButtonLoadingDescription="Saving…"
+        successDescription="Password set"
+        errorTitle="Password could not be set"
+        onsubmit={submitPassword}
+    >
+        <!-- Helper text 4 px below the field; the error replaces it -->
+        <div class="flex flex-col gap-1">
+            <PasswordInput
+                labelText="New password"
+                bind:value={newPassword}
+                autocomplete="new-password"
+                aria-describedby={passwordMissing && !newPassword
+                    ? undefined
+                    : hintId}
+                invalidText={passwordMissing && !newPassword
+                    ? "Enter a password"
+                    : undefined}
+            />
+            {#if !(passwordMissing && !newPassword)}
+                <p id={hintId} class="text-helper-text-01 text-text-helper">
+                    {PASSWORD_HINT}
+                </p>
+            {/if}
+        </div>
+    </Modal>
 {/if}
