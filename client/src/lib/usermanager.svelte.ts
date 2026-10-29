@@ -95,9 +95,9 @@ export class UserManager {
     // }
 
     async signup(username: string, password: string) {
-        const user = await authClient.register(username, password);
-        this.user = user;
-        this.starredTagIds = user.starred_tags ?? [];
+        // Register sets no session; log in to get one.
+        await authClient.register(username, password);
+        await this.login(username, password, false);
     }
 }
 

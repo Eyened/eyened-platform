@@ -68,3 +68,30 @@ describe("UserManager.init", () => {
         expect(goto).not.toHaveBeenCalled();
     });
 });
+
+describe("UserManager.signup", () => {
+    it("logs the new account in, then navigates", async () => {
+        const user = {
+            id: 1,
+            username: "ada",
+            role: null,
+            is_admin: false,
+            starred_tags: [],
+        };
+        const register = vi
+            .spyOn(authClient, "register")
+            .mockResolvedValue(user);
+        const login = vi.spyOn(authClient, "login").mockResolvedValue(user);
+        history.replaceState(null, "", "/users/signup");
+
+        await new UserManager().signup("ada", "a-long-test-password");
+
+        expect(register).toHaveBeenCalledWith("ada", "a-long-test-password");
+        expect(login).toHaveBeenCalledWith(
+            "ada",
+            "a-long-test-password",
+            false,
+        );
+        expect(goto).toHaveBeenCalledWith("/");
+    });
+});

@@ -66,3 +66,10 @@
 - **Problem:** `check_oidc_login` / `oidc_authenticate` in `server/routes/auth.py` still take a `Session` (allow-listed in `server/tests/test_no_session_in_service_or_route_signatures.py`). No test asserts the `Set-Cookie` attributes (`HttpOnly`, `SameSite`, `Max-Age`, `Path`) of `login`, `oidc_authenticate` or `refresh`, so a refactor can weaken them silently.
 - **Fix:** add wire-contract tests on the response `Set-Cookie` headers first, then extract a `resolve_oidc()` into `AuthService` and delete the two allow-list entries.
 - **Note:** no deployment uses OIDC and there is no token-validation harness; build one for the extraction.
+
+### Read OIDC claims from the userinfo endpoint
+- **Status:** open
+- **Source:** SURFconext test-entity Playground check, 2026-10-29
+- **Problem:** `check_oidc_login` (`server/routes/auth.py`) reads claims only from the ID token. SURFconext puts only `sub` there; `email` comes from userinfo and no display name arrives at all. So email matching and auto-provisioning (`preferred_username`) never fire, and a SURFconext login only works for an account that already holds `oidc:sub:<sub>`.
+- **Fix:** add `userinfo_endpoint` to `OIDCMetadata` (`server/config.py`); in `oidc_authenticate`, call it with the token response's `access_token`, check its `sub` equals the ID token's, and merge its claims before `check_oidc_login`.
+- **Note:** the SURFconext test entity needs subject type Persistent; its claims list offers `nickname`, not `preferred_username`.

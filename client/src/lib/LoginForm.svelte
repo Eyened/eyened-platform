@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from "$app/paths";
     import { ApiError } from "$lib/api/client";
     import { Button } from "$lib/components/ui/button/index.js";
     import { Checkbox } from "$lib/components/ui/checkbox/index.js";
@@ -11,6 +12,7 @@
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getContext, onMount, tick } from "svelte";
     import { authClient } from "../auth";
+    import AuthPage from "./AuthPage.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
@@ -92,66 +94,75 @@
     });
 </script>
 
-<!-- Carbon Login pattern, one step, centred. -->
-<main class="flex flex-1 justify-center overflow-y-auto px-4">
-    <div class="my-auto w-full max-w-80 py-16">
-        <h1 class="mb-8 text-heading-03">Log in to EyeNED</h1>
-
+<AuthPage>
+    <div class="mb-8">
+        <h1 class="text-heading-03">Log in to EyeNED</h1>
         {#if passwordEnabled}
-            <form
-                novalidate
-                class="flex flex-col gap-6"
-                onsubmit={handlePasswordLogin}
-            >
-                <TextInput
-                    labelText="Username"
-                    autocomplete="username"
-                    bind:value={username}
-                    bind:ref={usernameInput}
-                    invalidText={usernameError}
-                    aria-describedby={loginError ? "login-error" : undefined}
-                />
-                <PasswordInput
-                    labelText="Password"
-                    autocomplete="current-password"
-                    bind:value={password}
-                    bind:ref={passwordInput}
-                    invalidText={passwordError}
-                />
-                <Field.Field orientation="horizontal">
-                    <Checkbox id="keep-logged-in" bind:checked={rememberMe} />
-                    <Field.Label
-                        for="keep-logged-in"
-                        class="text-body-compact-01 text-text-primary"
-                        >Keep me logged in</Field.Label
-                    >
-                </Field.Field>
-                {#if loginError}
-                    <InlineNotification
-                        id="login-error"
-                        role="none"
-                        title={loginError.title}
-                        subtitle={loginError.subtitle}
-                    />
-                {/if}
-                <Button type="submit" size="lg" class="w-full">Log in</Button>
-            </form>
-        {/if}
-
-        {#if oidcEnabled}
-            <Button
-                size="lg"
-                class="mt-6 w-full"
-                variant={passwordEnabled ? "outline" : "default"}
-                onclick={handleOIDCLogin}>Log in with {oidcProviderName}</Button
-            >
-            {#if oidcError}
-                <InlineNotification
-                    class="mt-4"
-                    title="Log in failed"
-                    subtitle={oidcError}
-                />
-            {/if}
+            <p class="mt-2 text-body-compact-01">
+                Don't have an account?
+                <a
+                    href={resolve("/users/signup")}
+                    class="text-link-primary underline hover:text-link-primary-hover"
+                    >Create an account</a
+                >
+            </p>
         {/if}
     </div>
-</main>
+
+    {#if passwordEnabled}
+        <form
+            novalidate
+            class="flex flex-col gap-6"
+            onsubmit={handlePasswordLogin}
+        >
+            <TextInput
+                labelText="Username"
+                autocomplete="username"
+                bind:value={username}
+                bind:ref={usernameInput}
+                invalidText={usernameError}
+                aria-describedby={loginError ? "login-error" : undefined}
+            />
+            <PasswordInput
+                labelText="Password"
+                autocomplete="current-password"
+                bind:value={password}
+                bind:ref={passwordInput}
+                invalidText={passwordError}
+            />
+            <Field.Field orientation="horizontal">
+                <Checkbox id="keep-logged-in" bind:checked={rememberMe} />
+                <Field.Label
+                    for="keep-logged-in"
+                    class="text-body-compact-01 text-text-primary"
+                    >Keep me logged in</Field.Label
+                >
+            </Field.Field>
+            {#if loginError}
+                <InlineNotification
+                    id="login-error"
+                    role="none"
+                    title={loginError.title}
+                    subtitle={loginError.subtitle}
+                />
+            {/if}
+            <Button type="submit" size="lg" class="w-full">Log in</Button>
+        </form>
+    {/if}
+
+    {#if oidcEnabled}
+        <Button
+            size="lg"
+            class="mt-6 w-full"
+            variant={passwordEnabled ? "outline" : "default"}
+            onclick={handleOIDCLogin}>Log in with {oidcProviderName}</Button
+        >
+        {#if oidcError}
+            <InlineNotification
+                class="mt-4"
+                title="Log in failed"
+                subtitle={oidcError}
+            />
+        {/if}
+    {/if}
+</AuthPage>
