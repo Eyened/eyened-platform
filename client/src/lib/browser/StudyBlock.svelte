@@ -91,6 +91,7 @@
         <a href={urlByDate} class={link}>{study.date}</a>
         <!-- eslint-enable svelte/no-navigation-without-resolve -->
     </h2>
+    <p class="mt-1 pe-8 text-label-01 text-text-secondary">{meta}</p>
     <button
         type="button"
         aria-expanded={expanded}
@@ -107,7 +108,6 @@
             )}
         />
     </button>
-    <p class="mt-1 pe-8 text-label-01 text-text-secondary">{meta}</p>
     <div class="mt-4">
         <Tagger
             tagType="Study"
