@@ -17,6 +17,7 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Fix or delete the `api_client` branch of `POST /auth/login` | [auth-and-sessions](auth-and-sessions.md) | open |
 | Check new passwords against a breached/common-password list | [auth-and-sessions](auth-and-sessions.md) | open |
 | Move OIDC login into `AuthService` and pin the auth cookie attributes | [auth-and-sessions](auth-and-sessions.md) | partial |
+| Read OIDC claims from the userinfo endpoint | [auth-and-sessions](auth-and-sessions.md) | open |
 | Keep admin HTTP writes and reads off non-human Creators | [rbac-admin](rbac-admin.md) | open |
 | Rename `has_credential` on `AdminUserResponse` | [rbac-admin](rbac-admin.md) | open |
 | Build the audit-log read endpoint `GET /admin/audit` | [rbac-admin](rbac-admin.md) | open |
