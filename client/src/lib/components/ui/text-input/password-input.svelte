@@ -12,6 +12,7 @@
     let {
         labelText,
         invalidText,
+        helperText,
         id = uid,
         value = $bindable(""),
         ref = $bindable(null),
@@ -23,8 +24,10 @@
     let shown = $state(false);
 
     const errorId = $derived(`${id}-error`);
+    const helperId = $derived(`${id}-helper`);
+    // Carbon: the error replaces the helper text.
     const ariaDescribedBy = $derived(
-        [invalidText ? errorId : undefined, describedBy]
+        [invalidText ? errorId : helperText ? helperId : undefined, describedBy]
             .filter(Boolean)
             .join(" ") || undefined,
     );
@@ -63,5 +66,9 @@
     </div>
     {#if invalidText}
         <Field.Error id={errorId}>{invalidText}</Field.Error>
+    {:else if helperText}
+        <p id={helperId} class="text-helper-text-01 text-text-helper">
+            {helperText}
+        </p>
     {/if}
 </Field.Field>
