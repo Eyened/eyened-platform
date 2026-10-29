@@ -72,15 +72,15 @@
         "text-link-primary hover:text-link-primary-hover hover:underline";
 </script>
 
-<!-- Carbon ExpandableTile, interactive: the chevron is its own button at the bottom right. -->
+<!-- Carbon ExpandableTile, interactive; chevron button top right (DESIGN.md deviation). -->
 <section
     data-slot="study-block"
     aria-labelledby="{uid}-heading"
-    class="relative bg-layer-01 p-4 pb-12 in-dialog:bg-layer-02"
+    class="relative bg-layer-01 p-4 in-dialog:bg-layer-02"
 >
     <h2
         id="{uid}-heading"
-        class="flex flex-wrap gap-x-2 text-heading-compact-02"
+        class="flex flex-wrap gap-x-2 pe-8 text-heading-compact-02"
     >
         <!-- eslint-disable svelte/no-navigation-without-resolve -- both URLs are built by globalContext.makeStudiesBrowserURL(), which calls resolve() internally -->
         {#if urlByPatient}
@@ -91,7 +91,23 @@
         <a href={urlByDate} class={link}>{study.date}</a>
         <!-- eslint-enable svelte/no-navigation-without-resolve -->
     </h2>
-    <p class="mt-1 text-label-01 text-text-secondary">{meta}</p>
+    <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="{uid}-details"
+        aria-label={expanded ? "Collapse study" : "Expand study"}
+        class="absolute top-0 right-0 flex size-12 cursor-pointer items-center justify-center hover:bg-layer-hover-01 in-dialog:hover:bg-layer-hover-02"
+        onclick={() => (expanded = !expanded)}
+    >
+        <ChevronDown
+            aria-hidden="true"
+            class={cn(
+                "text-icon-primary transition-transform duration-110",
+                expanded && "rotate-180",
+            )}
+        />
+    </button>
+    <p class="mt-1 pe-8 text-label-01 text-text-secondary">{meta}</p>
     <div class="mt-4">
         <Tagger
             tagType="Study"
@@ -123,20 +139,4 @@
             {additional_data_sources}
         />
     </div>
-    <button
-        type="button"
-        aria-expanded={expanded}
-        aria-controls="{uid}-details"
-        aria-label={expanded ? "Collapse study" : "Expand study"}
-        class="absolute right-0 bottom-0 flex size-12 cursor-pointer items-center justify-center hover:bg-layer-hover-01 in-dialog:hover:bg-layer-hover-02"
-        onclick={() => (expanded = !expanded)}
-    >
-        <ChevronDown
-            aria-hidden="true"
-            class={cn(
-                "text-icon-primary transition-transform duration-110",
-                expanded && "rotate-180",
-            )}
-        />
-    </button>
 </section>
