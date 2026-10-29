@@ -8,7 +8,9 @@
     import { formAnnotations } from "$lib/data/stores.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
+    import FormDeleteModal from "$lib/viewer-window/panelForm/FormDeleteModal.svelte";
     import { Button } from "$lib/components/ui/button";
+    import Add from "carbon-icons-svelte/lib/Add.svelte";
     import { getContext } from "svelte";
 
     interface Props {
@@ -27,6 +29,15 @@
     }: Props = $props();
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
+
+    let deleting = $state<FormAnnotationGET | null>(null);
+    let deleteOpen = $state(false);
+    let heading = $state<HTMLElement>();
+
+    function openDelete(form: FormAnnotationGET) {
+        deleting = form;
+        deleteOpen = true;
+    }
 
     const forms = $derived(
         formAnnotations
@@ -62,39 +73,44 @@
     suffix: string = "",
 )}
     {#if laterality !== undefined && create_new}
-        <div>
-            <Button
-                onclick={() => create(laterality)}
-                variant="outline"
-                size="sm"
-            >
-                Create {formSchema.name}
-                {suffix}
-            </Button>
-        </div>
+        <Button
+            onclick={() => create(laterality)}
+            variant="outline"
+            size="sm"
+            class="self-start"
+        >
+            Create {formSchema.name}
+            {suffix}
+            <Add aria-hidden="true" />
+        </Button>
     {/if}
 
-    {#each forms as form}
-        <div>
-            <div class="form-item flex w-[20em] flex-col">
-                <FormItem {form} theme="light" />
-            </div>
+    {#each forms as form (form.id)}
+        <div class="flex w-full max-w-80 flex-col">
+            <FormItem {form} ondelete={openDelete} />
         </div>
     {/each}
 {/snippet}
 
-<div id="main" class="flex flex-col px-2">
-    <h4 class="m-0 mt-2 mb-2 p-0">{title}</h4>
+<div class="flex flex-col gap-2 pt-4">
+    <!-- tabindex=-1: focus lands here after a delete -->
+    <h3 bind:this={heading} tabindex="-1" class="text-heading-compact-01">
+        {title}
+    </h3>
     {#if split_laterality}
-        <div id="eyes" class="flex flex-row">
-            <div class="flex flex-1 flex-col">
+        <div class="flex gap-4 max-md:flex-col">
+            <div class="flex flex-1 flex-col gap-2">
                 {@render form_item("R", rightForms, "OD")}
             </div>
-            <div class="flex flex-1 flex-col">
+            <div class="flex flex-1 flex-col gap-2">
                 {@render form_item("L", leftForms, "OS")}
             </div>
         </div>
     {:else}
-        {@render form_item(undefined, forms)}
+        <div class="flex flex-col gap-2">
+            {@render form_item(undefined, forms)}
+        </div>
     {/if}
 </div>
+
+<FormDeleteModal form={deleting} bind:open={deleteOpen} fallback={heading} />

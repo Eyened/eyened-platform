@@ -2,37 +2,6 @@
   "src/lib/browser/AdditionalDataSources.svelte": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    },
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/browser/ConditionsMultiSelect.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/browser/ExternalData.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/browser/InstanceInfo.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/browser/InstanceSegmentationTable.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/browser/StudyBlockForm.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
     }
   },
   "src/lib/browser/StudyBlockForms.svelte": {
@@ -101,7 +70,7 @@
   },
   "src/lib/data/helpers.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 65
+      "count": 64
     }
   },
   "src/lib/forms/SchemaForm.svelte": {
@@ -155,14 +124,6 @@
   "src/lib/registration/privateEyeRegistrationHeidelberg.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
-    }
-  },
-  "src/lib/tags/Tagger.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
-    "svelte/require-each-key": {
-      "count": 3
     }
   },
   "src/lib/tags/TagsEditor.svelte": {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import type {
+    ImageGET,
     SearchCondition,
     SignatureField,
 } from "../../types/openapi_types";
@@ -21,6 +22,7 @@ vi.mock("$lib/data/api", async (importOriginal) => ({
 }));
 
 const api = await import("$lib/data/api");
+const { instances } = await import("$lib/data/stores.svelte");
 const { BrowserContext, encodeConditions } = await import(
     "./browserContext.svelte"
 );
@@ -150,5 +152,69 @@ describe("Browser", () => {
         await screen.findByText("1 study");
         expect(api.searchStudies).toHaveBeenCalledTimes(1);
         expect(goto).not.toHaveBeenCalled();
+    });
+
+    it("closes the selected images panel on the last remove and focuses Filters", async () => {
+        instances.set("img-1", {
+            id: "img-1",
+            modality: "ColorFundus",
+            patient: { identifier: "P1" },
+            study: { date: "2020-01-01" },
+            tags: [],
+        } as unknown as ImageGET);
+        const context = new BrowserContext();
+        context.selectedIds = ["img-1"];
+        render(Browser, { props: { context } });
+        // Let the mount's own focus move (to Patient identifier) happen first.
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getByLabelText(/patient/i, { selector: "input" }),
+            ),
+        );
+
+        await fireEvent.click(
+            screen.getByRole("button", { name: "View selected" }),
+        );
+        await fireEvent.click(
+            await screen.findByRole("button", {
+                name: "Remove CFI from selection",
+            }),
+        );
+
+        await waitFor(() => expect(document.activeElement).toBe(toggle()));
+        expect(
+            screen.queryByRole("dialog", { name: "Selected images" }),
+        ).toBeNull();
+    });
+
+    it("moves focus to the next row's Remove button when a selected image is removed", async () => {
+        for (const id of ["img-a", "img-b"]) {
+            instances.set(id, {
+                id,
+                modality: "ColorFundus",
+                patient: { identifier: "P1" },
+                study: { date: "2020-01-01" },
+                tags: [],
+            } as unknown as ImageGET);
+        }
+        const context = new BrowserContext();
+        context.selectedIds = ["img-a", "img-b"];
+        render(Browser, { props: { context } });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "View selected" }),
+        );
+        const [first, second] = await screen.findAllByRole("button", {
+            name: "Remove CFI from selection",
+        });
+        expect(second).toBeTruthy();
+
+        await fireEvent.click(first);
+
+        await waitFor(() => {
+            const [only] = screen.getAllByRole("button", {
+                name: "Remove CFI from selection",
+            });
+            expect(document.activeElement).toBe(only);
+        });
     });
 });

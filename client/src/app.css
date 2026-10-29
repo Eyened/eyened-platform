@@ -22,6 +22,8 @@
     --color-layer-selected-hover-01: #474747;
     --color-layer-selected-02: #525252;
     --color-layer-selected-hover-02: #636363;
+    --color-layer-03: #525252;
+    --color-layer-hover-03: #636363;
     --color-layer-selected-inverse: #f4f4f4;
     --color-layer-active-01: #525252;
     --color-layer-accent-01: #393939;
@@ -57,6 +59,7 @@
     --color-icon-inverse: #161616;
     --color-icon-disabled: rgba(244, 244, 244, 0.25);
     --color-interactive: #4589ff;
+    --color-background-brand: #0f62fe;
     --color-focus: #ffffff;
     --color-focus-inset: #161616;
     --color-support-error: #fa4d56;
@@ -88,6 +91,9 @@
     --color-status-purple: #a56eff;
     --color-content-switcher-background-hover: rgba(141, 141, 141, 0.12);
     --color-content-switcher-selected: rgba(141, 141, 141, 0.24);
+    --color-tag-background-gray: #525252;
+    --color-tag-color-gray: #f4f4f4;
+    --color-tag-hover-gray: #636363;
 
     /* Type: @carbon/type 11.69.0, productive set */
     --font-*: initial;
@@ -133,14 +139,17 @@
     --breakpoint-md: 42rem;
     --breakpoint-lg: 66rem;
     --breakpoint-xlg: 82rem;
+    /* Carbon's max; a breakpoint named `max` would shadow Tailwind's max-* variants. */
+    --breakpoint-cds-max: 99rem;
     --container-*: initial;
-    --container-page: 99rem;
 
     /* Shapes: Carbon corners are square; shadow from @carbon/styles (g100) */
     --radius-*: initial;
     --radius-checkbox: 2px;
     --radius-tooltip: 2px;
     --radius-content-switcher: 4px;
+    --radius-tag: 1rem;
+    --radius-popover: 2px;
     --shadow-*: initial;
     --shadow-popover: 0 2px 6px rgba(0, 0, 0, 0.8);
     --shadow-button-focus:
@@ -148,6 +157,8 @@
         inset 0 0 0 2px var(--color-focus-inset);
     --shadow-content-switcher-selected: inset 0 0 0 1px
         var(--color-border-inverse);
+    /* Carbon Popover dropShadow (popover/_popover.scss) */
+    --drop-shadow-popover: 0 2px 2px rgba(0, 0, 0, 0.2);
 
     /* Motion: @carbon/styles 1.117.0 loading (690 ms linear rotation) */
     --animate-loading-rotate: loading-rotate 690ms linear infinite;
@@ -205,11 +216,15 @@
     }
 }
 
-/* Carbon Layer: inside a dialog or a ConditionBuilder popover, surfaces and fields use the 02 set. */
-@custom-variant in-dialog (&:where([data-slot="dialog-content"] *, [data-slot="condition-popover"] *));
+/* Carbon Layer: inside a dialog, a ConditionBuilder popover or a tag popover, surfaces and fields use the 02 set. */
+@custom-variant in-dialog (&:where([data-slot="dialog-content"] *, [data-slot="condition-popover"] *, [data-slot="tag-popover"] *));
 /* Data table size: rows and cells follow the table's data-size. */
 @custom-variant table-xl (&:where([data-size="xl"] *));
 @custom-variant table-lg (&:where([data-size="lg"] *));
+/* Carbon Layer: a tile on a study block (itself on layer-01) is one layer up. */
+@custom-variant in-study (&:where([data-slot="study-block"] *));
+/* Structured list isCondensed: every cell 8 px, the first keeps its 16 px start. */
+@custom-variant list-condensed (&:where([data-condensed] *));
 /* Dropdown (Carbon list-box): an item after a hovered, highlighted or selected one hides its divider. */
 @custom-variant after-active-item (&:where([data-slot="select-item"]:is(:hover, [data-highlighted], [data-selected]) + [data-slot="select-item"] *));
 /* Dropdown: items in an inline dropdown's menu. */

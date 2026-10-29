@@ -1,19 +1,17 @@
 <script lang="ts">
+    import * as StructuredList from "$lib/components/ui/structured-list/index.js";
     import { getThumbUrl } from "$lib/data-loading/utils";
-    import { instances } from "$lib/data/stores.svelte";
-    import { getContext } from "svelte";
     import {
         tagInstance,
         untagInstance,
         updateTagInstance,
-    } from "../data/helpers";
-    import Tagger from "../tags/Tagger.svelte";
+    } from "$lib/data/helpers";
+    import { instances } from "$lib/data/stores.svelte";
+    import Tagger from "$lib/tags/Tagger.svelte";
+    import { getContext } from "svelte";
     import type { BrowserContext } from "./browserContext.svelte";
 
-    interface Props {
-        instanceId: string;
-    }
-    let { instanceId }: Props = $props();
+    let { instanceId }: { instanceId: string } = $props();
 
     // Reactive: updates when instance in store changes!
     const instance = $derived(instances.get(instanceId)!);
@@ -56,74 +54,66 @@
         walk(input, "");
         return out;
     };
+
+    // v1's flat field list in API order; the response has no grouping (D13).
+    const rows = $derived(Object.entries(flattenToDotPaths(instance)));
 </script>
 
-<div class="flex h-[80vh] w-[80vw] flex-col">
-    <div class="flex-shrink-0">
-        <h2 class="text-2xl font-bold">
-            {instance.id}
-        </h2>
-        <Tagger
-            tagType="ImageInstance"
-            tags={instance.tags ?? []}
-            tag={(id) => {
-                tagInstance(instance, id);
-                browserContext?.refreshSignatures();
-            }}
-            untag={(id) => untagInstance(instance, id)}
-            onUpdate={(tagId, comment) =>
-                updateTagInstance(instance.id, tagId, comment)}
-        />
-    </div>
-
-    <div class="flex min-h-0 flex-1">
-        <div class="w-[60%]">
-            <img
-                src={getThumbUrl(instance, 540)}
-                alt="preview"
-                class="h-full w-full object-contain"
-            />
-        </div>
-        <div class="w-[40%] overflow-y-scroll">
-            <div class="flex-1 overflow-auto p-4">
-                <table
-                    class="text-sm text-gray-500 w-full table-fixed border-collapse"
-                >
-                    <thead>
-                        <tr>
-                            <th class="font-bold text-black">Property</th>
-                            <th class="font-bold text-black">Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {#each Object.entries(flattenToDotPaths(instance)) as [key, value]}
-                            <tr
-                                class="odd:bg-gray-100 even:bg-gray-200 hover:bg-white"
-                            >
-                                <td
-                                    class="border-gray-400 border-t p-1 break-all"
-                                    >{key}</td
-                                >
-                                <td
-                                    class="border-gray-400 border-t p-1 break-all"
-                                >
-                                    {#if value == null}
-                                        NULL
-                                    {:else if typeof value === "object" && value !== null}
-                                        <pre>{JSON.stringify(
-                                                value,
-                                                null,
-                                                2,
-                                            )}</pre>
-                                    {:else}
-                                        {value}
-                                    {/if}
-                                </td>
-                            </tr>
-                        {/each}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<Tagger
+    tagType="ImageInstance"
+    tags={instance.tags ?? []}
+    tag={async (id) => {
+        await tagInstance(instance, id);
+        browserContext?.refreshSignatures();
+    }}
+    untag={(id) => untagInstance(instance, id)}
+    onUpdate={(tagId, comment) =>
+        updateTagInstance(instance.id, tagId, comment)}
+/>
+<div class="flex min-h-0 flex-1 gap-4 max-md:flex-col">
+    <img
+        src={getThumbUrl(instance, 540)}
+        alt="Preview of image {instance.id}"
+        class="object-contain object-top md:h-full md:w-3/5"
+    />
+    <!-- Scrolls on its own from md; a focusable region so keyboard users can scroll it (Carbon Modal). -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div
+        class="md:w-2/5 md:overflow-y-auto"
+        tabindex="0"
+        role="region"
+        aria-label="Image properties"
+    >
+        <StructuredList.Root condensed aria-label="Image properties">
+            <StructuredList.Head>
+                <StructuredList.Row head>
+                    <StructuredList.Cell head>Property</StructuredList.Cell>
+                    <StructuredList.Cell head>Value</StructuredList.Cell>
+                </StructuredList.Row>
+            </StructuredList.Head>
+            <StructuredList.Body>
+                {#each rows as [key, value] (key)}
+                    <StructuredList.Row>
+                        <StructuredList.Cell class="break-all">
+                            {key}
+                        </StructuredList.Cell>
+                        <StructuredList.Cell class="break-all">
+                            {#if value == null}
+                                NULL
+                            {:else if typeof value === "object"}
+                                <pre
+                                    class="whitespace-pre-wrap">{JSON.stringify(
+                                        value,
+                                        null,
+                                        2,
+                                    )}</pre>
+                            {:else}
+                                {value}
+                            {/if}
+                        </StructuredList.Cell>
+                    </StructuredList.Row>
+                {/each}
+            </StructuredList.Body>
+        </StructuredList.Root>
     </div>
 </div>

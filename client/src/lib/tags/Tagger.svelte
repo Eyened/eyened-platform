@@ -1,314 +1,217 @@
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button";
-    import {
-        Command,
-        CommandEmpty,
-        CommandGroup,
-        CommandInput,
-        CommandItem,
-        CommandList,
-    } from "$lib/components/ui/command";
-    import {
-        Dialog,
-        DialogContent,
-        DialogHeader,
-        DialogTitle,
-    } from "$lib/components/ui/dialog";
-    import {
-        Popover,
-        PopoverContent,
-        PopoverTrigger,
-    } from "$lib/components/ui/popover";
-    import {
-        Tooltip,
-        TooltipContent,
-        TooltipProvider,
-        TooltipTrigger,
-    } from "$lib/components/ui/tooltip";
-    import { createTag } from "$lib/data/helpers";
-    import { tags } from "$lib/data/stores.svelte";
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
+    import * as Popover from "$lib/components/ui/popover/index.js";
+    import { Tag } from "$lib/components/ui/tag/index.js";
+    import { TextArea } from "$lib/components/ui/text-area/index.js";
     import { timeAgo } from "$lib/utils";
-    import { faSquareXmark } from "@fortawesome/free-solid-svg-icons";
-    import Fa from "svelte-fa";
+    import Edit from "carbon-icons-svelte/lib/Edit.svelte";
     import type { TagMeta, TagType } from "../../types/openapi_types";
-    import TagEditForm from "./TagEditForm.svelte";
+    import AddTag from "./AddTag.svelte";
+    import { tagPopoverClass } from "./popover";
 
+    // Read-only Carbon tags, all wrapping, then Edit tags: a popover listing each tag with its comment
+    // (Edit comment, Remove) and a combo box to add one. Each action keeps the popover open with Inline
+    // loading on its button; a failure shows an inline error notification there.
     let {
         tagType,
         tags: itemTags = [],
-        maxTags = 3,
-        tag: onTag = (_id: number, _comment?: string) => {},
-        untag: onUntag = (_id: number) => {},
-        onUpdate = (_id: number, _comment?: string) => {},
+        tag: onTag,
+        untag: onUntag,
+        onUpdate,
     }: {
         tagType: TagType;
         tags?: TagMeta[];
-        maxTags?: number;
-        tag?: (id: number, comment?: string) => void;
-        untag?: (id: number) => void;
-        onUpdate?: (id: number, comment?: string) => void;
+        tag: (id: number) => Promise<unknown>;
+        untag: (id: number) => Promise<unknown>;
+        onUpdate: (id: number, comment?: string) => Promise<unknown>;
     } = $props();
 
-    const allTags = $derived(
-        tags.filter(
-            (t) =>
-                t.tag_type ===
-                (tagType === "Annotation" ? "FormAnnotation" : tagType),
-        ),
-    );
+    let open = $state(false);
+    let creating = $state(false);
+    let editing = $state<number | null>(null);
+    let comment = $state("");
+    let pending = $state<string | null>(null);
+    let error = $state<{ title: string; subtitle: string } | null>(null);
+    const applied = $derived(new Set(itemTags.map((t) => t.id)));
 
-    // Build dropdown candidates (ids already in itemTags are excluded)
-    const selectedIds = $derived(new Set(itemTags.map((t) => t.id)));
-    const dropdownTags = $derived(
-        allTags.filter((t) => !selectedIds.has(t.id)),
-    );
+    function report(title: string, e: unknown) {
+        error = { title, subtitle: e instanceof Error ? e.message : String(e) };
+    }
 
-    let textValue = $state("");
-    let value = $state("");
-    let dropdownOpen = $state(false);
-    let dialogOpen = $state(false);
-    let commentDialogOpen = $state(false);
-    let activeTagId = $state<number | null>(null);
-    let commentText = $state("");
-
-    async function linkTag(name: string) {
-        const id = allTags.find((t) => t.name === name)?.id;
-        if (id !== undefined) {
-            onTag(id);
+    async function run(
+        key: string,
+        title: string,
+        action: () => Promise<unknown>,
+    ): Promise<boolean> {
+        if (pending) return false;
+        pending = key;
+        error = null;
+        try {
+            await action();
+            return true;
+        } catch (e) {
+            report(title, e);
+            return false;
+        } finally {
+            pending = null;
         }
     }
 
-    async function handleUntag(id: number) {
-        onUntag(id);
+    function startEdit(t: TagMeta) {
+        editing = t.id;
+        comment = t.comment ?? "";
+        error = null;
     }
 
-    function handleCommandKeydown(e: KeyboardEvent) {
-        if (e.key !== "Enter") return;
-
-        // Ignore Enter while any dialog is open
-        if (dialogOpen || commentDialogOpen) return;
-
-        const q = textValue.trim();
-        if (!q) return;
-
-        if (allTags.some((t) => t.name === q)) {
-            linkTag(q);
-            value = "";
-            textValue = "";
-        } else {
-            // Close popover before opening dialog
-            dropdownOpen = false;
-            dialogOpen = true;
-        }
-    }
-
-    async function handleCreateTag(p: {
-        name: string;
-        description?: string;
-        tagType: TagType;
-    }) {
-        // Use the helper function
-        const newTag = await createTag(p.name, p.tagType, p.description);
-
-        if (newTag) {
-            // Auto-link the newly created tag
-            onTag(newTag.id);
-
-            // Clear input and close dialog
-            textValue = "";
-            value = "";
-        }
-
-        dialogOpen = false;
-    }
-
-    function openCommentDialog(t: TagMeta) {
-        activeTagId = t.id;
-        commentText = (t as any).comment ?? "";
-        commentDialogOpen = true;
-    }
-
-    function submitComment() {
-        if (activeTagId == null) return;
-        const newComment = (commentText || "").trim() || undefined;
-        onUpdate?.(activeTagId, newComment);
-        commentDialogOpen = false;
+    async function saveComment(t: TagMeta) {
+        const saved = await run(
+            `comment-${t.id}`,
+            "Could not save the comment",
+            () => onUpdate(t.id, comment.trim() || undefined),
+        );
+        if (saved) editing = null;
     }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<TooltipProvider>
-    <div
-        class="tagging-component rounded-md border-gray-300 bg-gray-100 text-lg border p-2"
-        onclick={(e) => e.stopPropagation()}
+<div class="flex flex-wrap items-center gap-2">
+    {#each itemTags as t (t.id)}
+        <Tag>{t.name}</Tag>
+    {/each}
+    <Popover.Root
+        bind:open
+        onOpenChange={(o) => {
+            if (o) return;
+            creating = false;
+            editing = null;
+            error = null;
+        }}
     >
-        <!-- Dialog with the new tag form -->
-        <Dialog bind:open={dialogOpen}>
-            <DialogContent portalProps={{ disabled: true }}>
-                <DialogHeader>
-                    <DialogTitle>New Tag</DialogTitle>
-                    <TagEditForm
-                        {tagType}
-                        initTagName={textValue}
-                        add={handleCreateTag}
-                    />
-                </DialogHeader>
-            </DialogContent>
-        </Dialog>
-
-        <!-- Dialog for editing/adding a tag comment -->
-        <Dialog bind:open={commentDialogOpen}>
-            <DialogContent portalProps={{ disabled: true }}>
-                <DialogHeader>
-                    <DialogTitle>Edit Tag Comment</DialogTitle>
-                    <div class="flex gap-2">
-                        <input
-                            class="input"
-                            bind:value={commentText}
-                            onkeydown={(e) => {
-                                if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    submitComment();
-                                }
-                            }}
-                        />
-                        <Button onclick={submitComment}>Save</Button>
-                    </div>
-                </DialogHeader>
-            </DialogContent>
-        </Dialog>
-
-        <!-- Combobox for adding new tags -->
-        <Popover bind:open={dropdownOpen}>
-            <PopoverTrigger>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    class="w-[200px] justify-between"
-                >
-                    Add tag...
+        <Popover.Trigger>
+            {#snippet child({ props })}
+                <Button {...props} variant="ghost" size="sm">
+                    Edit tags
+                    <Edit aria-hidden="true" />
                 </Button>
-            </PopoverTrigger>
-            <PopoverContent class="w-80" portalProps={{ disabled: true }}>
-                <Command bind:value onkeydown={handleCommandKeydown}>
-                    <CommandInput
-                        bind:value={textValue}
-                        placeholder="Search tags..."
-                    />
-                    <CommandList>
-                        <CommandEmpty>No tags found.</CommandEmpty>
-                        <CommandGroup>
-                            {#each dropdownTags as tag}
-                                <CommandItem
-                                    value={tag.name}
-                                    onSelect={() => {
-                                        linkTag(tag.name);
-                                        value = tag.name;
-                                        dropdownOpen = false;
-                                    }}
-                                >
-                                    {tag.name}
-                                </CommandItem>
-                            {/each}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
-
-        <!-- Display tags -->
-        <div class="tags-list">
-            {#each itemTags.slice(0, maxTags) as tag}
-                {@const fullTag = tags.get(tag.id)}
-                <div class="tag" onclick={() => openCommentDialog(tag)}>
-                    <Tooltip>
-                        <TooltipTrigger><span>{tag.name}</span></TooltipTrigger>
-                        <TooltipContent>
-                            {#if fullTag}
-                                <p>{fullTag.description}</p>
+            {/snippet}
+        </Popover.Trigger>
+        <Popover.Content
+            data-slot="tag-popover"
+            role="dialog"
+            align="start"
+            aria-label="Edit tags"
+            class={tagPopoverClass}
+        >
+            {#if !creating && itemTags.length > 0}
+                <ul class="mb-4 flex flex-col">
+                    {#each itemTags as t (t.id)}
+                        <li
+                            class="flex flex-col gap-1 border-b border-border-subtle-01 py-3 first:pt-0"
+                        >
+                            <p class="text-heading-compact-01">{t.name}</p>
+                            {#if editing === t.id}
+                                <TextArea
+                                    labelText="Comment on {t.name}"
+                                    rows={2}
+                                    bind:value={comment}
+                                />
+                                <div class="mt-2 flex">
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        class="flex-1"
+                                        onclick={() => (editing = null)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        class="flex-1"
+                                        aria-disabled={pending !== null ||
+                                            undefined}
+                                        onclick={() => saveComment(t)}
+                                    >
+                                        {#if pending === `comment-${t.id}`}
+                                            <InlineLoading
+                                                class="text-inherit"
+                                                status="active"
+                                                description="Saving…"
+                                            />
+                                        {:else}
+                                            Save
+                                        {/if}
+                                    </Button>
+                                </div>
+                            {:else}
+                                {#if t.comment}
+                                    <p class="text-body-01">{t.comment}</p>
+                                {/if}
+                                <p class="text-label-01 text-text-secondary">
+                                    Tagged by {t.tagger.name} · {timeAgo(
+                                        new Date(t.date),
+                                    )}
+                                </p>
+                                <div class="flex">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-label="Edit comment on {t.name}"
+                                        onclick={() => startEdit(t)}
+                                    >
+                                        Edit comment
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-label="Remove {t.name}"
+                                        aria-disabled={pending !== null ||
+                                            undefined}
+                                        onclick={() =>
+                                            run(
+                                                `remove-${t.id}`,
+                                                `Could not remove ${t.name}`,
+                                                () => onUntag(t.id),
+                                            )}
+                                    >
+                                        {#if pending === `remove-${t.id}`}
+                                            <InlineLoading
+                                                status="active"
+                                                description="Removing…"
+                                            />
+                                        {:else}
+                                            Remove
+                                        {/if}
+                                    </Button>
+                                </div>
                             {/if}
-                            {#if (tag as any).comment}
-                                <p>“{(tag as any).comment}”</p>
-                            {/if}
-                            <p>
-                                Tagged by {tag.tagger.name}
-                                {timeAgo(new Date(tag.date))}
-                            </p>
-                        </TooltipContent>
-                    </Tooltip>
-                    <button
-                        class="hover:text-red-700 ml-2"
-                        onclick={(e) => {
-                            e.stopPropagation();
-                            handleUntag(tag.id);
-                        }}
-                    >
-                        <Fa icon={faSquareXmark} size="lg" />
-                    </button>
-                </div>
-            {/each}
-
-            {#if itemTags.length > maxTags}
-                <div class="tag plus-tag">
-                    <span>+{itemTags.length - maxTags}</span>
-                    <div class="overlay">
-                        {#each itemTags.slice(maxTags) as tag}
-                            <div class="tag overlay-tag">
-                                <span>{tag.name}</span>
-                            </div>
-                        {/each}
-                    </div>
-                </div>
+                        </li>
+                    {/each}
+                </ul>
             {/if}
-        </div>
-    </div>
-</TooltipProvider>
-
-<style>
-    .tags-list {
-        display: inline-flex;
-        flex-wrap: wrap;
-        /* margin-top: 1em; */
-    }
-    .tag {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.5em 1em;
-        margin: 0 0.5em;
-        border: 1px solid #ccc;
-        border-radius: 20px;
-        background-color: #f1f1f1;
-        font-size: 0.7em;
-    }
-    .plus-tag {
-        position: relative;
-        cursor: pointer;
-        background-color: #007bff;
-        color: white;
-        border-radius: 50%;
-        padding: 0.5em;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-    .overlay {
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        background: white;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        padding: 0.5em;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        display: none;
-    }
-    .plus-tag:hover .overlay {
-        display: block;
-    }
-    .overlay-tag {
-        margin: 0.2em 0;
-    }
-</style>
+            <AddTag
+                {tagType}
+                {applied}
+                titleText="Add a tag"
+                bind:creating
+                onadd={(t) =>
+                    run("add", `Could not add ${t.name}`, () => onTag(t.id))}
+                onerror={report}
+            />
+            {#if pending === "add"}
+                <InlineLoading
+                    class="mt-2"
+                    status="active"
+                    description="Adding…"
+                />
+            {/if}
+            {#if error}
+                <InlineNotification
+                    class="mt-4"
+                    title={error.title}
+                    subtitle={error.subtitle}
+                />
+            {/if}
+        </Popover.Content>
+    </Popover.Root>
+</div>

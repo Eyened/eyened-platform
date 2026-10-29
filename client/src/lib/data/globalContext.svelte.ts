@@ -18,7 +18,6 @@ export type ComponentDef = {
 
 export class GlobalContext {
     public userManager: UserManager;
-    public popupComponent: ComponentDef | null = $state(null);
     public dialogue: ComponentDef | string | null = $state(null);
     public showUserMenu: boolean = $state(false);
 
@@ -57,10 +56,6 @@ export class GlobalContext {
 
     get user() {
         return this.userManager.user;
-    }
-
-    setPopup(component: ComponentDef | null) {
-        this.popupComponent = component;
     }
 
     canEdit(

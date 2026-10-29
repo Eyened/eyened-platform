@@ -21,6 +21,7 @@
     import { getContext } from "svelte";
     import Fa from "svelte-fa";
     import type { TagGET, TagType } from "../../types/openapi_types";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { Button } from "../components/ui/button";
     import TagEditForm from "./TagEditForm.svelte";
 
@@ -62,12 +63,23 @@
         }
     }
 
+    let createError: { title: string; subtitle: string } | null = $state(null);
+
     async function handleCreateTag(payload: Partial<TagGET>) {
-        await createTag(
-            payload.name!,
-            tagType as any,
-            payload.description ?? "",
-        );
+        createError = null;
+        try {
+            await createTag(
+                payload.name!,
+                tagType as any,
+                payload.description ?? "",
+            );
+        } catch (e) {
+            createError = {
+                title: `Could not create ${payload.name}`,
+                subtitle: e instanceof Error ? e.message : String(e),
+            };
+            throw e;
+        }
     }
 
     async function handleDeleteTag() {
@@ -98,6 +110,13 @@
 
     <div class="border-radius-5 bg-gray-100 p-4">
         <TagEditForm {tagType} add={handleCreateTag} />
+        {#if createError}
+            <InlineNotification
+                class="mt-4"
+                title={createError.title}
+                subtitle={createError.subtitle}
+            />
+        {/if}
     </div>
     {#each filtered_tags as tag}
         <div

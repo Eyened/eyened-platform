@@ -1,115 +1,63 @@
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button";
-    import { tagInstance, untagInstance } from "$lib/data/helpers";
-    import Tagger from "$lib/tags/Tagger.svelte";
+    import { Button } from "$lib/components/ui/button/index.js";
+    import BulkTagger from "$lib/tags/BulkTagger.svelte";
+    import Launch from "carbon-icons-svelte/lib/Launch.svelte";
     import { getContext } from "svelte";
-    import type { TagMeta } from "../../types/openapi_types";
-    import InstanceComponent from "./InstanceComponent.svelte";
     import type { BrowserContext } from "./browserContext.svelte";
+    import { imageCount } from "./images";
+
+    // Carbon data table batch action bar, sticky above the results toolbar (DESIGN.md deviation). In
+    // overlay mode the selection is the sub-task's or viewer's images, so the bar can't clear or tag it.
+    let {
+        mode = "full",
+        panelOpen,
+        onviewselected,
+    }: {
+        mode?: "full" | "overlay";
+        panelOpen: boolean;
+        onviewselected: () => void;
+    } = $props();
 
     const browserContext = getContext<BrowserContext>("browserContext");
-
-    // 'bottom' (default) floats fixed at the bottom of the viewport (landing page).
-    // 'top' sticks to the top of the scroll container (embedded overlay usage),
-    // staying visible while taking up flow space so it never overlaps content.
-    let { placement = "bottom" }: { placement?: "top" | "bottom" } = $props();
-
-    const intersectionTagIds = $derived(
-        (() => {
-            const selected = browserContext.selectedInstances;
-            if (selected.length === 0) return new Set<number>();
-
-            let ids = new Set<number>(
-                (selected[0].tags ?? []).map((t: TagMeta) => t.id),
-            );
-            for (let i = 1; i < selected.length; i++) {
-                const current = new Set<number>(
-                    (selected[i].tags ?? []).map((t: TagMeta) => t.id),
-                );
-                ids = new Set([...ids].filter((id) => current.has(id)));
-                if (ids.size === 0) break;
-            }
-            return ids;
-        })(),
-    );
-
-    const intersectionTags: TagMeta[] = $derived(
-        (() => {
-            const selected = browserContext.selectedInstances;
-            if (selected.length === 0) return [];
-            const ids = intersectionTagIds;
-            return (selected[0].tags ?? []).filter((t: TagMeta) =>
-                ids.has(t.id),
-            );
-        })(),
-    );
-
-    function clear() {
-        browserContext.selectedIds = [];
-    }
-
-    function openSelectionTab() {
-        browserContext.openTab(browserContext.selectedIds);
-    }
-
-    async function bulkTagSelection(tagId: number, comment?: string) {
-        for (const inst of browserContext.selectedInstances) {
-            const isAlreadyTagged = inst.tags?.some(
-                (t: TagMeta) => t.id === tagId,
-            );
-            if (!isAlreadyTagged) {
-                await tagInstance(inst, tagId, comment);
-            }
-        }
-    }
-
-    async function bulkUntagSelection(tagId: number) {
-        for (const inst of browserContext.selectedInstances) {
-            if (inst.tags?.some((t: TagMeta) => t.id === tagId)) {
-                await untagInstance(inst, tagId);
-            }
-        }
-    }
+    const action = "min-h-12 px-4 whitespace-nowrap [&>svg]:static";
 </script>
 
 <div
-    class="bg-black/90 right-0 left-0 z-50 w-full {placement === 'top'
-        ? 'sticky top-0'
-        : 'fixed bottom-0'}"
+    class="sticky top-0 z-10 flex h-12 items-center overflow-x-auto bg-background-brand"
 >
-    <div class="flex items-start gap-4 p-2">
-        <div class="button-container flex flex-col gap-1">
-            <div>
-                {browserContext.selectedIds.length}
-                {browserContext.selectedIds.length != 1 ? "images" : "image"} selected
-            </div>
-            <Button
-                variant="outline"
-                disabled={browserContext.selectedIds.length === 0}
-                onclick={openSelectionTab}
-            >
-                Open selected images
-            </Button>
-            <Button
-                variant="outline"
-                disabled={browserContext.selectedIds.length === 0}
-                onclick={clear}
-            >
-                Clear selection
-            </Button>
-
-            <Tagger
-                tagType="ImageInstance"
-                tags={intersectionTags}
-                tag={bulkTagSelection}
-                untag={bulkUntagSelection}
-            />
-        </div>
-
-        <div class="flex gap-2 overflow-x-auto">
-            {#each browserContext.selectedInstances as instance (instance.id)}
-                <InstanceComponent {instance} />
-            {/each}
-        </div>
-    </div>
+    <p
+        class="sticky start-0 z-10 shrink-0 bg-background-brand px-4 text-body-compact-01 whitespace-nowrap text-text-on-color"
+    >
+        {imageCount(browserContext.selectedIds.length)} selected
+    </p>
+    <Button
+        size="lg"
+        class="{action} ms-auto"
+        aria-expanded={panelOpen}
+        aria-controls="selected-images"
+        onclick={onviewselected}
+    >
+        View selected
+    </Button>
+    {#if mode === "full"}
+        <Button
+            size="lg"
+            class={action}
+            onclick={() => browserContext.openTab(browserContext.selectedIds)}
+        >
+            Open in viewer
+            <Launch aria-hidden="true" />
+        </Button>
+        <BulkTagger
+            instances={browserContext.selectedInstances}
+            class={action}
+        />
+        <Button
+            size="lg"
+            class="{action} before:absolute before:start-0 before:top-4 before:h-4 before:w-px before:bg-text-on-color hover:before:opacity-0"
+            onclick={() => (browserContext.selectedIds = [])}
+        >
+            Cancel
+        </Button>
+    {/if}
 </div>

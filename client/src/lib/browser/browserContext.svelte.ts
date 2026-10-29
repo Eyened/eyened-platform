@@ -143,6 +143,7 @@ export class BrowserContext {
     limitOptionsStudies = [10, 20, 30, 40, 50];
     limitOptionsInstances = [100, 200, 500, 1000];
 
+    // Kept across searches and pages until the user clears it (B7); memory only.
     selectedIds: string[] = $state([]);
     queryMode: QueryMode = $state("studies");
     displayMode: DisplayMode = $state("study");
@@ -179,7 +180,8 @@ export class BrowserContext {
     instancesSignature: SignatureField[] = $state([]);
     studiesSignature: SignatureField[] = $state([]);
 
-    thumbnailSize: string = $state("8em");
+    // 128 px; em would resolve against the surrounding text size.
+    thumbnailSize: string = $state("8rem");
 
     // Derived: depends on queryMode + signatures
     activeSignature: SignatureField[] = $derived(
@@ -400,8 +402,6 @@ export class BrowserContext {
         this.updateURL(query);
         this.loading = true;
         this.hasSearched = true;
-        // On the landing page a search clears the selection (v1; PR 5 changes this). A widget keeps it.
-        if (this.urlSync) this.selectedIds = [];
         try {
             const res: SearchResult = await this.executeSearch(query);
             if (seq !== this.searchSeq) return;

@@ -1,39 +1,25 @@
 <script lang="ts">
-    import { openNewWindow } from "$lib/newWindow";
     import type { DataRow, DataSource } from "$lib/browser/dataSources";
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { openNewWindow } from "$lib/newWindow";
     import DataTable from "$lib/utils/DataTable.svelte";
-    interface Props {
-        data: DataSource;
-        name: string;
-        collapse?: boolean;
-    }
-    let { data, name, collapse = $bindable(false) }: Props = $props();
+    import Launch from "carbon-icons-svelte/lib/Launch.svelte";
+
+    let { data }: { data: DataSource } = $props();
 
     function open(tag: string, rows: DataRow[]) {
         openNewWindow(DataTable, { data: rows }, tag);
     }
 </script>
 
-<div>
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <h4
-        class="mt-[0.2em] mb-[0.2em] cursor-pointer pl-2 hover:bg-[var(--browser-background)]"
-        onclick={() => (collapse = !collapse)}
-    >
-        {#if collapse}►{:else}▼{/if}
-        {name}
-    </h4>
-    <ul class:hidden={collapse} class="m-0 ml-4 list-none p-0">
-        {#each Object.entries(data) as [tag, rows]}
-            <li>
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <span
-                    class="font-mono cursor-pointer hover:underline"
-                    onclick={() => open(tag, rows)}>{tag}</span
-                >
-            </li>
-        {/each}
-    </ul>
-</div>
+<!-- -ms-4: button labels align with the text above (Carbon Button, Aligning ghost buttons). -->
+<ul class="-ms-4 flex flex-col items-start">
+    {#each Object.entries(data) as [tag, rows] (tag)}
+        <li>
+            <Button variant="ghost" size="sm" onclick={() => open(tag, rows)}>
+                {tag}
+                <Launch aria-hidden="true" />
+            </Button>
+        </li>
+    {/each}
+</ul>
