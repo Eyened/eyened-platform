@@ -193,7 +193,7 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
 - **Popover** (`ui/popover` with `tagPopoverClass`; no caret, Carbon React `caret={false}`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/popover/usage).
 - **Structured list** (`ui/structured-list`, `condensed`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/structured-list/usage).
-- **Accordion** (`ui/accordion`, align end, md): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/accordion/usage).
+- **Accordion** (`ui/accordion`, align end, md, flush): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/accordion/guidelines). In a study block it is pulled out by the tile padding so titles align with the tile content ([Flush alignment](https://www.carbondesignsystem.com/building-blocks/core/components/accordion/guidelines#flush-alignment)); its hover is one layer up.
 - **Side panel** (`ui/side-panel`: IBM Products SidePanel, slide-over, right, md, with overlay): no guidelines page; references are
   `@carbon/ibm-products` 2.99.0 ([source and Storybook docs](https://github.com/carbon-design-system/ibm-products/tree/main/packages/ibm-products/src/components/SidePanel))
   and `@carbon/ibm-products-styles` 2.95.0.

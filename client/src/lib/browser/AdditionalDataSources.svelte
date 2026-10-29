@@ -45,7 +45,8 @@
 
 {#if sources.length > 0}
     <!-- ASSUMPTION: source names are unique in the extensions config. -->
-    <Accordion.Root bind:value={open} class="mt-4">
+    <!-- -mx-4 cancels the tile padding (Carbon Accordion, Flush alignment). -->
+    <Accordion.Root bind:value={open} class="-mx-4 mt-4">
         {#each sources as source (source.name)}
             <!-- The await depends on the URL string only, so a study update that leaves the URL alone does not reload. -->
             {@const url = resolveURL(source.url, context)}
