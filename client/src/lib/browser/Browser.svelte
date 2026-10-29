@@ -295,7 +295,7 @@
             </div>
         </form>
         <!-- isolate keeps the results' own z-index layers under the batch bar (z-10), the scrim (z-20) and the column (z-30). -->
-        <div class="isolate col-start-1 row-start-1 max-w-page min-w-0">
+        <div class="isolate col-start-1 row-start-1 min-w-0">
             <BrowserContent />
         </div>
         <!-- Dims everything below the header under the open column; the picker's modal already dims the page. -->
