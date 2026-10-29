@@ -12,7 +12,8 @@
     }
 </script>
 
-<ul class="flex flex-col items-start">
+<!-- -ms-4: button labels align with the text above (Carbon Button, Aligning ghost buttons). -->
+<ul class="-ms-4 flex flex-col items-start">
     {#each Object.entries(data) as [tag, rows] (tag)}
         <li>
             <Button variant="ghost" size="sm" onclick={() => open(tag, rows)}>
