@@ -242,63 +242,59 @@
             </Empty.Header>
         </Empty.Root>
     {:else}
-        <!-- Rerendered on every load, so a refused role change shows the saved role again. -->
-        {#key data}
-            <Table.Root aria-labelledby={membershipsId}>
-                <Table.Header>
+        <Table.Root aria-labelledby={membershipsId}>
+            <Table.Header>
+                <Table.Row>
+                    <Table.Head>Project</Table.Head>
+                    <Table.Head>Role</Table.Head>
+                    <Table.Head><span class="sr-only">Actions</span></Table.Head
+                    >
+                </Table.Row>
+            </Table.Header>
+            <Table.Body>
+                {#each data.memberships as m (m.project_id)}
                     <Table.Row>
-                        <Table.Head>Project</Table.Head>
-                        <Table.Head>Role</Table.Head>
-                        <Table.Head
-                            ><span class="sr-only">Actions</span></Table.Head
-                        >
+                        <Table.Cell>{m.project_name}</Table.Cell>
+                        <Table.Cell class="py-0">
+                            <SelectInput
+                                inline
+                                hideLabel
+                                labelText="Role in {m.project_name}"
+                                value={m.role}
+                                onchange={(e) => {
+                                    const role = e.currentTarget
+                                        .value as RoleName;
+                                    run("Role could not be changed", () =>
+                                        grantMembership(
+                                            m.project_id,
+                                            userId,
+                                            role,
+                                        ),
+                                    );
+                                }}
+                            >
+                                {#each ROLES as role (role.value)}
+                                    <SelectItem
+                                        value={role.value}
+                                        text={role.label}
+                                    />
+                                {/each}
+                            </SelectInput>
+                        </Table.Cell>
+                        <!-- Carbon inline row action: ghost button in a trailing column. -->
+                        <Table.Cell class="text-end whitespace-nowrap">
+                            <Button
+                                variant="ghost"
+                                aria-label="Remove from {m.project_name}"
+                                onclick={() => openRemove(m)}
+                            >
+                                Remove <Subtract />
+                            </Button>
+                        </Table.Cell>
                     </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                    {#each data.memberships as m (m.project_id)}
-                        <Table.Row>
-                            <Table.Cell>{m.project_name}</Table.Cell>
-                            <Table.Cell class="py-0">
-                                <SelectInput
-                                    inline
-                                    hideLabel
-                                    labelText="Role in {m.project_name}"
-                                    value={m.role}
-                                    onchange={(e) => {
-                                        const role = e.currentTarget
-                                            .value as RoleName;
-                                        run("Role could not be changed", () =>
-                                            grantMembership(
-                                                m.project_id,
-                                                userId,
-                                                role,
-                                            ),
-                                        );
-                                    }}
-                                >
-                                    {#each ROLES as role (role.value)}
-                                        <SelectItem
-                                            value={role.value}
-                                            text={role.label}
-                                        />
-                                    {/each}
-                                </SelectInput>
-                            </Table.Cell>
-                            <!-- Carbon inline row action: ghost button in a trailing column. -->
-                            <Table.Cell class="text-end whitespace-nowrap">
-                                <Button
-                                    variant="ghost"
-                                    aria-label="Remove from {m.project_name}"
-                                    onclick={() => openRemove(m)}
-                                >
-                                    Remove <Subtract />
-                                </Button>
-                            </Table.Cell>
-                        </Table.Row>
-                    {/each}
-                </Table.Body>
-            </Table.Root>
-        {/key}
+                {/each}
+            </Table.Body>
+        </Table.Root>
     {/if}
 
     <h2 class="mt-10 mb-4 text-heading-compact-02 text-text-primary">
