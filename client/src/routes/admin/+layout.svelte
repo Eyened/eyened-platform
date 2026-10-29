@@ -1,5 +1,6 @@
 <script lang="ts">
     import Main from "$lib/components/Main.svelte";
+    import * as Empty from "$lib/components/ui/empty/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { getContext, type Snippet } from "svelte";
 
@@ -13,7 +14,11 @@
         {#if userManager.user.is_admin}
             {@render children()}
         {:else}
-            <p>Not authorised</p>
+            <Empty.Root>
+                <Empty.Header>
+                    <Empty.Title>Not authorised</Empty.Title>
+                </Empty.Header>
+            </Empty.Root>
         {/if}
     </div>
 </Main>
