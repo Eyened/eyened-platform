@@ -68,6 +68,31 @@ describe("user page", () => {
         );
     });
 
+    it("keeps focus on the role select after a role change", async () => {
+        const grant = vi.fn(() =>
+            json({
+                project_id: 1,
+                project_name: "Alpha",
+                user_id: 3,
+                role: "project_admin",
+                changed: true,
+            }),
+        );
+        stubUser({ "PUT /api/admin/projects/1/members/3": grant });
+        render(UserPage);
+
+        const select = await screen.findByLabelText("Role in Alpha");
+        select.focus();
+        await fireEvent.change(select, { target: { value: "project_admin" } });
+
+        await vi.waitFor(() =>
+            expect(grant).toHaveBeenCalledWith({ role: "project_admin" }),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(select).toBeInTheDocument();
+        expect(select).toHaveFocus();
+    });
+
     it("disables Add to project when the user is in every project", async () => {
         stubUser({}, [
             alpha,
