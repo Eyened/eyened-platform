@@ -256,7 +256,7 @@
             hidden={!filtersOpen}
             onsubmit={submit}
             onkeydown={onFiltersKeydown}
-            class="z-30 col-start-1 row-start-1 flex w-full max-w-80 flex-col gap-6 self-start justify-self-start border-e border-border-subtle-00 bg-background py-6 pe-4 in-dialog:border-border-subtle-01 in-dialog:bg-layer-01"
+            class="z-30 col-start-1 row-start-1 flex w-full max-w-80 flex-col gap-6 self-start justify-self-start border-e border-border-subtle-00 bg-background px-4 py-6 in-dialog:border-border-subtle-01 in-dialog:bg-layer-01"
         >
             <h2 class="text-heading-compact-02 text-text-primary">Filters</h2>
             <FilterShorcuts bind:patientInput />
