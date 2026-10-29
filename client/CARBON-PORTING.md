@@ -20,7 +20,8 @@ Run in the worktree `eyened-platform-worktrees/client-carbon`, from `client/` un
    `https://www.carbondesignsystem.com/building-blocks/core/components/<slug>/guidelines` (and its
    Style and Accessibility tabs) and each pattern against
    `https://www.carbondesignsystem.com/building-blocks/core/patterns/<slug>`. A deviation needs a
-   reason and a `DESIGN.md` row.
+   reason and a `DESIGN.md` row. Look every Carbon fact up with the `carbon-builder` skill and its
+   `carbon-mcp` tools (`docs_search`, `code_search`), never from memory, and cite the page they return.
 4. Run the gates (CI does not run on stacked PRs):
    `npm run verify:runes && npm run lint && npm run check && npm run test && npm run build`
 5. Button icons go after the label, at most one per button; move any leading icon and drop extras.
