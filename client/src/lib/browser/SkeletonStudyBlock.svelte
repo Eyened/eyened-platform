@@ -7,7 +7,7 @@
     const size = getContext<BrowserContext>("browserContext").thumbnailSize;
 </script>
 
-<div class="bg-layer-01 p-4 pb-12 in-dialog:bg-layer-02">
+<div class="bg-layer-01 p-4 in-dialog:bg-layer-02">
     <span class={cn(skeleton, "mb-2 h-6 w-1/3")}></span>
     <span class={cn(skeleton, "h-4 w-1/2")}></span>
     <div
