@@ -139,8 +139,9 @@
     --breakpoint-md: 42rem;
     --breakpoint-lg: 66rem;
     --breakpoint-xlg: 82rem;
+    /* Carbon's max; a breakpoint named `max` would shadow Tailwind's max-* variants. */
+    --breakpoint-cds-max: 99rem;
     --container-*: initial;
-    --container-page: 99rem;
 
     /* Shapes: Carbon corners are square; shadow from @carbon/styles (g100) */
     --radius-*: initial;
