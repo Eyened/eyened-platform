@@ -23,8 +23,23 @@ const projects = [
     { id: 2, name: "Beta", member_count: 0 },
 ];
 
+const alpha = { project_id: 1, project_name: "Alpha", role: "grader" };
+
+function stubUser(
+    routes: Record<string, (body: unknown) => Response> = {},
+    memberships: unknown[] = [alpha],
+    user = alice,
+) {
+    return stubFetch({
+        "GET /api/admin/users": () => json([user]),
+        "GET /api/admin/users/3/memberships": () => json(memberships),
+        "GET /api/admin/projects": () => json(projects),
+        ...routes,
+    });
+}
+
 describe("user page", () => {
-    it("grants only projects the user does not hold", async () => {
+    it("adds the user only to projects they are not in", async () => {
         const grant = vi.fn(() =>
             json({
                 project_id: 2,
@@ -34,25 +49,60 @@ describe("user page", () => {
                 changed: true,
             }),
         );
-        stubFetch({
-            "GET /api/admin/users": () => json([alice]),
-            "GET /api/admin/users/3/memberships": () =>
-                json([
-                    { project_id: 1, project_name: "Alpha", role: "grader" },
-                ]),
-            "GET /api/admin/projects": () => json(projects),
-            "PUT /api/admin/projects/2/members/3": grant,
-        });
+        stubUser({ "PUT /api/admin/projects/2/members/3": grant });
         render(UserPage);
 
-        const select = await screen.findByLabelText("Project");
+        await fireEvent.click(
+            await screen.findByRole("button", { name: "Add to project" }),
+        );
+        const dialog = await screen.findByRole("dialog");
+        const select = within(dialog).getByLabelText("Project");
         expect(within(select).queryByText("Alpha")).toBeNull();
         await fireEvent.change(select, { target: { value: "2" } });
-        await fireEvent.click(screen.getByRole("button", { name: "Grant" }));
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Add" }),
+        );
 
         await vi.waitFor(() =>
             expect(grant).toHaveBeenCalledWith({ role: "read_only" }),
         );
+    });
+
+    it("keeps focus on the role select after a role change", async () => {
+        const grant = vi.fn(() =>
+            json({
+                project_id: 1,
+                project_name: "Alpha",
+                user_id: 3,
+                role: "project_admin",
+                changed: true,
+            }),
+        );
+        stubUser({ "PUT /api/admin/projects/1/members/3": grant });
+        render(UserPage);
+
+        const select = await screen.findByLabelText("Role in Alpha");
+        select.focus();
+        await fireEvent.change(select, { target: { value: "project_admin" } });
+
+        await vi.waitFor(() =>
+            expect(grant).toHaveBeenCalledWith({ role: "project_admin" }),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(select).toBeInTheDocument();
+        expect(select).toHaveFocus();
+    });
+
+    it("disables Add to project when the user is in every project", async () => {
+        stubUser({}, [
+            alpha,
+            { project_id: 2, project_name: "Beta", role: "read_only" },
+        ]);
+        render(UserPage);
+
+        expect(
+            await screen.findByRole("button", { name: "Add to project" }),
+        ).toHaveAttribute("aria-disabled", "true");
     });
 
     it("says so when the user does not exist", async () => {
@@ -67,30 +117,30 @@ describe("user page", () => {
         expect(await screen.findByText("User not found")).toBeInTheDocument();
     });
 
-    it("revokes only after confirmation", async () => {
+    it("removes a membership only from a danger modal named for the action", async () => {
         const revoke = vi.fn(() => json(null, 204));
-        stubFetch({
-            "GET /api/admin/users": () => json([alice]),
-            "GET /api/admin/users/3/memberships": () =>
-                json([
-                    { project_id: 1, project_name: "Alpha", role: "grader" },
-                ]),
-            "GET /api/admin/projects": () => json(projects),
-            "DELETE /api/admin/projects/1/members/3": revoke,
-        });
+        stubUser({ "DELETE /api/admin/projects/1/members/3": revoke });
         render(UserPage);
 
         await fireEvent.click(
-            await screen.findByRole("button", { name: "Revoke" }),
+            await screen.findByRole("button", { name: "Remove from Alpha" }),
         );
+        let dialog = await screen.findByRole("dialog", {
+            name: "Remove alice from Alpha?",
+        });
         await fireEvent.click(
-            await screen.findByRole("button", { name: "Cancel" }),
+            within(dialog).getByRole("button", { name: "Cancel" }),
         );
         expect(revoke).not.toHaveBeenCalled();
 
-        await fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
         await fireEvent.click(
-            await screen.findByRole("button", { name: "Confirm" }),
+            await screen.findByRole("button", { name: "Remove from Alpha" }),
+        );
+        dialog = await screen.findByRole("dialog", {
+            name: "Remove alice from Alpha?",
+        });
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Remove" }),
         );
         await vi.waitFor(() => expect(revoke).toHaveBeenCalledTimes(1));
     });
@@ -100,25 +150,59 @@ describe("user page", () => {
         { active: false, button: "Reactivate", sent: true },
     ])("$button sends active: $sent", async ({ active, button, sent }) => {
         const setActive = vi.fn(() => json({ ...alice, active: sent }));
-        stubFetch({
-            "GET /api/admin/users": () => json([{ ...alice, active }]),
-            "GET /api/admin/users/3/memberships": () => json([]),
-            "GET /api/admin/projects": () => json(projects),
-            "PUT /api/admin/users/3/active": setActive,
+        stubUser({ "PUT /api/admin/users/3/active": setActive }, [], {
+            ...alice,
+            active,
         });
         render(UserPage);
 
         await fireEvent.click(
             await screen.findByRole("button", { name: button }),
         );
-        // Reactivate is not destructive, so only Deactivate asks for confirmation.
+        // Reactivate is not destructive, so only Deactivate opens a danger modal.
         if (active) {
+            const dialog = await screen.findByRole("dialog", {
+                name: "Deactivate alice?",
+            });
             await fireEvent.click(
-                await screen.findByRole("button", { name: "Confirm" }),
+                within(dialog).getByRole("button", { name: "Deactivate" }),
             );
         }
         await vi.waitFor(() =>
             expect(setActive).toHaveBeenCalledWith({ active: sent }),
         );
+    });
+
+    it("shows a refused password in the Set password modal", async () => {
+        stubUser({
+            "PUT /api/admin/users/3/password": () =>
+                json(
+                    {
+                        detail: {
+                            code: "weak_password",
+                            message: "Password must be at least 15 characters",
+                        },
+                    },
+                    400,
+                ),
+        });
+        render(UserPage);
+
+        await fireEvent.click(
+            await screen.findByRole("button", { name: "Set password" }),
+        );
+        const dialog = await screen.findByRole("dialog");
+        await fireEvent.input(within(dialog).getByLabelText("New password"), {
+            target: { value: "short" },
+        });
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Set password" }),
+        );
+
+        expect(
+            await within(dialog).findByText(
+                "Password must be at least 15 characters",
+            ),
+        ).toBeInTheDocument();
     });
 });
