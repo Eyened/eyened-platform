@@ -4,9 +4,11 @@ import { ApiError } from "$lib/api/client";
 import { authClient } from "../auth";
 import LoginForm from "./LoginForm.svelte";
 
-function renderForm(login = vi.fn()) {
+vi.mock("$app/paths", () => ({ resolve: (route: string) => route }));
+
+function renderForm(login = vi.fn(), passwordEnabled = true) {
     vi.spyOn(authClient, "options").mockResolvedValue({
-        password_enabled: true,
+        password_enabled: passwordEnabled,
         oidc_enabled: true,
         oidc_provider_name: "SURF",
     });
@@ -19,6 +21,25 @@ function renderForm(login = vi.fn()) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("LoginForm", () => {
+    it.each([true, false])(
+        "shows Create an account only with password login (%s)",
+        async (passwordEnabled) => {
+            renderForm(vi.fn(), passwordEnabled);
+            // The OIDC button means the options have loaded.
+            await screen.findByRole("button", { name: "Log in with SURF" });
+
+            const link = screen.queryByRole("link", {
+                name: "Create an account",
+            });
+
+            if (passwordEnabled) {
+                expect(link).toHaveAttribute("href", "/users/signup");
+            } else {
+                expect(link).toBeNull();
+            }
+        },
+    );
+
     it("reports each empty field on submit and focuses Username", async () => {
         const login = renderForm();
         const username = await screen.findByLabelText("Username");
