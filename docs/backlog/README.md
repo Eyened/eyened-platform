@@ -74,3 +74,7 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Open the image picker in a new tab | [frontend](frontend.md) | open |
 | Guard logged-in pages with a route group | [frontend](frontend.md) | open |
 | Cycle viewer regions with F6 | [frontend](frontend.md) | open |
+| Create a feature from the viewer's segmentation panel | [frontend](frontend.md) | open |
+| Let favourites sort the Tagger, or drop stars from the API | [frontend](frontend.md) | open |
+| Add column names to external data sources | [frontend](frontend.md) | open |
+| Show the filter count and Clear filters on the Library type filter | [frontend](frontend.md) | open |

@@ -22,24 +22,6 @@
       "count": 3
     }
   },
-  "src/lib/components/Autocomplete.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/components/MultiSelectWithSearch.svelte": {
-    "svelte/require-each-key": {
-      "count": 2
-    }
-  },
-  "src/lib/components/SelectWithSearch.svelte": {
-    "svelte/prefer-svelte-reactivity": {
-      "count": 1
-    },
-    "svelte/require-each-key": {
-      "count": 2
-    }
-  },
   "src/lib/components/ui/data-table/data-table.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
       "count": 2
@@ -124,14 +106,6 @@
   "src/lib/registration/privateEyeRegistrationHeidelberg.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
-    }
-  },
-  "src/lib/tags/TagsEditor.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "svelte/require-each-key": {
-      "count": 1
     }
   },
   "src/lib/tasks/SubTaskRow.svelte": {

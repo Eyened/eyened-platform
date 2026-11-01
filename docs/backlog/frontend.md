@@ -101,3 +101,27 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** to get from the form panel to the canvas, a keyboard user tabs back through about 20 tool and option controls; the viewer regions get landmarks but no shortcut between them.
 - **Fix:** F6 / Shift+F6 on the viewer root move focus to the next/previous region (header, tool rail, options bar, canvas, right panel, timeline), each region restoring its last-focused element and hidden regions skipped (S2 `foundations/app-frame/creating-bluelines-browsing-context.md`, "Support F6 key navigation").
 - **Note:** it needs an ADR 0006 deviation (viewer shortcuts work only while the image has focus), and a check that Chrome and Firefox let the page `preventDefault` F6.
+
+### Create a feature from the viewer's segmentation panel
+- **Status:** open
+- **Source:** client Carbon PR 8 (`ui/carbon-8-library-leftovers`) brainstorm, 2026-10-30
+- **Problem:** features can only be created on `/library`. The viewer's segmentation panel picks from the features loaded once at startup, so a grader who needs a new one leaves the viewer and reloads it.
+- **Fix:** an inline `Create "<text>"` option in the panel's feature picker, as `AddTag` does for tags, adding the new feature to the loaded list.
+
+### Let favourites sort the Tagger, or drop stars from the API
+- **Status:** open
+- **Source:** client Carbon PR 8 (`ui/carbon-8-library-leftovers`) brainstorm, 2026-10-30
+- **Problem:** PR 8 removed the star buttons, which changed nothing visible. `starTag`/`unstarTag` in `client/src/lib/data/api.ts` and `userManager.starredTagIds` are now unused by the UI.
+- **Fix:** either list starred tags first in the Tagger and bring the star back, or delete the star endpoints and client calls.
+
+### Add column names to external data sources
+- **Status:** open
+- **Source:** client Carbon PR 8 (`ui/carbon-8-library-leftovers`) brainstorm, 2026-11-01
+- **Problem:** `client/src/lib/utils/DataTable.svelte` shows no column headers because the source sends none, so screen readers cannot announce column names (a DESIGN.md deviation).
+- **Fix:** an optional `columns` field in the data-source config, rendered as the table's header row when present.
+
+### Show the filter count and Clear filters on the Library type filter
+- **Status:** open
+- **Source:** client Carbon PR 8 (`ui/carbon-8-library-leftovers`) Task 12a review, 2026-11-01
+- **Problem:** below `md`, `/library`'s Tags Type filter sits behind an icon-only Filter button that shows neither the number of filters applied nor a way to clear them; Carbon Filtering, Filter states asks for both on the closed filter.
+- **Fix:** the task page's pattern (`routes/tasks/[taskid]/+page.svelte`): a ghost lg `Filters (n)` button and a Clear filters button beside it.

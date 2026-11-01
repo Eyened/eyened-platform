@@ -132,6 +132,7 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
 - **UI shell header** (`TopMenu.svelte`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/ui-shell-header/guidelines),
   [Global header](https://www.carbondesignsystem.com/building-blocks/core/patterns/global-header). Below `lg` the links move
   to a side nav behind a menu button ([UI shell left panel](https://www.carbondesignsystem.com/building-blocks/core/components/ui-shell-left-panel/guidelines)); Escape, the overlay, a link or moving focus out closes it.
+- **Profile popover** (`ProfilePopover.svelte` on `ui/popover`, opened by the header username): [Disclosures, Profile menu](https://carbondesignsystem.com/building-blocks/core/patterns/disclosures/#profile-menu). The username as text, Change password (only with password login; opens a modal, focus returns to the username on close) and Log out, a ghost button, not danger. `role="dialog"` with an `aria-label`.
 - **Button** (`ui/button`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/button/guidelines).
 - **Link** (`ui/button` `variant="link"`, or `<a>` with `text-link-primary hover:text-link-primary-hover`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/link/guidelines). Standalone with an icon: `inline-flex gap-2` and a 16 px icon after the text (Launch for another tab).
@@ -179,6 +180,7 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
 - **Content switcher** (`ui/content-switcher`, low contrast; `selectionMode` automatic or manual; sizes md, lg):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/content-switcher/usage). Low contrast because
   the default selected option is a light bar on Gray 100.
+- **Tabs** (`ui/tabs`, line, automatic activation; the selected tab in `?tab=`): [Carbon](https://carbondesignsystem.com/building-blocks/core/components/tabs/guidelines). Tabs switch between distinct areas (`/library` Tags, Features); filtering the same content uses a Dropdown ([Filtering the same content](https://carbondesignsystem.com/building-blocks/core/components/tabs/guidelines/#filtering-the-same-content)).
 - **Date picker** (`ui/date-picker`, single, typed as `yyyy-mm-dd`, the stored format; calendar `ui/calendar`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/date-picker/usage).
 - **Number input** (`ui/number-input`, `hideSteppers`, `allowEmpty`: the value is the raw text):
@@ -194,6 +196,7 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
   opens a popover with each tag's comment, Edit comment and Remove; bulk tags are dismissible, after a confirm.
 - **Combo box** (`ui/combo-box`, md, menu from `ui/select`; the caller filters, a pick is an action):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/combo-box/usage). The tag combo box ends with `Create "<text>"`.
+- **Multiselect** (`ui/multi-select`, filterable, md; bits-ui Combobox `type="multiple"`, menu from `ui/select`): [Carbon](https://carbondesignsystem.com/building-blocks/core/components/dropdown/guidelines/#multiselect). Options show a checkbox; the field shows a count tag whose ✕ clears all; the filter text stays after a pick, which is not an action (unlike the combo box).
 - **Popover** (`ui/popover` with `tagPopoverClass`; no caret, Carbon React `caret={false}`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/popover/usage).
 - **Structured list** (`ui/structured-list`, `condensed`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/structured-list/usage).
@@ -234,6 +237,8 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
 | Account status                               | Lifecycle states (activated, deactivated) use shape indicators                                                                                                          | Icon indicator: Active `normal` (blue checkmark), Inactive `undefined` (purple)                                                                                                         | Reuses `ui/status-indicator`; Carbon names no shape kind for active or inactive                                                                                                      |
 | OIDC callback loading                        | The Loading component (or skeleton states) for a whole-page wait                                                                                                        | Inline loading under the title                                                                                                                                                          | One short exchange; nothing to skeleton, and no `ui/loading` for one screen                                                                                                          |
 | Task page toolbar                            | One row, as tall as the table rows (Data table, [Toolbar height](https://carbondesignsystem.com/building-blocks/core/components/data-table/guidelines/#toolbar-height)) | Below `md`, Claim unassigned on page wraps onto a second row                                                                                                                            | The filter buttons and the claim label do not fit in 320 px (Reflow)                                                                                                                 |
+| Profile popover keyboard                     | ↑/↓ between items; Esc closes (Disclosures, Keyboard)                                                                                                                   | Tab between items; Esc closes                                                                                                                                                           | Two buttons; Carbon's Popover allows Tab order                                                                                                                                       |
+| External data table headers                  | Column headers (Data table, Anatomy)                                                                                                                                    | None; the source tag is the table's caption                                                                                                                                             | The source sends no header row                                                                                                                                                       |
 
 ## Keyboard & Focus
 
@@ -244,6 +249,9 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
 - Pagination: Previous and Next are aria-disabled at the ends; reaching the last page moves focus to Previous, reaching page 1 to Next (Carbon React).
 - Content switcher: ←/→ move between options (wrapping); automatic selects on the move, manual on Enter or Space.
 - Browser filter column: while it is open, Tab and Shift+Tab wrap inside it; Escape closes it and returns focus to Filters.
+- Tabs: one Tab stop; ←/→ move and select, wrapping ([Tabs, Keyboard interactions](https://carbondesignsystem.com/building-blocks/core/components/tabs/accessibility/#keyboard-interactions)).
+- Multiselect (filterable): Enter or a click toggles the focused option and keeps the menu open; Space types into the filter, as Carbon's combo box does (it would otherwise submit a space into the filter string; [Dropdown, Combo box](https://carbondesignsystem.com/building-blocks/core/components/dropdown/accessibility/#combo-box)); Delete, or Backspace in an empty field, clears all; Escape closes ([Dropdown, Multiselect](https://carbondesignsystem.com/building-blocks/core/components/dropdown/accessibility/#multiselect)).
+- Profile popover: opening focuses its first button; Tab moves between items; Escape closes and returns focus to the username (deviation below).
 - Condition builder: one Tab stop; ←/→ move through every part, ↑/↓ to the same part of the next condition;
   Enter or Space opens a part's popover, which traps focus and returns it to the part on close; Escape clears a
   search field first, then closes.
