@@ -39,12 +39,6 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** `DoubleRangeSlider.svelte` 18 errors (11 implicit-any, 3 unbound `bind:this` `| undefined`, 3 undeclared `ondragmove`); 16 implicit-any params elsewhere; 16 missing null/unknown guards, some latent runtime `TypeError`s (e.g. `TopRowImages.svelte:57` `e.target.focus()`).
 - **Fix:** type properly (not `any`, which grows the ESLint baseline); treat the guard group as bug candidates.
 
-### Remove small dead code
-- **Status:** open
-- **Source:** Phase 3 sweep
-- **Problem:** `client/src/lib/viewer-window/icons/AV-Nicking.svelte` declares an inert `stroke` prop and has 0 callers.
-- **Fix:** delete the component (or the prop).
-
 ### Decide `prefer-const` for `.svelte` files
 - **Status:** open
 - **Source:** Phase 3 ESLint gate

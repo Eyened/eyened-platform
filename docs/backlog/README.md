@@ -62,7 +62,6 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Ratchet down `@typescript-eslint/no-explicit-any` | [frontend](frontend.md) | open |
 | Gate svelte-check in CI (Phase 4) | [frontend](frontend.md) | open |
 | Fix the remaining svelte-check error clusters | [frontend](frontend.md) | open |
-| Remove small dead code | [frontend](frontend.md) | open |
 | Decide `prefer-const` for `.svelte` files | [frontend](frontend.md) | open |
 | Re-audit navigation if `kit.paths.base` is ever set | [frontend](frontend.md) | open, conditional |
 | Round-trip a comma inside an "is one of" value | [frontend](frontend.md) | open |
