@@ -7,7 +7,7 @@
     let { data, tag }: { data: DataRow[]; tag: string } = $props();
 </script>
 
-<div class="p-4">
+<div class="overflow-auto p-4">
     {#if data.length > 0}
         <Table.Root size="md">
             <Table.Caption

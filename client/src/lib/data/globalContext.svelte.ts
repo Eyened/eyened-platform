@@ -36,6 +36,16 @@ export class GlobalContext {
         // user must be logged in before fetching any data
         await this.userManager.init(pathname);
 
+        // Public endpoint: fetch it logged out too, since a password login does not rerun init.
+        authClient
+            .options()
+            .then((options) => {
+                this.passwordEnabled = options.password_enabled;
+            })
+            .catch((error) =>
+                console.error("Failed to fetch auth options:", error),
+            );
+
         // Only fetch data if user is logged in
         // If user is not logged in, userManager.init will redirect to login
         if (this.userManager.loggedIn) {
@@ -44,9 +54,6 @@ export class GlobalContext {
                     fetchTags(),
                     fetchFormSchemas(),
                     fetchFeatures({ with_counts: true }),
-                    authClient.options().then((options) => {
-                        this.passwordEnabled = options.password_enabled;
-                    }),
                 ]);
             } catch (error) {
                 // Log error but don't throw - let pages handle errors individually
