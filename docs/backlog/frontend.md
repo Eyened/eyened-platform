@@ -64,12 +64,6 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Fix:** pick one display/input format: fixed dd-mm-yyyy, `Intl` locale-based, or unambiguous "13 Oct 2026" with lenient input. Amend D8 first. Keep ISO on the wire and in URLs; change only display and input. Show the format as visible helper text (Carbon date picker guidance), not only as a placeholder.
 - **Note:** about 5-8 files, plus the tests `StudyBlock.test.ts`, `PanelVisits.test.ts` and `patientStudies.test.ts`.
 
-### Rank exact property matches first in the ConditionBuilder search
-- **Status:** open
-- **Source:** P4 browser search final review / demo 2026-10-13
-- **Problem:** typing "Study Date" in the property search lists "Study Tag Name" first; `ui/command` (bits-ui Command) scores with its default fuzzy filter.
-- **Fix:** pass a custom `filter` that ranks exact, then prefix matches above fuzzy ones.
-
 ### Round-trip a comma inside an "is one of" value
 - **Status:** open
 - **Source:** P4 browser search final review / demo 2026-10-13

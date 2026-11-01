@@ -30,6 +30,20 @@
     let root = $state<HTMLElement | null>(null);
     // bits-ui Command's value is the highlighted option; start on the current choice (read once).
     let highlighted = $state(untrack(() => selected[0] ?? ""));
+    let search = $state("");
+
+    // bits-ui only reorders items inside a Command.Group, so rank here: exact label, then prefix, then the rest.
+    function rank(optionLabel: string, query: string) {
+        const text = optionLabel.toLowerCase();
+        return text === query ? 0 : text.startsWith(query) ? 1 : 2;
+    }
+    const shown = $derived.by(() => {
+        const query = search.trim().toLowerCase();
+        if (!query) return options;
+        return [...options].sort(
+            (a, b) => rank(a.label, query) - rank(b.label, query),
+        );
+    });
 
     // Space toggles the highlighted option of a multi list (Enter is Command's); in the search field it types.
     function onkeydown(e: KeyboardEvent) {
@@ -45,7 +59,7 @@
 <Command.Root bind:ref={root} bind:value={highlighted} {onkeydown}>
     {#if options.length > SEARCH_THRESHOLD}
         <div class="px-4 pb-4">
-            <Command.Input aria-label={searchLabel} />
+            <Command.Input aria-label={searchLabel} bind:value={search} />
         </div>
     {/if}
     <Command.List
@@ -53,7 +67,7 @@
         aria-multiselectable={multi || undefined}
         class="max-h-none"
     >
-        {#each options as option (option.id)}
+        {#each shown as option (option.id)}
             {@const chosen = selected.includes(option.id)}
             <Command.Item
                 value={option.id}
