@@ -220,7 +220,9 @@ describe("task subtasks page", () => {
                 }),
             ),
         );
-        expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+        expect(
+            screen.queryByRole("button", { name: "Clear filters" }),
+        ).toBeNull();
     });
 
     it("shows a load error with the server's message", async () => {
