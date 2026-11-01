@@ -155,3 +155,10 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** signup-redirect fix on the Carbon branch, 2026-10-26
 - **Problem:** which pages need a login is decided by path strings (`isPublicPath` in `client/src/lib/publicPaths.ts`) plus a separate redirect in `client/src/lib/components/Main.svelte`; a new public page must be added to the list or it bounces to login.
 - **Fix:** move login, signup and oidc-callback under `routes/(public)/` and the rest under `routes/(app)/`, whose `+layout.ts` `load` checks the session and calls `redirect()`; then delete `publicPaths.ts` and the `Main.svelte` redirect.
+
+### Cycle viewer regions with F6
+- **Status:** open
+- **Source:** viewer skin-mapping brainstorm, 2026-10-29
+- **Problem:** to get from the form panel to the canvas, a keyboard user tabs back through about 20 tool and option controls; the viewer regions get landmarks but no shortcut between them.
+- **Fix:** F6 / Shift+F6 on the viewer root move focus to the next/previous region (header, tool rail, options bar, canvas, right panel, timeline), each region restoring its last-focused element and hidden regions skipped (S2 `foundations/app-frame/creating-bluelines-browsing-context.md`, "Support F6 key navigation").
+- **Note:** it needs an ADR 0006 deviation (viewer shortcuts work only while the image has focus), and a check that Chrome and Firefox let the page `preventDefault` F6.
