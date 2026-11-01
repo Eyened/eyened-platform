@@ -2,6 +2,7 @@
     import { Tabs as TabsPrimitive } from "bits-ui";
     import { cn } from "$lib/utils.js";
 
+    // Carbon line tab, md: 40 px, 2 px bottom border, 1 px between tabs.
     let {
         ref = $bindable(null),
         class: className,
@@ -13,7 +14,7 @@
     bind:ref
     data-slot="tabs-trigger"
     class={cn(
-        "rounded-md text-sm font-medium text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring data-[state=active]:shadow-sm dark:text-muted-foreground dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 dark:data-[state=active]:text-foreground inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 border border-transparent px-2 py-1 whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "h-10 border-b-2 border-border-subtle-00 px-4 py-2 text-body-compact-01 whitespace-nowrap text-text-secondary not-first:ms-px hover:border-border-strong-01 hover:text-text-primary disabled:border-border-disabled disabled:text-text-disabled data-[state=active]:border-border-interactive data-[state=active]:text-heading-compact-01 data-[state=active]:text-text-primary",
         className,
     )}
     {...restProps}
