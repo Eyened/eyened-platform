@@ -7,6 +7,9 @@
     import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     import { Button } from "$lib/components/ui/button";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import Add from "carbon-icons-svelte/lib/Add.svelte";
+    import Help from "carbon-icons-svelte/lib/Help.svelte";
     import BrowserOverlay from "./BrowserOverlay.svelte";
     import HelpOverlay from "./HelpOverlay.svelte";
 
@@ -81,11 +84,16 @@
             {/if}
         </div>
     </div>
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div id="panel-selector">
-        <div class="icon" onclick={() => selectPanel("help")}>?</div>
-        <div class="icon" onclick={() => selectPanel("browser")}>+</div>
+        <IconButton label="Help" onclick={() => selectPanel("help")}>
+            <Help />
+        </IconButton>
+        <IconButton
+            label="Browse images"
+            onclick={() => selectPanel("browser")}
+        >
+            <Add />
+        </IconButton>
     </div>
 {/if}
 
@@ -153,22 +161,5 @@
         flex: 1;
         flex-direction: row;
         display: flex;
-    }
-    div.icon {
-        padding: 0.2em;
-        color: rgba(255, 255, 255, 0.8);
-        width: 2em;
-        height: 2em;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: rgba(255, 255, 255, 0.3);
-        margin: 0.2em;
-        border-radius: 2px;
-        user-select: none;
-        cursor: pointer;
-    }
-    div.icon:hover {
-        color: rgba(255, 255, 255, 1);
     }
 </style>

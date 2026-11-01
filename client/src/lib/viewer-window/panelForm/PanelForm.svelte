@@ -16,6 +16,8 @@
     import { HIDE_FROM_FORM_PANEL_NAMES } from "$lib/config/builtinFormSchemas";
     import FormItem from "./FormItem.svelte";
     import FormDeleteModal from "./FormDeleteModal.svelte";
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { NativeSelect } from "$lib/components/ui/native-select/index.js";
     import {
         buildFormAnnotationCreatePayload,
         matchesFormEntityScope,
@@ -36,7 +38,7 @@
     let selectedSchema: FormSchemaGET | undefined = $state();
     let deleting = $state<FormAnnotationGET | null>(null);
     let deleteOpen = $state(false);
-    let schemaSelect = $state<HTMLElement>();
+    let schemaSelect = $state<HTMLElement | null>(null);
 
     function openDelete(form: FormAnnotationGET) {
         deleting = form;
@@ -114,34 +116,36 @@
 <div class="main">
     <div class="new-form">
         <div>
-            <select
-                class="schema-select"
-                bind:value={selectedSchema}
-                bind:this={schemaSelect}
-            >
+            <NativeSelect bind:value={selectedSchema} bind:ref={schemaSelect}>
                 <option value={undefined} disabled
                     >-- select form type --</option
                 >
                 {#each selectableSchemas as schema}
                     <option value={schema}>{schema.name}</option>
                 {/each}
-            </select>
+            </NativeSelect>
         </div>
 
         <div>
-            <button
+            <Button
+                variant="outline"
+                size="sm"
                 onclick={() => addFormWithSchema(selectedSchema)}
                 disabled={!selectedSchema}
             >
                 Create new form
-            </button>
+            </Button>
         </div>
 
         {#if formShortcutSchema}
             <div>
-                <button onclick={() => addFormWithSchema(formShortcutSchema)}>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onclick={() => addFormWithSchema(formShortcutSchema)}
+                >
                     Create {formShortcut}
-                </button>
+                </Button>
             </div>
         {/if}
     </div>
@@ -155,7 +159,7 @@
 <FormDeleteModal
     form={deleting}
     bind:open={deleteOpen}
-    fallback={schemaSelect}
+    fallback={schemaSelect ?? undefined}
 />
 
 <style>
@@ -168,37 +172,7 @@
     div.new-form {
         display: flex;
         flex-direction: column;
+        gap: 0.5rem;
         padding: 0.5em;
-    }
-    button {
-        margin-top: 0.5em;
-    }
-    button {
-        color: rgba(255, 255, 255, 0.8);
-        padding: 0.2em;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background-color: rgba(255, 255, 255, 0.2);
-        border-radius: 2px;
-    }
-    button:disabled {
-        cursor: not-allowed;
-        opacity: 0.3;
-    }
-    button:not(:disabled):hover {
-        cursor: pointer;
-        background-color: rgba(255, 255, 255, 0.3);
-    }
-    select.schema-select {
-        /* Inherited sidebar text color breaks native <select> on Windows */
-        color: rgba(255, 255, 255, 0.8);
-        background-color: rgba(255, 255, 255, 0.2);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 2px;
-        padding: 0.2em;
-        color-scheme: dark;
-    }
-    select.schema-select option {
-        color: rgba(255, 255, 255, 0.9);
-        background-color: rgb(30, 30, 30);
     }
 </style>
