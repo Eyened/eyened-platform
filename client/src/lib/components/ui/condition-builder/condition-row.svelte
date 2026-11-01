@@ -330,10 +330,10 @@
 {/snippet}
 
 {#snippet iconCell(cell: "delete" | "add", label: string, onclick: () => void)}
-    <!-- ConditionBlock / ConditionBuilderAdd: gridcells "Delete condition" and "Add condition row". -->
+    <!-- ConditionBuilderAdd: gridcell "Add condition row". The Delete gridcell takes its name from its button. -->
     <span
         role="gridcell"
-        aria-label={cell === "add" ? "Add condition row" : "Delete condition"}
+        aria-label={cell === "add" ? "Add condition row" : undefined}
         class={cell === "add" ? "ms-0.5" : undefined}
     >
         <Tooltip.Root>

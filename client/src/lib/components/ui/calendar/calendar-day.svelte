@@ -15,7 +15,7 @@
     bind:ref
     data-slot="calendar-day"
     class={cn(
-        "relative flex size-10 cursor-pointer items-center justify-center text-body-compact-01 text-text-primary select-none hover:bg-layer-hover-01",
+        "relative flex size-10 cursor-pointer items-center justify-center text-body-compact-01 text-text-primary select-none not-data-disabled:hover:bg-layer-hover-01",
         "data-outside-month:text-text-helper",
         "data-today:text-heading-compact-01 data-today:not-data-selected:text-link-primary data-today:after:absolute data-today:after:bottom-1.75 data-today:after:left-1/2 data-today:after:size-1 data-today:after:-translate-x-1/2 data-today:after:bg-link-primary",
         "data-selected:bg-button-primary data-selected:text-text-on-color data-selected:after:hidden",

@@ -45,17 +45,11 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** `DoubleRangeSlider.svelte` 18 errors (11 implicit-any, 3 unbound `bind:this` `| undefined`, 3 undeclared `ondragmove`); 16 implicit-any params elsewhere; 16 missing null/unknown guards, some latent runtime `TypeError`s (e.g. `TopRowImages.svelte:57` `e.target.focus()`).
 - **Fix:** type properly (not `any`, which grows the ESLint baseline); treat the guard group as bug candidates.
 
-### Fix the prop bugs unmasked by the `ui/` prop helpers
-- **Status:** open
-- **Source:** Phase 3 review
-- **Problem:** `client/src/lib/components/Pagination.svelte:34` passes `isVisible`, not a prop of `Pagination.Item` (silently dropped); `client/src/lib/tasks/SubtasksTable.svelte:104` passes `colspan="6"` (string, typed `number`).
-- **Fix:** decide whether `isVisible` behaviour is needed (maybe covered by `Pagination.Link isActive`); `colspan={6}`.
-
 ### Remove small dead code
 - **Status:** open
 - **Source:** Phase 3 sweep
-- **Problem:** `client/src/lib/viewer-window/icons/AV-Nicking.svelte` declares an inert `stroke` prop and has 0 callers; `client/src/routes/+layout.ts` and `routes/users/login/+page.ts` have no-op `load()`s.
-- **Fix:** delete the component (or the prop); delete the `load()`s after checking SvelteKit route semantics.
+- **Problem:** `client/src/lib/viewer-window/icons/AV-Nicking.svelte` declares an inert `stroke` prop and has 0 callers.
+- **Fix:** delete the component (or the prop).
 
 ### Decide `prefer-const` for `.svelte` files
 - **Status:** open
@@ -101,23 +95,11 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** `resetForQueryModeChange` in `client/src/lib/browser/browserContext.svelte.ts` does not bump `searchSeq`, so an in-flight Studies response can be processed as Images. When the switch removes every condition no new search starts, so that response lands as Images and `loading` stays true until it does.
 - **Fix:** `this.searchSeq++` in the reset.
 
-### Skip the hover background on disabled calendar days
-- **Status:** open
-- **Source:** P4 browser search final review / demo 2026-10-13
-- **Problem:** `client/src/lib/components/ui/calendar/calendar-day.svelte` applies `hover:bg-layer-hover-01` to disabled days too.
-- **Fix:** apply the hover background only to enabled days.
-
 ### Round-trip a comma inside an "is one of" value
 - **Status:** open
 - **Source:** P4 browser search final review / demo 2026-10-13
 - **Problem:** the value parser in `client/src/lib/browser/conditionConfig.ts` splits "is one of" text on commas and `condition-row.svelte` joins list values with ", ", so `["a,b"]` comes back as `["a","b"]`. Inherited v1 encoding.
 - **Fix:** an escape or quoting rule for commas in the text, or a multi-value input instead of comma-separated text.
-
-### Announce Delete condition once
-- **Status:** open
-- **Source:** P4 browser search final review / demo 2026-10-13
-- **Problem:** in `client/src/lib/components/ui/condition-builder/condition-row.svelte` the gridcell and its button both carry `aria-label="Delete condition"`, so it is read twice. Matches the IBM ConditionBuilder source.
-- **Fix:** label only the button.
 
 ### Contain focus in the open filter overlay
 - **Status:** open

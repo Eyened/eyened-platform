@@ -63,7 +63,6 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Ratchet down `@typescript-eslint/no-explicit-any` | [frontend](frontend.md) | open |
 | Gate svelte-check in CI (Phase 4) | [frontend](frontend.md) | open |
 | Fix the remaining svelte-check error clusters | [frontend](frontend.md) | open |
-| Fix the prop bugs unmasked by the `ui/` prop helpers | [frontend](frontend.md) | open |
 | Remove small dead code | [frontend](frontend.md) | open |
 | Decide `prefer-const` for `.svelte` files | [frontend](frontend.md) | open |
 | Re-audit navigation if `kit.paths.base` is ever set | [frontend](frontend.md) | open, conditional |
@@ -71,9 +70,7 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Show an error when the login options fail to load | [frontend](frontend.md) | open |
 | Rank exact property matches first in the ConditionBuilder search | [frontend](frontend.md) | open |
 | Drop a stale search response after a Studies/Images switch | [frontend](frontend.md) | open |
-| Skip the hover background on disabled calendar days | [frontend](frontend.md) | open |
 | Round-trip a comma inside an "is one of" value | [frontend](frontend.md) | open |
-| Announce Delete condition once | [frontend](frontend.md) | open |
 | Contain focus in the open filter overlay | [frontend](frontend.md) | open |
 | Find the cause of the intermittent `npm run test` error | [frontend](frontend.md) | open |
 | Show portalled menus above the viewer overlay panel | [frontend](frontend.md) | open |
