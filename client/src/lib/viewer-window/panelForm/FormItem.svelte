@@ -77,7 +77,13 @@
     class="flex flex-col bg-layer-01 in-dialog:bg-layer-02 in-study:bg-layer-02 in-dialog:in-study:bg-layer-03"
 >
     <div class="flex items-center">
-        <Button variant="ghost" size="sm" onclick={() => openInNewWindow(form)}>
+        <!-- Shrinks and wraps a long form name so Copy and Delete stay in the card. -->
+        <Button
+            variant="ghost"
+            size="sm"
+            class="min-w-0 shrink"
+            onclick={() => openInNewWindow(form)}
+        >
             Open {formSchema.name}
             <Launch aria-hidden="true" />
         </Button>
