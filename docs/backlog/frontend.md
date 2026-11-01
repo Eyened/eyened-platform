@@ -70,12 +70,6 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** the value parser in `client/src/lib/browser/conditionConfig.ts` splits "is one of" text on commas and `condition-row.svelte` joins list values with ", ", so `["a,b"]` comes back as `["a","b"]`. Inherited v1 encoding.
 - **Fix:** an escape or quoting rule for commas in the text, or a multi-value input instead of comma-separated text.
 
-### Show portalled menus above the viewer overlay panel
-- **Status:** open
-- **Source:** client Carbon PR 4 demo, 2026-10-13
-- **Problem:** in the viewer overlay, condition-builder popovers (and other portalled menus, such as the picker's menus noted in PR 3) render behind `div#panel` (`position: fixed; z-index: 1000` in `client/src/lib/viewer-window/TopRowImages.svelte:121-123`), because portal content uses `z-50` (`client/src/lib/components/ui/popover/popover-content.svelte:24`). Pointer clicks can't reach them; the keyboard still works. It predates the filter-column change.
-- **Fix:** one shared layer order for overlays and portalled menus.
-
 ### Add a scroll-to-top button to the browser results
 - **Status:** open
 - **Source:** client Carbon PR 4 slide-over filter change, 2026-10-26

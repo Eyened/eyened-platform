@@ -108,6 +108,8 @@ Keeps track of the main panels and the top row of images.
         grid-template-rows: 20% 1px 1fr;
         overflow: auto;
         flex: 1;
+        /* Keeps the viewer's z-indexes below menus portalled to <body>. */
+        isolation: isolate;
     }
     div#top {
         display: flex;
