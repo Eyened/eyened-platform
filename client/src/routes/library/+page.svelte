@@ -2,6 +2,7 @@
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
     import { page } from "$app/state";
+    import Main from "$lib/components/Main.svelte";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import * as Table from "$lib/components/ui/table/index.js";
     import * as Tabs from "$lib/components/ui/tabs/index.js";
@@ -42,57 +43,63 @@
     }
 </script>
 
-<h1 id={headingId} tabindex="-1" class="mb-6 text-heading-04 text-text-primary">
-    Library
-</h1>
+<Main>
+    <h1
+        id={headingId}
+        tabindex="-1"
+        class="mt-8 mb-6 text-heading-04 text-text-primary"
+    >
+        Library
+    </h1>
 
-<Tabs.Root
-    bind:value={
-        () => tab,
-        (v) => {
-            tab = v;
-            syncUrl();
+    <Tabs.Root
+        bind:value={
+            () => tab,
+            (v) => {
+                tab = v;
+                syncUrl();
+            }
         }
-    }
->
-    <Tabs.List aria-labelledby={headingId}>
-        <Tabs.Trigger value="tags">Tags</Tabs.Trigger>
-        <Tabs.Trigger value="features">Features</Tabs.Trigger>
-    </Tabs.List>
-    <Tabs.Content value="tags" class="pt-6">
-        {#await tagsLoading}
-            <Table.Skeleton
-                headers={["Name", "Description", "Type", "Owner"]}
-                aria-label="Tags"
-            />
-        {:then}
-            <TagsTable
-                {type}
-                onselecttype={(v) => {
-                    type = v;
-                    syncUrl();
-                }}
-            />
-        {:catch error}
-            <InlineNotification
-                title="Tags could not be loaded"
-                subtitle={errorText(error)}
-            />
-        {/await}
-    </Tabs.Content>
-    <Tabs.Content value="features" class="pt-6">
-        {#await featuresLoading}
-            <Table.Skeleton
-                headers={["Name", "Subfeatures", "Segmentations"]}
-                aria-label="Features"
-            />
-        {:then}
-            <FeaturesTable />
-        {:catch error}
-            <InlineNotification
-                title="Features could not be loaded"
-                subtitle={errorText(error)}
-            />
-        {/await}
-    </Tabs.Content>
-</Tabs.Root>
+    >
+        <Tabs.List aria-labelledby={headingId}>
+            <Tabs.Trigger value="tags">Tags</Tabs.Trigger>
+            <Tabs.Trigger value="features">Features</Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content value="tags" class="pt-6">
+            {#await tagsLoading}
+                <Table.Skeleton
+                    headers={["Name", "Description", "Type", "Owner"]}
+                    aria-label="Tags"
+                />
+            {:then}
+                <TagsTable
+                    {type}
+                    onselecttype={(v) => {
+                        type = v;
+                        syncUrl();
+                    }}
+                />
+            {:catch error}
+                <InlineNotification
+                    title="Tags could not be loaded"
+                    subtitle={errorText(error)}
+                />
+            {/await}
+        </Tabs.Content>
+        <Tabs.Content value="features" class="pt-6">
+            {#await featuresLoading}
+                <Table.Skeleton
+                    headers={["Name", "Subfeatures", "Segmentations"]}
+                    aria-label="Features"
+                />
+            {:then}
+                <FeaturesTable />
+            {:catch error}
+                <InlineNotification
+                    title="Features could not be loaded"
+                    subtitle={errorText(error)}
+                />
+            {/await}
+        </Tabs.Content>
+    </Tabs.Root>
+</Main>
