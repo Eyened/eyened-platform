@@ -5,7 +5,7 @@
     import { Combobox } from "bits-ui";
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
     import Close from "carbon-icons-svelte/lib/Close.svelte";
-    import { tick } from "svelte";
+    import { flushSync, tick } from "svelte";
 
     // Carbon ComboBox, md (40 px); values from @carbon/styles 1.117.0 list-box and combo-box, strings from
     // @carbon/react 1.118.0. The caller filters `items` by the typed `value`. A pick is an action, not a
@@ -57,6 +57,7 @@
                 oninput={(e) => {
                     value = e.currentTarget.value;
                     open = true;
+                    flushSync(); // render the filtered list before bits-ui highlights its first option
                 }}
                 class={cn(
                     "h-10 w-full border-0 border-b border-border-strong-01 bg-field-01 ps-4 text-body-compact-01 text-text-primary placeholder:text-text-placeholder hover:bg-field-hover-01 in-dialog:border-border-strong-02 in-dialog:bg-field-02 in-dialog:hover:bg-field-hover-02",

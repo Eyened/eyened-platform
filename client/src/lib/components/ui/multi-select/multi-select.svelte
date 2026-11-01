@@ -5,7 +5,7 @@
     import { cn } from "$lib/utils.js";
     import { Combobox, Select as SelectPrimitive } from "bits-ui";
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
-    import { tick } from "svelte";
+    import { flushSync, tick } from "svelte";
 
     // Carbon FilterableMultiSelect, md (40 px); field values as ui/combo-box, strings from Carbon React
     // MultiSelect. A pick toggles a stored value: the menu stays open and the typed filter stays.
@@ -97,6 +97,7 @@
                 oninput={(e) => {
                     filter = e.currentTarget.value;
                     open = true;
+                    flushSync(); // render the filtered list before bits-ui highlights its first option
                 }}
                 {onkeydown}
                 class={cn(

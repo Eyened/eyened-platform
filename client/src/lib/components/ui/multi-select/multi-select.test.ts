@@ -28,4 +28,23 @@ describe("MultiSelect", () => {
             screen.queryByRole("option", { name: "Haemorrhage" }),
         ).toBeNull();
     });
+
+    it("highlights and toggles with the keyboard after typing a filter", async () => {
+        render(MultiSelect, {
+            props: { label: "Subfeatures", options, values: [] },
+        });
+        const input = screen.getByRole("combobox", { name: "Subfeatures" });
+
+        await fireEvent.input(input, { target: { value: "e" } });
+        await screen.findByRole("option", { name: "Haemorrhage" });
+        await fireEvent.input(input, { target: { value: "er" } });
+        await fireEvent.keyDown(input, { key: "ArrowDown" });
+        await fireEvent.keyDown(input, { key: "Enter" });
+
+        await waitFor(() =>
+            expect(
+                screen.getByRole("option", { name: "Druse cluster" }),
+            ).toHaveAttribute("aria-selected", "true"),
+        );
+    });
 });

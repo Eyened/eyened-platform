@@ -32,8 +32,9 @@
         )}
         {...restProps}
     >
-        <SelectPrimitive.Viewport>
+        <!-- Not SelectPrimitive.Viewport: its fully-visible check fails at unpadded edges, so typing lost the highlight. -->
+        <div class="relative flex-1 overflow-auto">
             {@render children?.()}
-        </SelectPrimitive.Viewport>
+        </div>
     </SelectPrimitive.Content>
 </SelectPrimitive.Portal>
