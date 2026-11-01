@@ -27,6 +27,7 @@
     import { Tag } from "$lib/components/ui/tag/index.js";
     import { PasswordInput } from "$lib/components/ui/text-input/index.js";
     import { cn } from "$lib/utils.js";
+    import { untrack } from "svelte";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
     import Subtract from "carbon-icons-svelte/lib/Subtract.svelte";
     import type {
@@ -45,7 +46,7 @@
     const membershipsId = "memberships-heading";
     const hintId = "set-password-hint";
 
-    const userId = Number(page.params.id);
+    const userId = $derived(Number(page.params.id));
 
     let data = $state<{
         user: AdminUserResponse;
@@ -66,20 +67,23 @@
         return ROLES.find((r) => r.value === role)?.label ?? role;
     }
 
-    async function load() {
+    // A reply for an id the page has since left is dropped.
+    async function load(id = userId) {
         try {
             const [users, memberships, projects] = await Promise.all([
                 listUsers(),
-                listMemberships(userId),
+                listMemberships(id),
                 listProjects(),
             ]);
-            const user = users.find((u) => u.id === userId);
+            if (id !== userId) return;
+            const user = users.find((u) => u.id === id);
             if (!user) {
                 notFound = true;
                 return;
             }
             data = { user, memberships, projects };
         } catch (e) {
+            if (id !== userId) return;
             const message = (e as Error).message;
             if (e instanceof ApiError && e.status === 404) notFound = true;
             else if (data)
@@ -90,7 +94,18 @@
             else loadError = message;
         }
     }
-    load();
+
+    // SvelteKit reuses this page on a param-only navigation, so a new id starts it over.
+    $effect(() => {
+        const id = userId;
+        untrack(() => {
+            data = null;
+            notFound = false;
+            loadError = "";
+            notice = null;
+            load(id);
+        });
+    });
 
     // An action without a modal: a failure shows above the memberships.
     async function run(title: string, action: () => Promise<unknown>) {

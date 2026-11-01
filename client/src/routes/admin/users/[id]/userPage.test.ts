@@ -3,11 +3,15 @@ import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { json, stubFetch } from "../../../../../vitest-fetch";
 
 vi.mock("$app/paths", () => ({ resolve: (route: string) => route }));
-vi.mock("$app/state", () => ({ page: { params: { id: "3" } } }));
+vi.mock("$app/state", () => import("./pageState.svelte"));
 
+const { page } = await import("./pageState.svelte");
 const { default: UserPage } = await import("./+page.svelte");
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+    vi.unstubAllGlobals();
+    page.params.id = "3";
+});
 
 const alice = {
     id: 3,
@@ -39,6 +43,24 @@ function stubUser(
 }
 
 describe("user page", () => {
+    it("loads the other user when the id changes", async () => {
+        const bob = { ...alice, id: 4, username: "bob" };
+        stubFetch({
+            "GET /api/admin/users": () => json([alice, bob]),
+            "GET /api/admin/users/3/memberships": () => json([alpha]),
+            "GET /api/admin/users/4/memberships": () => json([]),
+            "GET /api/admin/projects": () => json(projects),
+        });
+        render(UserPage);
+        await screen.findByRole("heading", { level: 1, name: "alice" });
+
+        page.params.id = "4";
+
+        expect(
+            await screen.findByRole("heading", { level: 1, name: "bob" }),
+        ).toBeInTheDocument();
+    });
+
     it("adds the user only to projects they are not in", async () => {
         const grant = vi.fn(() =>
             json({
