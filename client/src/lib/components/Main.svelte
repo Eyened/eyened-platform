@@ -5,7 +5,6 @@
     import { getContext, type Snippet } from "svelte";
     import type { GlobalContext } from "../data/globalContext.svelte";
     import TopMenu from "./TopMenu.svelte";
-    import UserMenu from "./UserMenu.svelte";
     import * as Tooltip from "./ui/tooltip";
 
     let { children }: { children: Snippet } = $props();
@@ -35,6 +34,4 @@
             </main>
         {/if}
     </div>
-
-    <UserMenu />
 </Tooltip.Provider>

@@ -1,6 +1,7 @@
 import { resolve } from "$app/paths";
 import type { ResolvedPathname } from "$app/types";
 import { UserManager } from "$lib/usermanager.svelte";
+import { authClient } from "../../auth";
 
 import type {
     FormAnnotationGET,
@@ -19,7 +20,7 @@ export type ComponentDef = {
 export class GlobalContext {
     public userManager: UserManager;
     public dialogue: ComponentDef | string | null = $state(null);
-    public showUserMenu: boolean = $state(false);
+    public passwordEnabled: boolean = $state(false);
 
     public formShortcut: string | null = $state("WARMGS");
     public config: any = $state({
@@ -43,6 +44,9 @@ export class GlobalContext {
                     fetchTags(),
                     fetchFormSchemas(),
                     fetchFeatures({ with_counts: true }),
+                    authClient.options().then((options) => {
+                        this.passwordEnabled = options.password_enabled;
+                    }),
                 ]);
             } catch (error) {
                 // Log error but don't throw - let pages handle errors individually

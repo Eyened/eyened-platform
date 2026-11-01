@@ -6,6 +6,7 @@
     import Menu from "carbon-icons-svelte/lib/Menu.svelte";
     import { getContext } from "svelte";
     import type { GlobalContext } from "../data/globalContext.svelte";
+    import ProfilePopover from "./ProfilePopover.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
@@ -128,14 +129,7 @@
             {@render links(navItem)}
         </ul>
     </nav>
-    <button
-        type="button"
-        aria-haspopup="dialog"
-        class="ml-auto h-12 min-w-0 truncate px-4 text-body-compact-01 text-text-primary hover:bg-background-hover active:bg-background-active"
-        onclick={() => (globalContext.showUserMenu = true)}
-    >
-        {globalContext.userManager.user?.username}
-    </button>
+    <ProfilePopover />
 </header>
 
 {#if sideNavOpen}
