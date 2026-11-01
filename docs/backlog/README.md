@@ -67,7 +67,6 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Re-audit navigation if `kit.paths.base` is ever set | [frontend](frontend.md) | open, conditional |
 | Rank exact property matches first in the ConditionBuilder search | [frontend](frontend.md) | open |
 | Round-trip a comma inside an "is one of" value | [frontend](frontend.md) | open |
-| Contain focus in the open filter overlay | [frontend](frontend.md) | open |
 | Show portalled menus above the viewer overlay panel | [frontend](frontend.md) | open |
 | Send per-task `can_edit_status` / `can_edit_details` / `can_delete` on `TaskGET` | [rbac-authz](rbac-authz.md) | open |
 | Validate task names on the server | [data-integrity](data-integrity.md) | open |

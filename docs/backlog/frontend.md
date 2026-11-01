@@ -76,12 +76,6 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** the value parser in `client/src/lib/browser/conditionConfig.ts` splits "is one of" text on commas and `condition-row.svelte` joins list values with ", ", so `["a,b"]` comes back as `["a","b"]`. Inherited v1 encoding.
 - **Fix:** an escape or quoting rule for commas in the text, or a multi-value input instead of comma-separated text.
 
-### Contain focus in the open filter overlay
-- **Status:** open
-- **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) Task 3 review, 2026-10-13; at every width since the slide-over change, 2026-10-26
-- **Problem:** the open filter column in `client/src/lib/browser/Browser.svelte` is a 20rem overlay stacked over the results at every width. Tab from its last button moves into the results it covers, so the focused element is hidden (WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)). Clicking outside does not close it.
-- **Fix:** trap focus in the overlay while open, or move it into a Carbon side-panel pattern; close on outside click.
-
 ### Show portalled menus above the viewer overlay panel
 - **Status:** open
 - **Source:** client Carbon PR 4 demo, 2026-10-13

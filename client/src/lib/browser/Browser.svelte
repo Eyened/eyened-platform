@@ -69,6 +69,9 @@
         ),
     );
     let toggle = $state<HTMLButtonElement | null>(null);
+    let filtersForm = $state<HTMLFormElement | null>(null);
+    const TABBABLE =
+        'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
     const filterCount = $derived(browserContext.activeConditions.length);
     let panelOpen = $state(false);
 
@@ -102,12 +105,30 @@
     }
 
     function onFiltersKeydown(e: KeyboardEvent) {
+        if (e.key === "Tab") return wrapTab(e);
         if (e.key !== "Escape") return;
         // A Select keeps focus on its trigger while open; let Escape close the menu first.
         if ((e.target as Element).closest('[aria-expanded="true"]')) return;
         // The picker's modal closes on Escape; its document listener skips a stopped event.
         e.stopPropagation();
         closeOverlay();
+    }
+
+    // The open column covers the results, so Tab wraps inside it.
+    function wrapTab(e: KeyboardEvent) {
+        const items = [
+            ...(filtersForm?.querySelectorAll<HTMLElement>(TABBABLE) ?? []),
+        ].filter((el) => el.tabIndex >= 0 && !el.matches(":disabled"));
+        if (items.length === 0) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        } else if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        }
     }
 
     const countText = $derived.by(() => {
@@ -251,6 +272,7 @@
         <!-- Escape bubbles up from the fields inside this form. -->
         <form
             id="browser-filters"
+            bind:this={filtersForm}
             role="search"
             novalidate
             hidden={!filtersOpen}
@@ -269,7 +291,10 @@
                     subtitle={n.subtitle}
                 />
             {/if}
-            <div class="flex">
+            <!-- Pinned so Search stays visible on a short screen; in a dialog, above the body's 80 px fade. -->
+            <div
+                class="sticky bottom-0 flex bg-background in-dialog:bottom-20 in-dialog:bg-layer-01"
+            >
                 <!-- In a dialog the dialog's own action is the one primary. -->
                 <Button
                     type="submit"
@@ -303,6 +328,13 @@
             <div
                 aria-hidden="true"
                 class="fixed inset-x-0 top-12 bottom-0 z-20 bg-overlay"
+                onclick={closeOverlay}
+            ></div>
+        {:else if filtersOpen}
+            <!-- In the picker a scrim over the results closes the column on click. -->
+            <div
+                aria-hidden="true"
+                class="absolute inset-0 z-20 bg-overlay"
                 onclick={closeOverlay}
             ></div>
         {/if}

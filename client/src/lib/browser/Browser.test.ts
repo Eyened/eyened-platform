@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from "@testing-library/svelte";
 import type {
     ImageGET,
     SearchCondition,
@@ -88,6 +94,25 @@ describe("Browser", () => {
             ),
         );
         expect(api.searchStudies).not.toHaveBeenCalled();
+    });
+
+    it("wraps Tab inside the open filter column", async () => {
+        render(Browser, { props: { context: new BrowserContext() } });
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getByLabelText(/patient/i, { selector: "input" }),
+            ),
+        );
+        const form = screen.getByRole("search");
+        const clear = within(form).getByRole("button", {
+            name: "Clear filters",
+        });
+        clear.focus();
+
+        await fireEvent.keyDown(clear, { key: "Tab" });
+
+        expect(form.contains(document.activeElement)).toBe(true);
+        expect(document.activeElement).not.toBe(clear);
     });
 
     it("searches the URL's conditions, collapses the filters and re-searches on submit", async () => {
