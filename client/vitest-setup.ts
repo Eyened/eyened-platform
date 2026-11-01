@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { afterEach } from "vitest";
+import { afterAll, afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/svelte";
 
 // jsdom has no WebGL; texture.ts reads GLenum constants at module load.
@@ -45,6 +45,12 @@ if (typeof ResizeObserver === "undefined") {
 // Unmount any component rendered by a test so DOM state never leaks between tests.
 afterEach(() => {
     cleanup();
+});
+
+// bits-ui restores the body style 24 ms after the last modal unmounts; wait for it before jsdom goes.
+afterAll(async () => {
+    vi.useRealTimers();
+    await new Promise((resolve) => setTimeout(resolve, 50));
 });
 
 // openapi-fetch builds `new Request("/api/...")`; Node's Request rejects a

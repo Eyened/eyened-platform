@@ -88,12 +88,6 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** the open filter column in `client/src/lib/browser/Browser.svelte` is a 20rem overlay stacked over the results at every width. Tab from its last button moves into the results it covers, so the focused element is hidden (WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)). Clicking outside does not close it.
 - **Fix:** trap focus in the overlay while open, or move it into a Carbon side-panel pattern; close on outside click.
 
-### Find the cause of the intermittent `npm run test` error
-- **Status:** open
-- **Source:** client Carbon PR 4 Task 3 review, 2026-10-13
-- **Problem:** `npm run test` (client) intermittently reports "Errors 1 error" (or 2) with all 401 tests passing; it exited 0 in some runs and 1 in others. It predates the filter-column change. Captured: `ReferenceError: document is not defined` in `bits-ui/dist/internal/body-scroll-lock.svelte.js:34` (`resetBodyStyle`, from a `setTimeout` cleanup), attributed to `ui/modal/modal.test.ts` and `tasks/SubtasksTable.test.ts`: the timer fires after the jsdom environment is torn down.
-- **Fix:** await or flush the modal's scroll-lock cleanup (or unmount) before each of those tests ends; confirm with repeated runs.
-
 ### Show portalled menus above the viewer overlay panel
 - **Status:** open
 - **Source:** client Carbon PR 4 demo, 2026-10-13
