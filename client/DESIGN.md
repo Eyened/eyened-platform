@@ -239,6 +239,7 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
 | Task page toolbar                            | One row, as tall as the table rows (Data table, [Toolbar height](https://carbondesignsystem.com/building-blocks/core/components/data-table/guidelines/#toolbar-height)) | Below `md`, Claim unassigned on page wraps onto a second row                                                                                                                            | The filter buttons and the claim label do not fit in 320 px (Reflow)                                                                                                                 |
 | Profile popover keyboard                     | ↑/↓ between items; Esc closes (Disclosures, Keyboard)                                                                                                                   | Tab between items; Esc closes                                                                                                                                                           | One or two buttons; Carbon's Popover allows Tab order                                                                                                                                |
 | External data table headers                  | Column headers (Data table, Anatomy)                                                                                                                                    | None; the source tag is the table's caption                                                                                                                                             | The source sends no header row                                                                                                                                                       |
+| Task status (viewer task panel)              | Radio group for one choice from mutually exclusive options (Radio button, When not to use)                                                                              | Three toggle buttons, `aria-pressed`; the current state is primary, the others ghost                                                                                                    | Old viewer only; the S2 viewer's grading and task panel replaces it                                                                                                                  |
 
 ## Keyboard & Focus
 
@@ -259,6 +260,9 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
 ## Do's and Don'ts
 
 - Token classes only; no hex, `rgb()` or named colours in components, `<style>` or `style=`.
+    - Exempt until the S2 viewer replaces it: the old viewer (`src/lib/viewer-window/`, `src/lib/viewer/`,
+      `src/lib/forms/`, `src/lib/tasks/TaskPanel.svelte`). Only visible defects are fixed there. The image
+      area is `#000000`; image drawings (segmentations, points, grids) keep their own colours.
 - No arbitrary values (`p-[13px]`), no `dark:`.
 - Carbon spacing steps only (see Layout).
 - Status = icon + label; colour on the icon.
