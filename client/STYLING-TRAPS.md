@@ -21,7 +21,7 @@ Facts about Tailwind 4, bits-ui and jsdom that cost time once. Carbon rules them
 | Tests query by role and name; a button that becomes a tab, or an enum shown as a label, breaks them                                                                 | Update the selector in the same commit, same intent                                                                                                                                                                                                                               |
 | `svelte-sonner` removes every toast after 4 s                                                                                                                       | Error toasts pass `{ duration: Number.POSITIVE_INFINITY }`                                                                                                                                                                                                                        |
 | A theme change re-sorts classes in files nobody touched: `prettier-plugin-tailwindcss` puts classes it does not know first                                          | Run `npx prettier --write .` and commit the re-sort on its own                                                                                                                                                                                                                    |
-| The demo container runs as root and writes `.svelte-kit` into the worktree; `npm run check` then fails with EACCES                                                  | `chown` it back through `docker exec` (step 7) — never `rm` it                                                                                                                                                                                                                    |
+| The demo container runs as root and writes `.svelte-kit` into the worktree; `npm run check` then fails with EACCES                                                  | `chown` it back through `docker exec` — never `rm` it                                                                                                                                                                                                                             |
 | `shadcn-svelte add` imports `tv` from `tailwind-variants` and bumps the package                                                                                     | Copy the files from `https://shadcn-svelte.com/registry/<name>.json` by hand; import `tv` from `$lib/utils`                                                                                                                                                                       |
 | A Carbon type class without `text-` (`body-compact-01`) emits no CSS, and the token check misses it                                                                 | Always write `text-<type token>`                                                                                                                                                                                                                                                  |
 | The unlayered `:focus-visible` rule in `app.css` beats `outline-offset-*` utilities                                                                                 | A ring outside the element needs its own unlayered rule in `app.css` (see the checkbox)                                                                                                                                                                                           |
@@ -76,12 +76,7 @@ git grep -nE -e '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|font-family|var\(--(backgro
 
 # dark: variants, and arbitrary values (data-[state=open]: and has-[>svg]: pass)
 git grep -nE -e 'dark:' -e '-\[[^]]*\]([^:]|$)' -- $FILES
-```
 
 # Named CSS colours in <style> blocks and style= attributes
-
-git grep -nE -e '(color|background|border|outline|fill|stroke|box-shadow)[a-z-]_[[:space:]]_:[^;]\*\b(white|black|gray|grey|silver|red|green|blue|yellow|orange|purple|darkolivegreen|lightgray|lightgrey|darkgray|darkgrey|whitesmoke|gainsboro)\b' -- $FILES
-
-```
-
+git grep -nE -e '(color|background|border|outline|fill|stroke|box-shadow)[a-z-]*[[:space:]]*:[^;]*\b(white|black|gray|grey|silver|red|green|blue|yellow|orange|purple|darkolivegreen|lightgray|lightgrey|darkgray|darkgrey|whitesmoke|gainsboro)\b' -- $FILES
 ```
