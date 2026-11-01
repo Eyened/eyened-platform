@@ -8,7 +8,7 @@
     let { data }: { data: DataSource } = $props();
 
     function open(tag: string, rows: DataRow[]) {
-        openNewWindow(DataTable, { data: rows }, tag);
+        openNewWindow(DataTable, { data: rows, tag }, tag);
     }
 </script>
 

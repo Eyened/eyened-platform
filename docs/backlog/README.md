@@ -56,7 +56,6 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Add a mypy per-module gate over the admin surface | [ci-and-tooling](ci-and-tooling.md) | open |
 | Turn unknown test warnings into errors | [ci-and-tooling](ci-and-tooling.md) | open |
 | Repair or delete `eyened_orm.form_validation` | [ci-and-tooling](ci-and-tooling.md) | open |
-| Sanitize the `{@html}` cells in `DataTable.svelte` | [frontend](frontend.md) | open |
 | Fix Svelte 5 reactivity traps | [frontend](frontend.md) | open |
 | Key the grandfathered `{#each}` blocks | [frontend](frontend.md) | open |
 | Hide the editing tools a project role does not allow | [frontend](frontend.md) | open |

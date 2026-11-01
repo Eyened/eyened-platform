@@ -1,88 +1,38 @@
 <script lang="ts">
     import type { DataRow } from "$lib/browser/dataSources";
-    interface Props {
-        data: DataRow[];
-    }
+    import * as Empty from "$lib/components/ui/empty/index.js";
+    import * as Table from "$lib/components/ui/table/index.js";
 
-    let { data }: Props = $props();
+    // A data source's rows have no header row, so the table has no column headers.
+    let { data, tag }: { data: DataRow[]; tag: string } = $props();
 </script>
 
-<div class="form-container">
-    <table>
-        <tbody>
-            {#each data as row}
-                <tr>
-                    {#each row as cell}
-                        <td>
-                            <!-- eslint-disable-next-line svelte/no-at-html-tags -- renders an admin-configured external data source fetched over the network (dataSources.ts loadDataSource); NOT end-user input, but NOT sanitized either. Pre-existing XSS surface, knowingly accepted and tracked in the backlog -->
-                            {@html cell}
-                        </td>
-                    {/each}
-                </tr>
-            {/each}
-        </tbody>
-    </table>
+<div class="p-4">
+    {#if data.length > 0}
+        <Table.Root size="md">
+            <Table.Caption
+                class="mt-0 caption-top bg-layer-01 px-4 pt-4 pb-6 text-left text-heading-03 text-text-primary"
+            >
+                {tag}
+            </Table.Caption>
+            <Table.Body>
+                {#each data as row, r (r)}
+                    <Table.Row>
+                        {#each row as cell, c (c)}
+                            <Table.Cell>{cell ?? ""}</Table.Cell>
+                        {/each}
+                    </Table.Row>
+                {/each}
+            </Table.Body>
+        </Table.Root>
+    {:else}
+        <Empty.Root>
+            <Empty.Header>
+                <Empty.Title>No data in {tag}</Empty.Title>
+                <Empty.Description>
+                    The data source returned no rows.
+                </Empty.Description>
+            </Empty.Header>
+        </Empty.Root>
+    {/if}
 </div>
-
-<style>
-    div.form-container {
-        overflow: auto;
-    }
-    table {
-        border-collapse: collapse;
-        margin: 0 auto;
-        font-size: small;
-    }
-
-    .light {
-        table {
-            color: rgb(2 9 65);
-        }
-        tr {
-            &:nth-child(even) {
-                background-color: rgb(248 250 252);
-            }
-            &:nth-child(odd) {
-                background-color: rgb(241 245 249);
-            }
-            &:hover {
-                background-color: rgb(226 232 240);
-            }
-            &:last-of-type {
-                border-bottom: 2px solid rgb(2 9 65);
-            }
-        }
-    }
-
-    .dark {
-        table {
-            color: rgb(226 232 240);
-        }
-        tr {
-            &:nth-child(even) {
-                background-color: rgb(30 41 59);
-            }
-            &:nth-child(odd) {
-                background-color: rgb(15 23 42);
-            }
-            &:hover {
-                background-color: rgb(51 65 85);
-            }
-            &:last-of-type {
-                border-bottom: 2px solid rgb(226 232 240);
-            }
-        }
-    }
-
-    td {
-        padding-left: 1.5em;
-        padding-right: 1.5em;
-        &:nth-child(0) {
-            text-align: center;
-        }
-        &:nth-child(3),
-        &:nth-child(4) {
-            text-align: end;
-        }
-    }
-</style>

@@ -2,12 +2,6 @@
 
 ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint . --prune-suppressions` and commit `eslint-suppressions.json`; never hand-merge that file. Run svelte-check in the dev container (`docker exec -w /app/client <client container> npx svelte-check --tsconfig ./tsconfig.json --output machine`); as your own user `.svelte-kit` EACCES errors inflate the counts.
 
-### Sanitize the `{@html}` cells in `DataTable.svelte`
-- **Status:** open (security)
-- **Source:** Frontend CI Phase 3, 2026-07-16
-- **Problem:** `client/src/lib/utils/DataTable.svelte:18` renders `{@html cell}` from JSON fetched by `dataSources.ts` `loadDataSource()`, possibly from an absolute admin-configured URL. A malicious/compromised source gets script execution. The inline eslint-disable means lint will never flag it again.
-- **Fix:** sanitize (e.g. DOMPurify), render as text, or restrict data sources to a trusted origin.
-
 ### Fix Svelte 5 reactivity traps
 - **Status:** open
 - **Source:** Phase 3 ESLint gate + Phase 4 svelte-check triage
