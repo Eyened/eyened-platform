@@ -202,6 +202,27 @@ describe("task subtasks page", () => {
         expect(fetchTask).toHaveBeenCalledTimes(1);
     });
 
+    it("clears both filters from the toolbar", async () => {
+        await renderPage(
+            "http://localhost/tasks/9?status=NotStarted&unassigned=1",
+        );
+
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Clear filters" }),
+        );
+
+        await waitFor(() =>
+            expect(fetchSubTasks).toHaveBeenLastCalledWith(
+                expect.objectContaining({
+                    subtask_status: undefined,
+                    unassigned: undefined,
+                    page: 0,
+                }),
+            ),
+        );
+        expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+    });
+
     it("shows a load error with the server's message", async () => {
         vi.mocked(fetchTask).mockRejectedValue(
             new ApiError(403, "Not allowed to view this task"),

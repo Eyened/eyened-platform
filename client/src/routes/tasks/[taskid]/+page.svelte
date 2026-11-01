@@ -8,7 +8,6 @@
     import { Button } from "$lib/components/ui/button/index.js";
     import { Dropdown } from "$lib/components/ui/dropdown/index.js";
     import * as Empty from "$lib/components/ui/empty/index.js";
-    import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import * as Popover from "$lib/components/ui/popover/index.js";
     import { StatusIndicator } from "$lib/components/ui/status-indicator/index.js";
@@ -62,6 +61,10 @@
     }
 
     const filtered = $derived(status !== "all" || assignee !== "all");
+    const filterCount = $derived(
+        (status !== "all" ? 1 : 0) + (assignee !== "all" ? 1 : 0),
+    );
+    let filterButton = $state<HTMLButtonElement | null>(null);
 
     const task = $derived(
         data.taskid === null ? undefined : tasks.get(data.taskid),
@@ -236,6 +239,14 @@
         reload();
     }
 
+    function clearFilters() {
+        status = "all";
+        assignee = "all";
+        pageIndex = 0;
+        reload();
+        filterButton?.focus();
+    }
+
     function changePage(p: { page: number; pageSize: number }) {
         pageIndex = p.page - 1;
         limit = p.pageSize;
@@ -378,17 +389,22 @@
                 <div class="hidden h-full items-center gap-4 ps-4 md:flex">
                     {@render filters("inline")}
                 </div>
-                <!-- Below md the filters move behind a toolbar filter button (Carbon TableToolbarMenu). -->
+                <!-- Below md the filters move behind a Filters button; closed, it shows the count and Clear filters. -->
                 <Popover.Root>
                     <Popover.Trigger>
                         {#snippet child({ props })}
-                            <IconButton
+                            <Button
                                 {...props}
-                                label="Filter"
-                                class="size-12 md:hidden"
+                                bind:ref={filterButton}
+                                variant="ghost"
+                                size="lg"
+                                class="md:hidden"
                             >
-                                <Filter />
-                            </IconButton>
+                                {filterCount === 0
+                                    ? "Filters"
+                                    : `Filters (${filterCount})`}
+                                <Filter aria-hidden="true" />
+                            </Button>
                         {/snippet}
                     </Popover.Trigger>
                     <Popover.Content
@@ -399,6 +415,16 @@
                         {@render filters("default")}
                     </Popover.Content>
                 </Popover.Root>
+                {#if filterCount > 0}
+                    <Button
+                        variant="ghost"
+                        size="lg"
+                        class="md:hidden"
+                        onclick={clearFilters}
+                    >
+                        Clear filters
+                    </Button>
+                {/if}
                 <Button
                     size="lg"
                     class="ms-auto"
