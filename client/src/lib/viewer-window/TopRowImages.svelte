@@ -93,8 +93,8 @@
     div.empty {
         padding: 2em;
         flex: 1;
-        background-color: white;
-        color: black;
+        background-color: #000000;
+        color: var(--color-text-primary);
         z-index: 2;
     }
     div.itemLoading {
@@ -125,14 +125,13 @@
         top: 0;
         bottom: 0;
         right: 0;
-        background-color: rgba(255, 255, 255, 0.9);
+        background-color: var(--color-background);
         backdrop-filter: blur(10px);
         display: flex;
         flex-direction: column;
         /* The body scrolls, not the whole panel, so the header stays put */
         overflow: hidden;
-        /* Force light theme for all child components */
-        color: #1a1a1a !important;
+        color: var(--color-text-primary);
     }
     div#panel.hidden {
         display: none !important;

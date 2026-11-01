@@ -135,7 +135,7 @@
 
     p.intro {
         margin: 0 0 1.5em;
-        color: #555;
+        color: var(--color-text-secondary);
         font-size: 0.95rem;
         line-height: 1.5;
     }
@@ -149,7 +149,7 @@
         font-weight: 600;
         margin: 0 0 0.5em;
         padding-bottom: 0.25em;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--color-border-subtle-00);
     }
 
     dl {
@@ -179,8 +179,7 @@
         padding: 0.15em 0.5em;
         font-family: inherit;
         font-size: 0.85rem;
-        background: #f3f4f6;
-        border: 1px solid #d1d5db;
+        background: var(--color-layer-01);
         border-radius: 4px;
         white-space: nowrap;
     }

@@ -151,7 +151,7 @@ Keeps track of the main panels and the top row of images.
     }
 
     div.no-viewer {
-        background-color: gray;
+        background-color: #000000;
         flex: 1;
         flex-direction: column;
         align-items: center;

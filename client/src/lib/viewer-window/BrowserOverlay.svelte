@@ -174,7 +174,7 @@
         align-items: center;
         gap: 1em;
         padding: 0.5em 1em;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid var(--color-border-subtle-00);
     }
     div#browser-overlay .header .title {
         font-weight: bold;

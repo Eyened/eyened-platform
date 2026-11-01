@@ -57,13 +57,13 @@
     }
     li {
         padding: 0.5em;
-        border-bottom: 1px solid #ccc;
+        border-bottom: 1px solid var(--color-border-subtle-01);
         cursor: pointer;
     }
     li.current {
-        background-color: #f0fff0;
+        background-color: var(--color-layer-selected-01);
     }
     li:hover {
-        background-color: #f0f0f0;
+        background-color: var(--color-layer-hover-01);
     }
 </style>
