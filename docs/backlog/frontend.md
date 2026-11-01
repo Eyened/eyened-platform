@@ -89,12 +89,6 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** typing "Study Date" in the property search lists "Study Tag Name" first; `ui/command` (bits-ui Command) scores with its default fuzzy filter.
 - **Fix:** pass a custom `filter` that ranks exact, then prefix matches above fuzzy ones.
 
-### Drop a stale search response after a Studies/Images switch
-- **Status:** open
-- **Source:** P4 browser search final review / demo 2026-10-13
-- **Problem:** `resetForQueryModeChange` in `client/src/lib/browser/browserContext.svelte.ts` does not bump `searchSeq`, so an in-flight Studies response can be processed as Images. When the switch removes every condition no new search starts, so that response lands as Images and `loading` stays true until it does.
-- **Fix:** `this.searchSeq++` in the reset.
-
 ### Round-trip a comma inside an "is one of" value
 - **Status:** open
 - **Source:** P4 browser search final review / demo 2026-10-13

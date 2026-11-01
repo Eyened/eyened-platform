@@ -69,7 +69,6 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Reload the admin user page when its `id` param changes | [frontend](frontend.md) | open |
 | Show an error when the login options fail to load | [frontend](frontend.md) | open |
 | Rank exact property matches first in the ConditionBuilder search | [frontend](frontend.md) | open |
-| Drop a stale search response after a Studies/Images switch | [frontend](frontend.md) | open |
 | Round-trip a comma inside an "is one of" value | [frontend](frontend.md) | open |
 | Contain focus in the open filter overlay | [frontend](frontend.md) | open |
 | Find the cause of the intermittent `npm run test` error | [frontend](frontend.md) | open |

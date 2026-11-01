@@ -293,6 +293,8 @@ export class BrowserContext {
         this.clearResults();
         this.failed = false;
         this.hasSearched = false;
+        this.searchSeq++; // drop a search still in flight
+        this.loading = false;
 
         const removed = this.advancedRows.filter(
             (r) => !acceptsRow(r, this.activeSignature),

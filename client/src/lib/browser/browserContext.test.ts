@@ -262,4 +262,25 @@ describe("BrowserContext", () => {
         await first;
         expect(ctx.orderedStudyIds).toEqual([2]);
     });
+
+    it("ends a studies search in flight when the switch to images removes every condition", async () => {
+        let resolveStudies: (value: unknown) => void = () => {};
+        vi.mocked(api.searchStudies).mockReturnValueOnce(
+            new Promise((resolve) => (resolveStudies = resolve)),
+        );
+        const ctx = await makeContext();
+        ctx.advancedRows = [
+            { id: 1, property: "Study Round", operator: "greater", value: "2" },
+        ];
+
+        const search = ctx.submitSearch();
+        expect(ctx.loading).toBe(true);
+        await ctx.resetForQueryModeChange("instances");
+        expect(ctx.loading).toBe(false);
+
+        resolveStudies(response([1]));
+        await search;
+        expect(ctx.orderedInstanceIds).toEqual([]);
+        expect(api.searchInstances).not.toHaveBeenCalled();
+    });
 });
