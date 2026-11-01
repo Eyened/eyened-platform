@@ -13,10 +13,15 @@
         updateFeature,
     } from "$lib/data/helpers";
     import { features } from "$lib/data/stores.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { getContext } from "svelte";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
+    import ArrowRight from "carbon-icons-svelte/lib/ArrowRight.svelte";
     import Edit from "carbon-icons-svelte/lib/Edit.svelte";
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
     import type { FeatureGET } from "../../types/openapi_types";
+
+    const globalContext = getContext<GlobalContext>("globalContext");
 
     const headingId = "library-heading";
     const descriptionId = $props.id();
@@ -168,6 +173,18 @@
                     </Table.Cell>
                     <Table.Cell>{f.segmentation_count ?? 0}</Table.Cell>
                     <Table.Cell class="pe-2 text-end whitespace-nowrap">
+                        <Button
+                            variant="ghost"
+                            aria-label="Open in browser: {f.name}"
+                            href={globalContext.makeInstancesBrowserURL({
+                                variable: "Segmentation Feature Name",
+                                type: "default",
+                                operator: "IN",
+                                value: [f.name],
+                            })}
+                        >
+                            Open in browser <ArrowRight />
+                        </Button>
                         <Button
                             variant="ghost"
                             aria-label="Edit {f.name}"
