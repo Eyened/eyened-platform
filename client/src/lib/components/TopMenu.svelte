@@ -64,6 +64,16 @@
             Tasks
         </a>
     </li>
+    <li>
+        <a
+            href={resolve("/library")}
+            class={itemClass}
+            aria-current={inSection("/library") ? "page" : undefined}
+            {onclick}
+        >
+            Library
+        </a>
+    </li>
     {#if globalContext.userManager.user?.is_admin}
         <li>
             <a
