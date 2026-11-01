@@ -86,11 +86,16 @@
     let passwordEnabled = $state(false);
     let oidcEnabled = $state(false);
     let oidcProviderName = $state("");
+    let optionsError = $state<string | null>(null);
     onMount(async () => {
-        const options = await authClient.options();
-        passwordEnabled = options.password_enabled;
-        oidcEnabled = options.oidc_enabled;
-        oidcProviderName = options.oidc_provider_name;
+        try {
+            const options = await authClient.options();
+            passwordEnabled = options.password_enabled;
+            oidcEnabled = options.oidc_enabled;
+            oidcProviderName = options.oidc_provider_name;
+        } catch (err) {
+            optionsError = err instanceof Error ? err.message : String(err);
+        }
     });
 </script>
 
@@ -108,6 +113,10 @@
             </p>
         {/if}
     </div>
+
+    {#if optionsError}
+        <InlineNotification title="Log in failed" subtitle={optionsError} />
+    {/if}
 
     {#if passwordEnabled}
         <form

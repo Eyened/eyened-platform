@@ -124,4 +124,20 @@ describe("LoginForm", () => {
         );
         expect(location.href).toBe("http://localhost/users/login");
     });
+
+    it("reports login options that fail to load", async () => {
+        vi.spyOn(authClient, "options").mockRejectedValue(
+            new Error("Server unreachable"),
+        );
+        render(LoginForm, {
+            context: new Map([
+                ["globalContext", { userManager: { login: vi.fn() } }],
+            ]),
+        });
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert).toHaveTextContent("Log in failed");
+        expect(alert).toHaveTextContent("Server unreachable");
+    });
 });
