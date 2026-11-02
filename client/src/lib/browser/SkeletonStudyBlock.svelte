@@ -16,7 +16,7 @@
         {#each { length: 3 }, i (i)}
             <span
                 class={skeleton}
-                style="width: calc({size} + 2px); height: calc({size} + 2rem + 2px);"
+                style="width: calc({size} + 2px); height: calc({size} + 3.75rem + 2px);"
             ></span>
         {/each}
     </div>

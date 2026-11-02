@@ -50,4 +50,15 @@ describe("InstanceComponent", () => {
         expect(await screen.findByRole("dialog")).toBeTruthy();
         expect(toggleInstance).not.toHaveBeenCalled();
     });
+
+    it("copies the public ID from the tile without toggling the selection", async () => {
+        const writeText = vi.fn(() => Promise.resolve());
+        Object.assign(navigator, { clipboard: { writeText } });
+        const toggleInstance = renderTile();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Copy public ID" }),
+        );
+        expect(writeText).toHaveBeenCalledWith("1.2.3");
+        expect(toggleInstance).not.toHaveBeenCalled();
+    });
 });

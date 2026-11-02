@@ -10,18 +10,21 @@
 
     // Carbon IconButton: ghost, 40 px; `label` is both the tooltip and the accessible name.
     // Its own Provider (Carbon's 100 ms enter delay) so it works outside Main.
+    // closeOnClick=false keeps the tooltip open after a click, for Carbon's "Copied!" feedback.
     let {
         label,
         children,
+        closeOnClick = true,
         ...restProps
     }: Omit<HTMLButtonAttributes, "aria-label" | "children"> & {
         label: string;
         children: Snippet;
+        closeOnClick?: boolean;
     } = $props();
 </script>
 
 <Tooltip.Provider delayDuration={100}>
-    <Tooltip.Root>
+    <Tooltip.Root disableCloseOnTriggerClick={!closeOnClick}>
         <Tooltip.Trigger>
             {#snippet child({ props })}
                 <Button

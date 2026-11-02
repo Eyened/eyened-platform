@@ -107,6 +107,25 @@
             <Information />
         </IconButton>
     </div>
+    <div
+        class="flex items-center justify-between gap-2 ps-2 pe-1 pb-1"
+        style="width: {size};"
+    >
+        <span
+            class="pointer-events-none truncate text-label-01 text-text-helper"
+            title={instance.id}
+        >
+            {instance.id}
+        </span>
+        <IconButton
+            label={copied ? "Copied!" : "Copy public ID"}
+            class="size-6"
+            closeOnClick={false}
+            onclick={copy}
+        >
+            <Copy />
+        </IconButton>
+    </div>
 </div>
 
 <!-- Carbon Modal lg, passive: no footer, ✕ only; an outside click closes it. -->
@@ -118,6 +137,7 @@
                 <Dialog.Title class="truncate">{instance.id}</Dialog.Title>
                 <IconButton
                     label={copied ? "Copied!" : "Copy public ID"}
+                    closeOnClick={false}
                     onclick={copy}
                 >
                     <Copy />
