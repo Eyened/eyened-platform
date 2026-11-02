@@ -26,8 +26,19 @@ function tag(
     return { id, name, tag_type, description: "", ...extra } as TagGET;
 }
 
+const makeInstancesBrowserURL = vi.fn(() => "/?images");
+const makeStudiesBrowserURL = vi.fn(() => "/?studies");
+
 function renderTable(type = "all") {
-    return render(TagsTable, { props: { type, onselecttype: vi.fn() } });
+    return render(TagsTable, {
+        props: { type, onselecttype: vi.fn() },
+        context: new Map([
+            [
+                "globalContext",
+                { makeInstancesBrowserURL, makeStudiesBrowserURL },
+            ],
+        ]),
+    });
 }
 
 function cellText(row: HTMLElement) {
@@ -142,5 +153,28 @@ describe("TagsTable", () => {
             within(dialog).getByRole("button", { name: "Delete" }),
         );
         await waitFor(() => expect(deleteTag).toHaveBeenCalledWith(1));
+    });
+
+    it("links each tag to a browser search on its tag variable", () => {
+        tags.set(3, tag(3, "Follow-up", "Study"));
+        renderTable();
+
+        expect(
+            screen
+                .getByRole("link", { name: "Open in browser: Blurry" })
+                .getAttribute("href"),
+        ).toBe("/?images");
+        expect(makeInstancesBrowserURL).toHaveBeenCalledWith(
+            expect.objectContaining({
+                variable: "Image Tag Name",
+                value: ["Blurry"],
+            }),
+        );
+        expect(makeStudiesBrowserURL).toHaveBeenCalledWith(
+            expect.objectContaining({
+                variable: "Study Tag Name",
+                value: ["Follow-up"],
+            }),
+        );
     });
 });

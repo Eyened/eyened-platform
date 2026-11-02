@@ -21,11 +21,15 @@
     } from "$lib/components/ui/select-input/index.js";
     import * as Table from "$lib/components/ui/table/index.js";
     import { TextInput } from "$lib/components/ui/text-input/index.js";
+    import type { ResolvedPathname } from "$app/types";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { createTag, deleteTag } from "$lib/data/helpers";
     import { tags } from "$lib/data/stores.svelte";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
+    import ArrowRight from "carbon-icons-svelte/lib/ArrowRight.svelte";
     import Filter from "carbon-icons-svelte/lib/Filter.svelte";
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
+    import { getContext } from "svelte";
     import type { TagGET, TagType } from "../../types/openapi_types";
 
     let {
@@ -41,6 +45,32 @@
         Segmentation: "Segmentation",
         FormAnnotation: "Form annotation",
     };
+
+    const globalContext = getContext<GlobalContext>("globalContext");
+
+    // Search has no variable for legacy Annotation tags, so they get no link.
+    const IMAGE_TAG_VARIABLE = {
+        ImageInstance: "Image Tag Name",
+        Segmentation: "Segmentation Tag Name",
+        FormAnnotation: "Form Tag Name",
+    } as const;
+
+    function browserURL(t: TagGET): ResolvedPathname | undefined {
+        if (t.tag_type === "Study") {
+            return globalContext.makeStudiesBrowserURL({
+                variable: "Study Tag Name",
+                operator: "IN",
+                value: [t.name],
+            });
+        }
+        if (t.tag_type === "Annotation") return undefined;
+        return globalContext.makeInstancesBrowserURL({
+            variable: IMAGE_TAG_VARIABLE[t.tag_type],
+            type: "default",
+            operator: "IN",
+            value: [t.name],
+        });
+    }
 
     let search = $state("");
     const query = $derived(search.trim().toLowerCase());
@@ -181,6 +211,16 @@
                     <Table.Cell>{TYPE_LABEL[t.tag_type]}</Table.Cell>
                     <Table.Cell>{t.creator?.name ?? "—"}</Table.Cell>
                     <Table.Cell class="pe-2 text-end whitespace-nowrap">
+                        {@const href = browserURL(t)}
+                        {#if href}
+                            <Button
+                                variant="ghost"
+                                aria-label="Open in browser: {t.name}"
+                                {href}
+                            >
+                                Open in browser <ArrowRight />
+                            </Button>
+                        {/if}
                         <Button
                             variant="ghost"
                             aria-label="Delete {t.name}"
