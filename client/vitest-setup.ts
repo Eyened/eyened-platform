@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { afterEach } from "vitest";
+import { afterAll, afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/svelte";
 
 // jsdom has no WebGL; texture.ts reads GLenum constants at module load.
@@ -25,9 +25,32 @@ if (typeof WebGL2RenderingContext === "undefined") {
     } as unknown as typeof WebGL2RenderingContext;
 }
 
+// bits-ui Select scrolls the highlighted item into view and checks pointer capture; jsdom has neither.
+if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = () => {};
+}
+if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = () => false;
+}
+
+// bits-ui Tooltip (IconButton) observes element size on focus; jsdom has no ResizeObserver.
+if (typeof ResizeObserver === "undefined") {
+    globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    };
+}
+
 // Unmount any component rendered by a test so DOM state never leaks between tests.
 afterEach(() => {
     cleanup();
+});
+
+// bits-ui restores the body style 24 ms after the last modal unmounts; wait for it before jsdom goes.
+afterAll(async () => {
+    vi.useRealTimers();
+    await new Promise((resolve) => setTimeout(resolve, 50));
 });
 
 // openapi-fetch builds `new Request("/api/...")`; Node's Request rejects a

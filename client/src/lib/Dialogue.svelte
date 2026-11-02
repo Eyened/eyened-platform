@@ -49,8 +49,9 @@
         flex-direction: column;
     }
     .popup-content {
-        background-color: var(--popover);
-        color: var(--popover-foreground);
+        background-color: var(--color-layer-01);
+        color: var(--color-text-primary);
+        border: 1px solid var(--color-border-subtle-01);
 
         padding: 1em;
 

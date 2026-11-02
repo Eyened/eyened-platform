@@ -1,6 +1,7 @@
 import { resolve } from "$app/paths";
 import type { ResolvedPathname } from "$app/types";
 import { UserManager } from "$lib/usermanager.svelte";
+import { authClient } from "../../auth";
 
 import type {
     FormAnnotationGET,
@@ -18,9 +19,8 @@ export type ComponentDef = {
 
 export class GlobalContext {
     public userManager: UserManager;
-    public popupComponent: ComponentDef | null = $state(null);
     public dialogue: ComponentDef | string | null = $state(null);
-    public showUserMenu: boolean = $state(false);
+    public passwordEnabled: boolean = $state(false);
 
     public formShortcut: string | null = $state("WARMGS");
     public config: any = $state({
@@ -35,6 +35,16 @@ export class GlobalContext {
     async init(pathname: string) {
         // user must be logged in before fetching any data
         await this.userManager.init(pathname);
+
+        // Public endpoint: fetch it logged out too, since a password login does not rerun init.
+        authClient
+            .options()
+            .then((options) => {
+                this.passwordEnabled = options.password_enabled;
+            })
+            .catch((error) =>
+                console.error("Failed to fetch auth options:", error),
+            );
 
         // Only fetch data if user is logged in
         // If user is not logged in, userManager.init will redirect to login
@@ -59,10 +69,6 @@ export class GlobalContext {
         return this.userManager.user;
     }
 
-    setPopup(component: ComponentDef | null) {
-        this.popupComponent = component;
-    }
-
     canEdit(
         annotation: SegmentationGET | FormAnnotationGET | ModelSegmentationGET,
     ) {
@@ -85,10 +91,9 @@ export class GlobalContext {
         params.set("limit", "10");
         params.set("conditions", this._encodeSingleCondition(condition));
         params.set("order_by", "Study Date");
-        params.set("order", "ASC");
+        params.set("order", "DESC");
         params.set("queryMode", "studies");
         params.set("displayMode", "study");
-        params.set("filterMode", "advanced");
         return resolve(`/?${params.toString()}`);
     }
 
@@ -104,10 +109,9 @@ export class GlobalContext {
             this._encodeSingleConditionExtended(condition as any),
         );
         params.set("order_by", "Study Date");
-        params.set("order", "ASC");
+        params.set("order", "DESC");
         params.set("queryMode", "instances");
         params.set("displayMode", "instance");
-        params.set("filterMode", "advanced");
         return resolve(`/?${params.toString()}`);
     }
 

@@ -24,3 +24,9 @@
 - **Source:** PR #145 review (@bjliefers), 2026-07-16
 - **Problem:** some repositories bake in `selectinload` graphs (`FormAnnotationRepository.list_active`, `SegmentationRepository.get_with_tag_links`), others take flags. Form-annotation and segmentation GET/list load tag links but call the DTO converter with `with_tag_metadata=False`, so `tags` stays `[]`.
 - **Fix:** one convention (explicit inputs to DTO converters rather than walking ORM relationships); remove the unused tag-link loads.
+
+### Cap `limit` on `GET /task/{task_id}/subtasks`
+- **Status:** open
+- **Source:** `ui/carbon-3-task` (Carbon client PR 3), 2026-10-12
+- **Problem:** `list_subtasks` (`server/routes/task.py:121`) takes any `limit` (default 200), so `?limit=100000` with `with_images=true` returns every subtask with its images. The client now sends only 10, 20, 50 or 100; the API does not enforce a maximum.
+- **Fix:** bound it with `Query(…, ge=1, le=<max>)` after checking the limits other callers (the grading viewer) send.

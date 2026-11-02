@@ -1,33 +1,27 @@
 <script lang="ts">
-    import InstanceInfo from "./InstanceInfo.svelte";
+    import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { fetchInstance } from "$lib/data/api";
     import { instances } from "$lib/data/stores.svelte";
+    import InstanceInfo from "./InstanceInfo.svelte";
 
-    interface Props {
-        instanceId: string;
-    }
-    let { instanceId }: Props = $props();
+    let { instanceId }: { instanceId: string } = $props();
 
     const loading = fetchInstance(instanceId);
-
-    // Check if instance is in store (reactive)
     const instance = $derived(instances.get(instanceId));
 </script>
 
 {#await loading}
-    <div class="flex h-[80vh] w-[80vw] items-center justify-center">
-        <div class="text-sm text-gray-500">Loading…</div>
-    </div>
+    <InlineLoading status="active" description="Loading image information…" />
 {:then}
     {#if instance}
         <InstanceInfo {instanceId} />
     {:else}
-        <div class="flex h-[80vh] w-[80vw] items-center justify-center">
-            <div class="text-sm text-red-600">Instance not found</div>
-        </div>
+        <InlineNotification title="Image not found" />
     {/if}
 {:catch error}
-    <div class="flex h-[80vh] w-[80vw] items-center justify-center">
-        <div class="text-sm text-red-600">{error}</div>
-    </div>
+    <InlineNotification
+        title="Image information could not be loaded"
+        subtitle={error instanceof Error ? error.message : String(error)}
+    />
 {/await}

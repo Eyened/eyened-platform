@@ -1,9 +1,10 @@
 <script lang="ts">
     import { Dialog as DialogPrimitive } from "bits-ui";
-    import XIcon from "@lucide/svelte/icons/x";
+    import Close from "carbon-icons-svelte/lib/Close.svelte";
     import type { Snippet } from "svelte";
     import * as Dialog from "./index.js";
     import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
+    import { setDialogContentElement } from "./dialog-context.js";
 
     let {
         ref = $bindable(null),
@@ -17,6 +18,8 @@
         children: Snippet;
         showCloseButton?: boolean;
     } = $props();
+
+    setDialogContentElement(() => ref);
 </script>
 
 <Dialog.Portal {...portalProps}>
@@ -25,7 +28,7 @@
         bind:ref
         data-slot="dialog-content"
         class={cn(
-            "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+            "fixed top-0 left-0 z-50 flex max-h-full w-full flex-col gap-4 border border-border-subtle-01 bg-layer-01 p-4 text-text-primary duration-240 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 md:top-1/2 md:left-1/2 md:max-h-9/10 md:w-21/25 md:-translate-x-1/2 md:-translate-y-1/2 lg:max-h-21/25 lg:w-3/5 xlg:w-12/25",
             className,
         )}
         {...restProps}
@@ -33,10 +36,10 @@
         {@render children?.()}
         {#if showCloseButton}
             <DialogPrimitive.Close
-                class="absolute end-4 top-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+                aria-label="Close"
+                class="absolute top-0 right-0 flex size-12 items-center justify-center border-2 border-transparent hover:bg-layer-hover-01"
             >
-                <XIcon />
-                <span class="sr-only">Close</span>
+                <Close size={20} class="text-icon-primary" />
             </DialogPrimitive.Close>
         {/if}
     </DialogPrimitive.Content>

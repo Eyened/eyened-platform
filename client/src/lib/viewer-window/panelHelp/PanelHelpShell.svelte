@@ -52,10 +52,10 @@
         align-items: flex-start;
         justify-content: center;
         padding: 2em 1em;
-        background-color: rgba(0, 0, 0, 0.55);
+        background-color: var(--color-overlay);
         backdrop-filter: blur(4px);
         overflow-y: auto;
-        color: #1a1a1a;
+        color: var(--color-text-primary);
     }
 
     .dialog {
@@ -63,7 +63,7 @@
         max-height: calc(100vh - 4em);
         display: flex;
         flex-direction: column;
-        background: rgba(255, 255, 255, 0.97);
+        background: var(--color-layer-01);
         border-radius: 4px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
         overflow: hidden;
@@ -75,7 +75,7 @@
         justify-content: space-between;
         gap: 1em;
         padding: 0.75em 1em;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--color-border-subtle-01);
         flex: 0 0 auto;
     }
 
@@ -93,7 +93,7 @@
 
     .body :global(p.intro) {
         margin: 0 0 1em;
-        color: #444;
+        color: var(--color-text-secondary);
         line-height: 1.5;
         font-size: 0.92rem;
     }
@@ -111,14 +111,13 @@
         font-weight: 600;
         margin: 0 0 0.4em;
         padding-bottom: 0.2em;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--color-border-subtle-01);
     }
 
     .body :global(p) {
         margin: 0 0 0.5em;
         font-size: 0.92rem;
         line-height: 1.45;
-        color: #333;
     }
 
     .body :global(ul) {
@@ -126,7 +125,6 @@
         padding-left: 1.25em;
         font-size: 0.92rem;
         line-height: 1.45;
-        color: #333;
     }
 
     .body :global(li + li) {
@@ -160,8 +158,7 @@
         padding: 0.12em 0.45em;
         font-family: inherit;
         font-size: 0.85rem;
-        background: #f3f4f6;
-        border: 1px solid #d1d5db;
+        background: var(--color-layer-02);
         border-radius: 4px;
         white-space: nowrap;
     }
@@ -171,21 +168,19 @@
         border-collapse: collapse;
         font-size: 0.92rem;
         line-height: 1.45;
-        color: #333;
     }
 
     .body :global(table.help-table th),
     .body :global(table.help-table td) {
         padding: 0.45em 0.6em;
-        border-bottom: 1px solid #e5e7eb;
+        border-bottom: 1px solid var(--color-border-subtle-01);
         vertical-align: top;
         text-align: left;
     }
 
     .body :global(table.help-table th) {
         font-weight: 600;
-        background: #f9fafb;
-        color: #111;
+        background: var(--color-layer-accent-01);
     }
 
     .body :global(table.help-table th.shortcut),
@@ -196,7 +191,7 @@
     }
 
     .body :global(table.help-table td.shortcut .none) {
-        color: #9ca3af;
+        color: var(--color-text-secondary);
         font-size: 0.85rem;
     }
 
@@ -206,9 +201,8 @@
 
     .body :global(details.subsection) {
         margin: 0.35em 0 0;
-        border: 1px solid #e5e7eb;
+        border: 1px solid var(--color-border-subtle-01);
         border-radius: 4px;
-        background: #fafafa;
     }
 
     .body :global(details.subsection + details.subsection) {
@@ -219,7 +213,6 @@
         padding: 0.45em 0.65em;
         font-size: 0.9rem;
         font-weight: 600;
-        color: #111;
         cursor: pointer;
         list-style: none;
         user-select: none;
@@ -234,7 +227,7 @@
         display: inline-block;
         margin-right: 0.45em;
         font-size: 0.85em;
-        color: #6b7280;
+        color: var(--color-text-secondary);
         transition: transform 0.15s ease;
     }
 
@@ -244,7 +237,7 @@
 
     .body :global(details.subsection .subsection-body) {
         padding: 0 0.65em 0.65em;
-        border-top: 1px solid #e5e7eb;
+        border-top: 1px solid var(--color-border-subtle-01);
     }
 
     .body :global(details.subsection .subsection-body > :first-child) {

@@ -14,13 +14,6 @@
 <!-- <Browser /> -->
 
 <style>
-    :global(body) {
-        margin: 0;
-        height: 100vh;
-        font-family: Verdana, sans-serif;
-        background-color: white;
-        color: rgb(99, 99, 99);
-    }
     :global(canvas) {
         position: absolute;
         left: 0;

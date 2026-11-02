@@ -4,6 +4,7 @@
     import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
+    import { Button } from "$lib/components/ui/button/index.js";
     import { Hide, Intersection, PanelIcon, Show, Trash } from "../icons/icons";
     import ThresholdSlider from "./ThresholdSlider.svelte";
 
@@ -213,13 +214,9 @@
     {/if}
     {#if isActive && segmentation.annotation_type == "model_segmentation"}
         <div class="row">
-            <button
-                type="button"
-                class="duplicate-button"
-                onclick={applyDuplicateAI}
-            >
+            <Button variant="outline" size="sm" onclick={applyDuplicateAI}>
                 Duplicate
-            </button>
+            </Button>
         </div>
     {/if}
 
@@ -389,17 +386,6 @@
     button:focus-visible {
         outline: 2px solid currentColor;
         outline-offset: 2px;
-    }
-    button.duplicate-button {
-        cursor: pointer;
-        padding: 0.2em;
-        border-radius: 2px;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        margin: 0.2em;
-        text-wrap-mode: nowrap;
-    }
-    button.duplicate-button:hover {
-        background-color: rgba(255, 255, 255, 0.3);
     }
 
     div.sync-indicator {

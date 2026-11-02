@@ -13,9 +13,11 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Stop a token outliving `docker compose down -v` or a restore | [auth-and-sessions](auth-and-sessions.md) | open |
 | Make `get_current_user` reject deleted and deactivated accounts | [auth-and-sessions](auth-and-sessions.md) | open |
 | Cap the absolute session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
+| Make "Keep me logged in" change the session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
 | Fix or delete the `api_client` branch of `POST /auth/login` | [auth-and-sessions](auth-and-sessions.md) | open |
 | Check new passwords against a breached/common-password list | [auth-and-sessions](auth-and-sessions.md) | open |
 | Move OIDC login into `AuthService` and pin the auth cookie attributes | [auth-and-sessions](auth-and-sessions.md) | partial |
+| Read OIDC claims from the userinfo endpoint | [auth-and-sessions](auth-and-sessions.md) | open |
 | Keep admin HTTP writes and reads off non-human Creators | [rbac-admin](rbac-admin.md) | open |
 | Rename `has_credential` on `AdminUserResponse` | [rbac-admin](rbac-admin.md) | open |
 | Build the audit-log read endpoint `GET /admin/audit` | [rbac-admin](rbac-admin.md) | open |
@@ -42,6 +44,7 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Check for oversized `IN` lists on `ImageInstance` | [performance](performance.md) | open |
 | Size the API pool for multi-hop connection checkout | [performance](performance.md) | open |
 | Pick one eager-loading convention and drop dead loads | [performance](performance.md) | open |
+| Cap `limit` on `GET /task/{task_id}/subtasks` | [performance](performance.md) | open |
 | Give the segmentation zarr store a cross-process write lock | [data-integrity](data-integrity.md) | open |
 | Add `eorm move-patient` / `move-images` for cross-project data cleaning | [data-integrity](data-integrity.md) | open |
 | Make the database the only maintainer of `DateModified` | [data-integrity](data-integrity.md) | open |
@@ -53,15 +56,23 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Add a mypy per-module gate over the admin surface | [ci-and-tooling](ci-and-tooling.md) | open |
 | Turn unknown test warnings into errors | [ci-and-tooling](ci-and-tooling.md) | open |
 | Repair or delete `eyened_orm.form_validation` | [ci-and-tooling](ci-and-tooling.md) | open |
-| Sanitize the `{@html}` cells in `DataTable.svelte` | [frontend](frontend.md) | open |
 | Fix Svelte 5 reactivity traps | [frontend](frontend.md) | open |
 | Key the grandfathered `{#each}` blocks | [frontend](frontend.md) | open |
 | Hide the editing tools a project role does not allow | [frontend](frontend.md) | open |
 | Ratchet down `@typescript-eslint/no-explicit-any` | [frontend](frontend.md) | open |
 | Gate svelte-check in CI (Phase 4) | [frontend](frontend.md) | open |
 | Fix the remaining svelte-check error clusters | [frontend](frontend.md) | open |
-| Fix the prop bugs unmasked by the `ui/` prop helpers | [frontend](frontend.md) | open |
-| Remove small dead code | [frontend](frontend.md) | open |
 | Decide `prefer-const` for `.svelte` files | [frontend](frontend.md) | open |
 | Re-audit navigation if `kit.paths.base` is ever set | [frontend](frontend.md) | open, conditional |
-| Reload the admin user page when its `id` param changes | [frontend](frontend.md) | open |
+| Round-trip a comma inside an "is one of" value | [frontend](frontend.md) | open |
+| Send per-task `can_edit_status` / `can_edit_details` / `can_delete` on `TaskGET` | [rbac-authz](rbac-authz.md) | open |
+| Validate task names on the server | [data-integrity](data-integrity.md) | open |
+| One date format across the client | [frontend](frontend.md) | open |
+| Add a scroll-to-top button to the browser results | [frontend](frontend.md) | open |
+| Open the image picker in a new tab | [frontend](frontend.md) | open |
+| Guard logged-in pages with a route group | [frontend](frontend.md) | open |
+| Cycle viewer regions with F6 | [frontend](frontend.md) | open |
+| Create a feature from the viewer's segmentation panel | [frontend](frontend.md) | open |
+| Let favourites sort the Tagger, or drop stars from the API | [frontend](frontend.md) | open |
+| Add column names to external data sources | [frontend](frontend.md) | open |
+| Show the filter count and Clear filters on the Library type filter | [frontend](frontend.md) | open |

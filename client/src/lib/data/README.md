@@ -308,25 +308,16 @@ const loadPromise = (async () => {
 <script lang="ts">
     import { tasks } from "$lib/data";
 
+    // rows: the list GET /task returned; the store holds each task's latest version.
     let { rows }: { rows: TaskGET[] } = $props();
 
-    // Direct access to plain objects
-    const columns: ColumnDef<TaskGET>[] = [
-        {
-            accessorKey: "name",
-            header: "Task",
-            cell: ({ row }) => {
-                const r = row.original as TaskGET;
-                const url = `/tasks/${r.id}${typeof window !== "undefined" ? window.location.search : ""}`;
-                return renderComponent(TaskNameCell, { task: r, url });
-            },
-        },
-        {
-            accessorKey: "task_state",
-            header: "State",
-            cell: ({ row }) => row.original.task_state ?? "-",
-        },
-    ];
+    // Direct access to plain objects: edits and deletes in the store show at once
+    const current = $derived(
+        rows.flatMap((r) => {
+            const t = tasks.get(r.id);
+            return t ? [t] : [];
+        }),
+    );
 </script>
 ```
 

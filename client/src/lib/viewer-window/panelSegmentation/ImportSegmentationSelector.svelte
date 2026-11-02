@@ -102,14 +102,14 @@
     th {
         text-align: left;
         padding: 8px;
-        border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+        border-bottom: 2px solid var(--color-border-subtle-01);
         font-weight: bold;
         /* background-color: #f5f5f5; */
     }
 
     td {
         padding: 8px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+        border-bottom: 1px solid var(--color-border-subtle-01);
     }
 
     tr {
@@ -124,6 +124,6 @@
 
     .annotation-id {
         font-size: x-small;
-        color: gray;
+        color: var(--color-text-secondary);
     }
 </style>

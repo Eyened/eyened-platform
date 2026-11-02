@@ -13,8 +13,9 @@
 <li
     bind:this={ref}
     data-slot="breadcrumb-item"
-    class={cn("inline-flex items-center gap-1.5", className)}
+    class={cn("relative me-2 flex items-center last:me-0", className)}
     {...restProps}
 >
     {@render children?.()}
+    <span aria-hidden="true" class="ms-2 text-text-primary">/</span>
 </li>

@@ -2,12 +2,6 @@
 
 ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint . --prune-suppressions` and commit `eslint-suppressions.json`; never hand-merge that file. Run svelte-check in the dev container (`docker exec -w /app/client <client container> npx svelte-check --tsconfig ./tsconfig.json --output machine`); as your own user `.svelte-kit` EACCES errors inflate the counts.
 
-### Sanitize the `{@html}` cells in `DataTable.svelte`
-- **Status:** open (security)
-- **Source:** Frontend CI Phase 3, 2026-07-16
-- **Problem:** `client/src/lib/utils/DataTable.svelte:18` renders `{@html cell}` from JSON fetched by `dataSources.ts` `loadDataSource()`, possibly from an absolute admin-configured URL. A malicious/compromised source gets script execution. The inline eslint-disable means lint will never flag it again.
-- **Fix:** sanitize (e.g. DOMPurify), render as text, or restrict data sources to a trusted origin.
-
 ### Fix Svelte 5 reactivity traps
 - **Status:** open
 - **Source:** Phase 3 ESLint gate + Phase 4 svelte-check triage
@@ -45,18 +39,6 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** `DoubleRangeSlider.svelte` 18 errors (11 implicit-any, 3 unbound `bind:this` `| undefined`, 3 undeclared `ondragmove`); 16 implicit-any params elsewhere; 16 missing null/unknown guards, some latent runtime `TypeError`s (e.g. `TopRowImages.svelte:57` `e.target.focus()`).
 - **Fix:** type properly (not `any`, which grows the ESLint baseline); treat the guard group as bug candidates.
 
-### Fix the prop bugs unmasked by the `ui/` prop helpers
-- **Status:** open
-- **Source:** Phase 3 review
-- **Problem:** `client/src/lib/components/Pagination.svelte:34` passes `isVisible`, not a prop of `Pagination.Item` (silently dropped); `client/src/lib/tasks/SubtasksTable.svelte:104` passes `colspan="6"` (string, typed `number`).
-- **Fix:** decide whether `isVisible` behaviour is needed (maybe covered by `Pagination.Link isActive`); `colspan={6}`.
-
-### Remove small dead code
-- **Status:** open
-- **Source:** Phase 3 sweep
-- **Problem:** `client/src/lib/viewer-window/icons/AV-Nicking.svelte` declares an inert `stroke` prop and has 0 callers; `client/src/routes/+layout.ts` and `routes/users/login/+page.ts` have no-op `load()`s.
-- **Fix:** delete the component (or the prop); delete the `load()`s after checking SvelteKit route semantics.
-
 ### Decide `prefer-const` for `.svelte` files
 - **Status:** open
 - **Source:** Phase 3 ESLint gate
@@ -69,9 +51,65 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Problem:** query-only `goto()`s carry `svelte/no-navigation-without-resolve` disables that are correct only while `base === ''`. `resolve()` throws on raw `[...]` in a query string.
 - **Fix:** when a base path is introduced, route those through `resolve()` and drop the disables.
 
-### Reload the admin user page when its `id` param changes
+### One date format across the client
 - **Status:** open
-- **Source:** PR #252 review, 2026-09-28
-- **Problem:** `client/src/routes/admin/users/[id]/+page.svelte` reads `const userId = Number(page.params.id)` once. SvelteKit reuses the component on a param-only navigation, so `/admin/users/3` → `/admin/users/4` keeps showing user 3 and later writes target user 3.
-- **Fix:** make `userId` a `$derived` of `page.params.id` and reset state + `load()` in an `$effect`, or remount via `{#key page.params.id}` in a wrapping `+layout.svelte`.
-- **Note:** unreachable today except by a history jump that skips entries (every in-app path goes through `/admin`); fix before adding any user-to-user link.
+- **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) review, 2026-10-13
+- **Problem:** the date picker types and shows ISO yyyy-mm-dd (P4 spec decision D8: the stored format, unambiguous in Dutch and English). A dd-mm-yyyy input was requested as more intuitive, but the client already shows dates in mixed formats: ISO in `browser/StudyBlock.svelte` (study header), `viewer-window/panelVisits/PanelVisits.svelte` and the `browser/dataSources.ts` results; "3 Oct 2026" in `lib/utils.ts` (en-GB); "Oct 3, 2026" in `viewer-window/panelForm/FormItem.svelte` (en-US); the browser locale in `viewer-window/panelForm/FormItemContent.svelte`.
+- **Fix:** pick one display/input format: fixed dd-mm-yyyy, `Intl` locale-based, or unambiguous "13 Oct 2026" with lenient input. Amend D8 first. Keep ISO on the wire and in URLs; change only display and input. Show the format as visible helper text (Carbon date picker guidance), not only as a placeholder.
+- **Note:** about 5-8 files, plus the tests `StudyBlock.test.ts`, `PanelVisits.test.ts` and `patientStudies.test.ts`.
+
+### Round-trip a comma inside an "is one of" value
+- **Status:** open
+- **Source:** P4 browser search final review / demo 2026-10-13
+- **Problem:** the value parser in `client/src/lib/browser/conditionConfig.ts` splits "is one of" text on commas and `condition-row.svelte` joins list values with ", ", so `["a,b"]` comes back as `["a","b"]`. Inherited v1 encoding.
+- **Fix:** an escape or quoting rule for commas in the text, or a multi-value input instead of comma-separated text.
+
+### Add a scroll-to-top button to the browser results
+- **Status:** open
+- **Source:** client Carbon PR 4 slide-over filter change, 2026-10-26
+- **Problem:** the toolbar with the Filters button is not sticky and the filter column scrolls with the results (`client/src/lib/browser/Browser.svelte`), so far down a long result list the user scrolls all the way back up to change filters.
+- **Fix:** a sticky bottom-right button that scrolls the results' scroll container (`Main.svelte` on `/`, the modal body in the picker) to the top; place it above the fixed `Selection` bar when images are selected.
+
+### Open the image picker in a new tab
+- **Status:** open
+- **Source:** client Carbon PR 4 slide-over filter change, 2026-10-26
+- **Problem:** the picker (`client/src/lib/browser/BrowserPicker.svelte`) puts the whole browser in a Modal lg: a second scroll container, a top `Selection` bar, and the form-in-form `stopPropagation` and Escape workarounds in `Browser.svelte`.
+- **Fix:** "Browse images" in `SubTaskRow.svelte` opens `/` in a new tab with the subtask id and the patient condition; that tab pre-selects the set's images, saves with `addSubTaskImage`/`removeSubTaskImage` (move `confirmImages` to a shared module) and tells the task tab to refresh via `BroadcastChannel`. Then delete `BrowserPicker` and the Browser's `mode="overlay"` branch.
+- **Note:** save in the new tab, not the opener: the task tab may have been reloaded or closed, and the error must show where the user is.
+
+### Guard logged-in pages with a route group
+- **Status:** open
+- **Source:** signup-redirect fix on the Carbon branch, 2026-10-26
+- **Problem:** which pages need a login is decided by path strings (`isPublicPath` in `client/src/lib/publicPaths.ts`) plus a separate redirect in `client/src/lib/components/Main.svelte`; a new public page must be added to the list or it bounces to login.
+- **Fix:** move login, signup and oidc-callback under `routes/(public)/` and the rest under `routes/(app)/`, whose `+layout.ts` `load` checks the session and calls `redirect()`; then delete `publicPaths.ts` and the `Main.svelte` redirect.
+
+### Cycle viewer regions with F6
+- **Status:** open
+- **Source:** viewer skin-mapping brainstorm, 2026-10-29
+- **Problem:** to get from the form panel to the canvas, a keyboard user tabs back through about 20 tool and option controls; the viewer regions get landmarks but no shortcut between them.
+- **Fix:** F6 / Shift+F6 on the viewer root move focus to the next/previous region (header, tool rail, options bar, canvas, right panel, timeline), each region restoring its last-focused element and hidden regions skipped (S2 `foundations/app-frame/creating-bluelines-browsing-context.md`, "Support F6 key navigation").
+- **Note:** it needs an ADR 0006 deviation (viewer shortcuts work only while the image has focus), and a check that Chrome and Firefox let the page `preventDefault` F6.
+
+### Create a feature from the viewer's segmentation panel
+- **Status:** open
+- **Source:** client Carbon PR 8 (`ui/carbon-8-library-leftovers`) brainstorm, 2026-10-30
+- **Problem:** features can only be created on `/library`. The viewer's segmentation panel picks from the features loaded once at startup, so a grader who needs a new one leaves the viewer and reloads it.
+- **Fix:** an inline `Create "<text>"` option in the panel's feature picker, as `AddTag` does for tags, adding the new feature to the loaded list.
+
+### Let favourites sort the Tagger, or drop stars from the API
+- **Status:** open
+- **Source:** client Carbon PR 8 (`ui/carbon-8-library-leftovers`) brainstorm, 2026-10-30
+- **Problem:** PR 8 removed the star buttons, which changed nothing visible. `starTag`/`unstarTag` in `client/src/lib/data/api.ts` and `userManager.starredTagIds` are now unused by the UI.
+- **Fix:** either list starred tags first in the Tagger and bring the star back, or delete the star endpoints and client calls.
+
+### Add column names to external data sources
+- **Status:** open
+- **Source:** client Carbon PR 8 (`ui/carbon-8-library-leftovers`) brainstorm, 2026-11-01
+- **Problem:** `client/src/lib/utils/DataTable.svelte` shows no column headers because the source sends none, so screen readers cannot announce column names (a DESIGN.md deviation).
+- **Fix:** an optional `columns` field in the data-source config, rendered as the table's header row when present.
+
+### Show the filter count and Clear filters on the Library type filter
+- **Status:** open
+- **Source:** client Carbon PR 8 (`ui/carbon-8-library-leftovers`) Task 12a review, 2026-11-01
+- **Problem:** below `md`, `/library`'s Tags Type filter sits behind an icon-only Filter button that shows neither the number of filters applied nor a way to clear them; Carbon Filtering, Filter states asks for both on the closed filter.
+- **Fix:** the task page's pattern (`routes/tasks/[taskid]/+page.svelte`): a ghost lg `Filters (n)` button and a Clear filters button beside it.

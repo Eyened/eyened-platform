@@ -1,17 +1,13 @@
 <script lang="ts">
     import { page } from "$app/state";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { Toaster } from "$lib/components/ui/sonner";
     import { GlobalContext } from "$lib/data/globalContext.svelte";
     import Dialogue from "$lib/Dialogue.svelte";
-    import Popup from "$lib/Popup.svelte";
-    import { setContext } from "svelte";
+    import { setContext, type Snippet } from "svelte";
     import "../app.css";
 
-    let { children }: { children: any } = $props();
-
-    function closePopup() {
-        globalContext.popupComponent = null;
-    }
+    let { children }: { children: Snippet } = $props();
 
     function closeDialogue() {
         globalContext.dialogue = null;
@@ -24,15 +20,19 @@
     const init = globalContext.init(page.url.pathname);
 </script>
 
-{#if globalContext.popupComponent}
-    <Popup componentDef={globalContext.popupComponent} close={closePopup} />
-{/if}
 {#if globalContext.dialogue}
     <Dialogue content={globalContext.dialogue} close={closeDialogue} />
 {/if}
 
 {#await init then _}
     {@render children()}
+{:catch error}
+    <div class="m-4">
+        <InlineNotification
+            title="Page failed to load"
+            subtitle={error.message}
+        />
+    </div>
 {/await}
 <Toaster />
 
@@ -40,16 +40,8 @@
     :global(body) {
         margin: 0;
         height: 100vh;
-        font-family: Verdana, sans-serif;
-        font-size: small;
         overflow: hidden;
         display: flex;
         flex-direction: column;
-    }
-    :root {
-        --browser-background: #f4f4f8;
-        --browser-color: #000010;
-        --browser-border: #e3e3e3;
-        --icon-hover: rgba(110, 164, 189, 0.43);
     }
 </style>
