@@ -553,9 +553,3 @@ class TorchAttributeInferencePipeline(CFIAttributeInferencePipeline):
 
         x_np = np.stack([x_im.transpose(2, 0, 1) for _, x_im in prep_batch], axis=0)
         return torch.from_numpy(x_np).to(device=self.device, dtype=torch.float32)
-
-    def _run_torch_forward(self, x_in: Any, model_forward_fn) -> np.ndarray:
-        import torch
-
-        with torch.no_grad():
-            return model_forward_fn(x_in).detach().cpu().numpy()

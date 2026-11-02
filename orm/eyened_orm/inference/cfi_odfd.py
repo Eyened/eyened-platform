@@ -68,11 +68,9 @@ class CFI_ODFD(TorchAttributeInferencePipeline):
     ) -> Iterable[float]:
         """Process batch: ensemble averaging and extract first channel."""
         x_in = self._prepare_torch_batch(prep_batch)
-        result = self._run_torch_forward(x_in, self.ensemble.forward)
-
-        # Ensemble averaging: result is (num_models, batch_size, 1)
-        # Average over ensemble (axis=0), extract channel [:, 0]
-        return result.mean(axis=0)[:, 0]
+        predictions = self.ensemble.predict_batch({"image": x_in}, fields=("prediction",))
+        # NMC member distances; retain NumPy averaging and the first channel.
+        return predictions["prediction"].cpu().numpy().mean(axis=1)[:, 0]
 
     def postprocess(
         self, prep_item: Tuple[Any, np.ndarray], batch_output: float

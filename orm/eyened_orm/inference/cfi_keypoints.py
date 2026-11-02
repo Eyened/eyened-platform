@@ -98,6 +98,11 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
             "contrast_enhance"
         ]
 
+        # These releases produced stored coordinates using float32 heatmaps.
+        # predict_batch normally enables CUDA autocast for heatmap ensembles.
+        self.ensemble_fovea.autocast_inference = False
+        self.ensemble_discedge.autocast_inference = False
+
         self.resize = 512
         self.apply_ce = True
 
@@ -118,14 +123,14 @@ class CFIKeypoints(TorchAttributeInferencePipeline):
         """Process batch with two ensembles (fovea and disc edge)."""
         x_in = self._prepare_torch_batch(prep_batch)
 
-        fovea_heatmap = self._run_torch_forward(x_in, self.ensemble_fovea.forward)
-        disc_edge_heatmap = self._run_torch_forward(
-            x_in, self.ensemble_discedge.forward
-        )
+        batch = {"image": x_in}
+        fovea = self.ensemble_fovea.predict_batch(batch, fields=("heatmaps",))
+        disc_edge = self.ensemble_discedge.predict_batch(batch, fields=("heatmaps",))
 
-        # Average over ensemble dimension (axis=1) to get (batch_size, _, h, w)
-        fovea_heatmap = fovea_heatmap.mean(axis=1)
-        disc_edge_heatmap = disc_edge_heatmap.mean(axis=1)
+        # NMKHW heatmaps: average before locating the maximum. The generic
+        # keypoint aggregate averages member coordinates, which is different.
+        fovea_heatmap = fovea["heatmaps"].cpu().numpy().mean(axis=1)
+        disc_edge_heatmap = disc_edge["heatmaps"].cpu().numpy().mean(axis=1)
 
         return zip(fovea_heatmap, disc_edge_heatmap)
 

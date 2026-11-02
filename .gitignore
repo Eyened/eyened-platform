@@ -58,3 +58,4 @@ client/coverage/
 # diff-cover writes its markdown report to the cwd, not into coverage/.
 diff-cover.md
 client/diff-cover-client.md
+AGENTS.md
