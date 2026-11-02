@@ -82,7 +82,7 @@ shadcn's colour names do not exist.
 | `content-switcher-selected`                                              | `rgba(141,141,141,0.24)`                                  | Selected content switcher option                  |
 | `tag-background-gray` / `tag-color-gray` / `tag-hover-gray`              | `#525252` / `#f4f4f4` / `#636363`                         | Tags; tag close button hover                      |
 
-A field inside a dialog uses `field-02`, `field-hover-02`, `border-strong-02` automatically (`in-dialog:` variant in `app.css`, Carbon's Layer). A tag popover's fields use the 02 set too (`[data-slot="tag-popover"]`), and a tile on a study block is one layer up (`in-study:`, Carbon's Layer).
+A field inside a dialog uses `field-02`, `field-hover-02`, `border-strong-02` automatically (`in-dialog:` variant in `app.css`, Carbon's Layer). A tag popover's and a filter popover's fields use the 02 set too (`[data-slot="tag-popover"]`, `[data-slot="filter-popover"]`), and a tile on a study block is one layer up (`in-study:`, Carbon's Layer).
 
 ## Typography
 
@@ -105,7 +105,7 @@ one class sets size, line height, letter spacing and weight (`text-body-compact-
 
 - Spacing: Carbon's [scale](https://www.carbondesignsystem.com/building-blocks/foundations/spacing/overview)
   only — `0.5 1 2 3 4 6 8 10 12 16 20 24 40`. Exceptions: Button padding `1.5 2.5 3.5 3.75 15.75`
-  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's and side nav's 3 px current-item bar `0.75`, the side nav `w-64` (Carbon's 256 px), and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), the modal widths and heights (Carbon's percentages as fractions), the dropdown menu `max-h-66` / md `max-h-55` (5.5 items) and inline menu `min-w-72 max-w-120` (288 / 480 px), the expanded table row `ps-14` (3.5 rem), and the pagination select `pe-9` (2.25 rem), the content switcher lg padding `px-3.5` (14 px), the number input `min-w-37.5` (150 px), the calendar `w-72` (288 px) and its today dot `bottom-1.75` (7 px), the condition builder popover `max-h-88 max-w-80 min-w-48` (22 / 20 / 12 rem), and the `ui/command` list `max-h-75` (shadcn's 300 px, for its other callers), the tag `max-w-52` (208 px), the tag popovers `w-92` (368 px), the side panel `w-120 min-w-64` (30 / 16 rem), and the combo box `pe-17.5` and clear button `end-11.25` (70 / 45 px) and menu `max-h-55` (220 px).
+  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's and side nav's 3 px current-item bar `0.75`, the side nav `w-64` (Carbon's 256 px), and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), the modal widths and heights (Carbon's percentages as fractions), the dropdown menu `max-h-66` / md `max-h-55` (5.5 items) and inline menu `min-w-72 max-w-120` (288 / 480 px), the expanded table row `ps-14` (3.5 rem), and the pagination select `pe-9` (2.25 rem), the content switcher lg padding `px-3.5` (14 px), the number input `min-w-37.5` (150 px), the calendar `w-72` (288 px) and its today dot `bottom-1.75` (7 px), the condition builder popover `max-h-88 max-w-80 min-w-48` (22 / 20 / 12 rem), and the `ui/command` list `max-h-75` (shadcn's 300 px, for its other callers), the tag `max-w-52` (208 px), the tag popovers `w-92` (368 px), the filter popovers `w-72` (288 px, also the `ui/popover` default), the profile popover `w-64` (256 px), the side panel `w-120 min-w-64` (30 / 16 rem), and the combo box `pe-17.5` and clear button `end-11.25` (70 / 45 px) and menu `max-h-55` (220 px).
 - Header 48 px (`h-12`), fixed; content below it (`mt-12`) in `<main class="px-4 md:px-8 cds-max:px-10">`, full width at every size
   ([2x Grid, High-density interface model](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#high-density-interface-model)).
   The inset is Carbon's grid margin plus half its 32 px gutter: 16 px below `md`, 32 px from `md`, 40 px from `cds-max`
@@ -116,7 +116,7 @@ one class sets size, line height, letter spacing and weight (`text-body-compact-
 
 ## Shapes
 
-Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popover (2 px each), rounded-content-switcher (4 px) and rounded-tag (16 px), Carbon's; the tag close button is a circle (`rounded-full`). Shadows: `shadow-popover` for menus (Carbon tooltips have none); `shadow-button-focus` for Button focus; `shadow-content-switcher-selected` (an inset 1 px `border-inverse` ring) for the selected content switcher option. The tag popovers use `drop-shadow-popover` (Carbon's `drop-shadow(0 2px 2px rgba(0,0,0,0.2))`). Motion: `animate-loading-rotate` (690 ms) for the loading spinner; `animate-skeleton` (3000 ms) for skeletons.
+Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popover (2 px each), rounded-content-switcher (4 px) and rounded-tag (16 px), Carbon's; the tag close button is a circle (`rounded-full`). Shadows: `shadow-popover` for menus (Carbon tooltips have none); `shadow-button-focus` for Button focus; `shadow-content-switcher-selected` (an inset 1 px `border-inverse` ring) for the selected content switcher option. The tag popovers and the profile popover use `drop-shadow-popover` (Carbon's `drop-shadow(0 2px 2px rgba(0,0,0,0.2))`); the filter popovers use `shadow-popover`, as menus. Motion: `animate-loading-rotate` (690 ms) for the loading spinner; `animate-skeleton` (3000 ms) for skeletons.
 
 ## Components
 
@@ -197,8 +197,10 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
 - **Combo box** (`ui/combo-box`, md, menu from `ui/select`; the caller filters, a pick is an action):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/combo-box/usage). The tag combo box ends with `Create "<text>"`.
 - **Multiselect** (`ui/multi-select`, filterable, md; bits-ui Combobox `type="multiple"`, menu from `ui/select`): [Carbon](https://carbondesignsystem.com/building-blocks/core/components/dropdown/guidelines/#multiselect). Options show a checkbox; the field shows a count tag whose ✕ clears all; the filter text stays after a pick, which is not an action (unlike the combo box).
-- **Popover** (`ui/popover` with `tagPopoverClass`; no caret, Carbon React `caret={false}`):
-  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/popover/usage).
+- **Popover** (`ui/popover`; no caret, Carbon React `caret={false}`):
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/popover/usage). Tag popovers use
+  `tagPopoverClass`; toolbar filter popovers below md use `filterPopoverClass`; the profile popover has its own
+  class (Profile popover).
 - **Structured list** (`ui/structured-list`, `condensed`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/structured-list/usage).
 - **Accordion** (`ui/accordion`, align end, md, flush): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/accordion/guidelines). In a study block it is pulled out by the tile padding so titles align with the tile content ([Flush alignment](https://www.carbondesignsystem.com/building-blocks/core/components/accordion/guidelines#flush-alignment)); its hover is one layer up.
 - **Side panel** (`ui/side-panel`: IBM Products SidePanel, slide-over, right, md, with overlay): no guidelines page; references are

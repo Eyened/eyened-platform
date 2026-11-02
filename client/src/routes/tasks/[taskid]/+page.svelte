@@ -410,7 +410,8 @@
                     <Popover.Content
                         align="start"
                         sideOffset={0}
-                        class="flex w-72 flex-col gap-6 rounded-none border-0 bg-layer-01 p-4 text-text-primary shadow-popover"
+                        data-slot="filter-popover"
+                        class={Popover.filterPopoverClass}
                     >
                         {@render filters("default")}
                     </Popover.Content>
