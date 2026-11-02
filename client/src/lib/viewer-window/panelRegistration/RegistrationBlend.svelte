@@ -1,13 +1,21 @@
 <script lang="ts">
-    import Viewer from "$lib/viewer/Viewer.svelte";
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import { composeGlslPath } from "$lib/registration/composeGlslPath";
+    import { glslPathBetween } from "$lib/registration/glslPathBetween";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import {
-        AffineBlendRenderer,
-        parseHexColour,
-    } from "$lib/webgl/affineBlendRenderer";
-    import { getContext, mount, unmount, untrack } from "svelte";
+        BlendRenderer,
+        type BlendComposite,
+        type BlendLayer,
+        type BlendMapping,
+    } from "$lib/webgl/blendRenderer";
+    import { getContext, untrack } from "svelte";
     import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
+    import BlendLayerControls from "./BlendLayerControls.svelte";
+    import {
+        defaultBlendStyle,
+        mountBlendViewer,
+        registeredImageSize,
+    } from "./blendViewer";
     import { directAffineMatrix } from "./directAffine";
 
     interface Props {
@@ -20,170 +28,134 @@
         "viewerWindowContext",
     );
 
+    const fixedMapping = composeGlslPath([]);
     const fixedImage = $derived(images[0] ?? null);
     const movingImage = $derived(images[1] ?? null);
 
-    let fixedMix = $state(1);
-    let movingMix = $state(1);
-    let fixedOpacity = $state(1);
-    let movingOpacity = $state(1);
-    let fixedColour = $state("#ff0000");
-    let movingColour = $state("#00ffff");
+    let composite = $state<BlendComposite>("overlay");
+    let tile = $state(64);
+    let fixedStyle = $state(defaultBlendStyle("#ff0000", 1));
+    let movingStyle = $state(defaultBlendStyle("#00ffff", 1));
 
-    // AffineBlendRenderer uses private fields, so it stays a plain instance.
-    // rendererEpoch is the signal that a new viewer context is ready.
-    let blendRenderer: AffineBlendRenderer | null = null;
-    let rendererEpoch = $state(0);
-
+    // Raw, because BlendRenderer uses private fields.
+    let blendRenderer = $state.raw<BlendRenderer | null>(null);
     let stage: HTMLDivElement | undefined = $state();
 
-    // Viewer reads its context once. A new fixed image needs a new
-    // ViewerContext, so the viewer is remounted rather than reused.
     $effect(() => {
         const node = stage;
         const image = fixedImage;
         if (!node || !image) return;
-
-        const mounted = untrack(() => {
-            const viewerContext = new ViewerContext(image, viewerWindowContext);
-            const renderer = new AffineBlendRenderer(image.webgl);
-            viewerContext.imageRenderer =
-                renderer as unknown as typeof viewerContext.imageRenderer;
-            const app = mount(Viewer, {
-                target: node,
-                props: { showInfo: false, foreground: true },
-                intro: false,
-                context: new Map<string, unknown>([
-                    ["viewerContext", viewerContext],
-                    ["viewerWindowContext", viewerWindowContext],
-                ]),
-            });
-            blendRenderer = renderer;
-            rendererEpoch += 1;
-            return app;
-        });
-
+        const renderer = new BlendRenderer();
+        const unmountViewer = untrack(() =>
+            mountBlendViewer(node, image, viewerWindowContext, renderer),
+        );
+        blendRenderer = renderer;
         return () => {
-            const renderer = blendRenderer;
             blendRenderer = null;
-            rendererEpoch += 1;
-            unmount(mounted);
-            renderer?.dispose();
+            unmountViewer();
+            renderer.dispose();
         };
     });
 
+    /**
+     * The direct affine is a uniform, so point drags do not recompile.
+     * Until that edge exists, any other baked path is shown instead.
+     */
+    const movingMapping = $derived.by((): BlendMapping => {
+        const fixed = fixedImage;
+        const moving = movingImage;
+        const registration = viewerWindowContext.registration;
+        void registration.revision;
+        if (!fixed || !moving) return { affine: null };
+        const affine = directAffineMatrix(
+            registration.getRegistrationItem(fixed.image_id, moving.image_id),
+        );
+        if (affine) return { affine };
+        return (
+            glslPathBetween(
+                registration,
+                fixed.image_id,
+                moving.image_id,
+                (id) => registeredImageSize(viewerWindowContext, id),
+            ) ?? { affine: null }
+        );
+    });
+
     $effect(() => {
-        const epoch = rendererEpoch;
         const renderer = blendRenderer;
         const fixed = fixedImage;
         const moving = movingImage;
-        const revision = viewerWindowContext.registration.revision;
-        const nextFixedMix = fixedMix;
-        const nextMovingMix = movingMix;
-        const nextFixedOpacity = fixedOpacity;
-        const nextMovingOpacity = movingOpacity;
-        const nextFixedColour = fixedColour;
-        const nextMovingColour = movingColour;
-        void epoch;
-        void revision;
         if (!renderer || !fixed) return;
 
-        const affine = moving
-            ? directAffineMatrix(
-                  viewerWindowContext.registration.getRegistrationItem(
-                      fixed.image_id,
-                      moving.image_id,
-                  ),
-              )
-            : null;
-        renderer.setPair(fixed, affine && moving ? moving : null, affine);
-        renderer.setTint(
-            nextFixedMix,
-            parseHexColour(nextFixedColour),
-            nextFixedOpacity,
-            nextMovingMix,
-            parseHexColour(nextMovingColour),
-            nextMovingOpacity,
-        );
+        const layers: BlendLayer[] = [
+            {
+                image: fixed,
+                mapping: fixedMapping,
+                style: $state.snapshot(fixedStyle),
+                weight: 1,
+            },
+        ];
+        if (moving) {
+            layers.push({
+                image: moving,
+                mapping: movingMapping,
+                style: $state.snapshot(movingStyle),
+                weight: 1,
+            });
+        }
+        renderer.setLayers(layers);
+        renderer.setComposite(composite, tile);
     });
 </script>
 
 <div class="blend">
     <div class="stage" bind:this={stage}></div>
     <aside class="controls">
+        <fieldset class="composite">
+            <legend>Blend</legend>
+            <label>
+                <input type="radio" bind:group={composite} value="overlay" />
+                Colour overlay
+            </label>
+            <label>
+                <input
+                    type="radio"
+                    bind:group={composite}
+                    value="checkerboard"
+                />
+                Checkerboard
+            </label>
+            {#if composite === "checkerboard"}
+                <label>
+                    Tile
+                    <input
+                        type="range"
+                        min="8"
+                        max="512"
+                        step="8"
+                        bind:value={tile}
+                        aria-label="Checkerboard tile size"
+                        title="Tile size in pixels of the fixed image"
+                    />
+                </label>
+            {/if}
+        </fieldset>
         {#if fixedImage}
-            {@render layer(
-                "Fixed",
-                fixedImage.instance.id,
-                fixedMix,
-                fixedColour,
-                fixedOpacity,
-                (value) => (fixedMix = value),
-                (value) => (fixedColour = value),
-                (value) => (fixedOpacity = value),
-            )}
+            <BlendLayerControls
+                image={fixedImage}
+                name="Fixed"
+                bind:style={fixedStyle}
+            />
         {/if}
         {#if movingImage}
-            {@render layer(
-                "Moving",
-                movingImage.instance.id,
-                movingMix,
-                movingColour,
-                movingOpacity,
-                (value) => (movingMix = value),
-                (value) => (movingColour = value),
-                (value) => (movingOpacity = value),
-            )}
+            <BlendLayerControls
+                image={movingImage}
+                name="Moving"
+                bind:style={movingStyle}
+            />
         {/if}
     </aside>
 </div>
-
-{#snippet layer(
-    role: string,
-    publicId: string,
-    mix: number,
-    colour: string,
-    opacity: number,
-    setMix: (value: number) => void,
-    setColour: (value: string) => void,
-    setOpacity: (value: number) => void,
-)}
-    <section class="layer">
-        <div class="public-id" title={publicId}>{publicId}</div>
-        <label>
-            Colour
-            <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={mix}
-                aria-label="{role} tint"
-                title="Left is the original colour, right is luminosity times the picked colour"
-                oninput={(event) => setMix(Number(event.currentTarget.value))}
-            />
-            <input
-                type="color"
-                value={colour}
-                aria-label="{role} colour"
-                oninput={(event) => setColour(event.currentTarget.value)}
-            />
-        </label>
-        <label>
-            Opacity
-            <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={opacity}
-                aria-label="{role} opacity"
-                oninput={(event) =>
-                    setOpacity(Number(event.currentTarget.value))}
-            />
-        </label>
-    </section>
-{/snippet}
 
 <style>
     .blend {
@@ -212,19 +184,18 @@
         color: white;
     }
 
-    .layer {
+    .composite {
         display: flex;
         flex-direction: column;
-        gap: 0.35em;
+        gap: 0.25em;
+        margin: 0;
         padding: 0.4em;
         border: 1px solid rgba(255, 255, 255, 0.25);
     }
 
-    .public-id {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+    .composite legend {
         font-size: 0.85em;
+        padding: 0 0.25em;
     }
 
     label {
@@ -237,15 +208,5 @@
     input[type="range"] {
         flex: 1;
         min-width: 0;
-    }
-
-    input[type="color"] {
-        flex: 0 0 auto;
-        width: 2rem;
-        height: 1.4rem;
-        padding: 0;
-        border: none;
-        background: transparent;
-        cursor: pointer;
     }
 </style>

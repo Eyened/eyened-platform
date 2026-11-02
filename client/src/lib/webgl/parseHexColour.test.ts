@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseHexColour } from "./affineBlendRenderer";
+import { parseHexColour } from "./parseHexColour";
 
 describe("parseHexColour", () => {
     it("parses a hex colour into 0–1 channels", () => {

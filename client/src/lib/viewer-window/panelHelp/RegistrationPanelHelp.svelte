@@ -32,14 +32,23 @@
             height.
         </li>
         <li>
-            Each image is a block headed by its public id. The colour slider
-            goes from the original colours to luminosity times the picked
-            colour. Opacity fades that image out. Fixed starts red and moving
-            starts cyan.
+            <strong>Colour overlay</strong> adds the images per colour channel.
+            Red and cyan turn grey where they match. Images that share a colour
+            average rather than getting brighter.
+            <strong>Checkerboard</strong> alternates fixed and moving in tiles of
+            the chosen size.
         </li>
         <li>
-            That second image stays out until the points define an affine
-            between the two.
+            Each image is a block headed by its public id, with the render mode
+            and window/level from the rendering panel. The colour slider goes
+            from the original colours to luminosity times the picked colour.
+            Opacity fades that image out. Fixed starts red and moving starts
+            cyan.
+        </li>
+        <li>
+            Once the points define an affine between the two, the moving image
+            follows it. Before that it follows any other registration between
+            them, or stays out.
         </li>
     </ul>
 </section>
@@ -53,7 +62,7 @@
         <li>
             The selected images sit above the blend. The slider walks from the
             first image to the last, blending one consecutive pair at a time.
-            Each image has its own opacity.
+            Each image has the same block as the editor and starts untinted.
         </li>
         <li>
             This blend follows the registration graph, including a polynomial

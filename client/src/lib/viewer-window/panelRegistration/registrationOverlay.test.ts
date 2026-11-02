@@ -19,25 +19,22 @@ vi.mock("$lib/viewer/viewerContext.svelte", () => ({
     },
 }));
 
-vi.mock("$lib/webgl/affineBlendRenderer", async () => {
-    const actual = await vi.importActual<
-        typeof import("$lib/webgl/affineBlendRenderer")
-    >("$lib/webgl/affineBlendRenderer");
-    return {
-        ...actual,
-        AffineBlendRenderer: class {
-            setPair = vi.fn();
-            setTint = vi.fn();
-            dispose = vi.fn();
-        },
-    };
-});
+const renderers = vi.hoisted(
+    () =>
+        [] as {
+            setLayers: ReturnType<typeof vi.fn>;
+            setComposite: ReturnType<typeof vi.fn>;
+        }[],
+);
 
-vi.mock("$lib/webgl/seriesBlendRenderer", () => ({
-    SeriesBlendRenderer: class {
+vi.mock("$lib/webgl/blendRenderer", () => ({
+    BlendRenderer: class {
         setLayers = vi.fn();
-        setWeights = vi.fn();
+        setComposite = vi.fn();
         dispose = vi.fn();
+        constructor() {
+            renderers.push(this);
+        }
     },
 }));
 
@@ -116,6 +113,35 @@ describe("registration overlays", () => {
         await fireEvent.input(screen.getByLabelText("Fixed opacity"), {
             target: { value: "0.2" },
         });
+        await fireEvent.change(screen.getByLabelText("Moving render mode"), {
+            target: { value: "CLAHE" },
+        });
+
+        const renderer = renderers.at(-1)!;
+        const [fixedLayer, movingLayer] = renderer.setLayers.mock.lastCall![0];
+        expect(fixedLayer.style).toMatchObject({
+            tint: 0.4,
+            colour: "#ff0000",
+            opacity: 0.2,
+        });
+        expect(movingLayer.style).toMatchObject({
+            colour: "#112233",
+            renderMode: "CLAHE",
+        });
+        expect(movingLayer.mapping).toEqual({ affine: null });
+        expect(renderer.setComposite).toHaveBeenLastCalledWith("overlay", 64);
+
+        expect(
+            screen.queryByLabelText("Checkerboard tile size"),
+        ).not.toBeInTheDocument();
+        await fireEvent.click(screen.getByLabelText("Checkerboard"));
+        await fireEvent.input(screen.getByLabelText("Checkerboard tile size"), {
+            target: { value: "128" },
+        });
+        expect(renderer.setComposite).toHaveBeenLastCalledWith(
+            "checkerboard",
+            128,
+        );
 
         const resizer = document.querySelector(".resizer");
         if (!resizer) throw new Error("resizer missing");
@@ -163,9 +189,21 @@ describe("registration overlays", () => {
                 target: { value: "0.6" },
             },
         );
-        await fireEvent.input(screen.getByLabelText("Opacity public-fixed"), {
+        await fireEvent.input(screen.getByLabelText("public-fixed opacity"), {
             target: { value: "0.3" },
         });
+        await fireEvent.input(screen.getByLabelText("public-moving tint"), {
+            target: { value: "1" },
+        });
+
+        const renderer = renderers.at(-1)!;
+        const layers = renderer.setLayers.mock.lastCall![0];
+        expect(layers.map((layer: { weight: number }) => layer.weight)).toEqual(
+            [0.4, 0.6],
+        );
+        expect(layers[0].style).toMatchObject({ opacity: 0.3, tint: 0 });
+        expect(layers[1].style).toMatchObject({ opacity: 1, tint: 1 });
+        expect(screen.queryByLabelText("Checkerboard")).not.toBeInTheDocument();
 
         const resizer = document.querySelector(".resizer");
         if (!resizer) throw new Error("resizer missing");

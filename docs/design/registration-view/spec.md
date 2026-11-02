@@ -13,7 +13,7 @@ A user reviewing registration can:
 - place landmarks on those two images with the point tool already on
 - see the moving image warped into the fixed image by a direct affine
 
-Each image can fade between its original colours and luminosity times a picked colour, and each has its own opacity.
+Each image has its own render mode, window/level, tint, and opacity. The images are then blended as a colour overlay or a checkerboard.
 
 ## Decisions
 
@@ -25,20 +25,27 @@ Each image can fade between its original colours and luminosity times a picked c
 - The editor is a full-window layer in this window. It reuses the existing graphics context. It does not open a browser popup.
 - The normal viewers stay mounted underneath and do not paint while the editor is open. Closing resumes them.
 - The editor uses the existing `Viewer`, point tool, loaded images, and registration graph. It does not reuse the top row, the side panels, or the main viewer.
-- The blend is one fixed shader for two images. The affine matrix, tint, and opacity are uniforms. Point drags do not recompile it.
-- Only a direct affine edge between the two images is used. The moving image stays out until that edge exists, and it is not drawn where the warp falls outside that image.
+- The editor and the series blend share one renderer and one generated shader. Layer styles, weights, the composite mode, and the direct affine are uniforms. Point drags do not recompile it.
+- The moving image uses the direct affine edge between the two images. Until that edge exists, it uses any other baked path from the registration graph, and stays out when there is none. It is not drawn where the warp falls outside that image.
 - The session is not written to the view-state URL.
 
 ## Editor
 
 Close sits at the top right. Above a draggable separator are the two images, each with the point tool armed. Below is the blend. The separator works like the one between the normal top row and the main viewer, and starts at 34% of the window.
 
-The blend panel has one block per image, headed by its public id:
+The blend panel starts with the blend mode:
 
+- **Colour overlay** adds the layers per colour channel, then divides each channel by how much of it the layers cover when that is above one. Complementary tints such as red and cyan add up, so matching structure turns grey. Layers that share a channel average instead of getting brighter.
+- **Checkerboard** shows fixed and moving in alternating tiles, with a tile size in fixed-image pixels. Where the moving image has no sample, the fixed image fills the tile.
+
+Below it is one block per image, headed by its public id. The block is shared with the series blend:
+
+- a render mode select, using the same modes and component as the rendering panel
+- a window/level slider, using the same component as the rendering panel
 - a slider from original colour (left) to luminosity times the picked colour (right), plus a colour picker
 - an opacity slider
 
-Fixed starts fully red. Moving starts fully cyan. Both start fully opaque.
+Fixed starts fully red. Moving starts fully cyan. Both start fully opaque, in Original, with the full window.
 
 ## Data flow
 
@@ -55,8 +62,8 @@ A separate section in the same panel opens a second full-window view. It is not 
 - Thumbnails for that eye can be selected in any number. The outline shows the selection. **View blend** needs at least two.
 - The series order is top-row order among the selected images.
 - The overlay shows those images on top and the blend below, with the same draggable separator, starting at 34%.
-- The side panel has one opacity slider per image, and one series slider. The series slider at the left shows only the first image. Moving it right blends into the next image, then the one after that, one consecutive pair at a time, until the last image is the only one shown.
-- Per-image opacity multiplies that pair weight.
+- The side panel has one series slider and one block per image, the same block as the editor. Images start untinted. The series slider at the left shows only the first image. Moving it right blends into the next image, then the one after that, one consecutive pair at a time, until the last image is the only one shown.
+- Per-image opacity multiplies that pair weight. Layers are combined as the editor's colour overlay. There is no checkerboard here.
 - The first image is the coordinate space. Each other image is warped by a baked path from the registration graph. That path can be affine, parabolic, composite, or enface. The shader is compiled when those paths change. The sliders only update weight uniforms.
 - An image with no bakeable path from the first image adds nothing.
 - Samples that fall outside an image are not drawn.
@@ -64,8 +71,8 @@ A separate section in the same panel opens a second full-window view. It is not 
 
 ## Out of scope
 
-- Multi-hop or non-affine warps in the two-image editor
-- Colour tint in the series blend
-- Invert, reset, and blend modes other than these two
+- Editing anything other than the direct affine in the two-image editor
+- Checkerboard in the series blend
+- Invert, reset, and blend modes other than overlay and checkerboard
 - A separate browser window
 - Changing point storage or the registration math
