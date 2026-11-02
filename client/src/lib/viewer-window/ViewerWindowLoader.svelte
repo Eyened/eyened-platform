@@ -34,7 +34,6 @@ Used to create the viewerwindow context.
     const { promise, resolve, reject } = new Deferred<ViewerWindowContext>();
     let viewerWindowContext: ViewerWindowContext | null = null;
     let webgl: WebGL | null = null;
-    let addedDarkClass = false;
 
     function handleContextLost(event: Event) {
         event.preventDefault();
@@ -66,11 +65,6 @@ Used to create the viewerwindow context.
     onMount(() => {
         window.addEventListener("resize", resizeCanvas);
         resizeCanvas();
-
-        if (!document.documentElement.classList.contains("dark")) {
-            document.documentElement.classList.add("dark");
-            addedDarkClass = true;
-        }
 
         // Add WebGL context event listeners
         mainCanvas.addEventListener("webglcontextlost", handleContextLost);
@@ -129,11 +123,6 @@ Used to create the viewerwindow context.
                 handleContextRestored,
             );
 
-            if (addedDarkClass) {
-                document.documentElement.classList.remove("dark");
-                addedDarkClass = false;
-            }
-
             if (viewerWindowContext) {
                 viewerWindowContext.destroy();
                 viewerWindowContext = null;
@@ -163,15 +152,6 @@ Used to create the viewerwindow context.
 {/await}
 
 <style>
-    :global(body) {
-        margin: 0;
-        height: 100vh;
-        font-family: Verdana, sans-serif;
-        font-size: small;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-    }
     canvas {
         position: absolute;
         left: 0;

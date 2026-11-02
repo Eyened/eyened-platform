@@ -12,7 +12,7 @@
 <div
     data-slot="empty-description"
     class={cn(
-        "text-sm/relaxed text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
+        "text-body-01 text-text-secondary [&>a]:text-link-primary [&>a:hover]:text-link-primary-hover",
         className,
     )}
     {...restProps}

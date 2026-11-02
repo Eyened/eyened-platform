@@ -146,9 +146,7 @@
         <Tagger
             tagType="FormAnnotation"
             tags={form.tags ?? []}
-            tag={(id) => {
-                tagFormAnnotation(form, id);
-            }}
+            tag={(id) => tagFormAnnotation(form, id)}
             untag={(id) => untagFormAnnotation(form, id)}
             onUpdate={(tagId, comment) =>
                 updateTagFormAnnotation(form.id, tagId, comment)}

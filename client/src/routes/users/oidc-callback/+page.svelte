@@ -1,9 +1,11 @@
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button/index.js";
-    import { getContext, onMount } from "svelte";
-    import { page } from "$app/state";
     import { resolve } from "$app/paths";
+    import { page } from "$app/state";
+    import AuthPage from "$lib/AuthPage.svelte";
+    import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { getContext, onMount } from "svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
@@ -33,21 +35,16 @@
     });
 </script>
 
-<div class="flex min-h-screen flex-col items-center justify-center p-4">
-    <div
-        class="m-4 w-[440px] rounded-xl border border-gray-200 bg-white p-8 shadow-sm"
-    >
-        {#if error}
-            <h1 class="mb-2 text-lg font-semibold">Sign-in failed</h1>
-            <p class="mb-6 text-sm text-red-600">{error}</p>
-            <Button href={resolve("/users/login")} class="w-full"
-                >Back to login</Button
-            >
-        {:else}
-            <h1 class="mb-2 text-lg font-semibold">Signing in</h1>
-            <p class="text-sm text-gray-600">
-                Completing OpenID Connect sign-in…
-            </p>
-        {/if}
-    </div>
-</div>
+<AuthPage>
+    <h1 class="mb-8 text-heading-03">Log in to EyeNED</h1>
+    {#if error}
+        <InlineNotification title="Log in failed" subtitle={error} />
+        <a
+            href={resolve("/users/login")}
+            class="mt-6 inline-block text-body-compact-01 text-link-primary hover:text-link-primary-hover hover:underline"
+            >Back to log in</a
+        >
+    {:else}
+        <InlineLoading status="active" description="Logging in…" />
+    {/if}
+</AuthPage>

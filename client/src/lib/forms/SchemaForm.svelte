@@ -301,8 +301,8 @@
         margin-left: 1em;
         padding: 0.2em 0.5em;
         border-radius: 0.25rem;
-        background-color: hsl(var(--muted));
-        color: darkolivegreen;
+        background-color: var(--color-layer-01);
+        color: var(--color-text-primary);
         font-weight: 600;
         display: inline-flex;
         align-items: center;

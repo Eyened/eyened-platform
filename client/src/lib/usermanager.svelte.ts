@@ -1,7 +1,7 @@
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
-import { page } from "$app/state";
 import { authClient, type UserResponse } from "../auth";
+import { isPublicPath } from "./publicPaths";
 
 export class UserManager {
     public user = $state<UserResponse>({
@@ -15,18 +15,20 @@ export class UserManager {
     public starredTagIds = $state<number[]>([]);
 
     async init(pathname: string) {
-        if (
-            pathname.startsWith("/users/login") ||
-            pathname.startsWith("/users/oidc-callback")
-        ) {
+        if (pathname.startsWith("/users/oidc-callback")) {
             return;
         }
 
-        const user = await authClient.me();
+        const onPublicPage = isPublicPath(pathname);
+        // Logged out, me() rejects once the session refresh fails; on a
+        // public page that just means: show the page.
+        const user = onPublicPage
+            ? await authClient.me().catch(() => null)
+            : await authClient.me();
         if (user === null) {
             console.log("User is not logged in");
-            // Only redirect if we're not already on the login page
-            if (!page.url.pathname.startsWith("/users/login")) {
+            // Only redirect if we're not already on a public page
+            if (!onPublicPage) {
                 console.log(
                     "redirecting to",
                     encodeURIComponent(window.location.href),
@@ -43,6 +45,11 @@ export class UserManager {
         this.user = user;
         this.starredTagIds = user.starred_tags ?? [];
 
+        // Already logged in: skip the login form.
+        if (pathname.startsWith("/users/login")) {
+            await goToNext(nextFromUrl());
+        }
+
         // await this.setCreator(user.id);
     }
 
@@ -51,38 +58,15 @@ export class UserManager {
         this.starredTagIds = this.user.starred_tags ?? [];
         // await this.setCreator(resp.id);
 
-        // Get the 'next' URL from the query parameters
-        const params = new URLSearchParams(window.location.search);
-        const nextUrl = params.get("next");
-
-        // If there's a 'next' URL, go there, otherwise go to the root
-        if (nextUrl) {
-            // nextUrl is an opaque redirect target captured earlier (e.g. from
-            // window.location.href) and round-tripped through the "next" query
-            // param; it is not a static route literal, so resolve() cannot
-            // validate it at compile time.
-            // eslint-disable-next-line svelte/no-navigation-without-resolve -- decoded redirect target, not a static route literal
-            await goto(decodeURIComponent(nextUrl));
-        } else {
-            await goto(resolve("/"));
-        }
+        await goToNext(nextFromUrl());
     }
 
     async OIDCLogin(code: string, state: string) {
         this.user = await authClient.OIDCAuthenticate(code, state);
         this.starredTagIds = this.user.starred_tags ?? [];
 
-        // Get the 'next' URL from state
         const state_decoded = JSON.parse(decodeURIComponent(state));
-        const nextUrl = state_decoded.next.toString();
-
-        // If there's a 'next' URL, go there, otherwise go to the root
-        if (nextUrl) {
-            // eslint-disable-next-line svelte/no-navigation-without-resolve -- decoded redirect target, not a static route literal
-            await goto(decodeURIComponent(nextUrl));
-        } else {
-            await goto(resolve("/"));
-        }
+        await goToNext(state_decoded.next.toString());
     }
 
     async logout() {
@@ -111,8 +95,24 @@ export class UserManager {
     // }
 
     async signup(username: string, password: string) {
-        const user = await authClient.register(username, password);
-        this.user = user;
-        this.starredTagIds = user.starred_tags ?? [];
+        // Register sets no session; log in to get one.
+        await authClient.register(username, password);
+        await this.login(username, password, false);
+    }
+}
+
+function nextFromUrl() {
+    return new URLSearchParams(window.location.search).get("next");
+}
+
+// `next` comes from the URL, so it can name another origin (a mistyped port,
+// a stale link) that goto() rejects; go to the root instead.
+async function goToNext(next: string | null) {
+    const url = next ? URL.parse(next, window.location.origin) : null;
+    if (url?.origin === window.location.origin) {
+        // eslint-disable-next-line svelte/no-navigation-without-resolve -- redirect target from the URL, not a static route literal
+        await goto(url.pathname + url.search + url.hash);
+    } else {
+        await goto(resolve("/"));
     }
 }

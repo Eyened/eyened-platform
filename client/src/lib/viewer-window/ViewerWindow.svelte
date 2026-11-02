@@ -78,7 +78,7 @@ Keeps track of the main panels and the top row of images.
 <RegistrationItemLoader {registration} {registrationSet} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div id="main" bind:this={main} class="dark">
+<div id="main" bind:this={main}>
     <div id="top" class="row">
         <TopRowImages />
     </div>
@@ -108,6 +108,8 @@ Keeps track of the main panels and the top row of images.
         grid-template-rows: 20% 1px 1fr;
         overflow: auto;
         flex: 1;
+        /* Keeps the viewer's z-indexes below menus portalled to <body>. */
+        isolation: isolate;
     }
     div#top {
         display: flex;
@@ -149,7 +151,7 @@ Keeps track of the main panels and the top row of images.
     }
 
     div.no-viewer {
-        background-color: gray;
+        background-color: #000000;
         flex: 1;
         flex-direction: column;
         align-items: center;

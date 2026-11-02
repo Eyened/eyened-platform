@@ -1,13 +1,14 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import { ButtonGroup } from "$lib/components/ui/button-group";
     import Button from "$lib/components/ui/button/button.svelte";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import { TextArea } from "$lib/components/ui/text-area/index.js";
     import { updateSubTaskComments } from "$lib/data";
     import { updateSubTask } from "$lib/data/api";
-    import ChevronLeft from "@lucide/svelte/icons/chevron-left";
-    import ChevronRight from "@lucide/svelte/icons/chevron-right";
-    import Expand from "@lucide/svelte/icons/expand";
-    import Shrink from "@lucide/svelte/icons/shrink";
+    import ChevronLeft from "carbon-icons-svelte/lib/ChevronLeft.svelte";
+    import ChevronRight from "carbon-icons-svelte/lib/ChevronRight.svelte";
+    import Maximize from "carbon-icons-svelte/lib/Maximize.svelte";
+    import Minimize from "carbon-icons-svelte/lib/Minimize.svelte";
     import { toast } from "svelte-sonner";
     import { subTaskStates } from "../../types/openapi_constants";
     import type { SubTaskState } from "../../types/openapi_types";
@@ -80,22 +81,20 @@
         {#if showExpandControl || panelConfig.sections.title}
             <div class="header">
                 {#if showExpandControl}
-                    <Button
-                        variant="outline"
-                        size="sm"
+                    <IconButton
+                        label={expanded
+                            ? "Collapse task panel"
+                            : "Expand task panel"}
                         class="toggle"
                         onclick={toggleExpanded}
                         aria-expanded={expanded}
-                        aria-label={expanded
-                            ? "Collapse task panel"
-                            : "Expand task panel"}
                     >
                         {#if expanded}
-                            <Shrink />
+                            <Minimize />
                         {:else}
-                            <Expand />
+                            <Maximize />
                         {/if}
-                    </Button>
+                    </IconButton>
                 {/if}
                 {#if panelConfig.sections.title}
                     <div class="title">
@@ -107,66 +106,57 @@
 
         {#if panelConfig.sections.nav}
             <div class="controls nav">
-                <ButtonGroup orientation="horizontal">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onclick={() => navigation.prev()}
-                        disabled={navigation.prevDisabled}
-                        aria-label="Previous subtask"
-                    >
-                        <ChevronLeft />
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onclick={() => navigation.next()}
-                        disabled={navigation.nextDisabled}
-                        aria-label="Next subtask"
-                    >
-                        <ChevronRight />
-                    </Button>
-                </ButtonGroup>
+                <IconButton
+                    label="Previous subtask"
+                    onclick={() => navigation.prev()}
+                    disabled={navigation.prevDisabled}
+                >
+                    <ChevronLeft />
+                </IconButton>
+                <IconButton
+                    label="Next subtask"
+                    onclick={() => navigation.next()}
+                    disabled={navigation.nextDisabled}
+                >
+                    <ChevronRight />
+                </IconButton>
             </div>
         {/if}
 
         {#if panelConfig.sections.status}
             <div class="controls">
-                <div class:busy={isUpdatingState} aria-busy={isUpdatingState}>
-                    <ButtonGroup orientation="vertical">
-                        {#each subTaskStates as state (state)}
-                            {@const isActive = subTask.task_state === state}
-                            <Button
-                                variant={isActive ? "default" : "outline"}
-                                size="sm"
-                                disabled={isUpdatingState}
-                                onclick={() => !isActive && setState(state)}
-                                aria-pressed={isActive}
-                                class={isActive ? "font-semibold" : ""}
-                            >
-                                {state}
-                            </Button>
-                        {/each}
-                    </ButtonGroup>
+                <div
+                    class="status"
+                    class:busy={isUpdatingState}
+                    aria-busy={isUpdatingState}
+                >
+                    {#each subTaskStates as state (state)}
+                        {@const isActive = subTask.task_state === state}
+                        <Button
+                            variant={isActive ? "default" : "ghost"}
+                            size="sm"
+                            disabled={isUpdatingState}
+                            onclick={() => !isActive && setState(state)}
+                            aria-pressed={isActive}
+                        >
+                            {state}
+                        </Button>
+                    {/each}
                 </div>
             </div>
         {/if}
 
         {#if expanded}
             {#if panelConfig.sections.comments}
-                <div class="comments">
-                    Comments:
-                    <textarea
-                        rows="4"
-                        value={subTask.comments || ""}
-                        onchange={async (e) => {
-                            const target = e.target as HTMLTextAreaElement;
-                            await updateComments(target.value);
-                        }}
-                        class="min-h-[48px] w-full rounded border p-1 text-xs"
-                        placeholder="Add comments..."
-                    ></textarea>
-                </div>
+                <TextArea
+                    labelText="Comments"
+                    value={subTask.comments || ""}
+                    onchange={async (e) => {
+                        const target = e.target as HTMLTextAreaElement;
+                        await updateComments(target.value);
+                    }}
+                    placeholder="Add comments..."
+                />
             {/if}
 
             {#if panelConfig.sections.overview}
@@ -187,8 +177,8 @@
         flex: 0 0 9rem;
         z-index: 2;
         background-color: black;
-        color: rgba(255, 255, 255, 0.9);
-        border-left: 1px solid rgba(255, 255, 255, 0.4);
+        color: var(--color-text-primary);
+        border-left: 1px solid var(--color-border-strong-01);
         padding: 0.25rem;
         gap: 0.2rem;
         overflow-y: auto;
@@ -226,12 +216,12 @@
         align-items: stretch;
         gap: 0;
     }
-    aside.task-panel :global([data-slot="button-group"]) {
-        width: 100%;
-    }
-    .nav :global([data-slot="button-group"]) {
-        display: flex;
+    .nav {
         flex-direction: row;
+    }
+    .status {
+        display: flex;
+        flex-direction: column;
     }
     .nav :global(button) {
         flex: 1;
@@ -258,16 +248,5 @@
         opacity: 0.6;
         pointer-events: none;
         cursor: wait;
-    }
-    .comments {
-        display: flex;
-        flex-direction: column;
-        gap: 0.15rem;
-        font-size: 0.75rem;
-    }
-    textarea {
-        background-color: white;
-        color: black;
-        line-height: 1.2;
     }
 </style>

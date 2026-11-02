@@ -1,99 +1,44 @@
 <script lang="ts">
-    import SelectWithSearch from "$lib/components/SelectWithSearch.svelte";
-    import * as Input from "$lib/components/ui/input";
-    import { getContext, onMount, tick } from "svelte";
-    import DatePicker from "../components/DatePicker.svelte";
-    import { BrowserContext, type Condition } from "./browserContext.svelte";
+    import { DatePicker } from "$lib/components/ui/date-picker/index.js";
+    import { Dropdown } from "$lib/components/ui/dropdown/index.js";
+    import { TextInput } from "$lib/components/ui/text-input/index.js";
+    import { getContext } from "svelte";
+    import type { BrowserContext } from "./browserContext.svelte";
 
+    // Quick fields: each filled field is its own condition (AND, B10). Enter in a field submits
+    // the surrounding search form.
+    const ALL = "__all__";
     const browserContext = getContext<BrowserContext>("browserContext");
+    let {
+        patientInput = $bindable(null),
+    }: { patientInput?: HTMLInputElement | null } = $props();
 
-    // bindable single basic condition - this is the root state
-    let { condition = $bindable<Condition | null>(null) } = $props();
-
-    function fieldUsesInOperator(variable: string) {
-        return Array.isArray(
-            browserContext.activeSignature.find((s) => s.name === variable)
-                ?.values,
-        );
-    }
-
-    // Factory to generate getter/setter objects for a single basic filter field
-    function conditionValueAccessor(variable: string) {
-        return {
-            get value() {
-                if (condition?.variable !== variable) return "";
-                const v = condition.value;
-                if (Array.isArray(v)) return v[0] ?? "";
-                return String(v ?? "");
-            },
-            set value(val: string) {
-                if (!val) {
-                    condition = null;
-                    return;
-                }
-                condition = fieldUsesInOperator(variable)
-                    ? {
-                          type: "default",
-                          variable,
-                          operator: "IN",
-                          value: [val],
-                      }
-                    : {
-                          type: "default",
-                          variable,
-                          operator: "==",
-                          value: val,
-                      };
-            },
-        };
-    }
-
-    const patientIdentifier = conditionValueAccessor("Patient Identifier");
-    const studyDate = conditionValueAccessor("Study Date");
-    const projectName = conditionValueAccessor("Project Name");
-
-    // Form submit handler
-    function handleSubmit(e: Event) {
-        e.preventDefault();
-        browserContext.search();
-    }
-
-    // Input ref for auto-focus
-    let patientInputRef = $state<HTMLInputElement | null>(null);
-
-    // Focus on page load
-    onMount(async () => {
-        await tick();
-        patientInputRef?.focus();
-    });
-
-    const projectOptions = $derived(
-        browserContext
+    const projectItems = $derived([
+        { id: ALL, text: "All projects" },
+        ...browserContext
             .getValueOptions("Project Name")
-            .map((v) => ({ label: v, value: v })),
-    );
+            .map((p) => ({ id: p, text: p })),
+    ]);
 </script>
 
-<form onsubmit={handleSubmit}>
-    <div
-        class="grid w-full grid-cols-[max-content_1fr] items-center gap-x-2 gap-y-1"
-    >
-        <!-- Inputs bind to getter/setter objects that derive from condition -->
-        <label>Patient Identifier:</label>
-        <Input.Input
-            bind:value={patientIdentifier.value}
-            placeholder="Patient Identifier"
-            bind:ref={patientInputRef}
-        />
-
-        <label>Study Date:</label>
-        <DatePicker bind:value={studyDate.value} />
-
-        <label>Project Name:</label>
-        <SelectWithSearch
-            options={projectOptions}
-            bind:value={projectName.value}
-            placeholder="Project Name"
-        />
-    </div>
-</form>
+<div class="flex flex-col gap-6">
+    <TextInput
+        labelText="Patient identifier"
+        autocomplete="off"
+        bind:value={browserContext.basic.patientIdentifier}
+        bind:ref={patientInput}
+    />
+    <DatePicker
+        labelText="Study date"
+        bind:value={browserContext.basic.studyDate}
+    />
+    <Dropdown
+        size="md"
+        labelText="Project"
+        items={projectItems}
+        bind:selectedId={
+            () => browserContext.basic.projectName || ALL,
+            (id) => (browserContext.basic.projectName = id === ALL ? "" : id)
+        }
+    />
+</div>
