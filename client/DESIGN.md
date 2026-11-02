@@ -90,22 +90,22 @@ IBM Plex Sans (variable), self-hosted via `@fontsource-variable/ibm-plex-sans`. 
 [productive type set](https://www.carbondesignsystem.com/building-blocks/foundations/typography/type-sets);
 one class sets size, line height, letter spacing and weight (`text-body-compact-01`).
 
-| Token                | Size / line height | Weight | Letter spacing | Use                                 |
-| -------------------- | ------------------ | ------ | -------------- | ----------------------------------- |
-| `label-01`           | 12 / 16 px         | 400    | 0.32 px        | Field labels, table meta, IDs       |
-| `helper-text-01`     | 12 / 16 px         | 400    | 0.32 px        | Help and error text                 |
-| `body-compact-01`    | 14 / 18 px         | 400    | 0.16 px        | Default text, table cells, controls |
-| `body-01`            | 14 / 20 px         | 400    | 0.16 px        | Multi-line text                     |
-| `heading-compact-01` | 14 / 18 px         | 600    | 0.16 px        | Table headers, product name         |
-| `heading-compact-02` | 16 / 22 px         | 600    | 0              | Section headings                    |
-| `heading-03`         | 20 / 28 px         | 400    | 0              | Modal titles, login title           |
-| `heading-04`         | 28 / 36 px         | 400    | 0              | Page heading                        |
+| Token                | Size / line height | Weight | Letter spacing | Use                                              |
+| -------------------- | ------------------ | ------ | -------------- | ------------------------------------------------ |
+| `label-01`           | 12 / 16 px         | 400    | 0.32 px        | Field labels, table meta, IDs                    |
+| `helper-text-01`     | 12 / 16 px         | 400    | 0.32 px        | Help and error text                              |
+| `body-compact-01`    | 14 / 18 px         | 400    | 0.16 px        | Default text, table cells, controls              |
+| `body-01`            | 14 / 20 px         | 400    | 0.16 px        | Multi-line text                                  |
+| `heading-compact-01` | 14 / 18 px         | 600    | 0.16 px        | Table headers, product name, subsection headings |
+| `heading-compact-02` | 16 / 22 px         | 600    | 0              | Section headings                                 |
+| `heading-03`         | 20 / 28 px         | 400    | 0              | Modal titles, login title, data table title      |
+| `heading-04`         | 28 / 36 px         | 400    | 0              | Page heading (sr-only on `/`)                    |
 
 ## Layout
 
 - Spacing: Carbon's [scale](https://www.carbondesignsystem.com/building-blocks/foundations/spacing/overview)
   only — `0.5 1 2 3 4 6 8 10 12 16 20 24 40`. Exceptions: Button padding `1.5 2.5 3.5 3.75 15.75`
-  (Carbon's values minus the 1 px border), Button max width and login column `max-w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's and side nav's 3 px current-item bar `0.75`, the side nav `w-64` (Carbon's 256 px), and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), the modal widths and heights (Carbon's percentages as fractions), the dropdown menu `max-h-66` / md `max-h-55` (5.5 items) and inline menu `min-w-72 max-w-120` (288 / 480 px), the expanded table row `ps-14` (3.5 rem), and the pagination select `pe-9` (2.25 rem), the content switcher lg padding `px-3.5` (14 px), the number input `min-w-37.5` (150 px), the calendar `w-72` (288 px) and its today dot `bottom-1.75` (7 px), the condition builder popover `max-h-88 max-w-80 min-w-48` (22 / 20 / 12 rem), and the `ui/command` list `max-h-75` (shadcn's 300 px, for its other callers), the tag `max-w-52` (208 px), the tag popovers `w-92` (368 px), the filter popovers `w-72` (288 px, also the `ui/popover` default), the profile popover `w-64` (256 px), the side panel `w-120 min-w-64` (30 / 16 rem), and the combo box `pe-17.5` and clear button `end-11.25` (70 / 45 px) and menu `max-h-55` (220 px).
+  (Carbon's values minus the 1 px border), Button max width, login column and study block form card `max-w-80` (20 rem), the login logo `w-32` (its 128 px source), the header's and side nav's 3 px current-item bar `0.75`, the side nav `w-64` (Carbon's 256 px), and the inline notification insets `3.25 3.5 3.75 13` (Carbon's values), the modal footer buttons `pt-3.5 pb-8`, the text area `pt-2.75`, the icon tooltip `py-0.5`, the tooltip `max-w-72`, the progress bar `min-w-12`, the table skeleton button `w-37.5` (Carbon's 150 px), the modal widths and heights (Carbon's percentages as fractions), the dropdown menu `max-h-66` / md `max-h-55` (5.5 items) and inline menu `min-w-72 max-w-120` (288 / 480 px), the expanded table row `ps-14` (3.5 rem), and the pagination select `pe-9` (2.25 rem), the content switcher lg padding `px-3.5` (14 px), the number input `min-w-37.5` (150 px), the calendar `w-72` (288 px) and its today dot `bottom-1.75` (7 px), the condition builder popover `max-h-88 max-w-80 min-w-48` (22 / 20 / 12 rem), and the `ui/command` list `max-h-75` (shadcn's 300 px, for its other callers), the tag `max-w-52` (208 px), the tag popovers `w-92` (368 px), the filter popovers `w-72` (288 px, also the `ui/popover` default), the profile popover `w-64` (256 px), the side panel `w-120 min-w-64` (30 / 16 rem), and the combo box `pe-17.5` and clear button `end-11.25` (70 / 45 px) and menu `max-h-55` (220 px).
 - Header 48 px (`h-12`), fixed; content below it (`mt-12`) in `<main class="px-4 md:px-8 cds-max:px-10">`, full width at every size
   ([2x Grid, High-density interface model](https://carbondesignsystem.com/building-blocks/foundations/2x-grid/guidelines/#high-density-interface-model)).
   The inset is Carbon's grid margin plus half its 32 px gutter: 16 px below `md`, 32 px from `md`, 40 px from `cds-max`
@@ -145,9 +145,9 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
   Low contrast only: Carbon's high-contrast default is a light box on Gray 100. Error (role alert) and warning (role status) kinds.
 - **Login, sign-up, OIDC callback** (`AuthPage.svelte` with `LoginForm.svelte`, `SignupForm.svelte`, `routes/users/oidc-callback`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/login); one centred column, as Carbon suggests without an illustration. Login shows "Don't have an account? Create an account" under the title when password login is on ([Anatomy](https://carbondesignsystem.com/building-blocks/core/patterns/login/#anatomy-of-a-basic-login-screen) item 2); a link inside a sentence is Carbon's inline variant, underlined ([Link](https://carbondesignsystem.com/building-blocks/core/components/link/guidelines/#variants)). Server errors go in one inline notification above the submit button, or under the title on the callback.
 - **Data table** (`ui/table`, `size` `md` 40 px, `lg` 48 px or `xl` 64 px for two-line rows; `Table.Toolbar`, `Table.ToolbarSearch`):
-  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/usage). Fewer than three row
-  actions are inline buttons, not an overflow menu. `Table.Skeleton` is Carbon's DataTableSkeleton
-  (toolbar, real headers, 5 skeleton rows, `aria-busy`), shown while a table loads. Expandable rows: `Table.ExpandButton` in the first cell and in the header (expand all), `Table.ExpandedRow` below its row; row actions are ghost buttons with a text label and icon (Claim, Unclaim, Edit) in a trailing column, whose header is an sr-only `Actions`; `Table.SkeletonRows` replaces the body while a filter or page loads. Links are `link-primary`, `link-secondary` while their row is hovered. Batch action bar (`Selection.svelte`): 48 px, `background-brand`, primary actions, Cancel last after a 1 px separator. Below `md` the task page's Status and Assignee dropdowns move behind a Filters button that shows the count, with Clear filters beside it ([Filtering, Filter states](https://carbondesignsystem.com/building-blocks/core/patterns/filtering/#filter-states): "the number of filters applied and … the option to clear filters without re-opening the filter container").
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/usage). Up to three row
+  actions are inline buttons; four or more go in an overflow menu. `Table.Skeleton` is Carbon's DataTableSkeleton
+  (toolbar, real headers, 5 skeleton rows, `aria-busy`), shown while a table loads. Expandable rows: `Table.ExpandButton` in the first cell and in the header (expand all), `Table.ExpandedRow` below its row; row actions are ghost buttons with a text label and icon (Claim, Unclaim, Edit) in a trailing column, whose header is an sr-only `Actions`; `Table.SkeletonRows` replaces the body while a filter or page loads. Links are `link-primary`, `link-secondary` while their row is hovered. Batch action bar (`Selection.svelte`): 48 px, `background-brand`, primary actions (Open in viewer: Launch, new tab), Cancel last after a 1 px separator. Below `md` the task page's Status and Assignee dropdowns move behind a Filters button that shows the count, with Clear filters beside it ([Filtering, Filter states](https://carbondesignsystem.com/building-blocks/core/patterns/filtering/#filter-states): "the number of filters applied and … the option to clear filters without re-opening the filter container").
 - **Search** (`Table.ToolbarSearch`, persistent): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/search/usage).
 - **Modal** (`ui/modal` over `ui/dialog`; `danger`, sizes `xs`/`sm`/`lg` from `ui/modal/sizes.ts`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/modal/usage).
   The heading names the action and `modalLabel` the item (Carbon: the title and button reflect the action).
@@ -175,7 +175,7 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/tooltip/usage).
 - **Progress bar** (`ui/progress-bar` over `ui/progress`, small; `status` `active` or `finished`, finished fills the bar in
   `support-success` with a CheckmarkFilled in the label row): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/progress-bar/usage).
-- **Empty state** (`ui/empty`, left-aligned, no image): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/empty-states).
+- **Empty state** (`ui/empty`, left-aligned, no image): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/empty-states). A title and a description that says what to do next (or where the items come from).
 - **Status indicator** (`ui/status-indicator`; task states in `src/lib/tasks/taskStatus.ts`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/status-indicators).
 - **Content switcher** (`ui/content-switcher`, low contrast; `selectionMode` automatic or manual; sizes md, lg):
@@ -249,7 +249,7 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
 - Every focusable element shows a 2 px `focus` ring inside its edge (checkbox: 1 px outside, as Carbon draws it). Never `outline-none` or
   `outline-hidden`.
 - Buttons: `focus` border plus `shadow-button-focus`; Link (`ui/button` `variant="link"` only): 1 px `focus` outline; a plain `<a>` gets the 2 px ring.
-- Modal: focus starts on the first field (danger: Cancel); while submitting, focus parks on the primary button, which is aria-disabled, not disabled.
+- Modal: focus starts on the first field (danger: Cancel; a `hasScrollingContent` modal with no leading field: its body region); while submitting, focus parks on the primary button, which is aria-disabled, not disabled.
 - Pagination: Previous and Next are aria-disabled at the ends; reaching the last page moves focus to Previous, reaching page 1 to Next (Carbon React).
 - Content switcher: ←/→ move between options (wrapping); automatic selects on the move, manual on Enter or Space.
 - Browser filter column: while it is open, Tab and Shift+Tab wrap inside it; Escape closes it and returns focus to Filters.

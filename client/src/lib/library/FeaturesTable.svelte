@@ -149,6 +149,9 @@
                 >
             {:else}
                 <Empty.Title>No features yet</Empty.Title>
+                <Empty.Description>
+                    Create a feature to segment images with it.
+                </Empty.Description>
             {/if}
         </Empty.Header>
     </Empty.Root>

@@ -188,6 +188,9 @@
                 </Empty.Description>
             {:else}
                 <Empty.Title>No tags yet</Empty.Title>
+                <Empty.Description>
+                    Create a tag to label studies and images.
+                </Empty.Description>
             {/if}
         </Empty.Header>
     </Empty.Root>

@@ -366,6 +366,9 @@
             <Empty.Root>
                 <Empty.Header>
                     <Empty.Title>This task has no subtasks</Empty.Title>
+                    <Empty.Description>
+                        Subtasks appear here when they are added to this task.
+                    </Empty.Description>
                 </Empty.Header>
             </Empty.Root>
         {:else}

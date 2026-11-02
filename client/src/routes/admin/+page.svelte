@@ -93,6 +93,9 @@
                     </Empty.Description>
                 {:else}
                     <Empty.Title>No users yet</Empty.Title>
+                    <Empty.Description>
+                        Create a user to give someone access.
+                    </Empty.Description>
                 {/if}
             </Empty.Header>
         </Empty.Root>
