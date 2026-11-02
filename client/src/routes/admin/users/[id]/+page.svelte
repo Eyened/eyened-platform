@@ -297,7 +297,7 @@
                             </SelectInput>
                         </Table.Cell>
                         <!-- Carbon inline row action: ghost button in a trailing column. -->
-                        <Table.Cell class="text-end whitespace-nowrap">
+                        <Table.Cell class="pe-2 text-end whitespace-nowrap">
                             <Button
                                 variant="ghost"
                                 aria-label="Remove from {m.project_name}"

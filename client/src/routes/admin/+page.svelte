@@ -64,7 +64,7 @@
 </h1>
 
 {#await loading}
-    <Table.Skeleton headers={HEADERS} aria-labelledby={headingId} />
+    <Table.Skeleton size="lg" headers={HEADERS} aria-labelledby={headingId} />
 {:then users}
     {@const visible = matching(users)}
     <Table.Toolbar>
@@ -98,7 +98,7 @@
             </Empty.Header>
         </Empty.Root>
     {:else}
-        <Table.Root aria-labelledby={headingId}>
+        <Table.Root size="lg" aria-labelledby={headingId}>
             <Table.Header>
                 <Table.Row>
                     {#each HEADERS as header (header)}
@@ -116,7 +116,7 @@
                                     href={resolve("/admin/users/[id]", {
                                         id: String(user.id),
                                     })}
-                                    class="text-link-primary hover:text-link-primary-hover hover:underline"
+                                    class="text-link-primary group-hover:text-link-secondary hover:underline"
                                 >
                                     {user.username}
                                 </a>

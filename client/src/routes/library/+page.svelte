@@ -68,7 +68,7 @@
         <Tabs.Content value="tags" class="pt-6">
             {#await tagsLoading}
                 <Table.Skeleton
-                    headers={["Name", "Description", "Type", "Owner"]}
+                    headers={["Name", "Description", "Type", "Owner", ""]}
                     aria-label="Tags"
                 />
             {:then}
@@ -89,7 +89,7 @@
         <Tabs.Content value="features" class="pt-6">
             {#await featuresLoading}
                 <Table.Skeleton
-                    headers={["Name", "Subfeatures", "Segmentations"]}
+                    headers={["Name", "Subfeatures", "Segmentations", ""]}
                     aria-label="Features"
                 />
             {:then}

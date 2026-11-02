@@ -4,7 +4,7 @@
     import { page } from "$app/state";
     import { Checkbox } from "$lib/components/ui/checkbox/index.js";
     import * as Empty from "$lib/components/ui/empty/index.js";
-    import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import { Button } from "$lib/components/ui/button/index.js";
     import { Label } from "$lib/components/ui/label/index.js";
     import { Modal } from "$lib/components/ui/modal/index.js";
     import { ProgressBar } from "$lib/components/ui/progress-bar/index.js";
@@ -224,7 +224,7 @@
                                 href={resolve("/tasks/[taskid]", {
                                     taskid: String(t.id),
                                 })}
-                                class="text-link-primary hover:text-link-primary-hover hover:underline"
+                                class="text-link-primary group-hover:text-link-secondary hover:underline"
                             >
                                 {t.name}
                             </a>
@@ -265,21 +265,23 @@
                                 No subtasks
                             {/if}
                         </Table.Cell>
-                        <Table.Cell class="table-xl:py-3">
-                            <div class="flex justify-end">
-                                <IconButton
-                                    label="Edit"
-                                    onclick={() => openEdit(t)}
-                                >
-                                    <Edit />
-                                </IconButton>
-                                <IconButton
-                                    label="Delete"
-                                    onclick={() => openDelete(t)}
-                                >
-                                    <TrashCan />
-                                </IconButton>
-                            </div>
+                        <Table.Cell
+                            class="pe-2 text-end whitespace-nowrap table-xl:py-3"
+                        >
+                            <Button
+                                variant="ghost"
+                                aria-label="Edit {t.name}"
+                                onclick={() => openEdit(t)}
+                            >
+                                Edit <Edit />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                aria-label="Delete {t.name}"
+                                onclick={() => openDelete(t)}
+                            >
+                                Delete <TrashCan />
+                            </Button>
                         </Table.Cell>
                     </Table.Row>
                 {/each}

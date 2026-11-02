@@ -129,7 +129,7 @@ describe("TasksTable", () => {
         renderTable([task(1, "Alpha"), task(2, "Beta")]);
 
         await fireEvent.click(
-            screen.getAllByRole("button", { name: "Edit" })[0],
+            screen.getByRole("button", { name: "Edit Alpha" }),
         );
         ingestTasks([task(1, "Alpha", { task_state: "Archived" })]);
         flushSync();
