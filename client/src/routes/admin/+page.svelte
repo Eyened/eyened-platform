@@ -20,7 +20,6 @@
     const PAGE_SIZES = [10, 20, 50, 100];
     const HEADERS = ["Username", "Status", "Password", "Employee ID"];
     const headingId = "users-heading";
-    const hintId = "create-password-hint";
 
     const loading = listUsers();
 
@@ -176,22 +175,12 @@
                 ? "Enter a username"
                 : undefined}
         />
-        <!-- Helper text 4 px below the field; the error replaces it -->
-        <div class="flex flex-col gap-1">
-            <PasswordInput
-                labelText="Password"
-                bind:value={password}
-                autocomplete="new-password"
-                aria-describedby={missing && !password ? undefined : hintId}
-                invalidText={missing && !password
-                    ? "Enter a password"
-                    : undefined}
-            />
-            {#if !(missing && !password)}
-                <p id={hintId} class="text-helper-text-01 text-text-helper">
-                    {PASSWORD_HINT}
-                </p>
-            {/if}
-        </div>
+        <PasswordInput
+            labelText="Password"
+            bind:value={password}
+            autocomplete="new-password"
+            helperText={PASSWORD_HINT}
+            invalidText={missing && !password ? "Enter a password" : undefined}
+        />
     </div>
 </Modal>

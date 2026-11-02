@@ -31,11 +31,16 @@
         submitted && !password ? "Password is required" : undefined,
     );
 
-    let loginError = $state<{ title: string; subtitle: string } | null>(null);
+    // One server error at a time; "password" errors are read via Username's description.
+    let serverError = $state<{
+        title: string;
+        subtitle: string;
+        source: "password" | "oidc";
+    } | null>(null);
 
     async function handlePasswordLogin(e: SubmitEvent) {
         e.preventDefault();
-        loginError = null;
+        serverError = null;
         submitted = true;
         if (!username || !password) {
             await tick();
@@ -49,16 +54,18 @@
                 rememberMe,
             );
         } catch (err) {
-            loginError =
+            serverError =
                 err instanceof ApiError && err.status === 401
                     ? {
                           title: "Incorrect username or password",
                           subtitle: "Try again.",
+                          source: "password",
                       }
                     : {
                           title: "Log in failed",
                           subtitle:
                               err instanceof Error ? err.message : String(err),
+                          source: "password",
                       };
             password = "";
             submitted = false;
@@ -69,14 +76,17 @@
         }
     }
 
-    let oidcError = $state<string | null>(null);
     async function handleOIDCLogin() {
-        oidcError = null;
+        serverError = null;
         let authorizeUrl: string;
         try {
             authorizeUrl = (await authClient.OIDCAuthorize()).url;
         } catch (err) {
-            oidcError = err instanceof Error ? err.message : String(err);
+            serverError = {
+                title: "Log in failed",
+                subtitle: err instanceof Error ? err.message : String(err),
+                source: "oidc",
+            };
             return;
         }
         window.location.href = authorizeUrl;
@@ -98,6 +108,17 @@
         }
     });
 </script>
+
+{#snippet serverNotification()}
+    {#if serverError}
+        <InlineNotification
+            id="login-error"
+            role={serverError.source === "password" ? "none" : undefined}
+            title={serverError.title}
+            subtitle={serverError.subtitle}
+        />
+    {/if}
+{/snippet}
 
 <AuthPage>
     <div class="mb-8">
@@ -130,7 +151,9 @@
                 bind:value={username}
                 bind:ref={usernameInput}
                 invalidText={usernameError}
-                aria-describedby={loginError ? "login-error" : undefined}
+                aria-describedby={serverError?.source === "password"
+                    ? "login-error"
+                    : undefined}
             />
             <PasswordInput
                 labelText="Password"
@@ -147,31 +170,20 @@
                     >Keep me logged in</Field.Label
                 >
             </Field.Field>
-            {#if loginError}
-                <InlineNotification
-                    id="login-error"
-                    role="none"
-                    title={loginError.title}
-                    subtitle={loginError.subtitle}
-                />
-            {/if}
+            {@render serverNotification()}
             <Button type="submit" size="lg" class="w-full">Log in</Button>
         </form>
     {/if}
 
     {#if oidcEnabled}
+        {#if !passwordEnabled}
+            {@render serverNotification()}
+        {/if}
         <Button
             size="lg"
             class="mt-6 w-full"
             variant={passwordEnabled ? "outline" : "default"}
             onclick={handleOIDCLogin}>Log in with {oidcProviderName}</Button
         >
-        {#if oidcError}
-            <InlineNotification
-                class="mt-4"
-                title="Log in failed"
-                subtitle={oidcError}
-            />
-        {/if}
     {/if}
 </AuthPage>

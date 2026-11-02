@@ -44,7 +44,6 @@
     const HEADERS = ["Project", "Role", ""];
     const headingId = "user-heading";
     const membershipsId = "memberships-heading";
-    const hintId = "set-password-hint";
 
     const userId = $derived(Number(page.params.id));
 
@@ -426,24 +425,14 @@
         errorTitle="Password could not be set"
         onsubmit={submitPassword}
     >
-        <!-- Helper text 4 px below the field; the error replaces it -->
-        <div class="flex flex-col gap-1">
-            <PasswordInput
-                labelText="New password"
-                bind:value={newPassword}
-                autocomplete="new-password"
-                aria-describedby={passwordMissing && !newPassword
-                    ? undefined
-                    : hintId}
-                invalidText={passwordMissing && !newPassword
-                    ? "Enter a password"
-                    : undefined}
-            />
-            {#if !(passwordMissing && !newPassword)}
-                <p id={hintId} class="text-helper-text-01 text-text-helper">
-                    {PASSWORD_HINT}
-                </p>
-            {/if}
-        </div>
+        <PasswordInput
+            labelText="New password"
+            bind:value={newPassword}
+            autocomplete="new-password"
+            helperText={PASSWORD_HINT}
+            invalidText={passwordMissing && !newPassword
+                ? "Enter a password"
+                : undefined}
+        />
     </Modal>
 {/if}

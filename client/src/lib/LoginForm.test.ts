@@ -140,4 +140,37 @@ describe("LoginForm", () => {
         expect(alert).toHaveTextContent("Log in failed");
         expect(alert).toHaveTextContent("Server unreachable");
     });
+
+    it("shows one server error, above the Log in button", async () => {
+        vi.stubGlobal("location", {
+            href: "http://localhost/users/login",
+            origin: "http://localhost",
+            search: "",
+        });
+        vi.spyOn(authClient, "OIDCAuthorize").mockRejectedValue(
+            new Error("OIDC authorize failed"),
+        );
+        renderForm(
+            vi.fn().mockRejectedValue(new ApiError(401, "Unauthorized")),
+        );
+        const username = await screen.findByLabelText("Username");
+        await fireEvent.input(username, { target: { value: "ada" } });
+        await fireEvent.input(screen.getByLabelText("Password"), {
+            target: { value: "wrong" },
+        });
+        await fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+        await screen.findByText("Incorrect username or password");
+
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Log in with SURF" }),
+        );
+
+        const error = await screen.findByText("OIDC authorize failed");
+        expect(screen.queryByText("Incorrect username or password")).toBeNull();
+        expect(
+            error.compareDocumentPosition(
+                screen.getByRole("button", { name: "Log in" }),
+            ) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+    });
 });

@@ -67,7 +67,7 @@
     {#if invalidText}
         <Field.Error id={errorId}>{invalidText}</Field.Error>
     {:else if helperText}
-        <p id={helperId} class="text-helper-text-01 text-text-helper">
+        <p id={helperId} class="-mt-1 text-helper-text-01 text-text-helper">
             {helperText}
         </p>
     {/if}

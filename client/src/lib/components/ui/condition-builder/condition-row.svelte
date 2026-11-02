@@ -47,7 +47,6 @@
         onadd: () => void;
     } = $props();
 
-    const uid = $props.id();
     const ADD: Record<Part, string> = {
         property: "Add property",
         operator: "Add operator",
@@ -309,18 +308,8 @@
                                 labelText={titles.value}
                                 bind:value={() => valueText, setValue}
                                 onkeydown={commitOnEnter}
-                                aria-describedby={operator?.helperText
-                                    ? `${uid}-help`
-                                    : undefined}
+                                helperText={operator?.helperText}
                             />
-                            {#if operator?.helperText}
-                                <p
-                                    id="{uid}-help"
-                                    class="mt-2 text-helper-text-01 text-text-helper"
-                                >
-                                    {operator.helperText}
-                                </p>
-                            {/if}
                         {/if}
                     </div>
                 {/if}
