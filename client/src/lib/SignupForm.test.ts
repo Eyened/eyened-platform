@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "$lib/api/client";
 import SignupForm from "./SignupForm.svelte";
 
-vi.mock("$app/paths", () => ({ resolve: (route: string) => route }));
+vi.mock("$app/paths", () => ({
+    asset: (file: string) => file,
+    resolve: (route: string) => route,
+}));
 
 describe("SignupForm", () => {
     it("reports a rejected sign-up, clears the password and focuses Username", async () => {

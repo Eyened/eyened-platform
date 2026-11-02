@@ -4,7 +4,10 @@ import { ApiError } from "$lib/api/client";
 import { authClient } from "../auth";
 import LoginForm from "./LoginForm.svelte";
 
-vi.mock("$app/paths", () => ({ resolve: (route: string) => route }));
+vi.mock("$app/paths", () => ({
+    asset: (file: string) => file,
+    resolve: (route: string) => route,
+}));
 
 function renderForm(login = vi.fn(), passwordEnabled = true) {
     vi.spyOn(authClient, "options").mockResolvedValue({

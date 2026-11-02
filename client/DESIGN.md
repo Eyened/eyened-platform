@@ -99,7 +99,7 @@ one class sets size, line height, letter spacing and weight (`text-body-compact-
 | `heading-compact-01` | 14 / 18 px         | 600    | 0.16 px        | Table headers, product name, subsection headings |
 | `heading-compact-02` | 16 / 22 px         | 600    | 0              | Section headings                                 |
 | `heading-03`         | 20 / 28 px         | 400    | 0              | Modal titles, login title, data table title      |
-| `heading-04`         | 28 / 36 px         | 400    | 0              | Page heading (sr-only on `/`)                    |
+| `heading-04`         | 28 / 36 px         | 400    | 0              | Page heading; on `/` the page heading is sr-only |
 
 ## Layout
 
@@ -145,8 +145,8 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
   Low contrast only: Carbon's high-contrast default is a light box on Gray 100. Error (role alert) and warning (role status) kinds.
 - **Login, sign-up, OIDC callback** (`AuthPage.svelte` with `LoginForm.svelte`, `SignupForm.svelte`, `routes/users/oidc-callback`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/patterns/login); one centred column, as Carbon suggests without an illustration. Login shows "Don't have an account? Create an account" under the title when password login is on ([Anatomy](https://carbondesignsystem.com/building-blocks/core/patterns/login/#anatomy-of-a-basic-login-screen) item 2); a link inside a sentence is Carbon's inline variant, underlined ([Link](https://carbondesignsystem.com/building-blocks/core/components/link/guidelines/#variants)). Server errors go in one inline notification above the submit button, or under the title on the callback.
 - **Data table** (`ui/table`, `size` `md` 40 px, `lg` 48 px or `xl` 64 px for two-line rows; `Table.Toolbar`, `Table.ToolbarSearch`):
-  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/usage). Up to three row
-  actions are inline buttons; four or more go in an overflow menu. `Table.Skeleton` is Carbon's DataTableSkeleton
+  [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/usage). Our rule (no Carbon
+  source found): up to three row actions are inline buttons; four or more go in an overflow menu. `Table.Skeleton` is Carbon's DataTableSkeleton
   (toolbar, real headers, 5 skeleton rows, `aria-busy`), shown while a table loads. Expandable rows: `Table.ExpandButton` in the first cell and in the header (expand all), `Table.ExpandedRow` below its row; row actions are ghost buttons with a text label and icon (Claim, Unclaim, Edit) in a trailing column, whose header is an sr-only `Actions`; `Table.SkeletonRows` replaces the body while a filter or page loads. Links are `link-primary`, `link-secondary` while their row is hovered. Batch action bar (`Selection.svelte`): 48 px, `background-brand`, primary actions (Open in viewer: Launch, new tab), Cancel last after a 1 px separator. Below `md` the task page's Status and Assignee dropdowns move behind a Filters button that shows the count, with Clear filters beside it ([Filtering, Filter states](https://carbondesignsystem.com/building-blocks/core/patterns/filtering/#filter-states): "the number of filters applied and … the option to clear filters without re-opening the filter container").
 - **Search** (`Table.ToolbarSearch`, persistent): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/search/usage).
 - **Modal** (`ui/modal` over `ui/dialog`; `danger`, sizes `xs`/`sm`/`lg` from `ui/modal/sizes.ts`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/modal/usage).

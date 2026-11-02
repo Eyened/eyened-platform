@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { resolve } from "$app/paths";
+    import { asset, resolve } from "$app/paths";
     import { ApiError } from "$lib/api/client";
     import { Button } from "$lib/components/ui/button/index.js";
     import { Checkbox } from "$lib/components/ui/checkbox/index.js";
@@ -123,7 +123,7 @@
 <AuthPage>
     <div class="mb-8">
         <img
-            src="/eyened-mark-light.png"
+            src={asset("/eyened-mark-light.png")}
             alt=""
             width="96"
             height="99"
