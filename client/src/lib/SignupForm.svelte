@@ -56,6 +56,13 @@
 
 <AuthPage>
     <div class="mb-8">
+        <img
+            src="/eyened-mark-light.png"
+            alt=""
+            width="96"
+            height="99"
+            class="mb-6 w-12"
+        />
         <h1 class="text-heading-03">Create an account</h1>
         <p class="mt-2 text-body-compact-01">
             Already have an account?
