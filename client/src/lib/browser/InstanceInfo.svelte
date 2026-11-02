@@ -8,6 +8,9 @@
     } from "$lib/data/helpers";
     import { instances } from "$lib/data/stores.svelte";
     import Tagger from "$lib/tags/Tagger.svelte";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import { copyToClipboard } from "$lib/utils/copyToClipboard";
+    import Copy from "carbon-icons-svelte/lib/Copy.svelte";
     import { getContext } from "svelte";
     import type { BrowserContext } from "./browserContext.svelte";
 
@@ -57,6 +60,20 @@
 
     // v1's flat field list in API order; the response has no grouping (D13).
     const rows = $derived(Object.entries(flattenToDotPaths(instance)));
+
+    const asText = (value: unknown): string =>
+        typeof value === "object"
+            ? JSON.stringify(value, null, 2)
+            : String(value);
+
+    // Carbon CopyButton feedback: "Copied!" for 2 s on the copied row.
+    let copiedKey: string | null = $state(null);
+    async function copy(key: string, value: unknown) {
+        if (await copyToClipboard(asText(value))) copiedKey = key;
+        setTimeout(() => {
+            if (copiedKey === key) copiedKey = null;
+        }, 2000);
+    }
 </script>
 
 <Tagger
@@ -100,15 +117,29 @@
                         <StructuredList.Cell class="break-all">
                             {#if value == null}
                                 NULL
-                            {:else if typeof value === "object"}
-                                <pre
-                                    class="whitespace-pre-wrap">{JSON.stringify(
-                                        value,
-                                        null,
-                                        2,
-                                    )}</pre>
                             {:else}
-                                {value}
+                                <div
+                                    class="flex items-start justify-between gap-2"
+                                >
+                                    {#if typeof value === "object"}
+                                        <pre
+                                            class="whitespace-pre-wrap">{asText(
+                                                value,
+                                            )}</pre>
+                                    {:else}
+                                        <span>{value}</span>
+                                    {/if}
+                                    <IconButton
+                                        label={copiedKey === key
+                                            ? "Copied!"
+                                            : `Copy ${key}`}
+                                        class="size-6 shrink-0"
+                                        closeOnClick={false}
+                                        onclick={() => copy(key, value)}
+                                    >
+                                        <Copy />
+                                    </IconButton>
+                                </div>
                             {/if}
                         </StructuredList.Cell>
                     </StructuredList.Row>
