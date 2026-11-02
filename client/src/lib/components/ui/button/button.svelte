@@ -28,6 +28,7 @@
                 sm: "min-h-8 py-1.5",
                 lg: "min-h-12 py-3.5",
                 icon: "size-10 justify-center p-0 [&>svg]:static",
+                "icon-xs": "size-6 justify-center p-0 [&>svg]:static",
             },
         },
         compoundVariants: [

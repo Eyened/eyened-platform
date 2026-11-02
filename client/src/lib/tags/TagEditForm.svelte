@@ -60,7 +60,7 @@
         oninput={() => (invalid = false)}
     />
     <TextInput
-        labelText="Description"
+        labelText="Description (optional)"
         maxlength={256}
         bind:value={description}
     />

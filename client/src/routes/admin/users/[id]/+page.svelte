@@ -316,10 +316,7 @@
     </h2>
     <div class="flex flex-wrap gap-4">
         {#if user.active}
-            <Button
-                variant="destructive"
-                onclick={() => (deactivateOpen = true)}
-            >
+            <Button variant="secondary" onclick={() => (deactivateOpen = true)}>
                 Deactivate
             </Button>
         {:else}
@@ -343,9 +340,10 @@
         bind:open={removeOpen}
         danger
         size="xs"
-        modalHeading={removing
-            ? `Remove ${user.username} from ${removing.project_name}?`
-            : ""}
+        modalHeading="Remove membership"
+        modalLabel={removing
+            ? `${user.username} in ${removing.project_name}`
+            : undefined}
         primaryButtonText="Remove"
         primaryButtonLoadingDescription="Removing…"
         successDescription="Removed"
@@ -402,9 +400,9 @@
 
     <Modal
         bind:open={deactivateOpen}
-        danger
         size="xs"
-        modalHeading="Deactivate {user.username}?"
+        modalHeading="Deactivate user"
+        modalLabel={user.username}
         primaryButtonText="Deactivate"
         primaryButtonLoadingDescription="Deactivating…"
         successDescription="Deactivated"

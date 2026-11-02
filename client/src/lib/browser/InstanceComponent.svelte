@@ -101,7 +101,7 @@
         </span>
         <IconButton
             label="Image information"
-            class="size-6"
+            size="icon-xs"
             onclick={() => (infoOpen = true)}
         >
             <Information />
@@ -119,7 +119,7 @@
         </span>
         <IconButton
             label={copied ? "Copied!" : "Copy public ID"}
-            class="size-6"
+            size="icon-xs"
             closeOnClick={false}
             onclick={copy}
         >

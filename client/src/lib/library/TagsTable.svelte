@@ -1,6 +1,6 @@
 <script lang="ts" module>
     export const TYPE_ITEMS = [
-        { id: "all", text: "All" },
+        { id: "all", text: "All types" },
         { id: "Study", text: "Study" },
         { id: "ImageInstance", text: "Image" },
         { id: "Segmentation", text: "Segmentation" },

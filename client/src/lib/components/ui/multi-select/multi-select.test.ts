@@ -11,7 +11,7 @@ const options = [
 describe("MultiSelect", () => {
     it("keeps the typed filter after a pick, so the list stays filtered", async () => {
         render(MultiSelect, {
-            props: { label: "Subfeatures", options, values: [] },
+            props: { titleText: "Subfeatures", options, values: [] },
         });
         const input = screen.getByRole("combobox", { name: "Subfeatures" });
 
@@ -31,7 +31,7 @@ describe("MultiSelect", () => {
 
     it("highlights and toggles with the keyboard after typing a filter", async () => {
         render(MultiSelect, {
-            props: { label: "Subfeatures", options, values: [] },
+            props: { titleText: "Subfeatures", options, values: [] },
         });
         const input = screen.getByRole("combobox", { name: "Subfeatures" });
 

@@ -228,7 +228,7 @@
                 : undefined}
         />
         <MultiSelect
-            label="Subfeatures (optional)"
+            titleText="Subfeatures (optional)"
             {options}
             bind:values={subfeatureIds}
             placeholder="Search features"

@@ -120,14 +120,14 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
 
 ## Components
 
-| shadcn `variant` | Carbon kind |     | shadcn `size` | Carbon size      |
-| ---------------- | ----------- | --- | ------------- | ---------------- |
-| `default`        | primary     |     | `sm`          | 32 px            |
-| `secondary`      | secondary   |     | `default`     | md, 40 px        |
-| `outline`        | tertiary    |     | `lg`          | 48 px            |
-| `ghost`          | ghost       |     | `icon`        | icon-only, 40 px |
-| `destructive`    | danger      |     |               |                  |
-| `link`           | Link        |     |               |                  |
+| shadcn `variant` | Carbon kind |     | shadcn `size` | Carbon size         |
+| ---------------- | ----------- | --- | ------------- | ------------------- |
+| `default`        | primary     |     | `sm`          | 32 px               |
+| `secondary`      | secondary   |     | `default`     | md, 40 px           |
+| `outline`        | tertiary    |     | `lg`          | 48 px               |
+| `ghost`          | ghost       |     | `icon`        | icon-only, 40 px    |
+| `destructive`    | danger      |     | `icon-xs`     | icon-only, xs 24 px |
+| `link`           | Link        |     |               |                     |
 
 - **UI shell header** (`TopMenu.svelte`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/ui-shell-header/guidelines),
   [Global header](https://www.carbondesignsystem.com/building-blocks/core/patterns/global-header). Below `lg` the links move
@@ -138,7 +138,7 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/link/guidelines). Standalone with an icon: `inline-flex gap-2` and a 16 px icon after the text (Launch for another tab).
 - **Text input / Password input** (`ui/text-input` over `ui/input`, `ui/label`, `ui/field`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/text-input/guidelines).
-  Carbon prop names (`labelText`, `invalidText`, `helperText`); the error replaces the helper text.
+  Carbon prop names (`labelText`; `titleText` for the combo box and multiselect; `invalidText`, `helperText`); the error replaces the helper text.
 - **Checkbox** (`ui/checkbox`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/checkbox/guidelines).
 - **Notification (inline)** (`ui/inline-notification` over `ui/alert`):
   [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/notification/guidelines).
@@ -150,6 +150,7 @@ Square corners; the radii are rounded-checkbox, rounded-tooltip and rounded-popo
   (toolbar, real headers, 5 skeleton rows, `aria-busy`), shown while a table loads. Expandable rows: `Table.ExpandButton` in the first cell and in the header (expand all), `Table.ExpandedRow` below its row; row actions are ghost buttons with a text label and icon (Claim, Unclaim, Edit) in a trailing column, whose header is an sr-only `Actions`; `Table.SkeletonRows` replaces the body while a filter or page loads. Links are `link-primary`, `link-secondary` while their row is hovered. Batch action bar (`Selection.svelte`): 48 px, `background-brand`, primary actions, Cancel last after a 1 px separator. Below `md` the task page's Status and Assignee dropdowns move behind a Filters button that shows the count, with Clear filters beside it ([Filtering, Filter states](https://carbondesignsystem.com/building-blocks/core/patterns/filtering/#filter-states): "the number of filters applied and … the option to clear filters without re-opening the filter container").
 - **Search** (`Table.ToolbarSearch`, persistent): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/search/usage).
 - **Modal** (`ui/modal` over `ui/dialog`; `danger`, sizes `xs`/`sm`/`lg` from `ui/modal/sizes.ts`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/modal/usage).
+  The heading names the action and `modalLabel` the item (Carbon: the title and button reflect the action).
   Submit shows Inline loading on the primary, disables the rest and blocks closing; a server error is an inline
   notification above the footer. `hasScrollingContent` (Carbon React): the body scrolls with a fade and is a focusable region labelled by the heading. Passive (image info): `ui/dialog` with the lg widths, no footer, ✕ only.
 - **Inline loading** (`ui/inline-loading`): [Carbon](https://www.carbondesignsystem.com/building-blocks/core/components/inline-loading/usage). The description is optional; the browser's Search button shows the spinner only (label unchanged, so its width holds).

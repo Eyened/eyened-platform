@@ -133,7 +133,8 @@
                                         label={copiedKey === key
                                             ? "Copied!"
                                             : `Copy ${key}`}
-                                        class="size-6 shrink-0"
+                                        size="icon-xs"
+                                        class="shrink-0"
                                         closeOnClick={false}
                                         onclick={() => copy(key, value)}
                                     >

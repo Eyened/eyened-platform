@@ -11,14 +11,14 @@
     // MultiSelect. A pick toggles a stored value: the menu stays open and the typed filter stays.
     const uid = $props.id(); // $props.id() is not allowed as a destructuring default
     let {
-        label,
+        titleText,
         options,
         values = $bindable([]),
         placeholder,
         helperText,
         id = uid,
     }: {
-        label: string;
+        titleText: string;
         options: { value: string; label: string }[];
         values?: string[];
         placeholder?: string;
@@ -66,7 +66,7 @@
 </script>
 
 <div class="flex flex-col gap-2">
-    <Label for={id}>{label}</Label>
+    <Label for={id}>{titleText}</Label>
     <Combobox.Root
         type="multiple"
         bind:open

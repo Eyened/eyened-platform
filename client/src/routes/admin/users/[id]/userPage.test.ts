@@ -148,7 +148,7 @@ describe("user page", () => {
             await screen.findByRole("button", { name: "Remove from Alpha" }),
         );
         let dialog = await screen.findByRole("dialog", {
-            name: "Remove alice from Alpha?",
+            name: "Remove membership",
         });
         await fireEvent.click(
             within(dialog).getByRole("button", { name: "Cancel" }),
@@ -159,7 +159,7 @@ describe("user page", () => {
             await screen.findByRole("button", { name: "Remove from Alpha" }),
         );
         dialog = await screen.findByRole("dialog", {
-            name: "Remove alice from Alpha?",
+            name: "Remove membership",
         });
         await fireEvent.click(
             within(dialog).getByRole("button", { name: "Remove" }),
@@ -181,10 +181,10 @@ describe("user page", () => {
         await fireEvent.click(
             await screen.findByRole("button", { name: button }),
         );
-        // Reactivate is not destructive, so only Deactivate opens a danger modal.
+        // Reactivate is not destructive, so only Deactivate opens a confirm modal.
         if (active) {
             const dialog = await screen.findByRole("dialog", {
-                name: "Deactivate alice?",
+                name: "Deactivate user",
             });
             await fireEvent.click(
                 within(dialog).getByRole("button", { name: "Deactivate" }),
