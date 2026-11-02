@@ -15,6 +15,7 @@ const shader = vi.hoisted(() => ({
 vi.mock("./FragmentShaderProgram", () => ({
     TextureShaderProgram: class {
         constructor(_webgl: unknown, source: string) {
+            if (source.includes("BROKEN")) throw new Error("compile failed");
             shader.constructed += 1;
             shader.sources.push(source);
         }
@@ -179,6 +180,23 @@ describe("BlendRenderer", () => {
                 u_tile: 32,
             }),
         );
+    });
+
+    it("keeps the working program when a new one fails to compile", () => {
+        const renderer = new BlendRenderer();
+        const layer = (mapping: string) => ({
+            image: image("a"),
+            mapping,
+            style: style(),
+            weight: 1,
+        });
+        renderer.setLayers([layer("map-a")]);
+        expect(() => renderer.setLayers([layer("BROKEN")])).toThrow(
+            "compile failed",
+        );
+        expect(shader.dispose).not.toHaveBeenCalled();
+        renderer.renderImage(viewer, target);
+        expect(shader.pass).toHaveBeenCalledOnce();
     });
 
     it("uses the plain texture for images without render-mode textures", () => {

@@ -61,18 +61,20 @@ export class BlendRenderer implements ImageRenderer {
 
     setLayers(layers: BlendLayer[]) {
         if (layers.length === 0) return;
-        this.layers = layers;
         const mappings = layers.map(({ mapping }) =>
             typeof mapping === "string" ? mapping : AFFINE_UNIFORM_LAYER,
         );
         const key = mappings.join("\0");
-        if (key === this.shaderKey && this.shader) return;
-        this.shader?.dispose();
-        this.shader = new TextureShaderProgram(
-            layers[0]!.image.webgl,
-            blendFragment(mappings),
-        );
-        this.shaderKey = key;
+        if (key !== this.shaderKey || !this.shader) {
+            const shader = new TextureShaderProgram(
+                layers[0]!.image.webgl,
+                blendFragment(mappings),
+            );
+            this.shader?.dispose();
+            this.shader = shader;
+            this.shaderKey = key;
+        }
+        this.layers = layers;
     }
 
     /** `tile` is the checkerboard square size in first-image pixels. */

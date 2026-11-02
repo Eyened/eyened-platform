@@ -21,7 +21,11 @@
         supportsColor={image.supportsColorRenderModes}
         label="{name} render mode"
     />
-    <WindowLevelSlider bind:windowLevel={style.windowLevel} iconSize="1.4em" />
+    <WindowLevelSlider
+        bind:windowLevel={style.windowLevel}
+        iconSize="1.4em"
+        fill
+    />
     <label>
         Colour
         <input

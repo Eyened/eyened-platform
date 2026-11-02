@@ -57,7 +57,7 @@ float blend_inside(vec2 uv) {
 }
 
 vec3 layer_colour(vec3 rgb, vec2 wl, int channel, float tint, vec3 colour) {
-    vec3 c = clamp((255.0 * rgb - wl.x) / (wl.y - wl.x), 0.0, 1.0);
+    vec3 c = clamp((255.0 * rgb - wl.x) / max(wl.y - wl.x, 1e-3), 0.0, 1.0);
     if (channel == -1) {
         c = vec3(dot(c, LUMA));
     } else if (channel >= 0) {

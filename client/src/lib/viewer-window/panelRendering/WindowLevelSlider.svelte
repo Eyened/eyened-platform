@@ -7,9 +7,15 @@
         /** 0–255 */
         windowLevel: WindowLevel;
         iconSize?: string;
+        /** Stretch to the container instead of a fixed 10em slider. */
+        fill?: boolean;
     }
 
-    let { windowLevel = $bindable(), iconSize = "2em" }: Props = $props();
+    let {
+        windowLevel = $bindable(),
+        iconSize = "2em",
+        fill = false,
+    }: Props = $props();
 
     const w = {
         get start() {
@@ -27,7 +33,7 @@
     };
 </script>
 
-<div class="container">
+<div class="container" class:fill>
     <Brightness size={iconSize} />
     <div class="slider">
         <DoubleRangeSlider bind:start={w.start} bind:end={w.end} />
@@ -37,12 +43,17 @@
 <style>
     div.container {
         display: flex;
-        align-items: center;
     }
     div.slider {
-        flex: 1;
         margin: 0em 1em;
-        min-width: 6em;
-        max-width: 10em;
+        width: 10em;
+    }
+    div.fill {
+        align-items: center;
+    }
+    div.fill div.slider {
+        flex: 1;
+        width: auto;
+        min-width: 0;
     }
 </style>
