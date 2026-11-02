@@ -156,7 +156,7 @@ export class BrowserContext {
     limit: number = $state(10);
     count: number = $state(0);
     sortBy: SortBy = $state("Study Date");
-    sortDirection: SortDirection = $state("ASC");
+    sortDirection: SortDirection = $state("DESC");
 
     // NEW: ordered arrays for rendering
     orderedInstanceIds: string[] = $state([]);

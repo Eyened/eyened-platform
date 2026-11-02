@@ -85,7 +85,7 @@ export class GlobalContext {
         params.set("limit", "10");
         params.set("conditions", this._encodeSingleCondition(condition));
         params.set("order_by", "Study Date");
-        params.set("order", "ASC");
+        params.set("order", "DESC");
         params.set("queryMode", "studies");
         params.set("displayMode", "study");
         return resolve(`/?${params.toString()}`);
@@ -103,7 +103,7 @@ export class GlobalContext {
             this._encodeSingleConditionExtended(condition as any),
         );
         params.set("order_by", "Study Date");
-        params.set("order", "ASC");
+        params.set("order", "DESC");
         params.set("queryMode", "instances");
         params.set("displayMode", "instance");
         return resolve(`/?${params.toString()}`);
