@@ -34,7 +34,7 @@ def prep_worker(
     for item in iter(work_q.get, None):
         iid, input_item = item
         try:
-            prep_q.put((iid, pipeline.preprocess(input_item)))
+            prep_q.put((iid, None if input_item is None else pipeline.preprocess(input_item)))
         except Exception as e:
             print(f"Error preprocessing image {iid}: {e}", file=sys.stderr)
             prep_q.put((iid, None))
@@ -137,52 +137,70 @@ class MultiProcessInference(Generic[InT, PrepT, BatchOutT, OutT]):
         self._work_q.cancel_join_thread()
         self._prep_q.cancel_join_thread()
 
-    def _batch_consumer(self) -> Iterator[Tuple[int, Optional[PrepT], Optional[BatchOutT]]]:
-        buffer: List[Tuple[int, Optional[PrepT]]] = []
+    def _prepped_from_workers(self) -> Iterator[Tuple[int, Optional[PrepT]]]:
         finished = 0
         while finished < self.n_workers:
             item = self._prep_q.get()
             if item is None:
                 finished += 1
             else:
-                buffer.append(item)
+                yield item
 
-            if buffer and (
-                len(buffer) == self.batch_size
-                or (item is None and finished == self.n_workers)
-            ):
-                # Separate successful and failed preprocessing results
-                successful_items: List[Tuple[int, PrepT]] = [
-                    (iid, prep_item) for iid, prep_item in buffer if prep_item is not None
-                ]
-                failed_items: List[Tuple[int, None]] = [
-                    (iid, prep_item) for iid, prep_item in buffer if prep_item is None
-                ]
-                
-                # Yield None for items that failed preprocessing
-                for iid, _ in failed_items:
-                    yield iid, None, None
-                
-                # Process successful items in batch
-                if successful_items:
-                    prep_batch = [prep_item for _, prep_item in successful_items]
-                    try:
-                        batch_outputs = self.pipeline.process_batch(prep_batch)
-                        for (iid, prep_item), batch_output in zip(successful_items, batch_outputs):
-                            yield iid, prep_item, batch_output
-                    except Exception as e:
-                        iids = [iid for iid, _ in successful_items]
-                        print(f"Error processing batch for images {iids}: {e}", file=sys.stderr)
-                        # Yield None for each item in the failed batch
-                        for iid, _ in successful_items:
-                            yield iid, None, None
+    def _prepped_in_process(self) -> Iterator[Tuple[int, Optional[PrepT]]]:
+        for iid, input_item in self.items:
+            if input_item is None:
+                yield iid, None
+                continue
+            try:
+                yield iid, self.pipeline.preprocess(input_item)
+            except Exception as e:
+                print(f"Error preprocessing image {iid}: {e}", file=sys.stderr)
+                yield iid, None
+
+    def _process_buffer(
+        self, buffer: List[Tuple[int, Optional[PrepT]]]
+    ) -> Iterator[Tuple[int, Optional[PrepT], Optional[BatchOutT]]]:
+        successful = [(iid, prep) for iid, prep in buffer if prep is not None]
+        for iid, prep in buffer:
+            if prep is None:
+                yield iid, None, None
+        if not successful:
+            return
+        try:
+            batch_outputs = list(
+                self.pipeline.process_batch([prep for _, prep in successful])
+            )
+        except Exception as e:
+            iids = [iid for iid, _ in successful]
+            print(f"Error processing batch for images {iids}: {e}", file=sys.stderr)
+            for iid, _ in successful:
+                yield iid, None, None
+            return
+        for (iid, prep), batch_output in zip(successful, batch_outputs):
+            yield iid, prep, batch_output
+
+    def _batch_consumer(
+        self, prepped: Iterable[Tuple[int, Optional[PrepT]]]
+    ) -> Iterator[Tuple[int, Optional[PrepT], Optional[BatchOutT]]]:
+        buffer: List[Tuple[int, Optional[PrepT]]] = []
+        for item in prepped:
+            buffer.append(item)
+            if len(buffer) == self.batch_size:
+                yield from self._process_buffer(buffer)
                 buffer = []
+        if buffer:
+            yield from self._process_buffer(buffer)
 
     def run(self) -> Iterator[Tuple[int, Optional[OutT]]]:
-        self._start_workers()
-        self._start_feeder()
+        """Yield ``(id, result)``; ``n_workers=0`` preprocesses in this process."""
+        if self.n_workers == 0:
+            prepped = self._prepped_in_process()
+        else:
+            self._start_workers()
+            self._start_feeder()
+            prepped = self._prepped_from_workers()
         try:
-            for iid, prep_item, batch_output in self._batch_consumer():
+            for iid, prep_item, batch_output in self._batch_consumer(prepped):
                 if batch_output is None:
                     yield iid, None
                 else:

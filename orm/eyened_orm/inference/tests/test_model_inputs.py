@@ -1,11 +1,8 @@
-"""Tests for model input resolution and registration."""
+"""Tests for model input resolution."""
 
 from __future__ import annotations
 
 import pytest
-
-pytest.importorskip("torch")
-import torch
 
 from eyened_orm import (
     AttributeDataType,
@@ -19,13 +16,9 @@ from eyened_orm.inference.model_inputs import (
     attribute_value_data,
     resolve_input_attribute_value,
 )
-from eyened_orm.inference.cfi_odfd import CFI_ODFD
 
 
-def test_resolve_input_attribute_value_picks_matching_version(session):
-    _proj, images = _import_images(session, count=1)
-    image = images[0]
-
+def _seed_roi(session, image_id: int, version: str) -> AttributeValue:
     attr = AttributeDefinition.get_or_create(
         session,
         match_by={
@@ -35,42 +28,40 @@ def test_resolve_input_attribute_value_picks_matching_version(session):
     )
     roi_model = AttributesModel.get_or_create(
         session,
-        match_by={"ModelName": "CFI_ROI", "Version": "1.0"},
+        match_by={"ModelName": "CFI_ROI", "Version": version},
         update_values={"Description": "roi"},
     )
     av = AttributeValue(
         AttributeID=attr.AttributeID,
         ModelID=roi_model.ModelID,
-        ImageInstanceID=image.ImageInstanceID,
+        ImageInstanceID=image_id,
         ValueJSON={"center": [1, 2], "radius": 3, "lines": {}},
     )
     session.add(av)
     session.commit()
+    return av
+
+
+@pytest.mark.parametrize(
+    ("stored", "required", "found"),
+    [("1.0", "1.0", True), ("0.9.0", "1.0.0", False)],
+)
+def test_resolve_input_attribute_value_matches_min_version(
+    session, stored, required, found
+):
+    _proj, images = _import_images(session, count=1)
+    image_id = images[0].ImageInstanceID
+    av = _seed_roi(session, image_id, stored)
 
     resolved = resolve_input_attribute_value(
         session,
-        image_id=image.ImageInstanceID,
-        spec=ModelInputSpec("CFI_ROI", "CFI_ROI", "1.0"),
+        image_id=image_id,
+        spec=ModelInputSpec("CFI_ROI", "CFI_ROI", min_version=required),
     )
-    assert resolved is not None
-    assert resolved.AttributeValueID == av.AttributeValueID
+
+    assert (resolved is not None and resolved.AttributeValueID == av.AttributeValueID) is found
 
 
 def test_attribute_value_data_reads_columns_without_relationships():
     av = AttributeValue(ValueJSON={"center": [1, 2]})
     assert attribute_value_data(av) == {"center": [1, 2]}
-
-
-def test_pipeline_registers_model_inputs_and_outputs(session):
-    pipeline = CFI_ODFD(session, device=torch.device("cpu"), n_workers=1)
-    session.flush()
-
-    model = AttributesModel.by_column(
-        session, ModelName="CFI_ODFD", Version=pipeline.model_version
-    )
-    assert model is not None
-    assert any(
-        out.AttributeName == "CFI_ODFD" for out in model.OutputAttributes
-    )
-    assert len(model.ModelInputs) == 1
-    assert model.ModelInputs[0].InputName == "CFI_ROI"

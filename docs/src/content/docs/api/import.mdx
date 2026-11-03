@@ -39,30 +39,25 @@ Poll RQ job status. **Authenticated**, but not scoped to project memberships —
 
 **Response:** `{ "task_id", "status", "result" }` or `{ "error": "job not found" }`
 
-### POST /api/import/run_cfi_models
+### POST /api/import/run_model
 
-Queue CFI attribute models (`cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality`). GPU models run on the inference worker (`worker/docker-compose.inference.yml`); `cfi-roi` can run on the slim ROI worker. See **[Inference — workers](/eyened-platform/orm/inference#workers-and-images)**.
+Queue registered models (`cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality`, `cfi-amd`, `cfi-drusen`, `layer-segmentation`). Requires the grader role on every image. One job per model goes to the RQ queue named after the model; each job only processes the image modalities that model supports. See **[Inference — workers](/eyened-platform/orm/inference#workers-and-images)**.
 
 **Request body:**
 ```json
 {
   "image_ids": [1, 2],
-  "model": "cfi-roi",
-  "overwrite": false,
-  "commit_interval": 100,
-  "batch_size": 8,
-  "n_workers": 16
+  "models": ["cfi-roi", "cfi-keypoints"],
+  "mode": "default",
+  "upscale": false,
+  "batch_size": null,
+  "n_workers": null,
+  "commit_interval": null
 }
 ```
 
-Omit `model` to queue one job per attribute model.
+Omit `models` to queue every model in registry order. `mode` is one of `default`, `upgrade`, `failed` or `overwrite` (see **[skip and re-run behaviour](/eyened-platform/orm/inference#skip-and-re-run-behaviour)**); `failed` jobs for segmentation models fail. `null` tuning fields use the model's defaults.
 
-### POST /api/import/run_cfi_amd
-
-Queue CFI AMD segmentation (`cfi-amd` queue).
-
-### POST /api/import/run_layer_segmentation
-
-Queue OCT layer segmentation (`layer-segmentation` queue).
+**Response:** `TaskResponse` with one id per queued model in `task_ids`.
 
 CLI equivalents: **[Inference](/eyened-platform/orm/inference)**.

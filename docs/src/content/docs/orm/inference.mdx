@@ -9,30 +9,47 @@ The ORM runs inference through `eorm` commands that write results to the databas
 
 **Where to run them** depends on the model. The server image does **not** include PyTorch. `cfi-roi` is OpenCV + `retinalysis-fundusprep` and can run in the server container or the slim ROI worker. GPU models need the images under `worker/` — see [Workers and images](#workers-and-images).
 
-## Attribute models (`run-cfi-models`)
+## Registered models (`run-model`)
 
-Runs **AttributesModel** pipelines — CFI ROI, keypoints, quality scores, etc. Each model:
-- Registers as a `Model` row (`ModelName` + `Version`)
-- Writes typed values to `AttributeValue`
-- Skips images that already have output from **any** version of that model (default)
-- Use `--upgrade` to add output for the current model version when only older versions exist (older rows kept; reads prefer the highest `ModelID`)
-- Use `--overwrite` to reprocess images that already have a row for the **current** version
+Every model in `orm/eyened_orm/inference/registry.py` runs through one command, one API route and one RQ task:
 
-Examples:
+| Slug | Output | Modality | Notes |
+|------|--------|----------|-------|
+| `cfi-roi` | `CFI_ROI` attribute | ColorFundus | No torch |
+| `cfi-keypoints` | `CFI_Keypoints` attribute | ColorFundus | Needs `CFI_ROI` |
+| `cfi-odfd` | `CFI_ODFD` attribute | ColorFundus | Needs `CFI_ROI` |
+| `cfi-quality` | `CFI_Quality` attribute | ColorFundus | Needs `CFI_ROI` |
+| `cfi-amd` | Drusen, RPD, hyperpigmentation, RPE degeneration segmentations | ColorFundus | Native mode needs `CFI_ROI`; `--upscale` supported |
+| `cfi-drusen` | Drusen segmentation | ColorFundus | `--upscale` supported |
+| `layer-segmentation` | OCT layer segmentation | OCT | |
+
 ```bash
-eorm run-cfi-models
-eorm run-cfi-models --project "My Study"
-eorm run-cfi-models --path ids.txt
-eorm run-cfi-models -m cfi-keypoints --upgrade
+eorm run-model                                  # every model, in the order above
+eorm run-model -m cfi-roi -m cfi-keypoints --project "My Study"
+eorm run-model -m cfi-keypoints --upgrade --path ids.txt
+eorm run-model -m cfi-amd --upscale --project "My Study"
 ```
 
-With no targeting flags, processes all active ColorFundus images. With no `-m`, all four CFI models run — keypoints, ODFD, and quality need the GPU inference image; `cfi-roi` alone can run in the server container.
+With no targeting flags, every active image is a candidate; each model only processes the modalities it supports. With no `-m`, models run in registry order, so `CFI_ROI` exists before the models that consume it. A failing model does not stop the next one, but the command exits non-zero.
 
-`run-models` is a deprecated alias for `run-cfi-models`.
+`run-models` is a deprecated alias for `run-model`.
+
+### Skip and re-run behaviour
+
+| Mode | When an image is processed |
+|------|----------------------------|
+| **Default** | Attribute models: no output for the image from any version. Segmentation models: the current version lacks a map for any of its features. |
+| **`--upgrade`** | The **current** model version has no output yet; older versions may already exist. New output is stored alongside older rows; reads prefer the newest registration (`ModelID`). |
+| **`--failed`** | Only images with a **failed** row for this model (null value columns) and no succeeded row. Attribute models only; segmentation models do not record failures, so `-m <segmentation> --failed` is rejected and a run of all models skips them. |
+| **`--overwrite`** | Always (replaces the current version's output only). |
+
+Images whose declared inputs (for example `CFI_ROI`) are missing or failed are skipped. Inputs resolve via `resolve_input_attribute_value` — see **[Attributes — selecting which AttributeValue to use](/eyened-platform/orm/data_model/attributes#selecting-which-attributevalue-to-use)**.
+
+An image that fails with an attribute model gets a failed row (and never overwrites an earlier success). An image that fails with a segmentation model gets no row, and the run raises at the end so the RQ job is marked failed; re-running picks it up again.
 
 ### Model versions
 
-Version strings are derived automatically from installed packages or HuggingFace artifact paths. When the version changes, pipeline init creates a new `AttributesModel`.
+Version strings are derived automatically from installed packages or HuggingFace artifact paths. When the version changes, the next run registers a new model row.
 
 | Model | Version source | Example |
 |-------|----------------|---------|
@@ -43,31 +60,66 @@ Version strings are derived automatically from installed packages or HuggingFace
 
 Attribute names `CFI_ROI`, `CFI_Keypoints`, `CFI_ODFD`, and `CFI_Quality` are platform-defined — see **[Attributes — reserved names](/eyened-platform/orm/data_model/attributes#reserved-attribute-names-platform-defined)** for API and client consumers.
 
-### Skip and re-run behaviour
+### Running a model without the database
 
-| Mode | When an image is processed |
-|------|----------------------------|
-| **Default** | No `AttributeValue` row exists for this model (any version) |
-| **`--upgrade`** | The **current** pipeline version has no row yet; older versions may already exist. New output is stored alongside older rows; reads prefer the newest registration (`ModelID`). |
-| **`--failed`** | Within the selected target, only images with a **failed** row for this model (null value columns). Failed rows are retried; succeeded images are skipped. |
-| **`--overwrite`** | Always (replaces the current version's row only) |
+Each pipeline can run on one image in-process:
 
-```bash
-eorm run-cfi-models --project "My Study" --failed
-eorm run-cfi-models -m cfi-roi --path ids.txt --failed
+```python
+from eyened_orm.inference.cfi_amd_segmentation import CFI_AMD
+
+result = CFI_AMD(device, upscale=True).predict(rgb_uint8)  # SegmentationResult
+result.masks["drusen"]
 ```
 
-Dependent models (`cfi-keypoints`, `cfi-odfd`, `cfi-quality`) declare `CFI_ROI` as input and resolve it via `resolve_input_attribute_value` — see **[Attributes — selecting which AttributeValue to use](/eyened-platform/orm/data_model/attributes#selecting-which-attributevalue-to-use)**.
+## Adding a model
 
-Implementation uses optional preprocess → batch → postprocess stages; see `orm/eyened_orm/commands/` in the repository for extending with custom models.
+A model is one `Pipeline` subclass plus one line in the registry. The pipeline does no database work: it declares where its output goes and which inputs it needs, and the runner handles selection, skip modes, provenance, batching and commits.
 
-## Segmentation models (`run-segmentation`)
+```python
+# orm/eyened_orm/inference/my_score.py
+import numpy as np
 
-Runs **SegmentationModel** inference into `ModelSegmentation` zarr arrays.
+from eyened_orm import AttributeDataType
+from eyened_orm.inference.model_inputs import CFI_ROI_INPUT
+from eyened_orm.inference.outputs import AttributeOutput
+from eyened_orm.inference.pipeline import Pipeline
 
-```bash
-eorm run-segmentation --project "My Study"
+
+class MyScore(Pipeline):
+    output = AttributeOutput(
+        model_name="My_Score",
+        attribute_name="My_Score",
+        data_type=AttributeDataType.Float,
+        version="1",
+    )
+    inputs = (CFI_ROI_INPUT,)  # optional; images without it are skipped
+    needs_torch = False        # True (default): the runner passes a torch device
+
+    def load(self):            # once, before the first batch
+        self.scale = 10
+
+    def preprocess(self, item):  # worker process; return None to fail this image
+        return item.image.mean(), item.input_values["CFI_ROI"]["radius"]
+
+    def process_batch(self, preps):  # parent process, one batch
+        return [mean * self.scale for mean, _ in preps]
+
+    def postprocess(self, prep, out):  # value stored for one image
+        return float(out + prep[1])
 ```
+
+```python
+# orm/eyened_orm/inference/registry.py — add to MODELS, after the models it consumes
+ModelSpec("my-score", f"{_PKG}.my_score:MyScore", _CFI),
+```
+
+`eorm run-model -m my-score`, `POST /api/import/run_model` with `"models": ["my-score"]`, and an RQ queue named `my-score` now work. Start a worker that listens on that queue.
+
+- **Segmentation output:** declare `output = SegmentationOutput(features=(SegFeature("key", "Feature name", "Model name", "1"),))` and return `SegmentationResult({"key": mask}, projection_matrix=...)` from `postprocess`. Masks are 2D `(H, W)` or 3D `(depth, H, W)`.
+- **Volumes:** set `image_input = "volume"` to receive `ImageInstance.pixel_array` instead of an RGB fundus array.
+- **Torch helpers:** `self.forward(model, preps)` stacks `(transform, HWC image)` preps and runs the model under `no_grad`.
+- **Tuning:** `ModelSpec` takes `batch_size`, `n_workers` (`0` preprocesses in the parent process), `supports_upscale` and `seconds_per_image` (sets the RQ job timeout).
+- **Tests:** `orm/eyened_orm/inference/tests/fake_models.py` has small numpy models that `test_runner.py` runs end to end against SQLite; `test_registry.py` checks that every model loads and that its inputs come from an earlier model.
 
 ## Registration (`run-registration`)
 
@@ -77,7 +129,7 @@ Pairwise enface registration via `eorm run-registration`. Writes transforms to p
 
 Computes ETDRS subfield areas from segmentations and keypoint/attribute data — not directly from manual FormAnnotation coordinates unless also present in attributes.
 
-Keypoints (`CFI_Keypoints`) and ODFD (`CFI_ODFD`) inputs are resolved with the same `ModelInputSpec` / highest-`ModelID` selection as CFI attribute pipelines (no manual `--keypoints-model-version` flags).
+Keypoints (`CFI_Keypoints`) and ODFD (`CFI_ODFD`) inputs are resolved with the same `ModelInputSpec` / highest-`ModelID` selection as the registered models (no manual `--keypoints-model-version` flags).
 
 ```bash
 eorm run-etdrs-model --project "My Study" -s <segmentation-model-id>
@@ -94,6 +146,8 @@ See also **[ETDRS Panel](/eyened-platform/client/panels/etdrs)** and **[CLI](/ey
 | `cfi-amd` | `worker/Dockerfile.cfi-amd` | `worker/docker-compose.cfi-amd.yml` |
 | `layer-segmentation` | `worker/Dockerfile.layersegmentation` | `worker/docker-compose.layersegmentation.yml` |
 
+`cfi-drusen` has no worker image yet; run it with `eorm run-model -m cfi-drusen` where `cfi_drusen` is installed. Jobs queued on `cfi-drusen` wait until a worker listens on that queue.
+
 Copy `worker/.env.example` to `worker/.env` (Redis, database, `EYENED_STORAGE_ROOT`). If you run both the slim ROI worker and the GPU worker, omit `cfi-roi` (and optionally `default`) from the GPU worker's `EYENED_RQ_WORKER_QUEUES` so each job is handled once.
 
 ### Queue via the API (usual production path)
@@ -106,25 +160,27 @@ docker compose -f docker-compose.cfi-roi.yml up --build
 docker compose -f docker-compose.inference.yml up --build
 ```
 
-`POST /api/import/run_cfi_models` (and `eorm` enqueue helpers) put `cfi-roi` on the `cfi-roi` queue and the torch models on their own queues. Thumbnail jobs use `default` — see **[Thumbnails](/eyened-platform/thumbnails#worker)**.
+`POST /api/import/run_model` (and `ApiClient.enqueue_run_model`) queues one job per model on the queue named after its slug. Thumbnail jobs use `default` — see **[Thumbnails](/eyened-platform/thumbnails#worker)**.
 
 ### Run `eorm` inside a worker image (one-shot / backfill)
 
 The server container can run `cfi-roi`:
 
 ```bash
-docker compose run --rm server eorm run-cfi-models -m cfi-roi --project "My Study"
+docker compose run --rm server eorm run-model -m cfi-roi --project "My Study"
 ```
 
-GPU CFI models must run in the inference image (torch, CUDA, `retinalysis-inference`):
+GPU models must run in their worker image (torch, CUDA, model packages):
 
 ```bash
 cd worker
 docker compose -f docker-compose.inference.yml run --rm worker \
-  eorm run-cfi-models -m cfi-keypoints --project "My Study"
+  eorm run-model -m cfi-keypoints --project "My Study"
+docker compose -f docker-compose.cfi-amd.yml run --rm worker-cfi-amd \
+  eorm run-model -m cfi-amd --project "My Study"
+docker compose -f docker-compose.layersegmentation.yml run --rm worker-layersegmentation \
+  eorm run-model -m layer-segmentation --project "My Study"
 ```
-
-Same pattern for segmentation: `docker compose -f docker-compose.cfi-amd.yml run --rm worker-cfi-amd eorm run-segmentation -m cfi-amd ...` and `docker compose -f docker-compose.layersegmentation.yml run --rm worker-layersegmentation eorm run-segmentation -m layer-segmentation ...`.
 
 ## Related data model docs
 

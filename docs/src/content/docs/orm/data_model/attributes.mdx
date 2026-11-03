@@ -43,7 +43,7 @@ Some `AttributeName` values are part of the platform contract: inference pipelin
 
 ### CFI fundus attributes (`ImageInstance`)
 
-Produced by `eorm run-cfi-models`. The `AttributeName` matches the producing `AttributesModel.ModelName`.
+Produced by `eorm run-model`. The `AttributeName` matches the producing `AttributesModel.ModelName`.
 
 #### `CFI_ROI`
 
@@ -111,7 +111,7 @@ Generic image attributes also appear in API `attrs` (flat, no producing model) a
 
 Older databases may still populate `CFROI`, `CFKeypoints`, and `CFQuality` columns.
 These are deprecated and will be removed in a future release.
-`keypoints` / API `cf_keypoints` and `quality` / API `cf_quality` prefer those columns when set, then fall back to `CFI_Keypoints` / `CFI_Quality`. `roi` / API `cf_roi` reads `CFI_ROI` only (not `CFROI`). New inference should use `eorm run-cfi-models` so values live in `AttributeValue` rows with model provenance.
+`keypoints` / API `cf_keypoints` and `quality` / API `cf_quality` prefer those columns when set, then fall back to `CFI_Keypoints` / `CFI_Quality`. `roi` / API `cf_roi` reads `CFI_ROI` only (not `CFROI`). New inference should use `eorm run-model` so values live in `AttributeValue` rows with model provenance.
 
 Search still filters **Color Fundus Quality** against the `ImageInstance.CFQuality` column, not the `CFI_Quality` attribute directly.
 

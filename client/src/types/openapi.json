@@ -1889,11 +1889,11 @@
         }
       }
     },
-    "/import/run_cfi_models": {
+    "/import/run_model": {
       "post": {
-        "summary": "Enqueue Run Cfi Models",
-        "description": "Queue one RQ job per CFI attribute model (``cfi-roi``, ``cfi-quality``, ...).",
-        "operationId": "enqueue_run_cfi_models_import_run_cfi_models_post",
+        "summary": "Enqueue Run Model",
+        "description": "Queue one RQ job per model; each model's queue is named after its slug.",
+        "operationId": "enqueue_run_model_import_run_model_post",
         "parameters": [
           {
             "name": "authorization",
@@ -1928,141 +1928,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RunCfiModelsRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/import/run_cfi_amd": {
-      "post": {
-        "summary": "Enqueue Run Cfi Amd",
-        "operationId": "enqueue_run_cfi_amd_import_run_cfi_amd_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "jwt_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Jwt Token"
-            }
-          },
-          {
-            "name": "refresh_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Refresh Token"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RunCfiAmdRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/import/run_layer_segmentation": {
-      "post": {
-        "summary": "Enqueue Run Layer Segmentation",
-        "operationId": "enqueue_run_layer_segmentation_import_run_layer_segmentation_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "jwt_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Jwt Token"
-            }
-          },
-          {
-            "name": "refresh_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "title": "Refresh Token"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RunImageIdsJobRequest"
+                "$ref": "#/components/schemas/RunModelRequest"
               }
             }
           }
@@ -8939,39 +8805,7 @@
         ],
         "title": "ProjectMeta"
       },
-      "RunCfiAmdRequest": {
-        "properties": {
-          "image_ids": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Image Ids"
-          },
-          "overwrite": {
-            "type": "boolean",
-            "title": "Overwrite",
-            "default": false
-          },
-          "batch_size": {
-            "type": "integer",
-            "title": "Batch Size",
-            "default": 8
-          },
-          "n_workers": {
-            "type": "integer",
-            "title": "N Workers",
-            "default": 12
-          }
-        },
-        "type": "object",
-        "required": [
-          "image_ids"
-        ],
-        "title": "RunCfiAmdRequest"
-      },
-      "RunCfiModelsRequest": {
+      "RunModelRequest": {
         "properties": {
           "image_ids": {
             "items": {
@@ -8980,76 +8814,93 @@
             "type": "array",
             "minItems": 1,
             "title": "Image Ids",
-            "description": "ImageInstance IDs to process (e.g. ColorFundus IDs from a completed import)."
+            "description": "ImageInstance IDs; each model only processes images of its modalities."
           },
-          "model": {
+          "models": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "cfi-roi",
-                  "cfi-keypoints",
-                  "cfi-odfd",
-                  "cfi-quality"
-                ]
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "cfi-roi",
+                    "cfi-keypoints",
+                    "cfi-odfd",
+                    "cfi-quality",
+                    "cfi-amd",
+                    "cfi-drusen",
+                    "layer-segmentation"
+                  ]
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Model",
-            "description": "Single CFI attribute pipeline, or omit to run all attribute models."
+            "title": "Models",
+            "description": "Models to run, or omit to run every registered model."
           },
-          "overwrite": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "default",
+              "upgrade",
+              "failed",
+              "overwrite"
+            ],
+            "title": "Mode",
+            "description": "default: skip images with output from any version; upgrade: run the current version where it has no output; failed: retry failed attempts (attribute models only); overwrite: reprocess everything.",
+            "default": "default"
+          },
+          "upscale": {
             "type": "boolean",
-            "title": "Overwrite",
-            "description": "If true, re-run even when results already exist.",
+            "title": "Upscale",
+            "description": "CFI segmentations: store masks in original image space.",
             "default": false
-          },
-          "commit_interval": {
-            "type": "integer",
-            "title": "Commit Interval",
-            "default": 100
           },
           "batch_size": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Batch Size",
-            "default": 8
+            "description": "Default: per model."
           },
           "n_workers": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "N Workers",
-            "default": 16
-          }
-        },
-        "type": "object",
-        "required": [
-          "image_ids"
-        ],
-        "title": "RunCfiModelsRequest",
-        "description": "Queue a model job for the given image instance IDs (CFI attributes or segmentation)."
-      },
-      "RunImageIdsJobRequest": {
-        "properties": {
-          "image_ids": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Image Ids"
+            "description": "Default: per model."
           },
-          "overwrite": {
-            "type": "boolean",
-            "title": "Overwrite",
-            "default": false
+          "commit_interval": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Interval",
+            "description": "Default: per output type."
           }
         },
         "type": "object",
         "required": [
           "image_ids"
         ],
-        "title": "RunImageIdsJobRequest"
+        "title": "RunModelRequest",
+        "description": "Queue one job per model for the given image instance IDs."
       },
       "ScanMeta": {
         "properties": {

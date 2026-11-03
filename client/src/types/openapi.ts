@@ -465,7 +465,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/import/run_cfi_models": {
+    "/import/run_model": {
         parameters: {
             query?: never;
             header?: never;
@@ -475,44 +475,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Enqueue Run Cfi Models
-         * @description Queue one RQ job per CFI attribute model (``cfi-roi``, ``cfi-quality``, ...).
+         * Enqueue Run Model
+         * @description Queue one RQ job per model; each model's queue is named after its slug.
          */
-        post: operations["enqueue_run_cfi_models_import_run_cfi_models_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/import/run_cfi_amd": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Enqueue Run Cfi Amd */
-        post: operations["enqueue_run_cfi_amd_import_run_cfi_amd_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/import/run_layer_segmentation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Enqueue Run Layer Segmentation */
-        post: operations["enqueue_run_layer_segmentation_import_run_layer_segmentation_post"];
+        post: operations["enqueue_run_model_import_run_model_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2211,72 +2177,49 @@ export interface components {
             /** Name */
             name: string;
         };
-        /** RunCfiAmdRequest */
-        RunCfiAmdRequest: {
-            /** Image Ids */
-            image_ids: number[];
-            /**
-             * Overwrite
-             * @default false
-             */
-            overwrite: boolean;
-            /**
-             * Batch Size
-             * @default 8
-             */
-            batch_size: number;
-            /**
-             * N Workers
-             * @default 12
-             */
-            n_workers: number;
-        };
         /**
-         * RunCfiModelsRequest
-         * @description Queue a model job for the given image instance IDs (CFI attributes or segmentation).
+         * RunModelRequest
+         * @description Queue one job per model for the given image instance IDs.
          */
-        RunCfiModelsRequest: {
+        RunModelRequest: {
             /**
              * Image Ids
-             * @description ImageInstance IDs to process (e.g. ColorFundus IDs from a completed import).
+             * @description ImageInstance IDs; each model only processes images of its modalities.
              */
             image_ids: number[];
             /**
-             * Model
-             * @description Single CFI attribute pipeline, or omit to run all attribute models.
+             * Models
+             * @description Models to run, or omit to run every registered model.
              */
-            model?: ("cfi-roi" | "cfi-keypoints" | "cfi-odfd" | "cfi-quality") | null;
+            models?: ("cfi-roi" | "cfi-keypoints" | "cfi-odfd" | "cfi-quality" | "cfi-amd" | "cfi-drusen" | "layer-segmentation")[] | null;
             /**
-             * Overwrite
-             * @description If true, re-run even when results already exist.
+             * Mode
+             * @description default: skip images with output from any version; upgrade: run the current version where it has no output; failed: retry failed attempts (attribute models only); overwrite: reprocess everything.
+             * @default default
+             * @enum {string}
+             */
+            mode: "default" | "upgrade" | "failed" | "overwrite";
+            /**
+             * Upscale
+             * @description CFI segmentations: store masks in original image space.
              * @default false
              */
-            overwrite: boolean;
-            /**
-             * Commit Interval
-             * @default 100
-             */
-            commit_interval: number;
+            upscale: boolean;
             /**
              * Batch Size
-             * @default 8
+             * @description Default: per model.
              */
-            batch_size: number;
+            batch_size?: number | null;
             /**
              * N Workers
-             * @default 16
+             * @description Default: per model.
              */
-            n_workers: number;
-        };
-        /** RunImageIdsJobRequest */
-        RunImageIdsJobRequest: {
-            /** Image Ids */
-            image_ids: number[];
+            n_workers?: number | null;
             /**
-             * Overwrite
-             * @default false
+             * Commit Interval
+             * @description Default: per output type.
              */
-            overwrite: boolean;
+            commit_interval?: number | null;
         };
         /** ScanMeta */
         ScanMeta: {
@@ -3973,7 +3916,7 @@ export interface operations {
             };
         };
     };
-    enqueue_run_cfi_models_import_run_cfi_models_post: {
+    enqueue_run_model_import_run_model_post: {
         parameters: {
             query?: never;
             header?: {
@@ -3987,83 +3930,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RunCfiModelsRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    enqueue_run_cfi_amd_import_run_cfi_amd_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: {
-                jwt_token?: string;
-                refresh_token?: string;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RunCfiAmdRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    enqueue_run_layer_segmentation_import_run_layer_segmentation_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: {
-                jwt_token?: string;
-                refresh_token?: string;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RunImageIdsJobRequest"];
+                "application/json": components["schemas"]["RunModelRequest"];
             };
         };
         responses: {

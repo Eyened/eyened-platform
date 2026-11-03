@@ -8,7 +8,7 @@ sidebar:
 The `eorm` CLI covers database setup, maintenance, and inference entry points. Use `eorm --help` and `eorm COMMAND --help` for current flags.
 
 :::note
-**Inference commands** (`run-cfi-models`, `run-segmentation`, `run-registration`, …) are summarized in **[Inference](/eyened-platform/orm/inference)**. **Thumbnails**: **[Thumbnails](/eyened-platform/thumbnails)**.
+**Inference commands** (`run-model`, `run-registration`, …) are summarized in **[Inference](/eyened-platform/orm/inference)**. **Thumbnails**: **[Thumbnails](/eyened-platform/thumbnails)**.
 :::
 
 ## Database setup
@@ -90,13 +90,12 @@ Grants and revocations take effect on the user's **next request** — no re-logi
 
 | Command | Purpose |
 |---------|---------|
-| `run-cfi-models` | CFI attribute inference (`cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality`) |
-| `run-models` | Deprecated alias for `run-cfi-models` |
-| `run-segmentation` | Segmentation model inference |
+| `run-model` | Registered attribute and segmentation models (`-m cfi-roi`, `cfi-keypoints`, `cfi-odfd`, `cfi-quality`, `cfi-amd`, `cfi-drusen`, `layer-segmentation`; all when omitted) |
+| `run-models` | Deprecated alias for `run-model` |
 | `run-registration` | Enface image registration — see **[Registration](/eyened-platform/orm/registration)** |
 | `run-etdrs-model` | ETDRS subfield areas |
 
-`run-cfi-models` flags include `--overwrite` (reprocess current version), `--upgrade` (add current version output when only older versions exist), and `--failed` (retry failed rows within the target). Attribute read precedence: **[Attributes](/eyened-platform/orm/data_model/attributes#selecting-which-attributevalue-to-use)**.
+`run-model` flags include `--overwrite` (reprocess current version), `--upgrade` (add current version output when only older versions exist), `--failed` (retry failed rows within the target; attribute models only) and `--upscale` (`cfi-amd`, `cfi-drusen`). Attribute read precedence: **[Attributes](/eyened-platform/orm/data_model/attributes#selecting-which-attributevalue-to-use)**.
 
 Details: **[Inference](/eyened-platform/orm/inference)**.
 
@@ -114,11 +113,11 @@ Image- and patient-scoped commands share targeting flags. For most inference com
 | `--modality` | Filter by modality (also when targeting all images) |
 
 ```bash
-eorm run-cfi-models --project "AMD-Study" --modality ColorFundus
+eorm run-model --project "AMD-Study" --modality ColorFundus
 eorm update-thumbnails --path ids.txt
 ```
 
-`run-cfi-models`, `update-thumbnails`, and `update-hashes` scan the whole database when no target flags are given.
+`run-model`, `update-thumbnails`, and `update-hashes` scan the whole database when no target flags are given.
 
 ## Maintenance
 

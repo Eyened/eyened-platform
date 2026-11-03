@@ -163,8 +163,10 @@ def queue_spy(monkeypatch):
     class _Spy:
         def __init__(self) -> None:
             self.enqueued: list[tuple] = []
+            self.queue_names: list[str] = []
 
         def __call__(self, name):  # stands in for get_rq_queue(name)
+            self.queue_names.append(name)
             return self
 
         def enqueue(self, func, *args, **kwargs):
