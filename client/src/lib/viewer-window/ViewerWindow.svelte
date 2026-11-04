@@ -47,13 +47,13 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     const task: TaskHeader | null = $derived(
         taskContext && navigation
             ? {
-                  label: `Set ${taskContext.subTaskIndex + 1} of ${taskContext.task.num_tasks}`,
+                  label: `Set ${taskContext.subTaskIndex} of ${taskContext.task.num_tasks}`,
                   prevDisabled: navigation.prevDisabled,
                   nextDisabled: navigation.nextDisabled,
                   prev: () => navigation.prev(),
                   next: () => navigation.next(),
                   overview: () => {
-                      window.location.href = `/tasks/${taskContext.task.id}${window.location.search}`;
+                      window.location.href = `/tasks/${taskContext.task.id}`;
                   },
               }
             : null,
