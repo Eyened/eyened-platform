@@ -139,7 +139,7 @@ export class Registration {
         // `revision++` both reads and writes. Callers often run from `$effect`
         // (RegistrationItemLoader), and a tracked read would re-subscribe that
         // effect to revision → infinite loop. Untrack the read so only explicit
-        // consumers (TopViewer `$derived`) depend on the signal.
+        // consumers (StripViewer `$derived`) depend on the signal.
         this.revision = untrack(() => this.revision) + 1;
     }
 

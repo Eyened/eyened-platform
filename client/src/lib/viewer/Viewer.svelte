@@ -16,8 +16,10 @@
         showInfo?: boolean;
         /** Paint only while the registration editor or series blend is open. */
         foreground?: boolean;
+        /** False keeps the viewer out of the Tab order, as in a strip tile; a press still focuses it. */
+        tabbable?: boolean;
     }
-    let { showInfo = true, foreground = false }: Props = $props();
+    let { showInfo = true, foreground = false, tabbable = true }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const viewerWindowContext = getContext<ViewerWindowContext>(
@@ -241,7 +243,7 @@
 <div class="main">
     <div
         class="viewer"
-        tabindex="0"
+        tabindex={tabbable ? 0 : -1}
         bind:this={viewerElement}
         {onpointerdown}
         {onpointerup}

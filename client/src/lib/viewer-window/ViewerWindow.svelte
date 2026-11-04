@@ -1,20 +1,23 @@
 <!--
 @component
-Main component for the viewer window.
-Manages the layout of the viewer window.
-Keeps track of the main panels and the top row of images.
+Plugs today's viewer into the workspace frame: sets the viewer-window context,
+loads registrations, renders MainViewer per viewport and StripViewer per strip tile, and hosts the Add images overlay.
 -->
 <script lang="ts">
-    import { onDestroy, onMount, setContext } from "svelte";
-    import MainPanel from "./MainPanel.svelte";
-    import TopRowImages from "./TopRowImages.svelte";
-    import { ViewerWindowContext } from "./viewerWindowContext.svelte";
-    import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
-    import RegistrationEditor from "./panelRegistration/RegistrationEditor.svelte";
-    import SeriesBlendEditor from "./panelRegistration/SeriesBlendEditor.svelte";
     import { instances, patients } from "$lib/data";
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
+    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+    import { TaskNavigation } from "$lib/tasks/taskUtils.svelte";
+    import { viewportTitle } from "$lib/workspace/imageMeta";
+    import WorkspaceFrame from "$lib/workspace/WorkspaceFrame.svelte";
+    import type { TaskHeader } from "$lib/workspace/WorkspaceHeader.svelte";
+    import { getContext, setContext } from "svelte";
+    import BrowserOverlay from "./BrowserOverlay.svelte";
+    import MainViewer from "./MainViewer.svelte";
+    import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
+    import StripViewer from "./StripViewer.svelte";
+    import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     interface Props {
         viewerWindowContext: ViewerWindowContext;
@@ -24,11 +27,6 @@ Keeps track of the main panels and the top row of images.
     setContext("viewerWindowContext", viewerWindowContext);
     const registration = viewerWindowContext.registration;
 
-    // Main viewers are restored by ViewerWindowContext after images load
-    // (see restoreMainViewersFromViewState) so task grade and /view share one path.
-
-    let main: HTMLDivElement | undefined = $state();
-    let isResizing = false;
     let registrationSet: RegistrationSet[] = $derived.by(() => {
         const result: RegistrationSet[] = [];
         const patientIds = new Set<number>(
@@ -36,7 +34,6 @@ Keeps track of the main panels and the top row of images.
                 .map((id) => instances.get(id)?.patient.id)
                 .filter((pid): pid is number => typeof pid === "number"),
         );
-        // TODO: check if patient can be fetched with promise directly?
         for (const patientId of patientIds) {
             const patient = patients.get(patientId);
             result.push(...collectPatientRegistrationSets(patient?.attrs));
@@ -44,136 +41,74 @@ Keeps track of the main panels and the top row of images.
         return result;
     });
 
-    function startResize(event: PointerEvent) {
-        isResizing = true;
-        event.preventDefault();
-    }
+    const taskContext = getContext<TaskContext | undefined>("taskContext");
+    const navigation = taskContext ? new TaskNavigation(taskContext) : null;
+    // subTaskIndex is 0-based: TaskNavigation disables Previous at 0.
+    const task: TaskHeader | null = $derived(
+        taskContext && navigation
+            ? {
+                  label: `Set ${taskContext.subTaskIndex + 1} of ${taskContext.task.num_tasks}`,
+                  prevDisabled: navigation.prevDisabled,
+                  nextDisabled: navigation.nextDisabled,
+                  prev: () => navigation.prev(),
+                  next: () => navigation.next(),
+                  overview: () => {
+                      window.location.href = `/tasks/${taskContext.task.id}${window.location.search}`;
+                  },
+              }
+            : null,
+    );
 
-    function stopResize() {
-        isResizing = false;
-    }
+    let browserOpen = $state(false);
 
-    onMount(() => {
-        if (window) {
-            window.addEventListener("pointerup", stopResize);
-            window.addEventListener("pointermove", doResize);
-        }
-    });
-
-    onDestroy(() => {
-        if (window) {
-            window.removeEventListener("pointerup", stopResize);
-            window.removeEventListener("pointermove", doResize);
-        }
-    });
-
-    function doResize(e: PointerEvent) {
-        if (!isResizing) {
-            return;
-        }
-        if (!main) return;
-        main.style.setProperty("grid-template-rows", `${e.clientY}px 1px 1fr`);
+    function titleFor(imageId: string) {
+        const image = viewerWindowContext.images.get(imageId);
+        return image ? viewportTitle(image.instance) : null;
     }
 </script>
 
 <!-- Patient attrs first, then form pointset/affine (pointset wins on conflict). -->
 <RegistrationItemLoader {registration} {registrationSet} />
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-    id="main"
-    bind:this={main}
-    class:main-hidden={viewerWindowContext.registrationEditor ||
-        viewerWindowContext.seriesBlend}
+<WorkspaceFrame
+    {titleFor}
+    {task}
+    onaddimages={() => (browserOpen = true)}
+    emptyMessage={viewerWindowContext.instanceIds.length === 0
+        ? "Enter instance IDs in url"
+        : null}
 >
-    <div id="top" class="row">
-        <TopRowImages />
-    </div>
-    <div id="resizer" onpointerdown={startResize}>
-        <div id="handle" onpointerdown={startResize}><hr /></div>
-    </div>
-    <div id="main-viewer" class="row">
-        {#if viewerWindowContext.mainPanels.length}
-            {#each viewerWindowContext.mainPanels as panel (panel)}
-                <MainPanel {viewerWindowContext} {panel}>
-                    <panel.component {...panel.props} />
-                </MainPanel>
-            {/each}
-        {:else}
-            <div class="no-viewer">Select Image</div>
+    {#snippet viewer(imageId: string)}
+        {@const image = viewerWindowContext.images.get(imageId)}
+        {#if image}
+            <MainViewer {image} />
         {/if}
+    {/snippet}
+    {#snippet tile(imageId: string)}
+        {@const image = viewerWindowContext.images.get(imageId)}
+        {#if image}
+            <StripViewer {image} />
+        {/if}
+    {/snippet}
+</WorkspaceFrame>
+
+{#if browserOpen}
+    <!-- isolate keeps the overlay's z-index below menus portalled to <body>. -->
+    <div class="isolate">
+        <div
+            class="fixed inset-0 z-1000 flex flex-col overflow-hidden bg-background text-text-primary"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add images"
+            tabindex="-1"
+            onkeydown={(e) => {
+                if (e.key === "Escape") browserOpen = false;
+            }}
+        >
+            <BrowserOverlay
+                {viewerWindowContext}
+                onClose={() => (browserOpen = false)}
+            />
+        </div>
     </div>
-</div>
-
-{#if viewerWindowContext.registrationEditor}
-    <RegistrationEditor />
 {/if}
-
-{#if viewerWindowContext.seriesBlend}
-    <SeriesBlendEditor />
-{/if}
-
-<style>
-    div.row {
-        overflow: hidden;
-    }
-
-    div#main {
-        display: grid;
-        grid-template-rows: 20% 1px 1fr;
-        overflow: auto;
-        flex: 1;
-        /* Keeps the viewer's z-indexes below menus portalled to <body>. */
-        isolation: isolate;
-    }
-    div#main.main-hidden {
-        visibility: hidden;
-    }
-    div#top {
-        display: flex;
-    }
-    div#top-images {
-        flex: 1;
-        display: flex;
-    }
-    div#info {
-        background-color: black;
-        flex: 0;
-        z-index: 1;
-    }
-    div#resizer {
-        position: relative;
-        background-color: gray;
-    }
-    div#handle {
-        position: absolute;
-        top: -3px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 30px;
-        height: 6px;
-        background: #ccc;
-        border-radius: 2px;
-        border: 1px solid rgba(0, 0, 0, 0.3);
-        cursor: row-resize;
-        z-index: 100;
-    }
-    #handle hr {
-        margin: 2px;
-
-        border-top: 1px solid rgba(0, 0, 0, 0.4);
-        background-color: rgba(255, 255, 255, 0.9);
-    }
-    div#main-viewer {
-        display: flex;
-    }
-
-    div.no-viewer {
-        background-color: #000000;
-        flex: 1;
-        flex-direction: column;
-        align-items: center;
-        padding: 3em;
-        z-index: 1;
-    }
-</style>

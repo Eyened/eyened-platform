@@ -72,17 +72,13 @@ describe("UpdatePosition", () => {
         expect(setPosition).not.toHaveBeenCalled();
     });
 
-    it("updates the linked cursor on top-row hover while Shift is held", () => {
+    it("never updates the linked cursor from a strip tile, even with Shift held", () => {
         const { event, setPosition } = makeEvent({
             shift: true,
             isTopViewer: true,
         });
         control.pointermove(event);
-        expect(setPosition).toHaveBeenCalledWith("img-1", {
-            x: 3,
-            y: 4,
-            index: 7,
-        });
+        expect(setPosition).not.toHaveBeenCalled();
     });
 
     it("does not update the linked cursor while dragging a top-row viewer", () => {
