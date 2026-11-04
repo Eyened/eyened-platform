@@ -41,6 +41,8 @@ export class Workspace {
     rowSizes: number[] = $state.raw([1]);
     selected = $state(0);
     maximised: number | null = $state(null);
+    /** False until `hydrate` has run; viewports say "Loading images…" until then. */
+    loaded = $state(false);
     /** Text for the polite live region. */
     announcement = $state("");
 
@@ -108,6 +110,7 @@ export class Workspace {
             this.fill(1);
         }
         this.persist();
+        this.loaded = true;
     }
 
     setPreset(id: string): void {
