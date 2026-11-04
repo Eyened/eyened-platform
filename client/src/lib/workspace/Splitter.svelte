@@ -119,7 +119,7 @@ An APG window splitter between two viewport tracks: drag it, or click to pick it
 </script>
 
 <!-- A focusable separator is a widget (APG window splitter), so it takes keys and pointer events. -->
-<!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 <div
     role="separator"
     tabindex="0"
