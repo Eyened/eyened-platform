@@ -3,6 +3,7 @@ import type { Position2D } from "$lib/types";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { BaseImageRenderer } from "$lib/webgl/imageRenderer";
 import type { Shaders } from "$lib/webgl/shaders";
+import type { RenderBounds } from "$lib/webgl/types";
 import { SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
 import type { Registration } from "../registration/registration.svelte";
@@ -12,6 +13,7 @@ import { ScrollOCT } from "./controls/scrollOCT";
 import { UpdatePosition } from "./controls/updatePosition";
 import { ZoomPan } from "./controls/zoomPan";
 import { CursorOverlay } from "./overlays/CursorOverlay";
+import { clipBox, sameBox } from "./viewportGeometry";
 import type { MeasureTool } from "./tools/Measure.svelte.js";
 import type {
     EventName,
@@ -99,6 +101,8 @@ export class ViewerContext {
         height: 100,
     });
     viewingRect: DOMRect = $state(new DOMRect(0, 0, 0, 0));
+    /** Set by Viewer.svelte: the viewer's box and the box its drawing is clipped to, read on every repaint. */
+    measure: (() => { box: DOMRect; clip: DOMRect | null }) | null = null;
 
     imageTransform: Matrix = $state(Matrix.identity);
     transform: Matrix = $state(Matrix.identity);
@@ -402,6 +406,27 @@ export class ViewerContext {
     }
 
     repaint() {
+        let scissor: RenderBounds | undefined;
+        if (this.measure) {
+            // A swap, a preset change or strip scrolling moves the box without resizing it.
+            const { box, clip } = this.measure();
+            if (box.width === 0 || box.height === 0) return;
+            if (!sameBox(box, this.viewingRect)) this.viewingRect = box;
+            if (clip) {
+                const visible = clipBox(box, clip);
+                if (!visible) return;
+                scissor =
+                    this.image.getRenderBounds(
+                        new DOMRect(
+                            visible.left,
+                            visible.top,
+                            visible.width,
+                            visible.height,
+                        ),
+                    ) ?? undefined;
+                if (!scissor) return;
+            }
+        }
         if (!this.viewingRect) {
             return;
         }
@@ -417,7 +442,7 @@ export class ViewerContext {
         }
         // else keep this.index (mid-slice / restored pending / last setIndex)
 
-        const renderTarget = { ...renderBounds, framebuffer: null };
+        const renderTarget = { ...renderBounds, framebuffer: null, scissor };
 
         this.imageRenderer.renderImage(this, renderTarget);
 

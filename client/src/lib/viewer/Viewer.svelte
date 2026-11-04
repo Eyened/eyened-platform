@@ -10,6 +10,7 @@
     import Stretch from "$lib/viewer-window/panelRendering/Stretch.svelte";
     import WindowLevel from "$lib/viewer-window/panelRendering/WindowLevel.svelte";
     import BscanLinks from "$lib/viewer-window/panelSegmentation/BscanLinks.svelte";
+    import { keepViewOnResize, sameTransform } from "./viewportGeometry";
 
     export interface Props {
         showInfo?: boolean;
@@ -20,6 +21,10 @@
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
     );
+    // ViewportGrid's box; drawing outside it (a scrolled strip tile) is clipped.
+    const getClip = getContext<(() => DOMRect | null) | undefined>(
+        "viewportClip",
+    );
 
     // add viewer to viewerWindowContext
     // this registers the viewerContext for repaint callbacks
@@ -27,21 +32,41 @@
 
     let viewerElement: HTMLDivElement;
 
-    // update viewingRect and canvas size on resize
+    // A viewport keeps its view (centre and scale) when it resizes; only a viewport at fit stays at fit.
+    // The first callback still fits: viewerSize starts at 100 × 100 with the fit transform.
     onMount(() => {
         const resizeObserver = new ResizeObserver(() => {
             const viewingRect = viewerElement.getBoundingClientRect();
-            viewerContext.viewingRect = viewingRect;
             const { width, height } = viewingRect;
+            if (width === 0 || height === 0) return;
+            const atFit = sameTransform(
+                viewerContext.transform,
+                viewerContext.getInitTransform(),
+            );
+            const from = viewerContext.viewerSize;
+            viewerContext.viewingRect = viewingRect;
             viewerContext.canvas2D.width = width;
             viewerContext.canvas2D.height = height;
             viewerContext.viewerSize = { width, height };
-            viewerContext.initTransform();
+            if (atFit) viewerContext.initTransform();
+            else
+                viewerContext.transform = keepViewOnResize(
+                    viewerContext.transform,
+                    from,
+                    { width, height },
+                );
         });
 
         resizeObserver.observe(viewerElement);
+        viewerContext.measure = () => ({
+            box: viewerElement.getBoundingClientRect(),
+            clip: getClip?.() ?? null,
+        });
 
-        return () => resizeObserver.disconnect();
+        return () => {
+            resizeObserver.disconnect();
+            viewerContext.measure = null;
+        };
     });
 
     //
