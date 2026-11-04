@@ -119,3 +119,9 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 - **Source:** viewer frame-grid Carbon check 2026-11-04
 - **Problem:** `client/DESIGN.md` (Pagination line) credits aria-disabled Previous / Next in the tab order, with a focus move at the ends, to "Carbon React". Carbon's Pagination accessibility page says the end button "is no longer navigable or operable, like any other disabled control" and is "disabled and unreachable" ([keyboard interaction](https://carbondesignsystem.com/building-blocks/core/components/pagination/accessibility/#keyboard-interaction)).
 - **Fix:** either make ‹ › disabled at the ends in `table-pagination.svelte` (app-wide), or turn the DESIGN.md line into a deviation that cites that page.
+
+### Open the viewer workspace before every image has loaded
+- **Status:** open
+- **Source:** viewer frame-grid hand checks 2026-11-04
+- **Problem:** `ViewerWindowContext` hydrates the workspace only after every instance has loaded, so a set with several OCT volumes shows "Loading images…" and an empty strip for up to ~95 s. On the old viewer the strip filled one image at a time.
+- **Fix:** hydrate once the first screen's images (the `v=` images, the first-screen pair, or the first page) are ready, and add the rest through `Workspace.addImages` as they arrive.
