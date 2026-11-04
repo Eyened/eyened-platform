@@ -416,7 +416,7 @@ export class ViewerContext {
             if (!sameBox(paintBox, this.viewingRect))
                 this.viewingRect = paintBox;
             if (clip) {
-                const visible = clipBox(box, clip);
+                const visible = clipBox(paintBox, clip);
                 if (!visible) return;
                 scissor =
                     this.image.getRenderBounds(
