@@ -7,6 +7,8 @@ import {
     frameSetNeighbour,
     modalityRank,
     sortCatalogue,
+    splitRange,
+    splitterSegments,
     swapSlots,
     type ArrangeOrder,
     type CatalogueEntry,
@@ -161,5 +163,28 @@ describe("firstScreenPair", () => {
         ];
         expect(firstScreenPair(open, pairs)).toEqual(["ir-os", "oct-os"]);
         expect(firstScreenPair(open, [pairs[1]])).toBeNull();
+    });
+});
+
+describe("splitterSegments", () => {
+    it("stops short of a spanning cell", () => {
+        expect(splitterSegments(preset("3+2"))).toEqual([
+            { axis: "col", line: 1, from: 0, to: 1 },
+            { axis: "col", line: 2, from: 1, to: 2 },
+            { axis: "col", line: 3, from: 0, to: 1 },
+            { axis: "row", line: 1, from: 0, to: 4 },
+        ]);
+    });
+});
+
+describe("splitRange", () => {
+    it("stops where a viewport would go below 160 px", () => {
+        const r = splitRange(preset("2x1"), [1, 1], "col", 1, 1000);
+        expect(r.lo * r.perFr).toBeCloseTo(160);
+        expect((r.total - r.hi) * r.perFr).toBeCloseTo(160);
+    });
+    it("doesn't move when the viewports are already below the minimum", () => {
+        const r = splitRange(preset("4x1"), [1, 1, 1, 1], "col", 2, 500);
+        expect([r.lo, r.hi]).toEqual([1, 1]);
     });
 });
