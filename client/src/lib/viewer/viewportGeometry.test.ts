@@ -1,6 +1,6 @@
 import { Matrix } from "$lib/matrix";
 import { describe, expect, it } from "vitest";
-import { clipBox, keepViewOnResize } from "./viewportGeometry";
+import { boxToPaint, clipBox, keepViewOnResize } from "./viewportGeometry";
 
 describe("keepViewOnResize", () => {
     it("keeps the image point at the centre", () => {
@@ -31,5 +31,20 @@ describe("clipBox", () => {
         expect(
             clipBox({ left: -200, top: 0, width: 132, height: 92 }, grid),
         ).toBeNull();
+    });
+});
+
+describe("boxToPaint", () => {
+    const size = { width: 200, height: 100 };
+    const current = { left: 0, top: 0, width: 200, height: 100 };
+
+    it("adopts a box that only moved", () => {
+        const moved = { left: 50, top: 10, width: 200, height: 100 };
+        expect(boxToPaint(moved, current, size)).toEqual(moved);
+    });
+
+    it("keeps the current box when the size changed", () => {
+        const resized = { left: 50, top: 10, width: 300, height: 100 };
+        expect(boxToPaint(resized, current, size)).toEqual(current);
     });
 });
