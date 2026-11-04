@@ -37,8 +37,8 @@
 <!-- The viewer sets these so toasts sit at the canvas's bottom right, above the pager. -->
 <Toaster
     offset={{
-        right: "var(--viewer-toast-right, 32px)",
-        bottom: "var(--viewer-toast-bottom, 32px)",
+        right: "var(--viewer-toast-right, 24px)",
+        bottom: "var(--viewer-toast-bottom, 24px)",
     }}
 />
 

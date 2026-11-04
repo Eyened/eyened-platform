@@ -123,7 +123,7 @@
 </script>
 
 <div class="main">
-    <!-- ASSUMPTION: the sidebar is removed, not hidden, so PanelHeader can be deleted (plan decision 12). -->
+    <!-- ASSUMPTION: the sidebar is removed, not hidden, so the panel header component can be deleted (plan decision 12). -->
     <section class="viewer-section">
         <Viewer />
     </section>
