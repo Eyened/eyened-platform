@@ -8,14 +8,20 @@ Arrow keys move focus only; Enter, Space or a click applies.
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import * as Popover from "$lib/components/ui/popover/index.js";
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
+    import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+    import * as Field from "$lib/components/ui/field/index.js";
     import Grid from "carbon-icons-svelte/lib/Grid.svelte";
     import { getContext, tick } from "svelte";
     import { PRESET_ROWS, smallestRowFor } from "./presets";
     import { rovingIndex } from "./rovingIndex";
     import type { Workspace } from "./workspace.svelte";
     import { ARRANGE_ORDERS, type ArrangeOrder } from "./workspaceRules";
+    import { writeStripOn } from "./workspacePrefs";
 
-    let { iconOnly = false }: { iconOnly?: boolean } = $props();
+    let {
+        iconOnly = false,
+        stripToggle = false,
+    }: { iconOnly?: boolean; stripToggle?: boolean } = $props();
 
     const workspace = getContext<Workspace>("workspace");
     const uid = $props.id();
@@ -85,6 +91,11 @@ Arrow keys move focus only; Enter, Space or a click applies.
         e.preventDefault();
         arrangeFocus = next;
         void focusItem(`[data-arrange-index="${next}"]`);
+    }
+
+    function setStrip(on: boolean) {
+        workspace.strip = on;
+        writeStripOn(on);
     }
 
     // Carbon Popover: Tab out of the last control closes it.
@@ -202,6 +213,21 @@ Arrow keys move focus only; Enter, Space or a click applies.
                 </button>
             {/each}
         </div>
+        {#if stripToggle}
+            <!-- ASSUMPTION: a checkbox is the toggle (plan decision 19); a task sets the strip in its config. -->
+            <Field.Field orientation="horizontal" class="mt-3 px-2">
+                <Checkbox
+                    id="{uid}-strip"
+                    bind:checked={() => workspace.strip, setStrip}
+                />
+                <Field.Label
+                    for="{uid}-strip"
+                    class="text-body-compact-01 text-text-primary"
+                >
+                    Thumbnail strip
+                </Field.Label>
+            </Field.Field>
+        {/if}
     </Popover.Content>
 </Popover.Root>
 

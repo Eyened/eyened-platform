@@ -6,6 +6,7 @@ import {
     workspaceContext,
     workspaceWith,
 } from "./testUtils";
+import { readStripOn } from "./workspacePrefs";
 
 async function open(ws = workspaceWith(20)) {
     const result = render(LayoutPopover, { context: workspaceContext(ws) });
@@ -51,5 +52,24 @@ describe("LayoutPopover", () => {
                 screen.queryByRole("button", { name: "One viewport" }),
             ).toBeNull(),
         );
+    });
+});
+
+describe("LayoutPopover strip toggle", () => {
+    it("on /view turns the strip off and remembers it per browser", async () => {
+        localStorage.clear();
+        const ws = workspaceWith(3);
+        render(LayoutPopover, {
+            props: { stripToggle: true },
+            context: workspaceContext(ws),
+        });
+        await fireEvent.click(screen.getByRole("button", { name: "Layout" }));
+        const toggle = await screen.findByRole("checkbox", {
+            name: "Thumbnail strip",
+        });
+        expect(toggle).toHaveAttribute("aria-checked", "true");
+        await fireEvent.click(toggle);
+        expect(ws.strip).toBe(false);
+        expect(readStripOn()).toBe(false);
     });
 });
