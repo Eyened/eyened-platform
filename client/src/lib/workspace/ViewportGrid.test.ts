@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { IMAGE_MIME, SLOT_MIME } from "./dragTypes";
 import {
     expectNoAxeViolations,
     workspaceContext,
@@ -99,5 +100,144 @@ describe("ViewportGrid", () => {
         expect(
             screen.getByRole("group", { name: /^Viewport 1:/ }),
         ).toHaveAttribute("data-mode", "big");
+    });
+
+    describe("drag and drop", () => {
+        const transfer = (data: Record<string, string>) => ({
+            types: Object.keys(data),
+            getData: (type: string) => data[type] ?? "",
+            setData: vi.fn(),
+            effectAllowed: "none",
+        });
+        const frame = (n: number) =>
+            screen.getByRole("group", { name: new RegExp(`^Viewport ${n}:`) });
+
+        it("swaps two viewports when one's title bar is dropped on the other", async () => {
+            const ws = workspaceWith(2, { layout: "2x1" });
+            renderGrid(ws);
+            const dataTransfer = transfer({});
+            await fireEvent.dragStart(
+                frame(1).querySelector(".titlebar") as Element,
+                { dataTransfer },
+            );
+            expect(dataTransfer.setData).toHaveBeenCalledWith(SLOT_MIME, "0");
+            await fireEvent.dragOver(frame(2), {
+                dataTransfer: transfer({ [SLOT_MIME]: "0" }),
+            });
+            expect(frame(2)).toHaveClass("drop-target");
+            await fireEvent.drop(frame(2), {
+                dataTransfer: transfer({ [SLOT_MIME]: "0" }),
+            });
+            expect(ws.slots.map((s) => s.imageId)).toEqual(["img02", "img01"]);
+            expect(frame(2)).not.toHaveClass("drop-target");
+        });
+
+        it("loads a dragged catalogue image into the frame it lands on and selects it", async () => {
+            const ws = workspaceWith(3, { layout: "2x1" });
+            renderGrid(ws);
+            await fireEvent.drop(frame(2), {
+                dataTransfer: transfer({ [IMAGE_MIME]: "img03" }),
+            });
+            expect(ws.slots[1].imageId).toBe("img03");
+            expect(ws.selected).toBe(1);
+        });
+
+        it("ignores a drag it does not know and clears the highlight on leave", async () => {
+            const ws = workspaceWith(2, { layout: "2x1" });
+            renderGrid(ws);
+            const unknown = { dataTransfer: transfer({ "text/plain": "x" }) };
+            await fireEvent.dragOver(frame(2), unknown);
+            expect(frame(2)).not.toHaveClass("drop-target");
+            await fireEvent.dragOver(frame(2), {
+                dataTransfer: transfer({ [IMAGE_MIME]: "img01" }),
+            });
+            await fireEvent.dragLeave(frame(2), { relatedTarget: null });
+            expect(frame(2)).not.toHaveClass("drop-target");
+        });
+
+        it("does not start a drag from an empty viewport", async () => {
+            const ws = workspaceWith(1, { layout: "2x1" });
+            renderGrid(ws);
+            const dataTransfer = transfer({});
+            await fireEvent.dragStart(
+                frame(2).querySelector(".titlebar") as Element,
+                { dataTransfer },
+            );
+            expect(dataTransfer.setData).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("splitters", () => {
+        afterEach(() => vi.restoreAllMocks());
+
+        function renderSized() {
+            vi.spyOn(
+                HTMLElement.prototype,
+                "clientWidth",
+                "get",
+            ).mockReturnValue(1000);
+            vi.spyOn(
+                HTMLElement.prototype,
+                "clientHeight",
+                "get",
+            ).mockReturnValue(600);
+            const ws = workspaceWith(2, { layout: "2x1" });
+            renderGrid(ws);
+            return ws;
+        }
+
+        it("Home and End move the column splitter to its limits and Enter resets it", async () => {
+            const ws = renderSized();
+            const splitter = screen.getByRole("separator");
+            await fireEvent.keyDown(splitter, { key: "Home" });
+            const [min] = ws.colSizes;
+            expect(min).toBeLessThan(1);
+            await fireEvent.keyDown(splitter, { key: "End" });
+            expect(ws.colSizes[0]).toBeGreaterThan(1);
+            await fireEvent.keyDown(splitter, { key: "Enter" });
+            expect(ws.colSizes).toEqual([1, 1]);
+        });
+
+        it("an arrow key nudges the splitter along its axis", async () => {
+            const ws = renderSized();
+            await fireEvent.keyDown(screen.getByRole("separator"), {
+                key: "ArrowRight",
+            });
+            expect(ws.colSizes[0]).toBeGreaterThan(1);
+            expect(ws.colSizes[1]).toBeLessThan(1);
+        });
+
+        it("dragging moves the splitter", async () => {
+            const ws = renderSized();
+            const splitter = screen.getByRole("separator");
+            await fireEvent.pointerDown(splitter, {
+                clientX: 100,
+                clientY: 0,
+                pointerId: 1,
+            });
+            await fireEvent.pointerMove(splitter, {
+                clientX: 160,
+                clientY: 0,
+                pointerId: 1,
+            });
+            expect(ws.colSizes[0]).toBeGreaterThan(1);
+            await fireEvent.pointerUp(splitter, { pointerId: 1 });
+            expect(ws.colSizes[0]).toBeGreaterThan(1);
+        });
+
+        it("Escape on a picked-up splitter restores the tracks", async () => {
+            const ws = renderSized();
+            const splitter = screen.getByRole("separator");
+            const at = { clientX: 100, clientY: 0, pointerId: 1 };
+            await fireEvent.pointerDown(splitter, at);
+            await fireEvent.pointerUp(splitter, at);
+            await fireEvent.pointerMove(screen.getByTestId("splitter-pickup"), {
+                clientX: 160,
+                clientY: 0,
+            });
+            expect(ws.colSizes[0]).toBeGreaterThan(1);
+            await fireEvent.keyDown(splitter, { key: "Escape" });
+            expect(ws.colSizes).toEqual([1, 1]);
+        });
     });
 });
