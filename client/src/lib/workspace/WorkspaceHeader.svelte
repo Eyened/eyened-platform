@@ -55,6 +55,7 @@
         {/if}
     {/if}
     <div class="min-w-0 flex-1"></div>
+    <div class="contents" data-header-slot="patients-open"></div>
     <!-- Save state: 4 and 5; "Mark ready and next": 5. -->
     <div class="contents" data-header-slot="save-state"></div>
     {#if task}
