@@ -155,15 +155,14 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
             </div>
         {/if}
     </div>
-    <!-- The title bar is a mouse-only drag handle; the keyboard has Maximise and Close. -->
+    <!-- The title bar is a mouse-only drag handle; without a drag, swap is two loads from the Images panel. -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="titlebar" draggable={slot.imageId !== null} {ondragstart}>
         <Tooltip.Provider delayDuration={100}>
             <Tooltip.Root bind:open={titleOpen}>
                 <Tooltip.Trigger>
                     {#snippet child({ props })}
-                        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                        <span {...props} tabindex={-1} class="title-text">
+                        <span {...props} tabindex="-1" class="title-text">
                             {#if shownTitle}
                                 <span class="patient">{shownTitle.patient}</span
                                 >
