@@ -315,6 +315,11 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
         display: flex;
         flex: 1;
         min-height: 0;
+        /* The viewer never grows past its frame. */
+        overflow: hidden;
+    }
+    .body > :global(*) {
+        min-width: 0;
     }
     .empty {
         display: flex;
