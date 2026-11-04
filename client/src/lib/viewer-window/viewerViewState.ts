@@ -47,6 +47,23 @@ export function parseViewersParam(
     return out;
 }
 
+const VIEWER_ID = /^[A-Za-z0-9_-]+$/;
+
+/** Parse one `v=` token, `id` or `id.index`; a malformed token gives null. */
+export function parseViewerToken(token: string): OpenViewerEntry | null {
+    const trimmed = token.trim();
+    if (!trimmed) return null;
+    const dot = trimmed.lastIndexOf(".");
+    if (dot > 0) {
+        const id = trimmed.slice(0, dot).trim();
+        const indexStr = trimmed.slice(dot + 1).trim();
+        if (VIEWER_ID.test(id) && /^\d+$/.test(indexStr)) {
+            return { id, index: Number(indexStr) };
+        }
+    }
+    return VIEWER_ID.test(trimmed) ? { id: trimmed } : null;
+}
+
 export function serializeViewersParam(viewers: OpenViewerEntry[]): string {
     return viewers
         .filter((v) => typeof v.id === "string" && v.id.length > 0)

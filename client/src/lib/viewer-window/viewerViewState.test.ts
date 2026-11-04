@@ -8,6 +8,7 @@ import {
     createViewerViewStateController,
     VIEW_STATE_PARAM,
     instanceIdFromImageId,
+    parseViewerToken,
 } from "./viewerViewState";
 
 function memoryStorage(): Pick<Storage, "getItem" | "setItem"> & {
@@ -242,5 +243,23 @@ describe("createViewerViewStateController", () => {
             c.recordIndex("aaa", 1, 10);
             c.flush();
         }).not.toThrow();
+    });
+});
+
+describe("parseViewerToken", () => {
+    it("reads id and id.index and rejects malformed tokens", () => {
+        expect(
+            ["aaa.42", "fff", "bad!", "bbb.x", "ccc.-1", "ddd.3.5", ""].map(
+                parseViewerToken,
+            ),
+        ).toEqual([
+            { id: "aaa", index: 42 },
+            { id: "fff" },
+            null,
+            null,
+            null,
+            null,
+            null,
+        ]);
     });
 });
