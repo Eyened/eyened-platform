@@ -112,6 +112,8 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
         overflow-y: hidden;
     }
     .tile {
+        /* Keeps the sr-only label inside the scrolled strip. */
+        position: relative;
         display: flex;
         flex: none;
         flex-direction: column;
