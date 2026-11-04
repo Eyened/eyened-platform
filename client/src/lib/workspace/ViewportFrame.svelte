@@ -148,10 +148,18 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
             {/key}
         {:else}
             <div class="empty">
-                <p class="text-body-compact-01 text-text-secondary">Empty</p>
-                <Button variant="ghost" size="sm" onclick={choose}
-                    >Choose an image</Button
-                >
+                {#if workspace.loaded}
+                    <p class="text-body-compact-01 text-text-secondary">
+                        Empty
+                    </p>
+                    <Button variant="ghost" size="sm" onclick={choose}
+                        >Choose an image</Button
+                    >
+                {:else}
+                    <p class="text-body-compact-01 text-text-secondary">
+                        Loading images…
+                    </p>
+                {/if}
             </div>
         {/if}
     </div>

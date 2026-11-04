@@ -203,18 +203,26 @@ export class ViewerWindowContext {
         }
 
         // Load images for all instances
+        const loadIds: string[] = [];
         const loadPromises: Promise<LoadedImages>[] = [];
         for (const id of ids) {
             const instance = instances.get(id);
-            if (instance) loadPromises.push(this.loadImage(instance));
-            else console.warn(`Instance with id ${id} not found after fetch`);
+            if (instance) {
+                loadIds.push(id);
+                loadPromises.push(this.loadImage(instance));
+            } else console.warn(`Instance with id ${id} not found after fetch`);
         }
         const entries: CatalogueEntry[] = [];
-        for (const loaded of await Promise.all(loadPromises)) {
-            for (const image of loaded) {
+        const results = await Promise.allSettled(loadPromises);
+        results.forEach((result, i) => {
+            if (result.status === "rejected") {
+                console.error(`Loading instance ${loadIds[i]} failed`);
+                return;
+            }
+            for (const image of result.value) {
                 entries.push(catalogueEntry(image.image_id, image.instance));
             }
-        }
+        });
         if (this.hydrated) this.workspace.addImages(entries);
         return entries;
     }

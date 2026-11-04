@@ -5,10 +5,11 @@ import { IMAGE_MIME, SLOT_MIME } from "./dragTypes";
 import {
     expectNoAxeViolations,
     workspaceContext,
+    NO_URL,
     workspaceWith,
 } from "./testUtils";
 import ViewportGrid from "./ViewportGrid.svelte";
-import type { Workspace } from "./workspace.svelte";
+import { Workspace } from "./workspace.svelte";
 
 const viewer = createRawSnippet((imageId: () => string) => ({
     render: () => `<div data-testid="viewer-${imageId()}"></div>`,
@@ -28,6 +29,20 @@ function renderGrid(ws: Workspace) {
 }
 
 describe("ViewportGrid", () => {
+    it("says Loading images… with no Choose button until the workspace has hydrated", async () => {
+        const ws = new Workspace();
+        renderGrid(ws);
+        expect(screen.getByText("Loading images…")).toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Choose an image" }),
+        ).not.toBeInTheDocument();
+        ws.hydrate([], NO_URL, null);
+        expect(
+            await screen.findByRole("button", { name: "Choose an image" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Loading images…")).not.toBeInTheDocument();
+    });
+
     it("names each viewport; only the selected one's controls are tab stops", async () => {
         const ws = workspaceWith(3, { layout: "2x2" });
         const { container } = renderGrid(ws);
