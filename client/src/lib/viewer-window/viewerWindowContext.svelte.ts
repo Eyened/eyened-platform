@@ -272,6 +272,8 @@ export class ViewerWindowContext {
                     // Create viewer contexts
                     for (const image of loadedImages) {
                         const viewerContext = new ViewerContext(image, this);
+                        // Strip tiles show the middle slice; only the main viewer scrolls.
+                        viewerContext.lockScroll = true;
                         if (image.image_id.endsWith("_proj")) {
                             viewerContext.enfaceProjectionMode = "binary";
                         }
