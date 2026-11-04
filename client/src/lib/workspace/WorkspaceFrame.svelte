@@ -126,6 +126,7 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
     }
 
     async function chooseImage() {
+        opener = document.activeElement as HTMLElement | null;
         left = "images";
         writeLeftPanel(left);
         await tick();
@@ -136,7 +137,9 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
     }
 
     function imageLoaded() {
-        if (narrow) left = null;
+        if (!narrow) return;
+        left = null;
+        opener?.focus();
     }
 
     // ASSUMPTION: the root <Toaster> reads these (plan decision 16): bottom right of the canvas, above the pager.
