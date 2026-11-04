@@ -166,7 +166,6 @@
     }
 
     function onpointerenter(e: PointerEvent) {
-        viewerElement.focus();
         viewerContext.active = true;
         forwardEvent("pointerenter", e);
     }
