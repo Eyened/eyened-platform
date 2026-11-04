@@ -90,7 +90,7 @@ Arrow keys move focus only; Enter, Space or a click applies.
     // Carbon Popover: Tab out of the last control closes it.
     function onfocusout(e: FocusEvent) {
         const to = e.relatedTarget as Node | null;
-        if (content?.contains(to) || triggerWrap?.contains(to)) return;
+        if (!to || content?.contains(to) || triggerWrap?.contains(to)) return;
         open = false;
     }
 </script>
