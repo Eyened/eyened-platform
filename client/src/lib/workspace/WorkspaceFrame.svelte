@@ -136,10 +136,17 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
             ?.focus();
     }
 
-    function imageLoaded() {
+    async function imageLoaded() {
         if (!narrow) return;
         left = null;
-        opener?.focus();
+        await tick();
+        // Loading unmounts the Choose button; fall back to the selected viewport's controls.
+        (opener?.isConnected
+            ? opener
+            : document.querySelector<HTMLElement>(
+                  '[aria-current="true"] [tabindex="0"]',
+              )
+        )?.focus();
     }
 
     // ASSUMPTION: the root <Toaster> reads these (plan decision 16): bottom right of the canvas, above the pager.

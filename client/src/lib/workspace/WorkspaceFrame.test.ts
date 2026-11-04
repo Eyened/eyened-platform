@@ -124,4 +124,25 @@ describe("WorkspaceFrame", () => {
         await waitFor(() => expect(images).toHaveFocus());
         expect(screen.getByRole("main")).not.toHaveAttribute("inert");
     });
+
+    it("below md loading an image into an empty viewport returns focus to the selected viewport", async () => {
+        mockWidth({ md: false, xlg: false });
+        const ws = workspaceWith(3, { layout: "2x1" });
+        ws.close(1);
+        ws.select(1);
+        renderFrame(ws);
+        const choose = screen.getByRole("button", { name: "Choose an image" });
+        choose.focus();
+        await fireEvent.click(choose);
+        const panel = await screen.findByRole("region", { name: "Images" });
+        await fireEvent.click(panel.querySelectorAll("li button")[2]);
+        await waitFor(() =>
+            expect(screen.getByRole("main")).not.toHaveAttribute("inert"),
+        );
+        await waitFor(() =>
+            expect(
+                document.querySelector('[aria-current="true"]'),
+            ).toContainElement(document.activeElement as HTMLElement),
+        );
+    });
 });

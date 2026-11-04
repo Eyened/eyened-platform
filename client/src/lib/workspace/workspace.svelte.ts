@@ -56,6 +56,8 @@ export class Workspace {
     });
 
     private nextId = 1;
+    /** True once the grader (or the URL) named a layout; only then is it carried to the next set. */
+    private layoutChosen = false;
     private sliceIndex: Record<string, number> = {};
     /** Open images in the order they were opened; every Arrange sort starts from it. */
     // ASSUMPTION: sorts start from the opened list, so ties keep the opened order (plan decision 17).
@@ -83,6 +85,7 @@ export class Workspace {
             if (e?.index !== undefined) this.sliceIndex[e.id] = e.index;
         }
         const named = url.layout ? getPreset(url.layout) : undefined;
+        this.layoutChosen = named !== undefined;
         if (v.some((e) => e !== null)) {
             this.reset(named ?? smallestRowFor(v.length).presets[0]);
             this.slots = this.slots.map((slot, i) => ({
@@ -110,6 +113,7 @@ export class Workspace {
     setPreset(id: string): void {
         const preset = getPreset(id);
         if (!preset) return;
+        this.layoutChosen = true;
         this.applyPreset(preset);
         this.announcePage();
         this.persist();
@@ -223,7 +227,7 @@ export class Workspace {
                     ? { id: slot.imageId }
                     : { id: slot.imageId, index };
             }),
-            layout: this.preset.id,
+            layout: this.layoutChosen ? this.preset.id : null,
             page: this.page,
             arrange: this.arrange,
         };

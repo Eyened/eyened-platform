@@ -21,6 +21,13 @@ describe("Workspace.hydrate", () => {
         expect(ids(ws)).toEqual(["img03", "img01"]);
     });
 
+    it("writes no layout until the grader picks one", () => {
+        const ws = workspaceWith(4);
+        expect(ws.urlState().layout).toBeNull();
+        ws.setPreset("2x2");
+        expect(ws.urlState().layout).toBe("2x2");
+    });
+
     it("pages a named layout when v= names none of the open images", () => {
         const ws = workspaceWith(6, {
             v: [{ id: "other-set" }],
