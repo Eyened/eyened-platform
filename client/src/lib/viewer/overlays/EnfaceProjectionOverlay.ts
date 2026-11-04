@@ -19,7 +19,7 @@ type PreparedSource = {
 };
 
 /**
- * Programs are compiled once when the overlay is created. TopViewer rebuilds
+ * Programs are compiled once when the overlay is created. StripViewer rebuilds
  * this overlay when registration / modes change, so repaint only draws.
  */
 export class EnfaceProjectionOverlay implements Overlay {

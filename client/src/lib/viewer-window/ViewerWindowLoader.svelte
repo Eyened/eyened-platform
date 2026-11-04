@@ -1,7 +1,6 @@
 <!--
 @component
-Used to create the viewerwindow context.
-
+Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Workspace.
 -->
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
@@ -9,9 +8,18 @@ Used to create the viewerwindow context.
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import { Deferred } from "$lib/utils";
     import { WebGL } from "$lib/webgl/webgl";
-    import { getContext, onMount } from "svelte";
+    import {
+        CLIENT_DEFAULTS,
+        mergeClientConfig,
+    } from "$lib/config/clientDefaults";
+    import { Workspace } from "$lib/workspace/workspace.svelte";
+    import { readStripOn } from "$lib/workspace/workspacePrefs";
+    import {
+        createWorkspaceUrlWriter,
+        parseWorkspaceParams,
+    } from "$lib/workspace/workspaceUrl";
+    import { getContext, onMount, setContext } from "svelte";
     import ViewerWindow from "./ViewerWindow.svelte";
-    import { createViewerViewStateController } from "./viewerViewState";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     interface Props {
@@ -30,6 +38,35 @@ Used to create the viewerwindow context.
     const globalContext = getContext<GlobalContext>("globalContext");
     const { user: creator } = globalContext;
     const taskContext = getContext<TaskContext | undefined>("taskContext");
+
+    // A task takes the strip from its config; /view from the user's choice.
+    const strip = taskContext
+        ? mergeClientConfig(
+              CLIENT_DEFAULTS,
+              taskContext.task.task_definition.config,
+          ).layout.strip
+        : (readStripOn() ?? true);
+
+    // One Workspace per viewer window, never a module singleton.
+    const urlWriter = createWorkspaceUrlWriter({
+        getSearchParams: () => new URLSearchParams(window.location.search),
+        replaceUrl: (params) => {
+            // Avoid `new URL(...)` (svelte/prefer-svelte-reactivity).
+            // Use history.replaceState (not page.url) so we don't fight SvelteKit;
+            // readers must use window.location.search (see BrowserOverlay).
+            const searchRaw = params.toString();
+            const search = searchRaw
+                ? `?${searchRaw.replaceAll("%2C", ",")}`
+                : "";
+            history.replaceState(
+                history.state,
+                "",
+                `${window.location.pathname}${search}${window.location.hash}`,
+            );
+        },
+    });
+    const workspace = new Workspace({ writeUrl: urlWriter.write, strip });
+    setContext("workspace", workspace);
 
     const { promise, resolve, reject } = new Deferred<ViewerWindowContext>();
     let viewerWindowContext: ViewerWindowContext | null = null;
@@ -76,38 +113,13 @@ Used to create the viewerwindow context.
         webgl = new WebGL(mainCanvas);
         const registration = new Registration();
 
-        const scope =
-            taskContext?.subTask?.id != null
-                ? `subtask:${taskContext.subTask.id}`
-                : "view";
-
-        const viewState = createViewerViewStateController({
-            scope,
-            getSearchParams: () => new URLSearchParams(window.location.search),
-            replaceUrl: (params) => {
-                // Avoid `new URL(...)` (svelte/prefer-svelte-reactivity).
-                // Use history.replaceState (not page.url) so we don't fight SvelteKit;
-                // readers must use window.location.search (see BrowserOverlay).
-                const searchRaw = params.toString();
-                const search = searchRaw
-                    ? `?${searchRaw.replaceAll("%2C", ",")}`
-                    : "";
-                history.replaceState(
-                    history.state,
-                    "",
-                    `${window.location.pathname}${search}${window.location.hash}`,
-                );
-            },
-            storage: localStorage,
-        });
-        viewState.hydrate();
-
         viewerWindowContext = new ViewerWindowContext(
             webgl,
             registration,
             creator,
             instanceIDs,
-            viewState,
+            workspace,
+            parseWorkspaceParams(new URLSearchParams(window.location.search)),
         );
 
         resolve(viewerWindowContext);
@@ -123,6 +135,7 @@ Used to create the viewerwindow context.
                 handleContextRestored,
             );
 
+            urlWriter.flush();
             if (viewerWindowContext) {
                 viewerWindowContext.destroy();
                 viewerWindowContext = null;

@@ -34,7 +34,13 @@
         />
     </div>
 {/await}
-<Toaster />
+<!-- The viewer sets these so toasts sit at the canvas's bottom right, above the pager. -->
+<Toaster
+    offset={{
+        right: "var(--viewer-toast-right, 32px)",
+        bottom: "var(--viewer-toast-bottom, 32px)",
+    }}
+/>
 
 <style>
     :global(body) {
