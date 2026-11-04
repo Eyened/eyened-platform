@@ -13,7 +13,7 @@ import { ScrollOCT } from "./controls/scrollOCT";
 import { UpdatePosition } from "./controls/updatePosition";
 import { ZoomPan } from "./controls/zoomPan";
 import { CursorOverlay } from "./overlays/CursorOverlay";
-import { clipBox, sameBox } from "./viewportGeometry";
+import { boxToPaint, clipBox, sameBox } from "./viewportGeometry";
 import type { MeasureTool } from "./tools/Measure.svelte.js";
 import type {
     EventName,
@@ -409,9 +409,12 @@ export class ViewerContext {
         let scissor: RenderBounds | undefined;
         if (this.measure) {
             // A swap, a preset change or strip scrolling moves the box without resizing it.
+            // A new size waits for the ResizeObserver update, which runs after this frame.
             const { box, clip } = this.measure();
             if (box.width === 0 || box.height === 0) return;
-            if (!sameBox(box, this.viewingRect)) this.viewingRect = box;
+            const paintBox = boxToPaint(box, this.viewingRect, this.viewerSize);
+            if (!sameBox(paintBox, this.viewingRect))
+                this.viewingRect = paintBox;
             if (clip) {
                 const visible = clipBox(box, clip);
                 if (!visible) return;

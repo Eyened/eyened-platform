@@ -38,6 +38,17 @@ export function sameBox(a: Box, b: Box): boolean {
     );
 }
 
+/** rAF runs before ResizeObserver, so a box at a new size waits for the observer to update size, transform and box together. */
+export function boxToPaint<T extends Box>(
+    measured: T,
+    current: T,
+    size: Size,
+): T {
+    const sameSize =
+        measured.width === size.width && measured.height === size.height;
+    return sameSize ? measured : current;
+}
+
 /** The part of `box` inside `clip`, or null when none is. */
 export function clipBox(box: Box, clip: Box): Box | null {
     const left = Math.max(box.left, clip.left);
