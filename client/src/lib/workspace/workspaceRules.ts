@@ -212,3 +212,112 @@ export function firstScreenPair(
     }
     return null;
 }
+
+export type Axis = "col" | "row";
+
+/** Minimum viewport size a splitter may leave, in CSS px: width for column splitters, height for row splitters. */
+export const MIN_VIEWPORT: Record<Axis, number> = { col: 160, row: 120 };
+
+/** Gap between viewports, in CSS px. */
+export const GRID_GAP = 2;
+
+/** One splitter: the boundary between tracks `line − 1` and `line`, running along the other axis's tracks [from, to). */
+export interface SplitterSegment {
+    axis: Axis;
+    line: number;
+    from: number;
+    to: number;
+}
+
+function spanOf(cell: Preset["cells"][number], axis: Axis): [number, number] {
+    return axis === "col"
+        ? [cell.col, cell.col + cell.colSpan]
+        : [cell.row, cell.row + 1];
+}
+
+/** Splitters run along every internal track line and stop where a cell spans across the line. */
+export function splitterSegments(preset: Preset): SplitterSegment[] {
+    const out: SplitterSegment[] = [];
+    for (const axis of ["col", "row"] as const) {
+        const other: Axis = axis === "col" ? "row" : "col";
+        const tracks = axis === "col" ? preset.cols.length : preset.rows.length;
+        const along = axis === "col" ? preset.rows.length : preset.cols.length;
+        for (let line = 1; line < tracks; line++) {
+            const crossed = Array<boolean>(along).fill(false);
+            for (const cell of preset.cells) {
+                const [s, e] = spanOf(cell, axis);
+                if (s < line && line < e) {
+                    const [os, oe] = spanOf(cell, other);
+                    for (let k = os; k < oe; k++) crossed[k] = true;
+                }
+            }
+            let from = -1;
+            for (let k = 0; k <= along; k++) {
+                const open = k < along && !crossed[k];
+                if (open && from < 0) from = k;
+                if (!open && from >= 0) {
+                    out.push({ axis, line, from, to: k });
+                    from = -1;
+                }
+            }
+        }
+    }
+    return out;
+}
+
+/** px per fr along one axis, gaps excluded. */
+export function pxPerFr(sizes: readonly number[], lengthPx: number): number {
+    const total = sizes.reduce((a, b) => a + b, 0);
+    return Math.max(0, lengthPx - GRID_GAP * (sizes.length - 1)) / total;
+}
+
+/**
+ * The range (fr) for track a = line − 1, keeping every viewport at least MIN_VIEWPORT; track b = line takes the rest of their sum.
+ * A range the viewports already violate never gets worse; an impossible one holds the splitter where it is.
+ */
+export function splitRange(
+    preset: Preset,
+    sizes: readonly number[],
+    axis: Axis,
+    line: number,
+    lengthPx: number,
+): { lo: number; hi: number; total: number; perFr: number } {
+    const a = line - 1;
+    const b = line;
+    const total = sizes[a] + sizes[b];
+    const perFr = pxPerFr(sizes, lengthPx);
+    const minFr = perFr > 0 ? MIN_VIEWPORT[axis] / perFr : Infinity;
+    let lo = 0;
+    let hi = total;
+    for (const cell of preset.cells) {
+        const [s, e] = spanOf(cell, axis);
+        const hasA = s <= a && a < e;
+        const hasB = s <= b && b < e;
+        if (hasA === hasB) continue;
+        let rest = 0;
+        for (let t = s; t < e; t++) if (t !== a && t !== b) rest += sizes[t];
+        if (hasA) lo = Math.max(lo, minFr - rest);
+        else hi = Math.min(hi, total - (minFr - rest));
+    }
+    const current = sizes[a];
+    if (lo > hi) return { lo: current, hi: current, total, perFr };
+    return {
+        lo: Math.min(lo, current),
+        hi: Math.max(hi, current),
+        total,
+        perFr,
+    };
+}
+
+/** Sets track line − 1 to `a` fr and gives track `line` the rest of their sum. */
+export function setSplit(
+    sizes: readonly number[],
+    line: number,
+    a: number,
+): number[] {
+    const next = [...sizes];
+    const total = sizes[line - 1] + sizes[line];
+    next[line - 1] = a;
+    next[line] = total - a;
+    return next;
+}
