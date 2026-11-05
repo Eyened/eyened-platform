@@ -5,6 +5,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
     import * as Tooltip from "$lib/components/ui/tooltip/index.js";
     import Close from "carbon-icons-svelte/lib/Close.svelte";
     import Maximize from "carbon-icons-svelte/lib/Maximize.svelte";
@@ -42,8 +43,9 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     // ASSUMPTION: the selected viewport's controls follow it in Tab order (plan decision 2).
     const tab = $derived(selected ? 0 : -1);
     const shownTitle = $derived(slot.imageId ? title : null);
+    const emptyTitle = $derived(workspace.loaded ? "Empty" : "Loading…");
     const name = $derived(
-        `Viewport ${position + 1}: ${shownTitle ? titleText(shownTitle) : "Empty"}`,
+        `Viewport ${position + 1}: ${shownTitle ? titleText(shownTitle) : emptyTitle}`,
     );
     let dropTarget = $state(false);
     let titleOpen = $state(false);
@@ -156,9 +158,11 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                         >Choose an image</Button
                     >
                 {:else}
-                    <p class="text-body-compact-01 text-text-secondary">
-                        Loading images…
-                    </p>
+                    <InlineLoading
+                        status="active"
+                        description="Loading images…"
+                        class="w-auto"
+                    />
                 {/if}
             </div>
         {/if}
@@ -176,7 +180,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                                 >
                                 <span class="rest">{shownTitle.rest}</span>
                             {:else}
-                                <span class="rest">Empty</span>
+                                <span class="rest">{emptyTitle}</span>
                             {/if}
                         </span>
                     {/snippet}
