@@ -149,15 +149,17 @@ Below md there are no icon columns: a menu button opens the left column's conten
     }
 
     /** Esc or a press on the scrim: close, and return focus to the opener. */
-    function dismiss() {
+    async function dismiss() {
         overlay = null;
+        // The opener may sit in the canvas, which stays inert until the DOM updates.
+        await tick();
         opener?.focus();
     }
 
     function onkeydown(e: KeyboardEvent) {
         if (e.key !== "Escape" || !overlayOpen) return;
         e.preventDefault();
-        dismiss();
+        void dismiss();
     }
 
     function openLayout() {
