@@ -10,7 +10,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     import Close from "carbon-icons-svelte/lib/Close.svelte";
     import Maximize from "carbon-icons-svelte/lib/Maximize.svelte";
     import Minimize from "carbon-icons-svelte/lib/Minimize.svelte";
-    import { getContext, type Snippet } from "svelte";
+    import { getContext, tick, type Snippet } from "svelte";
     import { IMAGE_MIME, SLOT_MIME } from "./dragTypes";
     import { titleText, type ViewportTitle } from "./imageMeta";
     import OverflowMenu from "./OverflowMenu.svelte";
@@ -62,12 +62,19 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
             titleOpen = false;
     }
 
-    function onkeydown(e: KeyboardEvent) {
+    async function onkeydown(e: KeyboardEvent) {
         if (e.key !== "PageUp" && e.key !== "PageDown") return;
         const delta = e.key === "PageUp" ? -1 : 1;
+        const frame = e.currentTarget as HTMLElement;
         if (e.shiftKey) workspace.turnPage(workspace.page + delta);
         else workspace.stepFrameSet(delta);
         e.preventDefault();
+        // A new image rebuilds the viewer and drops its focus; focus moves to the new viewer, or to Choose an image.
+        await tick();
+        if (!frame.contains(document.activeElement))
+            frame
+                .querySelector<HTMLElement>(".body [tabindex], .body button")
+                ?.focus();
     }
 
     function onclick(e: MouseEvent) {
