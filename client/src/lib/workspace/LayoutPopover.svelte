@@ -247,16 +247,17 @@ Arrow keys move focus only; Enter, Space or a click applies.
         width: 28px;
         height: 18px;
         gap: 1px;
-        border: 1px solid var(--color-border-subtle-01);
-        background: var(--color-border-subtle-01);
+        border: 1px solid var(--color-icon-secondary);
+        background: var(--color-icon-secondary);
     }
     .preview i {
         background: var(--color-layer-01);
     }
     .preset[aria-pressed="true"] .preview {
-        border-color: var(--color-text-primary);
+        border-color: var(--color-icon-primary);
+        background: var(--color-layer-01);
     }
     .preset[aria-pressed="true"] .preview i {
-        background: var(--color-text-secondary);
+        background: var(--color-icon-primary);
     }
 </style>
