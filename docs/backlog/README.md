@@ -1,17 +1,14 @@
 # Backlog
 
 Deferred work, grouped by theme. Each item is a `###` title (imperative or defect) followed by `Status` (open | partial, saying what is left), `Source` (PR, commit or review), `Problem` and `Fix` (1–2 lines each, concrete symbols), and an optional one-line `Note` for a decision or number a fixer must know.
-To add: append the item to the fitting file and add a row below. To close: delete the item and its row in the change that fixes it; git is the history.
+**Frozen since 2026-11-05: add no new items.** New work goes to GitHub issues in this repo; security findings go to private issues in `Eyened/designdocuments` (label `security`).
+To pick up an item: open an issue for it and delete the item and its row here in the same change. To close: delete the item and its row in the change that fixes it; git is the history.
 
 ## Index
 
 | Item | File | Status |
 |---|---|---|
 | Validate usernames at every entry point | [auth-and-sessions](auth-and-sessions.md) | open |
-| Fence `PUBLIC_AUTH_DISABLED` | [auth-and-sessions](auth-and-sessions.md) | open |
-| End existing sessions on a password change or reset | [auth-and-sessions](auth-and-sessions.md) | open |
-| Stop a token outliving `docker compose down -v` or a restore | [auth-and-sessions](auth-and-sessions.md) | open |
-| Make `get_current_user` reject deleted and deactivated accounts | [auth-and-sessions](auth-and-sessions.md) | open |
 | Cap the absolute session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
 | Make "Keep me logged in" change the session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
 | Fix or delete the `api_client` branch of `POST /auth/login` | [auth-and-sessions](auth-and-sessions.md) | open |
