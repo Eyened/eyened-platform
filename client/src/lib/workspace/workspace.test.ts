@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { entries, entry, NO_URL, workspaceWith } from "./testUtils";
+import { entry, NO_URL, workspaceWith } from "./testUtils";
 import { Workspace } from "./workspace.svelte";
 
 const ids = (ws: Workspace) => ws.slots.map((s) => s.imageId);
@@ -12,13 +12,6 @@ describe("Workspace.hydrate", () => {
         expect(ws.preset.id).toBe("3x1");
         expect(ids(ws)).toEqual(["img02", null, null]);
         expect(ws.peekIndex("img02", 20)).toBe(7);
-    });
-
-    it("opens the first-screen pair side by side", () => {
-        const ws = new Workspace();
-        ws.hydrate(entries(4), NO_URL, ["img03", "img01"]);
-        expect(ws.preset.id).toBe("2x1");
-        expect(ids(ws)).toEqual(["img03", "img01"]);
     });
 
     it("writes no layout until the grader picks one", () => {
@@ -83,7 +76,6 @@ describe("Workspace edits", () => {
                 entry("a", { patient: "P-000417" }),
             ],
             { ...NO_URL, arrange: "opened" },
-            null,
         );
         ws.setArrange("visit");
         expect(ws.catalogue).toEqual(["a", "b"]);

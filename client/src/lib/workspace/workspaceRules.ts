@@ -184,35 +184,6 @@ export function frameSetNeighbour(
         : null;
 }
 
-export interface LocatorPair {
-    enfaceImageId: string;
-    octImageId: string;
-}
-
-/** BIR first screen: the first opened en-face image with an OCT of the same patient, eye and visit whose photo locators point onto it. */
-// ASSUMPTION: photo-locator pairs only; other registrations wait for sub-project 2's linking (plan decision 25).
-export function firstScreenPair(
-    openOrder: readonly CatalogueEntry[],
-    pairs: readonly LocatorPair[],
-): [string, string] | null {
-    const byId = new Map(openOrder.map((e) => [e.imageId, e]));
-    for (const enface of openOrder) {
-        for (const pair of pairs) {
-            if (pair.enfaceImageId !== enface.imageId) continue;
-            const oct = byId.get(pair.octImageId);
-            if (
-                oct &&
-                oct.patient === enface.patient &&
-                oct.eyeRank === enface.eyeRank &&
-                oct.date === enface.date
-            ) {
-                return [enface.imageId, oct.imageId];
-            }
-        }
-    }
-    return null;
-}
-
 export type Axis = "col" | "row";
 
 /** Minimum viewport size a splitter may leave, in CSS px: width for column splitters, height for row splitters. */

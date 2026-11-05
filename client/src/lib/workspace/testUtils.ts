@@ -39,7 +39,7 @@ export function workspaceWith(
     writeUrl: (state: WorkspaceUrlState) => void = () => {},
 ): Workspace {
     const workspace = new Workspace({ writeUrl });
-    workspace.hydrate(entries(n), { ...NO_URL, ...url }, null);
+    workspace.hydrate(entries(n), { ...NO_URL, ...url });
     return workspace;
 }
 

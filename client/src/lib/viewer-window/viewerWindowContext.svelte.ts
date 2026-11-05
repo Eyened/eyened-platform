@@ -16,10 +16,7 @@ import type { Image3D } from "$lib/webgl/image3D";
 import type { WebGL } from "$lib/webgl/webgl";
 import { catalogueEntry } from "$lib/workspace/imageMeta";
 import type { Workspace } from "$lib/workspace/workspace.svelte";
-import {
-    firstScreenPair,
-    type CatalogueEntry,
-} from "$lib/workspace/workspaceRules";
+import type { CatalogueEntry } from "$lib/workspace/workspaceRules";
 import type { WorkspaceUrlState } from "$lib/workspace/workspaceUrl";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
@@ -145,15 +142,7 @@ export class ViewerWindowContext {
     private hydrate(entries: CatalogueEntry[]) {
         if (this.destroyed) return;
         this.hydrated = true;
-        const pairs = this.photoLocatorSets.flat().map((locator) => ({
-            enfaceImageId: String(locator.enfaceImageId),
-            octImageId: String(locator.octImageId),
-        }));
-        this.workspace.hydrate(
-            entries,
-            this.initialUrl,
-            firstScreenPair(entries, pairs),
-        );
+        this.workspace.hydrate(entries, this.initialUrl);
     }
 
     /** Loads the instances and returns their catalogue entries, in opened order. */
