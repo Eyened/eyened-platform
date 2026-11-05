@@ -29,9 +29,12 @@ function renderGrid(ws: Workspace) {
 }
 
 describe("ViewportGrid", () => {
-    it("says Loading images… with no Choose button until the workspace has hydrated", async () => {
+    it("says Loading… with no Choose button until the workspace has hydrated", async () => {
         const ws = new Workspace();
         renderGrid(ws);
+        expect(
+            screen.getByRole("group", { name: "Viewport 1: Loading…" }),
+        ).toHaveTextContent("Loading…");
         expect(screen.getByText("Loading images…")).toBeInTheDocument();
         expect(
             screen.queryByRole("button", { name: "Choose an image" }),
@@ -41,6 +44,9 @@ describe("ViewportGrid", () => {
             await screen.findByRole("button", { name: "Choose an image" }),
         ).toBeInTheDocument();
         expect(screen.queryByText("Loading images…")).not.toBeInTheDocument();
+        expect(
+            screen.getByRole("group", { name: "Viewport 1: Empty" }),
+        ).toBeInTheDocument();
     });
 
     it("names each viewport; only the selected one's controls are tab stops", async () => {
