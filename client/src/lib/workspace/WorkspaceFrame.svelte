@@ -517,6 +517,8 @@ Below md there are no icon columns: a menu button opens the left column's conten
     }
     /* Carbon left panel: 256 px over the canvas, flush left. */
     .narrow .left:not([hidden]) {
+        /* A grid area would be the containing block, and the left one is 0 px wide. */
+        grid-area: auto;
         position: absolute;
         top: 48px;
         bottom: 0;
