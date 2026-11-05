@@ -141,5 +141,6 @@
     .viewer-section {
         display: flex;
         flex: 1;
+        min-width: 0;
     }
 </style>
