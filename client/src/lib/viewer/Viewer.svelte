@@ -297,6 +297,8 @@
     div.main {
         display: flex;
         flex: 1;
+        /* The info controls never widen the viewer past its container; the WebGL drawing follows this box. */
+        min-width: 0;
         position: relative;
         flex-direction: column;
         align-items: center;
