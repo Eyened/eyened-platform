@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { IMAGE_MIME, SLOT_MIME } from "./dragTypes";
@@ -12,7 +12,7 @@ import ViewportGrid from "./ViewportGrid.svelte";
 import { Workspace } from "./workspace.svelte";
 
 const viewer = createRawSnippet((imageId: () => string) => ({
-    render: () => `<div data-testid="viewer-${imageId()}"></div>`,
+    render: () => `<div tabindex="0" data-testid="viewer-${imageId()}"></div>`,
 }));
 const titleFor = (imageId: string) => ({
     patient: "P-000417",
@@ -90,6 +90,45 @@ describe("ViewportGrid", () => {
         });
         expect(ws.page).toBe(2);
         expect(screen.getByText("Page 2 of 2, images 5–6")).toBeInTheDocument();
+    });
+
+    it("keeps focus in the viewport after a page turn or a step loads a new image", async () => {
+        const ws = workspaceWith(6, { layout: "2x2" });
+        renderGrid(ws);
+        screen.getByTestId("viewer-img01").focus();
+        await fireEvent.keyDown(document.activeElement!, {
+            key: "PageDown",
+            shiftKey: true,
+        });
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getByTestId("viewer-img05"),
+            ),
+        );
+        await fireEvent.keyDown(document.activeElement!, { key: "PageUp" });
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getByTestId("viewer-img04"),
+            ),
+        );
+    });
+
+    it("moves focus to Choose an image when a page turn empties the focused viewport", async () => {
+        const ws = workspaceWith(6, { layout: "2x2" });
+        renderGrid(ws);
+        screen.getByTestId("viewer-img03").focus();
+        await fireEvent.keyDown(document.activeElement!, {
+            key: "PageDown",
+            shiftKey: true,
+        });
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getAllByRole("button", { name: "Choose an image" })[0],
+            ),
+        );
+        expect(
+            screen.getByRole("group", { name: "Viewport 3: Empty" }),
+        ).toContainElement(document.activeElement as HTMLElement);
     });
 
     it("maximises into a strip on the same frame nodes, without splitters", async () => {
