@@ -71,12 +71,8 @@ export class Workspace {
         this.strip = options.strip ?? true;
     }
 
-    /** The first state once the catalogue has loaded: v= wins, then a named layout, then the BIR first screen. */
-    hydrate(
-        entries: readonly CatalogueEntry[],
-        url: WorkspaceUrlState,
-        pair: readonly [string, string] | null,
-    ): void {
+    /** The first state once the catalogue has loaded: v= wins, then a named layout, then one viewport with the first image. */
+    hydrate(entries: readonly CatalogueEntry[], url: WorkspaceUrlState): void {
         this.arrange = url.arrange;
         this.opened = [...entries];
         this.entries = sortCatalogue(this.opened, url.arrange);
@@ -99,12 +95,6 @@ export class Workspace {
             this.reset(named);
             this.applyPreset(named);
             this.fill(Math.min(url.page, this.pageCount));
-        } else if (pair) {
-            this.reset(getPreset("2x1")!);
-            this.slots = this.slots.map((slot, i) => ({
-                id: slot.id,
-                imageId: pair[i],
-            }));
         } else {
             this.reset(getPreset(DEFAULT_PRESET_ID)!);
             this.fill(1);

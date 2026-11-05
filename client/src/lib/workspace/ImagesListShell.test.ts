@@ -14,7 +14,6 @@ function renderList() {
             entry("img03", { patient: "P-000502" }),
         ],
         { ...NO_URL, layout: "2x1" },
-        null,
     );
     const props = {
         titleFor: (id: string) => ({ patient: "x", rest: `title ${id}` }),

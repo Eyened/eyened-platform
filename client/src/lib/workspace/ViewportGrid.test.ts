@@ -39,7 +39,7 @@ describe("ViewportGrid", () => {
         expect(
             screen.queryByRole("button", { name: "Choose an image" }),
         ).not.toBeInTheDocument();
-        ws.hydrate([], NO_URL, null);
+        ws.hydrate([], NO_URL);
         expect(
             await screen.findByRole("button", { name: "Choose an image" }),
         ).toBeInTheDocument();

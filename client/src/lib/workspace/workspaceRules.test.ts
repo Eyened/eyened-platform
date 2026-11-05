@@ -3,7 +3,6 @@ import { getPreset } from "./presets";
 import {
     changePreset,
     eyeRank,
-    firstScreenPair,
     frameSetNeighbour,
     modalityRank,
     sortCatalogue,
@@ -145,24 +144,6 @@ describe("frameSetNeighbour", () => {
         expect(frameSetNeighbour(open, "v1-cf", 1)).toBe("v1-oct");
         expect(frameSetNeighbour(open, "v1-oct", 1)).toBeNull();
         expect(frameSetNeighbour(open, "v1-cf", -1)).toBeNull();
-    });
-});
-
-describe("firstScreenPair", () => {
-    it("pairs the first opened en-face image with an OCT of the same eye and visit", () => {
-        const open = [
-            entry("ir-os", { eyeRank: 1 }),
-            entry("oct-od", { modalityRank: 4 }),
-            entry("ir-od"),
-            entry("oct-os", { eyeRank: 1, modalityRank: 4 }),
-        ];
-        const pairs = [
-            { enfaceImageId: "ir-od", octImageId: "oct-od" },
-            { enfaceImageId: "ir-os", octImageId: "oct-od" },
-            { enfaceImageId: "ir-os", octImageId: "oct-os" },
-        ];
-        expect(firstScreenPair(open, pairs)).toEqual(["ir-os", "oct-os"]);
-        expect(firstScreenPair(open, [pairs[1]])).toBeNull();
     });
 });
 
