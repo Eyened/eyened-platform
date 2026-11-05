@@ -7,15 +7,17 @@
 </script>
 
 {#if workspace.showPager}
-    <Table.Pagination
-        size="sm"
-        class="border-t border-border-subtle-01"
-        page={workspace.page}
-        pageSize={workspace.preset.count}
-        totalItems={workspace.catalogue.length}
-        rangeText={workspace.pagerText}
-        backwardHint="Shift + Page Up"
-        forwardHint="Shift + Page Down"
-        onchange={({ page }) => workspace.turnPage(page)}
-    />
+    <!-- The border sits outside the pager so its 32 px controls fit. -->
+    <div class="border-t border-border-subtle-01">
+        <Table.Pagination
+            size="sm"
+            page={workspace.page}
+            pageSize={workspace.preset.count}
+            totalItems={workspace.catalogue.length}
+            rangeText={workspace.pagerText}
+            backwardHint="Shift + Page Up"
+            forwardHint="Shift + Page Down"
+            onchange={({ page }) => workspace.turnPage(page)}
+        />
+    </div>
 {/if}
