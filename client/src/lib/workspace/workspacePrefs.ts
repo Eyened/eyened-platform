@@ -1,5 +1,7 @@
 /** Per-user viewer panel state; each read and write survives private mode and quota errors. */
 
+import { MediaQuery } from "svelte/reactivity";
+
 const LEFT_KEY = "eyened:viewer:leftPanel";
 const RIGHT_KEY = "eyened:viewer:rightOpen";
 const STRIP_KEY = "eyened:viewer:strip";
@@ -58,6 +60,12 @@ export function readStripOn(): boolean | undefined {
     } catch {
         return undefined;
     }
+}
+
+/** The strip's start value: off on a narrow window, else the task's config or the /view choice. */
+export function startStripOn(taskStrip?: boolean): boolean {
+    if (!new MediaQuery("min-width: 42rem").current) return false;
+    return taskStrip ?? readStripOn() ?? true;
 }
 
 export function writeStripOn(on: boolean): void {

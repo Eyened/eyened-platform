@@ -13,7 +13,7 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
     import { Workspace } from "$lib/workspace/workspace.svelte";
-    import { readStripOn } from "$lib/workspace/workspacePrefs";
+    import { startStripOn } from "$lib/workspace/workspacePrefs";
     import {
         createWorkspaceUrlWriter,
         parseWorkspaceParams,
@@ -39,13 +39,15 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
     const { user: creator } = globalContext;
     const taskContext = getContext<TaskContext | undefined>("taskContext");
 
-    // A task takes the strip from its config; /view from the user's choice.
-    const strip = taskContext
-        ? mergeClientConfig(
-              CLIENT_DEFAULTS,
-              taskContext.task.task_definition.config,
-          ).layout.strip
-        : (readStripOn() ?? true);
+    // Off on a narrow window; else a task takes the strip from its config, /view from the user's choice.
+    const strip = startStripOn(
+        taskContext
+            ? mergeClientConfig(
+                  CLIENT_DEFAULTS,
+                  taskContext.task.task_definition.config,
+              ).layout.strip
+            : undefined,
+    );
 
     // One Workspace per viewer window, never a module singleton.
     const urlWriter = createWorkspaceUrlWriter({
