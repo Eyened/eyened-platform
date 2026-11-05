@@ -1,18 +1,25 @@
 <!--
 @component
 The viewer's region grid: header, left icon column and panel, tool options bar, canvas, pager and right column.
+Below md there are no icon columns: a menu button opens the left column's content and a header button the right column's, both over the canvas.
 -->
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import * as Tabs from "$lib/components/ui/tabs/index.js";
+    import Close from "carbon-icons-svelte/lib/Close.svelte";
     import Document from "carbon-icons-svelte/lib/Document.svelte";
     import Help from "carbon-icons-svelte/lib/Help.svelte";
     import Image from "carbon-icons-svelte/lib/Image.svelte";
     import Information from "carbon-icons-svelte/lib/Information.svelte";
     import Layers from "carbon-icons-svelte/lib/Layers.svelte";
+    import Menu from "carbon-icons-svelte/lib/Menu.svelte";
+    import RightPanelOpen from "carbon-icons-svelte/lib/RightPanelOpen.svelte";
     import { getContext, tick, type Snippet } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
     import type { ViewportTitle } from "./imageMeta";
     import ImagesListShell from "./ImagesListShell.svelte";
+    import LayoutPopover from "./LayoutPopover.svelte";
     import Pager from "./Pager.svelte";
     import ThumbnailStrip from "./ThumbnailStrip.svelte";
     import ViewportGrid from "./ViewportGrid.svelte";
@@ -50,23 +57,33 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
     const RIGHT_OPEN_PX = 288;
     const RAIL_PX = 48;
 
-    const storedLeft = readLeftPanel();
     // Images starts closed while the strip is on: the strip already shows the catalogue.
     // ASSUMPTION: read once at mount (plan decision 22).
     const defaultLeft: LeftPanel | null = workspace.strip ? null : "images";
-    let left: LeftPanel | null = $state(
-        md.current
-            ? storedLeft === undefined
-                ? defaultLeft
-                : storedLeft
-            : null,
-    );
+    /** The wide left panel: the stored choice, else the default. */
+    function initialLeft(): LeftPanel | null {
+        const stored = readLeftPanel();
+        return stored === undefined ? defaultLeft : stored;
+    }
+
+    // Wide state: stored per user.
+    let left: LeftPanel | null = $state(md.current ? initialLeft() : null);
     let rightChoice: boolean | undefined = $state(readRightOpen());
-    // The user's choice beats the narrow-window default.
+    // The user's choice beats the below-xlg default.
     const rightOpen = $derived(rightChoice ?? xlg.current);
     let expanded = $state({ layers: true, forms: true });
+
+    // Narrow state: one overlay at a time, never stored.
+    let overlay: "menu" | "right" | null = $state(null);
+    let menuTab: LeftPanel = $state("images");
+    let layoutOpen = $state(false);
+
+    const leftShown = $derived(
+        narrow ? (overlay === "menu" ? menuTab : null) : left,
+    );
+    const rightShown = $derived(narrow ? overlay === "right" : rightOpen);
+    const overlayOpen = $derived(narrow && overlay !== null);
     const formsName = $derived(task ? "Grading" : "Forms");
-    const overlayOpen = $derived(narrow && (left !== null || rightOpen));
     let opener: HTMLElement | null = null;
 
     const LEFT_PANELS = [
@@ -74,6 +91,10 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
         { id: "info", label: "Info", Icon: Information },
         { id: "help", label: "Help", Icon: Help },
     ] as const;
+    /** IconButton's tooltip trigger replaces any id, so buttons are found by what they control. */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used by the md-crossing focus handling added next
+    const byControls = (id: string) =>
+        document.querySelector<HTMLElement>(`[aria-controls="${id}"]`);
 
     function setRight(open: boolean) {
         rightChoice = open;
@@ -90,7 +111,6 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
         opener = e.currentTarget as HTMLElement;
         left = left === panel ? null : panel;
         writeLeftPanel(left);
-        if (narrow && left && rightOpen) setRight(false);
         if (left) void focusPanel(left);
     }
 
@@ -110,25 +130,55 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
         if (!rightOpen) expanded = { layers: false, forms: false };
         expanded = { ...expanded, [section]: true };
         setRight(true);
-        if (narrow) left = null;
     }
 
-    function closeOverlays() {
-        left = null;
-        if (rightOpen) setRight(false);
+    /** Below md: the menu or the right column, opened from its header button. */
+    async function toggleOverlay(next: "menu" | "right", e: MouseEvent) {
+        opener = e.currentTarget as HTMLElement;
+        layoutOpen = false;
+        overlay = overlay === next ? null : next;
+        if (overlay === null) return;
+        await tick();
+        if (next === "right")
+            document.getElementById(`${uid}-layers-title`)?.focus();
+        else
+            document
+                .getElementById(`${uid}-left`)
+                ?.querySelector<HTMLElement>("button")
+                ?.focus();
+    }
+
+    /** Esc or a press on the scrim: close, and return focus to the opener. */
+    function dismiss() {
+        overlay = null;
+        opener?.focus();
     }
 
     function onkeydown(e: KeyboardEvent) {
         if (e.key !== "Escape" || !overlayOpen) return;
         e.preventDefault();
-        closeOverlays();
-        opener?.focus();
+        dismiss();
+    }
+
+    function openLayout() {
+        overlay = null;
+        layoutOpen = true;
+    }
+
+    function openOverview() {
+        overlay = null;
+        task?.overview();
     }
 
     async function chooseImage() {
         opener = document.activeElement as HTMLElement | null;
-        left = "images";
-        writeLeftPanel(left);
+        if (narrow) {
+            overlay = "menu";
+            menuTab = "images";
+        } else {
+            left = "images";
+            writeLeftPanel(left);
+        }
         await tick();
         document
             .getElementById(`${uid}-images`)
@@ -138,7 +188,7 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
 
     async function imageLoaded() {
         if (!narrow) return;
-        left = null;
+        overlay = null;
         await tick();
         // Loading unmounts the Choose button; fall back to the selected viewport's controls.
         (opener?.isConnected
@@ -154,7 +204,7 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
         const style = document.body.style;
         style.setProperty(
             "--viewer-toast-right",
-            `${(rightOpen && !narrow ? RIGHT_OPEN_PX : RAIL_PX) + 16}px`,
+            `${narrow ? 16 : (rightOpen ? RIGHT_OPEN_PX : RAIL_PX) + 16}px`,
         );
         style.setProperty(
             "--viewer-toast-bottom",
@@ -167,38 +217,112 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
     });
 </script>
 
+{#snippet tools()}
+    <div role="group" aria-label="Tools"></div>
+{/snippet}
+
+{#snippet headerStart()}
+    <IconButton
+        label={overlay === "menu" ? "Hide menu" : "Show menu"}
+        aria-controls="{uid}-left"
+        onclick={(e) => toggleOverlay("menu", e)}
+    >
+        {#if overlay === "menu"}<Close />{:else}<Menu />{/if}
+    </IconButton>
+    <LayoutPopover
+        anchor={`[aria-controls="${uid}-left"]`}
+        bind:open={layoutOpen}
+        stripToggle={task === null}
+    />
+{/snippet}
+
+{#snippet headerEnd()}
+    <IconButton
+        label="{overlay === 'right' ? 'Hide' : 'Show'} Layers and {formsName}"
+        aria-controls="{uid}-right-panels"
+        onclick={(e) => toggleOverlay("right", e)}
+    >
+        {#if overlay === "right"}<Close />{:else}<RightPanelOpen />{/if}
+    </IconButton>
+{/snippet}
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="frame"
     class:narrow
-    style="--left: {left && !narrow ? '256px' : '0px'}; --right: {rightOpen &&
-    !narrow
-        ? `${RIGHT_OPEN_PX}px`
-        : `${RAIL_PX}px`};"
+    style="--rail: {narrow ? '0px' : `${RAIL_PX}px`}; --left: {left && !narrow
+        ? '256px'
+        : '0px'}; --right: {narrow
+        ? '0px'
+        : rightOpen
+          ? `${RIGHT_OPEN_PX}px`
+          : `${RAIL_PX}px`};"
     {onkeydown}
 >
-    <WorkspaceHeader {task} {narrow} />
-    <nav class="rail" aria-label="Tools and panels">
-        <div role="group" aria-label="Tools"></div>
-        <div class="rail-bottom">
-            {#each LEFT_PANELS as panel (panel.id)}
-                <IconButton
-                    label={panel.label}
-                    aria-pressed={left === panel.id}
-                    aria-controls="{uid}-{panel.id}"
-                    onclick={(e) => toggleLeft(panel.id, e)}
+    <WorkspaceHeader {task} {narrow} start={headerStart} end={headerEnd} />
+    {#if !narrow}
+        <nav class="rail" aria-label="Tools and panels">
+            {@render tools()}
+            <div class="rail-bottom">
+                {#each LEFT_PANELS as panel (panel.id)}
+                    <IconButton
+                        label={panel.label}
+                        aria-pressed={left === panel.id}
+                        aria-controls="{uid}-{panel.id}"
+                        onclick={(e) => toggleLeft(panel.id, e)}
+                    >
+                        <panel.Icon />
+                    </IconButton>
+                {/each}
+            </div>
+        </nav>
+    {/if}
+    <div
+        id="{uid}-left"
+        class="left"
+        hidden={narrow ? overlay !== "menu" : left === null}
+    >
+        {#if narrow}
+            <!-- ASSUMPTION: Carbon puts header links above the left panel items; ghost buttons as in the wide header. -->
+            <nav
+                aria-label="Menu"
+                class="flex flex-col border-b border-border-subtle-01 py-2"
+            >
+                {#if task}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        class="justify-start"
+                        onclick={openOverview}>Task overview</Button
+                    >
+                {/if}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    class="justify-start"
+                    onclick={openLayout}>Layout…</Button
                 >
-                    <panel.Icon />
-                </IconButton>
-            {/each}
-        </div>
-    </nav>
-    <div class="left" class:open={left !== null}>
+            </nav>
+            {@render tools()}
+            <!-- ASSUMPTION: tabs switch the sections below without Tabs.Content, so both widths share one markup. -->
+            <Tabs.Root
+                bind:value={() => menuTab, (v) => (menuTab = v as LeftPanel)}
+                class="px-4 pt-2"
+            >
+                <Tabs.List aria-label="Panels">
+                    {#each LEFT_PANELS as panel (panel.id)}
+                        <Tabs.Trigger value={panel.id}
+                            >{panel.label}</Tabs.Trigger
+                        >
+                    {/each}
+                </Tabs.List>
+            </Tabs.Root>
+        {/if}
         {#each LEFT_PANELS as panel (panel.id)}
             <section
                 id="{uid}-{panel.id}"
                 aria-labelledby="{uid}-{panel.id}-title"
-                hidden={left !== panel.id}
+                hidden={leftShown !== panel.id}
             >
                 <h2
                     id="{uid}-{panel.id}-title"
@@ -217,7 +341,7 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
             </section>
         {/each}
     </div>
-    <div class="tool-options"></div>
+    <div class="tool-options" inert={overlayOpen}></div>
     <main class="canvas" inert={overlayOpen}>
         {#if emptyMessage}
             <p class="m-8 text-body-compact-01 text-text-primary">
@@ -230,32 +354,35 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
             <ViewportGrid {viewer} {titleFor} onchooseimage={chooseImage} />
         {/if}
     </main>
-    <div class="pager"><Pager /></div>
+    <div class="pager" inert={overlayOpen}><Pager /></div>
     <aside class="right" aria-label="Layers and {formsName.toLowerCase()}">
-        <div class="right-rail">
-            <IconButton
-                label="{shown('layers') ? 'Hide' : 'Show'} Layers"
-                aria-controls="{uid}-layers"
-                onclick={(e) => toggleSection("layers", e)}
-            >
-                <Layers />
-            </IconButton>
-            <IconButton
-                label="{shown('forms') ? 'Hide' : 'Show'} {formsName}"
-                aria-controls="{uid}-forms"
-                onclick={(e) => toggleSection("forms", e)}
-            >
-                <Document />
-            </IconButton>
-        </div>
-        <div class="right-panels" hidden={!rightOpen}>
+        {#if !narrow}
+            <div class="right-rail">
+                <IconButton
+                    label="{shown('layers') ? 'Hide' : 'Show'} Layers"
+                    aria-controls="{uid}-layers"
+                    onclick={(e) => toggleSection("layers", e)}
+                >
+                    <Layers />
+                </IconButton>
+                <IconButton
+                    label="{shown('forms') ? 'Hide' : 'Show'} {formsName}"
+                    aria-controls="{uid}-forms"
+                    onclick={(e) => toggleSection("forms", e)}
+                >
+                    <Document />
+                </IconButton>
+            </div>
+        {/if}
+        <div id="{uid}-right-panels" class="right-panels" hidden={!rightShown}>
             <section
                 id="{uid}-layers"
                 aria-labelledby="{uid}-layers-title"
-                hidden={!expanded.layers}
+                hidden={!narrow && !expanded.layers}
             >
                 <h2
                     id="{uid}-layers-title"
+                    tabindex="-1"
                     class="px-4 pt-3 pb-2 text-heading-compact-01 text-text-primary"
                 >
                     Layers
@@ -264,7 +391,7 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
             <section
                 id="{uid}-forms"
                 aria-labelledby="{uid}-forms-title"
-                hidden={!expanded.forms}
+                hidden={!narrow && !expanded.forms}
             >
                 <h2
                     id="{uid}-forms-title"
@@ -276,7 +403,7 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
         </div>
     </aside>
     {#if overlayOpen}
-        <div class="scrim" aria-hidden="true" onclick={closeOverlays}></div>
+        <div class="scrim" aria-hidden="true" onclick={dismiss}></div>
     {/if}
 </div>
 
@@ -288,7 +415,9 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
         min-height: 0;
         /* Keeps the viewer's z-indexes below menus portalled to <body>. */
         isolation: isolate;
-        grid-template-columns: 48px var(--left) minmax(0, 1fr) var(--right);
+        grid-template-columns: var(--rail) var(--left) minmax(0, 1fr) var(
+                --right
+            );
         grid-template-rows: 48px 32px minmax(0, 1fr) auto;
         grid-template-areas:
             "header header header header"
@@ -314,9 +443,6 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
         grid-area: left;
         overflow-y: auto;
         background: var(--color-layer-01);
-    }
-    .left:not(.open) {
-        display: none;
     }
     .tool-options {
         grid-area: tools;
@@ -353,26 +479,31 @@ The viewer's region grid: header, left icon column and panel, tool options bar, 
         min-width: 0;
         overflow-y: auto;
     }
-    .narrow .left.open {
+    .narrow .right {
+        border-inline-start: 0;
+    }
+    /* Carbon left panel: 256 px over the canvas, flush left. */
+    .narrow .left:not([hidden]) {
         position: absolute;
         top: 48px;
         bottom: 0;
-        left: 48px;
+        left: 0;
         z-index: 20;
-        width: min(256px, calc(100% - 96px));
+        width: min(256px, calc(100% - 48px));
     }
+    /* Carbon right panel: floats over the canvas, flush right. */
     .narrow .right-panels:not([hidden]) {
         position: absolute;
         top: 48px;
         bottom: 0;
-        right: 48px;
+        right: 0;
         z-index: 20;
-        width: min(240px, calc(100% - 96px));
+        width: min(288px, calc(100% - 48px));
         background: var(--color-layer-01);
     }
     .scrim {
         position: absolute;
-        inset: 48px 48px 0 48px;
+        inset: 48px 0 0 0;
         z-index: 10;
         background: var(--color-overlay);
     }
