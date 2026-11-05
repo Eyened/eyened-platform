@@ -41,6 +41,7 @@ describe("WorkspaceHeader", () => {
         renderHeader(null);
         expect(screen.queryByRole("button", { name: "Next set" })).toBeNull();
         expect(screen.queryByText("Task overview")).toBeNull();
+        expect(screen.queryByText("Show menu")).toBeNull();
     });
 
     it("in a task, labels the set and wires Previous, Next and Task overview", async () => {
