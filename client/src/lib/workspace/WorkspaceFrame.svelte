@@ -15,7 +15,7 @@ Below md there are no icon columns: a menu button opens the left column's conten
     import Layers from "carbon-icons-svelte/lib/Layers.svelte";
     import Menu from "carbon-icons-svelte/lib/Menu.svelte";
     import RightPanelOpen from "carbon-icons-svelte/lib/RightPanelOpen.svelte";
-    import { getContext, tick, type Snippet } from "svelte";
+    import { getContext, tick, untrack, type Snippet } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
     import type { ViewportTitle } from "./imageMeta";
     import ImagesListShell from "./ImagesListShell.svelte";
@@ -92,7 +92,6 @@ Below md there are no icon columns: a menu button opens the left column's conten
         { id: "help", label: "Help", Icon: Help },
     ] as const;
     /** IconButton's tooltip trigger replaces any id, so buttons are found by what they control. */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used by the md-crossing focus handling added next
     const byControls = (id: string) =>
         document.querySelector<HTMLElement>(`[aria-controls="${id}"]`);
 
@@ -199,6 +198,38 @@ Below md there are no icon columns: a menu button opens the left column's conten
                   '[aria-current="true"] [tabindex="0"]',
               )
         )?.focus();
+    }
+
+    // Crossing md closes an open overlay; the wide side reads the stored prefs again,
+    // and focus that was in a panel moves to the button that controls it at the new width.
+    let wasNarrow = untrack(() => narrow);
+    $effect.pre(() => {
+        const now = narrow;
+        if (now === wasNarrow) return;
+        wasNarrow = now;
+        untrack(() => void crossed(now));
+    });
+
+    async function crossed(nowNarrow: boolean) {
+        const active = document.activeElement;
+        const within = (id: string) =>
+            !!active && !!document.getElementById(id)?.contains(active);
+        const inLeft = within(`${uid}-left`);
+        const inRight = within(`${uid}-right-panels`);
+        const tab = menuTab;
+        overlay = null;
+        layoutOpen = false;
+        if (!nowNarrow) {
+            left = initialLeft();
+            rightChoice = readRightOpen();
+        }
+        await tick();
+        if (inLeft)
+            byControls(nowNarrow ? `${uid}-left` : `${uid}-${tab}`)?.focus();
+        else if (inRight)
+            byControls(
+                nowNarrow ? `${uid}-right-panels` : `${uid}-layers`,
+            )?.focus();
     }
 
     // ASSUMPTION: the root <Toaster> reads these (plan decision 16): bottom right of the canvas, above the pager.
