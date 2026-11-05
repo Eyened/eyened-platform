@@ -254,4 +254,37 @@ describe("WorkspaceFrame", () => {
             ).toContainElement(document.activeElement as HTMLElement),
         );
     });
+    it("crossing md closes an open overlay and moves focus to the button that now controls it", async () => {
+        const width = mockWidth({ md: false, xlg: false });
+        renderFrame(workspaceWith(3));
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Show Layers and Forms" }),
+        );
+        await waitFor(() =>
+            expect(
+                screen.getByRole("heading", { name: "Layers" }),
+            ).toHaveFocus(),
+        );
+        width.resize({ md: true, xlg: false });
+        await waitFor(() =>
+            expect(
+                screen.getByRole("button", { name: "Show Layers" }),
+            ).toHaveFocus(),
+        );
+        expect(screen.getByRole("main")).not.toHaveAttribute("inert");
+        expect(screen.queryByRole("region", { name: "Layers" })).toBeNull();
+
+        await fireEvent.click(screen.getByRole("button", { name: "Info" }));
+        await waitFor(() =>
+            expect(screen.getByRole("heading", { name: "Info" })).toHaveFocus(),
+        );
+        width.resize({ md: false, xlg: false });
+        await waitFor(() =>
+            expect(
+                screen.getByRole("button", { name: "Show menu" }),
+            ).toHaveFocus(),
+        );
+        expect(screen.queryByRole("region", { name: "Info" })).toBeNull();
+        expect(localStorage.getItem("eyened:viewer:leftPanel")).toBe("info");
+    });
 });
