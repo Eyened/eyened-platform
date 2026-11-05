@@ -10,15 +10,22 @@
     import Stretch from "$lib/viewer-window/panelRendering/Stretch.svelte";
     import WindowLevel from "$lib/viewer-window/panelRendering/WindowLevel.svelte";
     import BscanLinks from "$lib/viewer-window/panelSegmentation/BscanLinks.svelte";
+    import { keepViewOnResize, sameTransform } from "./viewportGeometry";
 
     export interface Props {
         showInfo?: boolean;
+        /** False keeps the viewer out of the Tab order, as in a strip tile; a press still focuses it. */
+        tabbable?: boolean;
     }
-    let { showInfo = true }: Props = $props();
+    let { showInfo = true, tabbable = true }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
+    );
+    // ViewportGrid's box; drawing outside it (a scrolled strip tile) is clipped.
+    const getClip = getContext<(() => DOMRect | null) | undefined>(
+        "viewportClip",
     );
 
     // add viewer to viewerWindowContext
@@ -27,21 +34,41 @@
 
     let viewerElement: HTMLDivElement;
 
-    // update viewingRect and canvas size on resize
+    // A viewport keeps its view (centre and scale) when it resizes; only a viewport at fit stays at fit.
+    // The first callback still fits: viewerSize starts at 100 × 100 with the fit transform.
     onMount(() => {
         const resizeObserver = new ResizeObserver(() => {
             const viewingRect = viewerElement.getBoundingClientRect();
-            viewerContext.viewingRect = viewingRect;
             const { width, height } = viewingRect;
+            if (width === 0 || height === 0) return;
+            const atFit = sameTransform(
+                viewerContext.transform,
+                viewerContext.getInitTransform(),
+            );
+            const from = viewerContext.viewerSize;
+            viewerContext.viewingRect = viewingRect;
             viewerContext.canvas2D.width = width;
             viewerContext.canvas2D.height = height;
             viewerContext.viewerSize = { width, height };
-            viewerContext.initTransform();
+            if (atFit) viewerContext.initTransform();
+            else
+                viewerContext.transform = keepViewOnResize(
+                    viewerContext.transform,
+                    from,
+                    { width, height },
+                );
         });
 
         resizeObserver.observe(viewerElement);
+        viewerContext.measure = () => ({
+            box: viewerElement.getBoundingClientRect(),
+            clip: getClip?.() ?? null,
+        });
 
-        return () => resizeObserver.disconnect();
+        return () => {
+            resizeObserver.disconnect();
+            viewerContext.measure = null;
+        };
     });
 
     //
@@ -139,7 +166,6 @@
     }
 
     function onpointerenter(e: PointerEvent) {
-        viewerElement.focus();
         viewerContext.active = true;
         forwardEvent("pointerenter", e);
     }
@@ -215,7 +241,7 @@
 <div class="main">
     <div
         class="viewer"
-        tabindex="0"
+        tabindex={tabbable ? 0 : -1}
         bind:this={viewerElement}
         {onpointerdown}
         {onpointerup}
@@ -269,6 +295,8 @@
     div.main {
         display: flex;
         flex: 1;
+        /* The info controls never widen the viewer past its container; the WebGL drawing follows this box. */
+        min-width: 0;
         position: relative;
         flex-direction: column;
         align-items: center;

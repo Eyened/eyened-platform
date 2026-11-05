@@ -64,3 +64,18 @@ globalThis.Request = class extends NodeRequest {
         );
     }
 } as typeof Request;
+
+// svelte/reactivity MediaQuery calls matchMedia; jsdom has none. Tests that need a width spy on it.
+if (!window.matchMedia) {
+    window.matchMedia = (query: string) =>
+        ({
+            matches: false,
+            media: query,
+            onchange: null,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            addListener: () => {},
+            removeListener: () => {},
+            dispatchEvent: () => false,
+        }) as MediaQueryList;
+}

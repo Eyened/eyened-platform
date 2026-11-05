@@ -14,17 +14,16 @@ import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { Image3D } from "$lib/webgl/image3D";
 import type { WebGL } from "$lib/webgl/webgl";
+import { catalogueEntry } from "$lib/workspace/imageMeta";
+import type { Workspace } from "$lib/workspace/workspace.svelte";
+import type { CatalogueEntry } from "$lib/workspace/workspaceRules";
+import type { WorkspaceUrlState } from "$lib/workspace/workspaceUrl";
 import { SvelteMap } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
-import MainViewer from "./MainViewer.svelte";
 import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
-import type { ViewerViewStateController } from "./viewerViewState";
-import { instanceIdFromImageId } from "./viewerViewState";
 
-export type MainPanelType = {
-    component: any;
-    props: any;
-};
+/** Where a ViewerContext reads and records its volume's slice index. */
+export type SliceIndexStore = Pick<Workspace, "peekIndex" | "recordIndex">;
 
 export class ViewerWindowContext {
     private imagesIndex = new Map<string, Promise<LoadedImages>>();
@@ -34,10 +33,10 @@ export class ViewerWindowContext {
 
     public instanceIds: string[] = $state([]);
 
-    public mainPanels: MainPanelType[] = $state([]);
-
     public readonly imageLoader: ImageLoader;
     public readonly topViewers = new SvelteMap<AbstractImage, ViewerContext>();
+    /** Loaded images by image id. */
+    public readonly images = new SvelteMap<string, AbstractImage>();
     public readonly enfaceProjectionManagers = new SvelteMap<
         string,
         EnfaceProjectionManager
@@ -46,21 +45,23 @@ export class ViewerWindowContext {
     photoLocators = new SvelteMap<string, PhotoLocator[]>();
     photoLocatorSets: PhotoLocator[][] = $state([]);
 
-    public readonly viewState: ViewerViewStateController | undefined;
+    public readonly viewState: SliceIndexStore;
 
     private frame: number = 0;
     private loadedPatientIds = new Set<number>();
     private destroyed = false;
+    private hydrated = false;
 
     constructor(
         public readonly webgl: WebGL,
         public readonly registration: Registration,
         public readonly creator: unknown,
-        instanceIDs: string[] = [],
-        viewState?: ViewerViewStateController,
+        instanceIDs: string[],
+        private readonly workspace: Workspace,
+        private readonly initialUrl: WorkspaceUrlState,
     ) {
         this.imageLoader = new ImageLoader(webgl);
-        this.viewState = viewState;
+        this.viewState = workspace;
 
         // start rendering loop
         const loop = () => {
@@ -70,28 +71,17 @@ export class ViewerWindowContext {
         loop();
 
         void this.setInstanceIDs(instanceIDs)
-            .then(async () => {
-                if (this.destroyed) return;
-                await this.restoreMainViewersFromViewState();
-                if (this.destroyed) return;
-                this.viewState?.enableRecording();
-            })
-            .catch(async (error) => {
-                if (this.destroyed) return;
+            .then((entries) => this.hydrate(entries))
+            .catch((error) => {
                 console.error(
-                    "[viewerViewState] initial load failed; restoring/enabling anyway",
+                    "[workspace] initial load failed; opening what loaded",
                     error,
                 );
-                try {
-                    await this.restoreMainViewersFromViewState();
-                } catch (restoreError) {
-                    console.error(
-                        "[viewerViewState] failed to restore open viewers",
-                        restoreError,
-                    );
-                }
-                if (this.destroyed) return;
-                this.viewState?.enableRecording();
+                this.hydrate(
+                    [...this.images.values()].map((image) =>
+                        catalogueEntry(image.image_id, image.instance),
+                    ),
+                );
             });
     }
 
@@ -114,13 +104,15 @@ export class ViewerWindowContext {
         this.viewers.forEach((viewer) => viewer.repaint());
     }
 
-    async setInstanceIDs(ids: string[]) {
-        this.viewState?.prune(ids);
-        this.mainPanels = this.mainPanels.filter((panel) => {
-            const image = panel.props?.image as AbstractImage | undefined;
-            if (!image) return true;
-            return ids.includes(instanceIdFromImageId(image.image_id));
-        });
+    private hydrate(entries: CatalogueEntry[]) {
+        if (this.destroyed) return;
+        this.hydrated = true;
+        this.workspace.hydrate(entries, this.initialUrl);
+    }
+
+    /** Loads the instances and returns their catalogue entries, in opened order. */
+    async setInstanceIDs(ids: string[]): Promise<CatalogueEntry[]> {
+        this.workspace.prune(ids);
 
         // ensure metadata of all instances is loaded
         const fetchOptions = {
@@ -165,18 +157,32 @@ export class ViewerWindowContext {
         }
 
         // Load images for all instances
-        const loadPromises: Promise<unknown>[] = [];
+        const loadIds: string[] = [];
+        const loadPromises: Promise<LoadedImages>[] = [];
         for (const id of ids) {
             const instance = instances.get(id);
-            if (instance) loadPromises.push(this.loadImage(instance));
-            else console.warn(`Instance with id ${id} not found after fetch`);
+            if (instance) {
+                loadIds.push(id);
+                loadPromises.push(this.loadImage(instance));
+            } else console.warn(`Instance with id ${id} not found after fetch`);
         }
-        await Promise.all(loadPromises);
+        const entries: CatalogueEntry[] = [];
+        const results = await Promise.allSettled(loadPromises);
+        results.forEach((result, i) => {
+            if (result.status === "rejected") {
+                console.error(`Loading instance ${loadIds[i]} failed`);
+                return;
+            }
+            for (const image of result.value) {
+                entries.push(catalogueEntry(image.image_id, image.instance));
+            }
+        });
+        if (this.hydrated) this.workspace.addImages(entries);
+        return entries;
     }
 
     destroy() {
         this.destroyed = true;
-        this.viewState?.flush();
         // Cancel animation frame
         cancelAnimationFrame(this.frame);
 
@@ -194,12 +200,12 @@ export class ViewerWindowContext {
 
         // Clear all maps and sets
         this.topViewers.clear();
+        this.images.clear();
         this.viewers.clear();
         this.imagesIndex.clear();
         this.bySOPInstanceUID.clear();
         this.photoLocators.clear();
         this.photoLocatorSets = [];
-        this.mainPanels = [];
         this.instanceIds = [];
         for (const manager of this.enfaceProjectionManagers.values()) {
             manager.dispose();
@@ -227,10 +233,13 @@ export class ViewerWindowContext {
                     // Create viewer contexts
                     for (const image of loadedImages) {
                         const viewerContext = new ViewerContext(image, this);
+                        // Strip tiles show the middle slice; only the main viewer scrolls.
+                        viewerContext.lockScroll = true;
                         if (image.image_id.endsWith("_proj")) {
                             viewerContext.enfaceProjectionMode = "binary";
                         }
                         this.topViewers.set(image, viewerContext);
+                        this.images.set(image.image_id, image);
                     }
 
                     const projImage = loadedImages.find((img) =>
@@ -268,119 +277,6 @@ export class ViewerWindowContext {
         }
         const locators = this.photoLocators.get(image.image_id) ?? [];
         this.registration.addImage(image, locators);
-    }
-
-    addImagePanel(image: AbstractImage) {
-        this.mainPanels.push({ component: MainViewer, props: { image } });
-        this.syncMainPanelsToViewState();
-    }
-
-    setImagePanel(image: AbstractImage) {
-        this.mainPanels = [{ component: MainViewer, props: { image } }];
-        this.syncMainPanelsToViewState();
-    }
-
-    /** Open the first image shown in the top row (first slice of the first instance). */
-    async openFirstTopRowImage(): Promise<void> {
-        const firstInstanceId = this.instanceIds[0];
-        if (!firstInstanceId) {
-            this.mainPanels = [];
-            return;
-        }
-        const images = await this.getImages(firstInstanceId);
-        const firstImage = images[0];
-        if (!firstImage) {
-            return;
-        }
-        this.setImagePanel(firstImage);
-    }
-
-    setPanel(panel: MainPanelType) {
-        this.mainPanels = [panel];
-        this.syncMainPanelsToViewState();
-    }
-
-    addPanel(panel: MainPanelType) {
-        this.mainPanels.push(panel);
-        this.syncMainPanelsToViewState();
-    }
-
-    removePanel(panel: MainPanelType) {
-        this.mainPanels = this.mainPanels.filter((item) => item !== panel);
-        this.syncMainPanelsToViewState();
-    }
-
-    /**
-     * Open main panels from hydrated view-state, or the first instance.
-     * Must run after setInstanceIDs so instances/images are in memory
-     * (task grade does not preload the instances store the way /view does).
-     */
-    async restoreMainViewersFromViewState() {
-        const pending = this.viewState?.getViewers() ?? [];
-        if (pending.length) {
-            const results = await Promise.allSettled(
-                pending.map(async (entry) => {
-                    const instanceId = instanceIdFromImageId(entry.id);
-                    const loaded = await this.getImages(instanceId);
-                    return (
-                        loaded.find((img) => img.image_id === entry.id) ??
-                        loaded[loaded.length - 1]
-                    );
-                }),
-            );
-            const panels = results.flatMap((result) =>
-                result.status === "fulfilled" && result.value
-                    ? [
-                          {
-                              component: MainViewer,
-                              props: { image: result.value },
-                          },
-                      ]
-                    : [],
-            );
-            if (panels.length === 1) {
-                this.setPanel(panels[0]);
-                return;
-            }
-            if (panels.length > 1) {
-                this.mainPanels = panels;
-                this.syncMainPanelsToViewState();
-                return;
-            }
-        }
-
-        if (!this.instanceIds.length) return;
-        const loaded = await this.getImages(this.instanceIds[0]);
-        this.setPanel({
-            component: MainViewer,
-            props: { image: loaded[loaded.length - 1] },
-        });
-    }
-
-    /** Keep URL/localStorage open-viewer list aligned with mainPanels. */
-    syncMainPanelsToViewState() {
-        if (!this.viewState) return;
-        const prev = this.viewState.getViewers();
-        const entries = [];
-        for (const panel of this.mainPanels) {
-            const image = panel.props?.image as AbstractImage | undefined;
-            if (!image) continue;
-            const existing = prev.find((v) => v.id === image.image_id);
-            if (image.is3D && image.depth > 1) {
-                const live = [...this.viewers].find(
-                    (vc) => vc.image.image_id === image.image_id,
-                );
-                const index = live?.index ?? existing?.index;
-                entries.push(
-                    index !== undefined
-                        ? { id: image.image_id, index }
-                        : { id: image.image_id },
-                );
-            } else {
-                entries.push({ id: image.image_id });
-            }
-        }
-        this.viewState.setOpenViewers(entries);
     }
 
     getImages(instanceID: string): Promise<LoadedImages> {
