@@ -71,10 +71,13 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
         e.preventDefault();
         // A new image rebuilds the viewer and drops its focus; focus moves to the new viewer, or to Choose an image.
         await tick();
-        if (!frame.contains(document.activeElement))
+        if (!frame.contains(document.activeElement)) {
             frame
                 .querySelector<HTMLElement>(".body [tabindex], .body button")
                 ?.focus();
+            // The title bar already shows the new image; the tooltip would cover the viewport above.
+            titleOpen = false;
+        }
     }
 
     function onclick(e: MouseEvent) {
