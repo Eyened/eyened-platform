@@ -11,7 +11,7 @@ Arrow keys move focus only; Enter, Space or a click applies.
     import { Checkbox } from "$lib/components/ui/checkbox/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
     import Grid from "carbon-icons-svelte/lib/Grid.svelte";
-    import { getContext, tick } from "svelte";
+    import { getContext, tick, untrack } from "svelte";
     import { PRESET_ROWS, smallestRowFor } from "./presets";
     import { rovingIndex } from "./rovingIndex";
     import type { Workspace } from "./workspace.svelte";
@@ -21,7 +21,15 @@ Arrow keys move focus only; Enter, Space or a click applies.
     let {
         iconOnly = false,
         stripToggle = false,
-    }: { iconOnly?: boolean; stripToggle?: boolean } = $props();
+        anchor,
+        open = $bindable(false),
+    }: {
+        iconOnly?: boolean;
+        stripToggle?: boolean;
+        /** CSS selector of an outside element to hang from; no trigger is rendered. */
+        anchor?: string;
+        open?: boolean;
+    } = $props();
 
     const workspace = getContext<Workspace>("workspace");
     const uid = $props.id();
@@ -35,7 +43,6 @@ Arrow keys move focus only; Enter, Space or a click applies.
         row.presets.map((preset, c) => ({ preset, r, c })),
     );
 
-    let open = $state(false);
     let content: HTMLElement | null = $state(null);
     let triggerWrap: HTMLElement | undefined = $state();
     let presetFocus = $state(0);
@@ -48,13 +55,26 @@ Arrow keys move focus only; Enter, Space or a click applies.
     const indexOf = (r: number, c: number) =>
         flat.findIndex((f) => f.r === r && f.c === c);
 
-    function onOpenChange(next: boolean) {
-        if (!next) return;
-        presetFocus = Math.max(
-            0,
-            flat.findIndex((f) => f.preset.id === workspace.preset.id),
-        );
-        arrangeFocus = Math.max(0, ARRANGE_ORDERS.indexOf(workspace.arrange));
+    // Opening, from the trigger or from outside, starts both tab stops on the current choice.
+    $effect.pre(() => {
+        if (!open) return;
+        untrack(() => {
+            presetFocus = Math.max(
+                0,
+                flat.findIndex((f) => f.preset.id === workspace.preset.id),
+            );
+            arrangeFocus = Math.max(
+                0,
+                ARRANGE_ORDERS.indexOf(workspace.arrange),
+            );
+        });
+    });
+
+    /** Without a trigger, closing returns focus to the outside anchor. */
+    function onCloseAutoFocus(e: Event) {
+        if (!anchor) return;
+        e.preventDefault();
+        document.querySelector<HTMLElement>(anchor)?.focus();
     }
 
     async function focusItem(selector: string) {
@@ -106,23 +126,32 @@ Arrow keys move focus only; Enter, Space or a click applies.
     }
 </script>
 
-<Popover.Root bind:open {onOpenChange}>
-    <span bind:this={triggerWrap} class="contents">
-        <Popover.Trigger>
-            {#snippet child({ props })}
-                {#if iconOnly}
-                    <IconButton {...props} label="Layout"><Grid /></IconButton>
-                {:else}
-                    <Button {...props} variant="ghost" size="sm"
-                        >Layout <ChevronDown /></Button
-                    >
-                {/if}
-            {/snippet}
-        </Popover.Trigger>
-    </span>
+<Popover.Root bind:open>
+    {#if !anchor}
+        <span bind:this={triggerWrap} class="contents">
+            <Popover.Trigger>
+                {#snippet child({ props })}
+                    {#if iconOnly}
+                        <IconButton {...props} label="Layout"
+                            ><Grid /></IconButton
+                        >
+                    {:else}
+                        <Button {...props} variant="ghost" size="sm"
+                            >Layout <ChevronDown /></Button
+                        >
+                    {/if}
+                {/snippet}
+            </Popover.Trigger>
+        </span>
+    {/if}
+    <!-- ASSUMPTION: below md the popover hangs from ☰ at the left edge, so it aligns to its start. -->
     <Popover.Content
         bind:ref={content}
-        align="end"
+        align={anchor ? "start" : "end"}
+        customAnchor={anchor && open
+            ? document.querySelector<HTMLElement>(anchor)
+            : null}
+        {onCloseAutoFocus}
         trapFocus={false}
         portalProps={{ disabled: true }}
         class="max-h-[calc(100dvh-4rem)] overflow-y-auto"
