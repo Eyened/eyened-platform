@@ -1,6 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
+import { createRawSnippet } from "svelte";
 import { describe, expect, it, vi } from "vitest";
-import { mockWidth, workspaceContext, workspaceWith } from "./testUtils";
+import {
+    expectNoAxeViolations,
+    mockWidth,
+    workspaceContext,
+    workspaceWith,
+} from "./testUtils";
 import WorkspaceHeader, { type TaskHeader } from "./WorkspaceHeader.svelte";
 
 function taskHeader(over: Partial<TaskHeader> = {}): TaskHeader {
@@ -15,10 +21,17 @@ function taskHeader(over: Partial<TaskHeader> = {}): TaskHeader {
     };
 }
 
+const start = createRawSnippet(() => ({
+    render: () => `<button type="button">Show menu</button>`,
+}));
+const end = createRawSnippet(() => ({
+    render: () => `<button type="button">Show Layers and Grading</button>`,
+}));
+
 function renderHeader(task: TaskHeader | null, narrow = false) {
-    mockWidth({ md: true, xlg: true });
+    mockWidth({ md: !narrow, xlg: !narrow });
     return render(WorkspaceHeader, {
-        props: { task, narrow },
+        props: { task, narrow, start, end },
         context: workspaceContext(workspaceWith(2)),
     });
 }
@@ -54,19 +67,25 @@ describe("WorkspaceHeader", () => {
         expect(next).toBeDisabled();
     });
 
-    it("narrow: Task overview moves into the More menu", async () => {
-        const task = taskHeader();
-        renderHeader(task, true);
-        const overview = screen.getByRole("button", {
-            name: "Task overview",
-            hidden: true,
-        });
-        expect(overview.closest("[hidden]")).not.toBeNull();
-        await fireEvent.click(screen.getByRole("button", { name: "More" }));
-        await fireEvent.click(
-            screen.getByRole("button", { name: "Task overview" }),
+    it("narrow: drops the name, Task overview, Layout, More and the word Set, and puts the frame's controls first and last", async () => {
+        const { container } = renderHeader(taskHeader(), true);
+        expect(screen.queryByText("EyeNED")).toBeNull();
+        expect(
+            screen.queryByRole("button", {
+                name: "Task overview",
+                hidden: true,
+            }),
+        ).toBeNull();
+        expect(screen.queryByRole("button", { name: "Layout" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+        const buttons = screen.getAllByRole("button");
+        expect(buttons[0]).toHaveTextContent("Show menu");
+        expect(buttons.at(-1)).toHaveTextContent("Show Layers and Grading");
+        expect(screen.getByText("2 of 5")).toHaveAttribute(
+            "aria-hidden",
+            "true",
         );
-        expect(task.overview).toHaveBeenCalledTimes(1);
-        expect(screen.getByRole("button", { name: "More" })).toHaveFocus();
+        expect(screen.getByText("Set 2 of 5")).toHaveClass("sr-only");
+        await expectNoAxeViolations(container);
     });
 });

@@ -5,12 +5,10 @@ Arrow keys move focus only; Enter, Space or a click applies.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
-    import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import * as Popover from "$lib/components/ui/popover/index.js";
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
     import { Checkbox } from "$lib/components/ui/checkbox/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
-    import Grid from "carbon-icons-svelte/lib/Grid.svelte";
     import { getContext, tick, untrack } from "svelte";
     import { PRESET_ROWS, smallestRowFor } from "./presets";
     import { rovingIndex } from "./rovingIndex";
@@ -19,12 +17,10 @@ Arrow keys move focus only; Enter, Space or a click applies.
     import { writeStripOn } from "./workspacePrefs";
 
     let {
-        iconOnly = false,
         stripToggle = false,
         anchor,
         open = $bindable(false),
     }: {
-        iconOnly?: boolean;
         stripToggle?: boolean;
         /** CSS selector of an outside element to hang from; no trigger is rendered. */
         anchor?: string;
@@ -131,15 +127,9 @@ Arrow keys move focus only; Enter, Space or a click applies.
         <span bind:this={triggerWrap} class="contents">
             <Popover.Trigger>
                 {#snippet child({ props })}
-                    {#if iconOnly}
-                        <IconButton {...props} label="Layout"
-                            ><Grid /></IconButton
-                        >
-                    {:else}
-                        <Button {...props} variant="ghost" size="sm"
-                            >Layout <ChevronDown /></Button
-                        >
-                    {/if}
+                    <Button {...props} variant="ghost" size="sm"
+                        >Layout <ChevronDown /></Button
+                    >
                 {/snippet}
             </Popover.Trigger>
         </span>
