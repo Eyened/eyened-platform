@@ -254,6 +254,7 @@ describe("WorkspaceFrame", () => {
             ).toContainElement(document.activeElement as HTMLElement),
         );
     });
+
     it("crossing md closes an open overlay and moves focus to the button that now controls it", async () => {
         const width = mockWidth({ md: false, xlg: false });
         renderFrame(workspaceWith(3));
