@@ -85,6 +85,17 @@ A viewport's bottom bar: render mode, W/L and, on B-scans, stretch. It shows the
             viewerContext.renderMode = "Original";
     });
 
+    // A press outside the menu closes it after the pressed element took focus, so only reclaim focus the menu or bar still holds.
+    function returnFocusAfterMenu() {
+        const active = document.activeElement;
+        if (
+            active === document.body ||
+            barElement?.contains(active) ||
+            active?.closest("[data-slot=select-content]")
+        )
+            viewerContext.returnFocus();
+    }
+
     // The refit runs here, not in an effect: an effect would also refit on mount.
     function setStretch(stretch: number) {
         viewerContext.stretch = stretch;
@@ -93,12 +104,12 @@ A viewport's bottom bar: render mode, W/L and, on B-scans, stretch. It shows the
 </script>
 
 {#snippet modeControl()}
-    <div class={colour ? "w-48 flex-none" : "w-32 flex-none"}>
+    <div class={colour ? "w-56 flex-none" : "w-32 flex-none"}>
         <Dropdown
             {items}
             size="sm"
             hideLabel
-            onclose={() => viewerContext.returnFocus()}
+            onclose={returnFocusAfterMenu}
             direction="top"
             labelText="Render mode"
             selectedId={viewerContext.renderMode}
@@ -111,7 +122,7 @@ A viewport's bottom bar: render mode, W/L and, on B-scans, stretch. It shows the
     <div role="group" aria-label="Window / level" class="control">
         <span class="name">W/L</span>
         <Slider
-            class="w-24"
+            class="mx-2 w-20"
             oncommit={() => viewerContext.returnFocus()}
             min={0}
             max={255}
@@ -136,7 +147,7 @@ A viewport's bottom bar: render mode, W/L and, on B-scans, stretch. It shows the
             onchange={(p) => setStretch(Number(p))}
         />
         <Slider
-            class="w-24"
+            class="mx-2 w-20"
             oncommit={() => viewerContext.returnFocus()}
             min={0}
             max={STRETCH_NOTCHES}
