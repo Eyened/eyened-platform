@@ -85,21 +85,10 @@ A viewport's bottom bar: render mode, W/L and, on B-scans, stretch. It shows the
             viewerContext.renderMode = "Original";
     });
 
-    // The refit runs here, not in an effect: an effect would also fire when another viewport syncs this one.
+    // The refit runs here, not in an effect: an effect would also refit on mount.
     function setStretch(stretch: number) {
         viewerContext.stretch = stretch;
         viewerContext.initTransform();
-    }
-
-    // After a mouse drag, keys go back to the image. Keyboard users and open popovers keep their focus.
-    function returnFocus() {
-        const active = document.activeElement;
-        if (
-            active?.matches(":focus-visible") ||
-            active?.closest("[role=dialog]")
-        )
-            return;
-        viewerContext.canvas2D.parentElement?.focus();
     }
 </script>
 
@@ -109,6 +98,7 @@ A viewport's bottom bar: render mode, W/L and, on B-scans, stretch. It shows the
             {items}
             size="sm"
             hideLabel
+            onclose={() => viewerContext.returnFocus()}
             direction="top"
             labelText="Render mode"
             selectedId={viewerContext.renderMode}
@@ -122,7 +112,7 @@ A viewport's bottom bar: render mode, W/L and, on B-scans, stretch. It shows the
         <span class="name">W/L</span>
         <Slider
             class="w-24"
-            oncommit={returnFocus}
+            oncommit={() => viewerContext.returnFocus()}
             min={0}
             max={255}
             labels={["Window low", "Window high"]}
@@ -147,7 +137,7 @@ A viewport's bottom bar: render mode, W/L and, on B-scans, stretch. It shows the
         />
         <Slider
             class="w-24"
-            oncommit={returnFocus}
+            oncommit={() => viewerContext.returnFocus()}
             min={0}
             max={STRETCH_NOTCHES}
             labels={["Stretch"]}

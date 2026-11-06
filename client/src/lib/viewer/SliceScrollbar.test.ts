@@ -168,4 +168,25 @@ describe("SliceScrollbar", () => {
         expect(visible(container)).toBe("B-scan 65 / 128");
         expect(setIndex).not.toHaveBeenCalled();
     });
+
+    it("returns focus to the image after a mouse drag, not after a key", async () => {
+        const { viewerContext } = await renderEdge("bscan");
+        const image = document.createElement("div");
+        image.tabIndex = 0;
+        image.append(viewerContext.canvas2D);
+        document.body.append(image);
+        const slider = screen.getByRole("slider", { name: "Slice" });
+
+        // jsdom has no focus heuristics, so :focus-visible is set by hand.
+        const focusVisible = vi.spyOn(slider, "matches").mockReturnValue(true);
+        slider.focus();
+        await fireEvent.keyDown(slider, { key: "ArrowDown" });
+        expect(document.activeElement).toBe(slider);
+
+        focusVisible.mockReturnValue(false);
+        await fireEvent.pointerDown(slider, { button: 0 });
+        await fireEvent.pointerUp(slider);
+        expect(document.activeElement).toBe(image);
+        image.remove();
+    });
 });

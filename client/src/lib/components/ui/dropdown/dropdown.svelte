@@ -5,7 +5,7 @@
     // Carbon Dropdown (carbon-components-svelte prop names) over ui/select, size lg (48 px), md (40 px) or sm (32 px);
     // menu items match the field height and the menu shows 5.5 items (@carbon/styles 1.117.0 list-box).
     // An item's optional `hint` (a shortcut key) follows its text in the menu.
-    // `onselect` fires only when the user picks a different item.
+    // `onselect` fires only when the user picks a different item; the optional `onclose` fires whenever the menu closes.
     const uid = $props.id(); // $props.id() is not allowed as a destructuring default
     let {
         items,
@@ -17,6 +17,7 @@
         direction = "bottom",
         id = uid,
         onselect,
+        onclose,
     }: {
         items: { id: string; text: string; hint?: string }[];
         selectedId?: string;
@@ -27,6 +28,7 @@
         direction?: "top" | "bottom";
         id?: string;
         onselect?: (selectedId: string) => void;
+        onclose?: () => void;
     } = $props();
 
     const heights = { sm: "h-8", md: "h-10", lg: undefined };
@@ -53,6 +55,9 @@
     </Label>
     <Select.Root
         type="single"
+        onOpenChange={(open) => {
+            if (!open) onclose?.();
+        }}
         items={items.map((i) => ({ value: i.id, label: i.text }))}
         bind:value={
             () => selectedId ?? "",
