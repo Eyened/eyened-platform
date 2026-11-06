@@ -60,23 +60,42 @@ export async function expectNoAxeViolations(container: Element): Promise<void> {
     ).toEqual([]);
 }
 
-/** Makes svelte's MediaQuery see a window at least `md` and/or `xlg` wide. */
+/** Makes svelte's MediaQuery see a window at least `md` and/or `xlg` wide; `resize` changes it and fires `change`. */
 export function mockWidth(widths: { md: boolean; xlg: boolean }) {
-    return vi.spyOn(window, "matchMedia").mockImplementation(
+    const current = { ...widths };
+    const listeners = new Set<(e: Event) => void>();
+    const matches = (query: string) =>
+        query.includes("82rem")
+            ? current.xlg
+            : query.includes("42rem")
+              ? current.md
+              : false;
+    const spy = vi.spyOn(window, "matchMedia").mockImplementation(
         (query: string) =>
             ({
-                matches: query.includes("82rem")
-                    ? widths.xlg
-                    : query.includes("42rem")
-                      ? widths.md
-                      : false,
+                get matches() {
+                    return matches(query);
+                },
                 media: query,
                 onchange: null,
-                addEventListener: () => {},
-                removeEventListener: () => {},
+                addEventListener: (
+                    _type: string,
+                    listener: (e: Event) => void,
+                ) => listeners.add(listener),
+                removeEventListener: (
+                    _type: string,
+                    listener: (e: Event) => void,
+                ) => listeners.delete(listener),
                 addListener: () => {},
                 removeListener: () => {},
                 dispatchEvent: () => false,
-            }) as MediaQueryList,
+            }) as unknown as MediaQueryList,
     );
+    return Object.assign(spy, {
+        resize(next: { md: boolean; xlg: boolean }) {
+            Object.assign(current, next);
+            // Svelte's event wrapper reads event.type, so pass a real Event.
+            for (const listener of listeners) listener(new Event("change"));
+        },
+    });
 }
