@@ -1,17 +1,5 @@
 # CI, tooling and code health
 
-### Bump `python-multipart`
-- **Status:** open
-- **Source:** Dependabot, re-counted 2026-08-24
-- **Problem:** `server/requirements.txt` pins `python-multipart==0.0.20`; 14 alerts (7 advisories counted twice via `test-requirements.txt`), including 3 high, all fixed by ≤ 0.0.31. Reachable on every form/upload endpoint.
-- **Fix:** bump to the current latest in its own small PR.
-
-### Clear the npm Dependabot alerts in `client/` and `docs/`
-- **Status:** open
-- **Source:** Dependabot, re-counted 2026-08-24 (111 npm: 62 docs, 49 client)
-- **Problem:** mostly build/generator tooling (`brace-expansion`, `js-yaml`, `fast-uri`, `vite`, `tar-fs`, `postcss`, `nanoid`, `astro`, ...); accumulating ~1/day.
-- **Fix:** `npm audit fix` in `client/`, then `docs/`, one PR each; manual major bumps only where needed. Consider Dependabot version-update PRs.
-
 ### Add a backend ruff lint + format gate
 - **Status:** open
 - **Source:** descoped from #118, 2026-07-16

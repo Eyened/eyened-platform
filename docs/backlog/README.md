@@ -21,7 +21,6 @@ To pick up an item: open an issue for it and delete the item and its row here in
 | Drop the dead `eorm create-user --is-human` option | [rbac-admin](rbac-admin.md) | open |
 | Decide the 15 legacy-credential humans the cutover skipped | [rbac-admin](rbac-admin.md) | open |
 | Finish trimming `docs/rbac-operations.md` | [rbac-admin](rbac-admin.md) | partial |
-| Scope the registration id → `PublicID` lookup in the DTO layer | [rbac-authz](rbac-authz.md) | open |
 | Stop `scope.require` passing vacuously for an administrator on nonexistent ids | [rbac-authz](rbac-authz.md) | open |
 | Make the session guards fail on stale allow-list entries | [rbac-authz](rbac-authz.md) | open |
 | Decide whether `AuthService.change_password` keeps its `actor` parameter | [rbac-authz](rbac-authz.md) | open |
@@ -46,8 +45,6 @@ To pick up an item: open an issue for it and delete the item and its row here in
 | Add `eorm move-patient` / `move-images` for cross-project data cleaning | [data-integrity](data-integrity.md) | open |
 | Make the database the only maintainer of `DateModified` | [data-integrity](data-integrity.md) | open |
 | Decide DDL defaults for the `Inactive` columns | [data-integrity](data-integrity.md) | open, low |
-| Bump `python-multipart` | [ci-and-tooling](ci-and-tooling.md) | open |
-| Clear the npm Dependabot alerts in `client/` and `docs/` | [ci-and-tooling](ci-and-tooling.md) | open |
 | Add a backend ruff lint + format gate | [ci-and-tooling](ci-and-tooling.md) | open |
 | Make CI checks required on `main`/`development` (coverage Phase C) | [ci-and-tooling](ci-and-tooling.md) | open |
 | Add a mypy per-module gate over the admin surface | [ci-and-tooling](ci-and-tooling.md) | open |
