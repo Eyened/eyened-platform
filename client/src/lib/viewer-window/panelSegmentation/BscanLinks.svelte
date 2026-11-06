@@ -5,7 +5,7 @@
     import {
         BSCAN_LINKS_SHOW_ALL_MAX,
         buildBscanDisplayItems,
-    } from "./bscanLinksDisplay";
+    } from "$lib/viewer/bscanLinksDisplay";
 
     const mainViewerContext =
         getContext<MainViewerContext>("mainViewerContext");
