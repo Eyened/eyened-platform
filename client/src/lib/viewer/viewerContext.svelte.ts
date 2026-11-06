@@ -378,6 +378,17 @@ export class ViewerContext {
         this.applyCursor("default");
     }
 
+    /** After a mouse drag or pick, keys go back to the image. Keyboard users and open popovers keep their focus. */
+    returnFocus() {
+        const active = document.activeElement;
+        if (
+            active?.matches(":focus-visible") ||
+            active?.closest("[role=dialog]")
+        )
+            return;
+        this.canvas2D.parentElement?.focus();
+    }
+
     private applyCursor(style: cursorStyle) {
         this.canvas2D.style.cursor = style;
         const parent = this.canvas2D.parentElement;

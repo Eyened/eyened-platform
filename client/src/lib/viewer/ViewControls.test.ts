@@ -186,4 +186,51 @@ describe("ViewControls", () => {
         expect(document.activeElement).toBe(image);
         image.remove();
     });
+
+    describe("render mode focus", () => {
+        async function pick(name: string, mouse: boolean) {
+            const { viewerContext } = await renderBar("colour", 1000);
+            const image = document.createElement("div");
+            image.tabIndex = 0;
+            image.append(viewerContext.canvas2D);
+            document.body.append(image);
+            const trigger = within(bar()).getByRole("button", {
+                name: /Render mode/,
+            });
+            // jsdom has no focus heuristics, so :focus-visible is set by hand.
+            vi.spyOn(trigger, "matches").mockReturnValue(!mouse);
+            trigger.focus();
+            await fireEvent.keyDown(trigger, { key: "Enter" });
+            const options = await screen.findAllByRole("option");
+            const option = options.find((o) =>
+                o.textContent?.startsWith(name),
+            )!;
+            await fireEvent.pointerUp(option, {
+                button: 0,
+                pointerType: "mouse",
+            });
+            await waitFor(() =>
+                expect(screen.queryByRole("listbox")).toBeNull(),
+            );
+            return { image, trigger };
+        }
+
+        it("moves focus to the image after a mouse pick", async () => {
+            const { image } = await pick("CLAHE", true);
+            expect(document.activeElement).toBe(image);
+            image.remove();
+        });
+
+        it("moves focus to the image when the current mode is picked again", async () => {
+            const { image } = await pick("Original", true);
+            expect(document.activeElement).toBe(image);
+            image.remove();
+        });
+
+        it("keeps focus on the trigger after a keyboard pick", async () => {
+            const { image, trigger } = await pick("CLAHE", false);
+            expect(document.activeElement).toBe(trigger);
+            image.remove();
+        });
+    });
 });

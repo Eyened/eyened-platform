@@ -139,6 +139,7 @@ Numbers are shown 1-based; the stored index stays 0-based.
             fill={false}
             min={0}
             max={depth - 1}
+            oncommit={() => viewerContext.returnFocus()}
             labels={["Slice"]}
             valueTexts={[
                 `${word} ${index + 1} of ${depth}${scanIndices.includes(index) ? ", has segmentation" : ""}`,
