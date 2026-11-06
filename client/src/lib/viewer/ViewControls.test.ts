@@ -174,14 +174,30 @@ describe("ViewControls", () => {
         document.body.append(image);
         const low = screen.getByRole("slider", { name: "Window low" });
 
-        // jsdom has no focus heuristics, so :focus-visible is set by hand.
-        const focusVisible = vi.spyOn(low, "matches").mockReturnValue(true);
         low.focus();
         await fireEvent.keyDown(low, { key: "ArrowRight" });
+        await fireEvent.keyUp(low, { key: "ArrowRight" });
         expect(document.activeElement).toBe(low);
 
-        focusVisible.mockReturnValue(false);
         await fireEvent.pointerDown(low, { button: 0 });
+        await fireEvent.pointerUp(low);
+        expect(document.activeElement).toBe(image);
+        image.remove();
+    });
+
+    it("returns focus to the image when a key came before the drag and Chrome reports the handle focus-visible", async () => {
+        const { viewerContext } = await renderBar("grey", 1000);
+        const image = document.createElement("div");
+        image.tabIndex = 0;
+        image.append(viewerContext.canvas2D);
+        document.body.append(image);
+        const low = screen.getByRole("slider", { name: "Window low" });
+
+        // The slider focuses its handle in code on pointerdown, which Chrome calls focus-visible after a key.
+        vi.spyOn(low, "matches").mockReturnValue(true);
+        await fireEvent.keyDown(document.body, { key: "r" });
+        await fireEvent.pointerDown(low, { button: 0 });
+        low.focus();
         await fireEvent.pointerUp(low);
         expect(document.activeElement).toBe(image);
         image.remove();
@@ -197,18 +213,25 @@ describe("ViewControls", () => {
             const trigger = within(bar()).getByRole("button", {
                 name: /Render mode/,
             });
-            // jsdom has no focus heuristics, so :focus-visible is set by hand.
-            vi.spyOn(trigger, "matches").mockReturnValue(!mouse);
             trigger.focus();
             await fireEvent.keyDown(trigger, { key: "Enter" });
             const options = await screen.findAllByRole("option");
             const option = options.find((o) =>
                 o.textContent?.startsWith(name),
             )!;
-            await fireEvent.pointerUp(option, {
-                button: 0,
-                pointerType: "mouse",
-            });
+            if (mouse) {
+                await fireEvent.pointerDown(option, {
+                    button: 0,
+                    pointerType: "mouse",
+                });
+                await fireEvent.pointerUp(option, {
+                    button: 0,
+                    pointerType: "mouse",
+                });
+            } else {
+                await fireEvent.keyDown(trigger, { key: "ArrowDown" });
+                await fireEvent.keyDown(trigger, { key: "Enter" });
+            }
             await waitFor(() =>
                 expect(screen.queryByRole("listbox")).toBeNull(),
             );

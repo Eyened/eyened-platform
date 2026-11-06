@@ -14,6 +14,7 @@ import { UpdatePosition } from "./controls/updatePosition";
 import { ZoomPan } from "./controls/zoomPan";
 import { CursorOverlay } from "./overlays/CursorOverlay";
 import { boxToPaint, clipBox, sameBox } from "./viewportGeometry";
+import { lastInputWasKeyboard } from "./lastInput";
 import type { MeasureTool } from "./tools/Measure.svelte.js";
 import type {
     EventName,
@@ -380,10 +381,9 @@ export class ViewerContext {
 
     /** After a mouse drag or pick, keys go back to the image. Keyboard users and open popovers keep their focus. */
     returnFocus() {
-        const active = document.activeElement;
         if (
-            active?.matches(":focus-visible") ||
-            active?.closest("[role=dialog]")
+            lastInputWasKeyboard() ||
+            document.activeElement?.closest("[role=dialog]")
         )
             return;
         this.canvas2D.parentElement?.focus();
