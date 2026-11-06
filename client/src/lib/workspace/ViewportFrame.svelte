@@ -335,6 +335,13 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     .body > :global(*) {
         min-width: 0;
     }
+    /* A maximise-strip tile shows only the image. */
+    .frame[data-mode="tile"] :global(.viewport-overlay) {
+        display: none;
+    }
+    .frame[data-mode="tile"] :global(.viewer-section) {
+        padding-bottom: 0;
+    }
     .empty {
         display: flex;
         flex: 1;
