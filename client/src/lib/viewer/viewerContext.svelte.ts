@@ -348,6 +348,18 @@ export class ViewerContext {
         this.transform = transform;
     }
 
+    /** Centre an image point at a multiple of the fit scale. */
+    focusFromFit(x: number, y: number, factor: number) {
+        this.initTransform();
+        const { width: w, height: h } = this.viewerSize;
+        this.transform = this.transform
+            .pan(this.imageToViewerCoordinates({ x, y }), {
+                x: w / 2,
+                y: h / 2,
+            })
+            .zoom(w / 2, h / 2, factor);
+    }
+
     get aspectRatio() {
         return this.imageViewerTransform.aspectRatio;
     }

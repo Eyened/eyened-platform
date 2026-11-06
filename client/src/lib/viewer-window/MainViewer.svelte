@@ -62,21 +62,13 @@
 
     const topViewer = viewerWindowContext.topViewers.get(image)!;
 
+    // The tile's zoom on hover, as a multiple of its own fit.
+    const TWIN_ZOOM = 3;
+
     const followCursor = {
         pointermove(e: ViewerEvent<PointerEvent>) {
-            const { viewerContext } = e;
-            const { x, y } = e.cursor;
-            const { viewerSize } = viewerContext;
-            const p = viewerContext.viewerToImageCoordinates({ x, y });
-            const scaleH = viewerSize.height / image.height;
-            const scaleW = viewerSize.width / image.width;
-            const baseFactor = Math.min(scaleH, scaleW);
-            const factor = image.is3D
-                ? 0.4
-                : image.image_id.endsWith("_proj")
-                  ? 0.5
-                  : 5;
-            topViewer.focusPoint(p.x, p.y, factor * baseFactor);
+            const p = e.viewerContext.viewerToImageCoordinates(e.cursor);
+            topViewer.focusFromFit(p.x, p.y, TWIN_ZOOM);
         },
         pointerleave() {
             topViewer.initTransform();
