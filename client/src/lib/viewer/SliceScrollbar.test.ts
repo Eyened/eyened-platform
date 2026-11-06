@@ -177,13 +177,10 @@ describe("SliceScrollbar", () => {
         document.body.append(image);
         const slider = screen.getByRole("slider", { name: "Slice" });
 
-        // jsdom has no focus heuristics, so :focus-visible is set by hand.
-        const focusVisible = vi.spyOn(slider, "matches").mockReturnValue(true);
         slider.focus();
         await fireEvent.keyDown(slider, { key: "ArrowDown" });
         expect(document.activeElement).toBe(slider);
 
-        focusVisible.mockReturnValue(false);
         await fireEvent.pointerDown(slider, { button: 0 });
         await fireEvent.pointerUp(slider);
         expect(document.activeElement).toBe(image);
