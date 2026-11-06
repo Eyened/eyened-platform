@@ -3,24 +3,15 @@ import type { PanelName } from "$lib/viewer/viewer-utils";
 import type { FormSchemaGET } from "../../types/openapi_types";
 import type { QuickFormPanelConfig, TaskConfig } from "./taskConfigLayout";
 import PanelInfo from "./panelInfo/panelInfo.svelte";
-import PanelRendering from "./panelRendering/PanelRendering.svelte";
 import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
 import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
 import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
 import PanelForm from "./panelForm/PanelForm.svelte";
 import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte";
 import PanelQuickForm from "./panelQuickForm/PanelQuickForm.svelte";
-import {
-    Draw,
-    ETDRS,
-    Form,
-    Info,
-    Registration,
-    Rendering,
-} from "./icons/icons";
+import { Draw, ETDRS, Form, Info, Registration } from "./icons/icons";
 import Measure from "./icons/Measure.svelte";
 import InfoPanelHelp from "./panelHelp/InfoPanelHelp.svelte";
-import RenderingPanelHelp from "./panelHelp/RenderingPanelHelp.svelte";
 import EtdrsPanelHelp from "./panelHelp/EtdrsPanelHelp.svelte";
 import RegistrationPanelHelp from "./panelHelp/RegistrationPanelHelp.svelte";
 import MeasurePanelHelp from "./panelHelp/MeasurePanelHelp.svelte";
@@ -62,12 +53,6 @@ export function buildDefaultPanels(
 ): ResolvedPanel[] {
     const panels: ResolvedPanel[] = [
         { name: "Info", component: PanelInfo, Icon: Info, Help: InfoPanelHelp },
-        {
-            name: "Rendering",
-            component: PanelRendering,
-            Icon: Rendering,
-            Help: RenderingPanelHelp,
-        },
     ];
 
     if (input.is2D && input.etdrsSchema) {

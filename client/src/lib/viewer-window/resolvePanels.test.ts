@@ -6,7 +6,6 @@ import {
 } from "./taskConfigLayout";
 
 vi.mock("./panelInfo/panelInfo.svelte", () => ({ default: {} }));
-vi.mock("./panelRendering/PanelRendering.svelte", () => ({ default: {} }));
 vi.mock("./panelETRDS/PanelETDRS.svelte", () => ({ default: {} }));
 vi.mock("./panelRegistration/PanelRegistration.svelte", () => ({
     default: {},
@@ -27,7 +26,6 @@ vi.mock("./icons/icons", () => ({
 }));
 vi.mock("./icons/Measure.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/InfoPanelHelp.svelte", () => ({ default: {} }));
-vi.mock("./panelHelp/RenderingPanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/EtdrsPanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/RegistrationPanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/MeasurePanelHelp.svelte", () => ({ default: {} }));
@@ -50,7 +48,6 @@ describe("resolvePanels", () => {
         );
         expect(panels.map((p) => p.name)).toEqual([
             "Info",
-            "Rendering",
             "Measure",
             "Form",
             "Segmentation",
@@ -89,7 +86,6 @@ describe("resolvePanels", () => {
         const { panels, expandedPanelNames } = resolvePanels(baseInput);
         expect(panels.map((p) => p.name)).toEqual([
             "Info",
-            "Rendering",
             "Measure",
             "Form",
             "Segmentation",
@@ -105,7 +101,6 @@ describe("resolvePanels", () => {
         });
         expect(panels.map((p) => p.name)).toEqual([
             "Info",
-            "Rendering",
             "ETDRS",
             "Registration",
             "Measure",
