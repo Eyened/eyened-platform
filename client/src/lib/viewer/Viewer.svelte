@@ -7,17 +7,13 @@
     import type { ViewerContext } from "./viewerContext.svelte";
     import { getContext, onDestroy, onMount } from "svelte";
     import { ViewerWindowContext } from "$lib/viewer-window/viewerWindowContext.svelte";
-    import Stretch from "$lib/viewer-window/panelRendering/Stretch.svelte";
-    import WindowLevel from "$lib/viewer-window/panelRendering/WindowLevel.svelte";
-    import BscanLinks from "$lib/viewer-window/panelSegmentation/BscanLinks.svelte";
     import { keepViewOnResize, sameTransform } from "./viewportGeometry";
 
     export interface Props {
-        showInfo?: boolean;
         /** False keeps the viewer out of the Tab order, as in a strip tile; a press still focuses it. */
         tabbable?: boolean;
     }
-    let { showInfo = true, tabbable = true }: Props = $props();
+    let { tabbable = true }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const viewerWindowContext = getContext<ViewerWindowContext>(
@@ -225,15 +221,6 @@
     function onblur() {
         resetModifierState();
     }
-
-    let index = $state({
-        get value() {
-            return viewerContext.index;
-        },
-        set value(value: number) {
-            viewerContext.setIndex(value);
-        },
-    });
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -255,64 +242,17 @@
         {onblur}
         {oncontextmenu}
     ></div>
-
-    {#if showInfo}
-        <div class="info">
-            {#if viewerContext.image.is3D}
-                <div>
-                    <label>
-                        Lock scroll
-                        <input
-                            type="checkbox"
-                            bind:checked={viewerContext.lockScroll}
-                        />
-                    </label>
-                </div>
-                <div>
-                    <input
-                        type="range"
-                        min="0"
-                        max={viewerContext.image.depth - 1}
-                        bind:value={index.value}
-                    />
-                    <span>{index.value}</span>
-                </div>
-            {/if}
-            {#if viewerContext.image.orientation === "axial"}
-                <WindowLevel />
-                <Stretch />
-            {/if}
-        </div>
-        <div class="info">
-            {#if viewerContext.image.is3D}
-                <BscanLinks />
-            {/if}
-        </div>
-    {/if}
 </div>
 
 <style>
     div.main {
         display: flex;
         flex: 1;
-        /* The info controls never widen the viewer past its container; the WebGL drawing follows this box. */
+        /* The viewer never grows past its container; the WebGL drawing follows this box. */
         min-width: 0;
         position: relative;
         flex-direction: column;
         align-items: center;
-    }
-    div.info {
-        display: flex;
-        color: white;
-        z-index: 1;
-        flex: 0;
-        align-items: center;
-    }
-    div.info span {
-        margin: 0.5em;
-        width: 3em;
-        font-size: small;
-        display: inline-block;
     }
     div.viewer {
         position: absolute;

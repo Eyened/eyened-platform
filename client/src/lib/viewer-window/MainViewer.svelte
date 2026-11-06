@@ -1,5 +1,12 @@
 <script lang="ts">
+    import {
+        CLIENT_DEFAULTS,
+        mergeClientConfig,
+    } from "$lib/config/clientDefaults";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+    import SliceScrollbar from "$lib/viewer/SliceScrollbar.svelte";
+    import ViewControls from "$lib/viewer/ViewControls.svelte";
     import type { ViewerEvent } from "$lib/viewer/viewer-utils";
     import Viewer from "$lib/viewer/Viewer.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -25,6 +32,12 @@
     const viewerContext = new ViewerContext(image, viewerWindowContext);
     setContext("viewerContext", viewerContext);
 
+    const taskContext = getContext<TaskContext | undefined>("taskContext");
+    viewerContext.renderControls = !mergeClientConfig(
+        CLIENT_DEFAULTS,
+        taskContext?.task.task_definition.config,
+    ).layout.hide.includes("Rendering");
+
     const mainViewerContext = new MainViewerContext(
         viewerContext.instance.id,
         viewerContext.axis,
@@ -49,21 +62,13 @@
 
     const topViewer = viewerWindowContext.topViewers.get(image)!;
 
+    // The tile's zoom on hover, as a multiple of its own fit.
+    const TWIN_ZOOM = 3;
+
     const followCursor = {
         pointermove(e: ViewerEvent<PointerEvent>) {
-            const { viewerContext } = e;
-            const { x, y } = e.cursor;
-            const { viewerSize } = viewerContext;
-            const p = viewerContext.viewerToImageCoordinates({ x, y });
-            const scaleH = viewerSize.height / image.height;
-            const scaleW = viewerSize.width / image.width;
-            const baseFactor = Math.min(scaleH, scaleW);
-            const factor = image.is3D
-                ? 0.4
-                : image.image_id.endsWith("_proj")
-                  ? 0.5
-                  : 5;
-            topViewer.focusPoint(p.x, p.y, factor * baseFactor);
+            const p = e.viewerContext.viewerToImageCoordinates(e.cursor);
+            topViewer.focusFromFit(p.x, p.y, TWIN_ZOOM);
         },
         pointerleave() {
             topViewer.initTransform();
@@ -124,8 +129,15 @@
 
 <div class="main">
     <!-- ASSUMPTION: the sidebar is removed, not hidden, so the panel header component can be deleted (plan decision 12). -->
-    <section class="viewer-section">
+    <section
+        class="viewer-section"
+        class:has-bar={viewerContext.renderControls}
+    >
         <Viewer />
+        {#if image.is3D && image.depth > 1}
+            <SliceScrollbar />
+        {/if}
+        <ViewControls />
     </section>
 </div>
 
@@ -139,8 +151,13 @@
     }
 
     .viewer-section {
+        position: relative;
         display: flex;
         flex: 1;
         min-width: 0;
+    }
+    /* The bar sits below the image, so it never covers part of the retina. */
+    .viewer-section.has-bar {
+        padding-bottom: 2rem;
     }
 </style>

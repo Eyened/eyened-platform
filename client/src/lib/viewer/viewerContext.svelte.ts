@@ -14,6 +14,7 @@ import { UpdatePosition } from "./controls/updatePosition";
 import { ZoomPan } from "./controls/zoomPan";
 import { CursorOverlay } from "./overlays/CursorOverlay";
 import { boxToPaint, clipBox, sameBox } from "./viewportGeometry";
+import { lastInputWasKeyboard } from "./lastInput";
 import type { MeasureTool } from "./tools/Measure.svelte.js";
 import type {
     EventName,
@@ -88,6 +89,11 @@ export class ViewerContext {
     );
     lockScroll: boolean = $state(false);
     windowLevel: WindowLevel = $state({ min: 0, max: 255 });
+    /** The image's starting W/L and stretch; the folded view bar names only what differs from them. */
+    readonly defaultWindowLevel: WindowLevel;
+    readonly defaultStretch: number;
+    /** False under `layout.hide: ["Rendering"]`: no view bar and no render-mode keys. */
+    renderControls = true;
     cursorStyle: cursorStyle = $state("default");
     private cursorClaimPriority = 0;
     active: boolean = $state(false);
@@ -186,6 +192,8 @@ export class ViewerContext {
                 this.stretch = (8 * image.resolution.y) / image.resolution.x;
             }
         }
+        this.defaultWindowLevel = { ...this.windowLevel };
+        this.defaultStretch = this.stretch;
         this.transform = this.getInitTransform();
         this.imageTransform = image.transform;
 
@@ -340,6 +348,18 @@ export class ViewerContext {
         this.transform = transform;
     }
 
+    /** Centre an image point at a multiple of the fit scale. */
+    focusFromFit(x: number, y: number, factor: number) {
+        this.initTransform();
+        const { width: w, height: h } = this.viewerSize;
+        this.transform = this.transform
+            .pan(this.imageToViewerCoordinates({ x, y }), {
+                x: w / 2,
+                y: h / 2,
+            })
+            .zoom(w / 2, h / 2, factor);
+    }
+
     get aspectRatio() {
         return this.imageViewerTransform.aspectRatio;
     }
@@ -369,6 +389,16 @@ export class ViewerContext {
         this.cursorClaimPriority = CursorPriority.Default;
         this.cursorStyle = "default";
         this.applyCursor("default");
+    }
+
+    /** After a mouse drag or pick, keys go back to the image. Keyboard users and open popovers keep their focus. */
+    returnFocus() {
+        if (
+            lastInputWasKeyboard() ||
+            document.activeElement?.closest("[role=dialog]")
+        )
+            return;
+        this.canvas2D.parentElement?.focus();
     }
 
     private applyCursor(style: cursorStyle) {
