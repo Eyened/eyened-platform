@@ -13,8 +13,8 @@ describe("tickAt", () => {
     });
 
     it("picks the nearest of two ticks in the band", () => {
-        expect(at(201, [40, 41])).toBe(40);
-        expect(at(204, [40, 41])).toBe(41);
+        expect(at(202, [40, 41])).toBe(40);
+        expect(at(203, [40, 41])).toBe(41);
     });
 
     it("leaves a press on the handle to the handle, even over a tick", () => {
