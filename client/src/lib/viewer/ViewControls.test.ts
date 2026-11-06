@@ -48,6 +48,15 @@ describe("ViewControls", () => {
     it("shows mode and W/L on 2D images, with no stretch", async () => {
         const { container } = await renderBar("grey", 1000);
         const controls = within(bar());
+        expect(
+            controls.getByRole("button", { name: /Render mode/ }),
+        ).toBeInTheDocument();
+        expect(
+            controls.getByRole("slider", { name: "Window low" }),
+        ).toBeInTheDocument();
+        expect(
+            controls.getByRole("slider", { name: "Window high" }),
+        ).toBeInTheDocument();
         expect(controls.queryByRole("group", { name: "Stretch" })).toBeNull();
         expect(controls.queryByRole("button", { name: /Stretch/ })).toBeNull();
         await expectNoAxeViolations(container);
