@@ -1,0 +1,10 @@
+# External data sources shown on studies in the browser and the viewer.
+# A deployment replaces this file with a bind mount; see
+# deploy/compose.data-sources.example.yaml. Each entry:
+#
+#   - name: Shown as the panel title, and used in the API path.
+#     url: Upstream URL template, fetched by the server. Placeholders:
+#          {project}, {patient} and {date} (YYYY-MM-DD).
+#     projects: Project names the source applies to.
+#     collapse: Start the panel closed (default false).
+sources: []

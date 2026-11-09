@@ -1,7 +1,6 @@
 <script lang="ts">
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { tagStudy, untagStudy, updateTagStudy } from "$lib/data/helpers";
-    import extensions from "$lib/extensions";
     import Tagger from "$lib/tags/Tagger.svelte";
     import { cn } from "$lib/utils.js";
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
@@ -11,7 +10,6 @@
     import type { BrowserContext } from "./browserContext.svelte";
     import Eye from "./Eye.svelte";
     import { eyeImages } from "./images";
-    import StudyBlockForms from "./StudyBlockForms.svelte";
 
     let { study }: { study: StudyGET } = $props();
 
@@ -60,13 +58,6 @@
     const right = $derived(eyeImages(study, "R"));
     const left = $derived(eyeImages(study, "L"));
     const unknown = $derived(eyeImages(study, null));
-
-    const { additional_data_sources } = extensions.browser.study;
-    const dataSourceContext = $derived({
-        study,
-        patient: study.patient,
-        project: study.project,
-    });
 
     const link =
         "text-link-primary hover:text-link-primary-hover hover:underline";
@@ -133,10 +124,6 @@
                 <Eye laterality={null} images={unknown} />
             {/if}
         </div>
-        <StudyBlockForms {study} />
-        <AdditionalDataSources
-            context={dataSourceContext}
-            {additional_data_sources}
-        />
+        <AdditionalDataSources studyId={study.id} />
     </div>
 </section>
