@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { mockWidth } from "./testUtils";
-import { startStripOn, writeStripOn } from "./workspacePrefs";
+import {
+    readStripLocalizer,
+    readStripTracking,
+    startStripOn,
+    writeStripOn,
+} from "./workspacePrefs";
 
 afterEach(() => localStorage.clear());
 
@@ -14,5 +19,14 @@ describe("startStripOn", () => {
         expect(startStripOn(true)).toBe(true);
         expect(startStripOn()).toBe(true);
         expect(localStorage.getItem("eyened:viewer:strip")).toBe("true");
+    });
+});
+
+describe("strip settings", () => {
+    it("start on and All, and ignore a stored value they do not know", () => {
+        expect(readStripTracking()).toBe(true);
+        expect(readStripLocalizer()).toBe("all");
+        localStorage.setItem("eyened:viewer:stripLocalizer", "lines");
+        expect(readStripLocalizer()).toBe("all");
     });
 });

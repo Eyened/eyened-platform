@@ -1,3 +1,4 @@
+import { SvelteSet } from "svelte/reactivity";
 import { instanceIdFromImageId } from "$lib/viewer-window/viewerViewState";
 import {
     DEFAULT_PRESET_ID,
@@ -16,6 +17,7 @@ import {
     type ArrangeOrder,
     type Axis,
     type CatalogueEntry,
+    type LocalizerMode,
     type Slot,
 } from "./workspaceRules";
 import type { WorkspaceUrlState } from "./workspaceUrl";
@@ -25,6 +27,10 @@ export interface WorkspaceOptions {
     writeUrl?: (state: WorkspaceUrlState) => void;
     /** Whether the thumbnail strip starts on; on when missing. */
     strip?: boolean;
+    /** Whether strip tiles start following the crosshair; on when missing. */
+    stripTracking?: boolean;
+    /** Which localizer lines strip tiles start with; All when missing. */
+    stripLocalizer?: LocalizerMode;
 }
 
 /** The state of one viewer window: the catalogue, the slots and how they page. Positions are 0-based. */
@@ -33,6 +39,10 @@ export class Workspace {
     entries: CatalogueEntry[] = $state.raw([]);
     /** Whether the thumbnail strip shows above the grid. */
     strip = $state(true);
+    /** Whether strip tiles follow the crosshair: tile cursor, twin zoom and OCT tile slice. */
+    stripTracking = $state(true);
+    /** Which localizer lines strip tiles draw. */
+    stripLocalizer: LocalizerMode = $state("all");
     arrange: ArrangeOrder = $state("opened");
     preset: Preset = $state.raw(getPreset(DEFAULT_PRESET_ID)!);
     page = $state(1);
@@ -61,6 +71,8 @@ export class Workspace {
     /** True once the grader (or the URL) named a layout; only then is it carried to the next set. */
     private layoutChosen = false;
     private sliceIndex: Record<string, number> = {};
+    /** Images whose B-scan the grader locked; kept until reload, like the remembered slice. */
+    private readonly lockedIds = new SvelteSet<string>();
     /** Open images in the order they were opened; every Arrange sort starts from it. */
     // ASSUMPTION: sorts start from the opened list, so ties keep the opened order (plan decision 17).
     private opened: CatalogueEntry[] = [];
@@ -69,6 +81,8 @@ export class Workspace {
     constructor(options: WorkspaceOptions = {}) {
         this.writeUrl = options.writeUrl;
         this.strip = options.strip ?? true;
+        this.stripTracking = options.stripTracking ?? true;
+        this.stripLocalizer = options.stripLocalizer ?? "all";
     }
 
     /** The first state once the catalogue has loaded: v= wins, then a named layout, then one viewport with the first image. */
@@ -209,6 +223,15 @@ export class Workspace {
         if (this.sliceIndex[imageId] === index) return;
         this.sliceIndex[imageId] = index;
         if (this.slots.some((slot) => slot.imageId === imageId)) this.persist();
+    }
+
+    isLocked(imageId: string): boolean {
+        return this.lockedIds.has(imageId);
+    }
+
+    setLocked(imageId: string, on: boolean): void {
+        if (on) this.lockedIds.add(imageId);
+        else this.lockedIds.delete(imageId);
     }
 
     urlState(): WorkspaceUrlState {
