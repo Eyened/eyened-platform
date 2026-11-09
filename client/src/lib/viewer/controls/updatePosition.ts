@@ -13,10 +13,6 @@ export class UpdatePosition implements ViewerEventListener {
         if (!viewerContext.updatePosition) {
             return;
         }
-        if (e.event.buttons !== 0) {
-            return;
-        }
-
         // Strip tiles never write the shared pointer, so hovering one moves nothing else.
         if (
             viewerContext.viewerWindowContext.topViewers.get(image) ===
