@@ -89,6 +89,7 @@ describe("SliceScrollbar", () => {
         expect(lock).toHaveAttribute("aria-pressed", "false");
         await fireEvent.click(lock);
         expect(viewerContext.sliceLocked).toBe(true);
+        expect(lock).toHaveAttribute("aria-pressed", "true");
     });
 
     it("a press on a tick goes to its slice and the track does not move there too", async () => {
