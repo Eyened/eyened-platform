@@ -43,6 +43,8 @@ export class Workspace {
     stripTracking = $state(true);
     /** Which localizer lines strip tiles draw. */
     stripLocalizer: LocalizerMode = $state("all");
+    /** True while an open image has B-scan positions to draw; the viewer window sets it. */
+    hasLocalizers = $state(false);
     arrange: ArrangeOrder = $state("opened");
     preset: Preset = $state.raw(getPreset(DEFAULT_PRESET_ID)!);
     page = $state(1);
