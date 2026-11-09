@@ -26,8 +26,11 @@ import type {
     SeriesBlendSession,
 } from "./panelRegistration/registrationSession";
 
-/** Where a ViewerContext reads and records its volume's slice index. */
-export type SliceIndexStore = Pick<Workspace, "peekIndex" | "recordIndex">;
+/** What a ViewerContext reads from the workspace: the remembered slice, Lock and strip tracking. */
+export type WorkspaceView = Pick<
+    Workspace,
+    "peekIndex" | "recordIndex" | "isLocked" | "setLocked" | "stripTracking"
+>;
 
 export class ViewerWindowContext {
     private imagesIndex = new Map<string, Promise<LoadedImages>>();
@@ -54,7 +57,7 @@ export class ViewerWindowContext {
     photoLocators = new SvelteMap<string, PhotoLocator[]>();
     photoLocatorSets: PhotoLocator[][] = $state([]);
 
-    public readonly viewState: SliceIndexStore;
+    public readonly viewState: WorkspaceView;
 
     private frame: number = 0;
     private loadedPatientIds = new Set<number>();
