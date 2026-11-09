@@ -30,6 +30,11 @@ class ObjectTagPATCH(BaseModel):
     comment: Optional[str] = None
 
 
+class DataSourceGET(BaseModel):
+    name: str
+    collapse: bool
+
+
 # Utility DTOs
 class Position2D(BaseModel):
     x: float

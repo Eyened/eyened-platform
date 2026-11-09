@@ -1,54 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
-import { formSchemas, instances } from "$lib/data/stores.svelte";
-import type {
-    FormSchemaGET,
-    ImageGET,
-    StudyGET,
-} from "../../types/openapi_types";
+import { instances } from "$lib/data/stores.svelte";
+import type { ImageGET, StudyGET } from "../../types/openapi_types";
 
 vi.mock("$app/paths", () => ({ resolve: (path: string) => path }));
 
-vi.mock("$lib/extensions", () => ({
-    default: {
-        browser: {
-            study: {
-                list_forms: [
-                    {
-                        title: "Visit grades",
-                        schema_name: "Visit grades",
-                        split_laterality: false,
-                        create_new: false,
-                    },
-                ],
-                additional_data_sources: [
-                    {
-                        name: "External grades",
-                        url: "/external",
-                        conditions: [],
-                    },
-                ],
-            },
-        },
-    },
+vi.mock("$lib/browser/dataSources", () => ({
+    listDataSources: vi.fn(async () => [
+        { name: "External grades", collapse: false },
+    ]),
+    loadDataSource: vi.fn(async () => ({ Scores: [] })),
 }));
-
-vi.mock("$lib/data", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("$lib/data")>();
-    return {
-        ...actual,
-        fetchFormAnnotations: vi.fn(async () => []),
-    };
-});
-
-vi.mock("$lib/browser/dataSources", async (importOriginal) => {
-    const actual =
-        await importOriginal<typeof import("$lib/browser/dataSources")>();
-    return {
-        ...actual,
-        loadDataSource: vi.fn(async () => ({ Scores: [] })),
-    };
-});
 
 const { default: StudyBlock } = await import("./StudyBlock.svelte");
 
@@ -82,17 +44,9 @@ function renderStudy(images: ImageGET[] = []) {
     return render(StudyBlock, { props: { study: withSeries }, context });
 }
 
-beforeEach(() => {
-    formSchemas.clear();
-    formSchemas.set(1, { id: 1, name: "Visit grades" } as FormSchemaGET);
-});
-
 describe("StudyBlock", () => {
-    it("shows visit grading and the data sources", async () => {
+    it("shows the data sources", async () => {
         renderStudy();
-        expect(
-            await screen.findByRole("heading", { name: "Visit grades" }),
-        ).toBeInTheDocument();
         expect(
             await screen.findByRole("heading", { name: /External grades/ }),
         ).toBeInTheDocument();
