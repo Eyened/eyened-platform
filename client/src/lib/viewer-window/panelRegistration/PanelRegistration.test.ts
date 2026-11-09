@@ -17,7 +17,9 @@ vi.mock("$lib/data", async () => {
     };
 });
 
-const { createFormAnnotation } = await import("$lib/data");
+const { createFormAnnotation, deleteFormAnnotation } = await import(
+    "$lib/data"
+);
 const { default: PanelRegistration } = await import(
     "./PanelRegistration.svelte"
 );
@@ -70,6 +72,7 @@ describe("PanelRegistration", () => {
         openRegistrationEditor.mockReset();
         openSeriesBlend.mockReset();
         vi.mocked(createFormAnnotation).mockReset();
+        vi.mocked(deleteFormAnnotation).mockReset();
         formAnnotations.set(21, {
             id: 21,
             form_schema_id: 4,
@@ -182,11 +185,11 @@ describe("PanelRegistration", () => {
         const right = eyeGroup("P-100", "R");
         const leftGroup = eyeGroup("P-100", "L");
         expect(right).toHaveTextContent("Existing registrations");
+        expect(right.querySelector("select")).toBeNull();
         expect(
-            [...right.querySelectorAll("select option")].map(
-                (option) => option.getAttribute("value") ?? option.value,
-            ),
-        ).toEqual(["21"]);
+            screen.getByRole("button", { name: "me [21]" }),
+        ).toBeInTheDocument();
+        expect(right.querySelector("span.icon")).toBeTruthy();
         expect(namedButton(right, "Open")).toBeInTheDocument();
         expect(namedButton(right, CREATE_NEW)).toBeInTheDocument();
         expect(leftGroup).not.toHaveTextContent("Existing registrations");
@@ -221,6 +224,39 @@ describe("PanelRegistration", () => {
             imageIds: ["imgA", "imgB"],
             annotationId: 21,
         });
+    });
+
+    it("opens the registration clicked in the list", async () => {
+        formAnnotations.set(22, {
+            id: 22,
+            form_schema_id: 4,
+            patient_id: 100,
+            laterality: "R",
+            image_id: null,
+            creator: { id: 5, name: "also-me" },
+            form_data: {},
+        } as never);
+        renderPanel();
+        const right = eyeGroup("P-100", "R");
+        await pick("Fixed", "imgA");
+        await pick("Moving", "imgB");
+        await fireEvent.click(
+            screen.getByRole("button", { name: "also-me [22]" }),
+        );
+        await fireEvent.click(namedButton(right, "Open"));
+        expect(openRegistrationEditor).toHaveBeenCalledWith({
+            imageIds: ["imgA", "imgB"],
+            annotationId: 22,
+        });
+    });
+
+    it("removes an annotation from the list", async () => {
+        renderPanel();
+        const right = eyeGroup("P-100", "R");
+        const icon = right.querySelector("span.icon");
+        if (!icon) throw new Error("remove icon missing");
+        await fireEvent.click(icon);
+        expect(deleteFormAnnotation).toHaveBeenCalledWith(21);
     });
 
     it("creates a new annotation only when New is clicked", async () => {
@@ -326,7 +362,9 @@ describe("PanelRegistration", () => {
             ]),
         } as never);
         const right = eyeGroup("P-100", "R");
+        expect(right).toHaveTextContent("me");
         expect(right).toHaveTextContent("[21]");
+        expect(right).not.toHaveTextContent("other");
         expect(right).not.toHaveTextContent("[22]");
     });
 

@@ -20,7 +20,7 @@ Each image has its own render mode, window/level, tint, and opacity. The images 
 - The image list is the images already open in this viewer window (the current top row), not every image for the patient. Volumes and slice stacks (`is2D === false`) are skipped. Enface projections stay.
 - Images are grouped by patient and eye. A registration never mixes eyes. An image with no laterality stays in an unset group for that patient.
 - Within a group, Fixed and Moving are two thumbnail strips in top-row order. The selected thumbnail has an outline. Hover shows the public id. The same image cannot be both.
-- The annotation list is registrations for that patient, eye, and schema that the current user can edit, plus **New**.
+- The annotation list is registrations for that patient, eye, and schema that the current user can edit, shown as rows with creator name, id, and a delete control, plus **New**.
 - **New** creates the annotation when Open is clicked. Patient and laterality come from the group. Study and image id come from the fixed image. The current subtask is included when a task is open. A failed create does not open the editor. A second click while create is in flight does not create twice.
 - The editor is a full-window layer in this window. It reuses the existing graphics context. It does not open a browser popup.
 - The normal viewers stay mounted underneath and do not paint while the editor is open. Closing resumes them.

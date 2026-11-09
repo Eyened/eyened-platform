@@ -14,8 +14,9 @@
             the window. Close returns to this viewer.
         </li>
         <li>
-            If a form annotation already exists for that eye, pick it and click
-            <strong>Open</strong>.
+            If a form annotation already exists for that eye, click its row and
+            then <strong>Open</strong>. The trash icon deletes that
+            registration.
         </li>
         <li>
             Each image in the editor already has the point tool on. Place

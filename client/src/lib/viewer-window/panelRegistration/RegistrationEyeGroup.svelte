@@ -2,6 +2,7 @@
     import Button from "$lib/components/ui/button/button.svelte";
     import {
         createFormAnnotation,
+        deleteFormAnnotation,
         formAnnotations,
         instances,
     } from "$lib/data";
@@ -10,6 +11,7 @@
     import { getContext } from "svelte";
     import type { FormSchemaGET } from "../../../types/openapi_types";
     import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
+    import RegistrationItem from "./RegistrationItem.svelte";
     import RegistrationThumbs from "./RegistrationThumbs.svelte";
     import {
         annotationMatchesEye,
@@ -154,31 +156,28 @@
     />
     {#if existing.length}
         <div class="role">
-            <label class="role-label" for="existing-{key}">
+            <div class="role-label" id="existing-{key}">
                 Existing registrations:
-            </label>
-            <div class="open-existing">
-                <select
-                    id="existing-{key}"
-                    value={choice}
-                    onchange={(event) => (choice = event.currentTarget.value)}
-                >
-                    {#each existing as annotation (annotation.id)}
-                        <option value={String(annotation.id)}>
-                            [{annotation.id}]
-                        </option>
-                    {/each}
-                </select>
-                <Button
-                    size="sm"
-                    disabled={!canOpenRegistration(fixedId, movingId) ||
-                        !choice ||
-                        creating}
-                    onclick={openExisting}
-                >
-                    Open
-                </Button>
             </div>
+            <ul class="existing" aria-labelledby="existing-{key}">
+                {#each existing as annotation (annotation.id)}
+                    <RegistrationItem
+                        formAnnotation={annotation}
+                        active={choice === String(annotation.id)}
+                        onactivate={() => (choice = String(annotation.id))}
+                        onremove={() => deleteFormAnnotation(annotation.id)}
+                    />
+                {/each}
+            </ul>
+            <Button
+                size="sm"
+                disabled={!canOpenRegistration(fixedId, movingId) ||
+                    !choice ||
+                    creating}
+                onclick={openExisting}
+            >
+                Open
+            </Button>
         </div>
     {/if}
     <Button
@@ -230,17 +229,9 @@
         opacity: 0.8;
         margin-bottom: 0.25em;
     }
-    .open-existing {
-        display: flex;
-        gap: 0.4em;
-        align-items: center;
-    }
-    .open-existing select {
-        flex: 1 1 auto;
-        min-width: 0;
-        margin-top: 0;
-    }
-    select {
-        margin-top: 0.4em;
+    ul.existing {
+        list-style: none;
+        margin: 0.25em 0 0.4em;
+        padding: 0;
     }
 </style>

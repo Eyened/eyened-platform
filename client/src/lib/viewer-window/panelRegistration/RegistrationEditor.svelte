@@ -138,7 +138,7 @@
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div class="handle" onpointerdown={startResize}><hr /></div>
             </div>
-            <RegistrationBlend {images} />
+            <RegistrationBlend {images} annotationId={session.annotationId} />
         </div>
     </svelte:boundary>
 {/if}

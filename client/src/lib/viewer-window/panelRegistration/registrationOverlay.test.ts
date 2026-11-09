@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { formAnnotations } from "$lib/data/stores.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
+import { AffineRegistration } from "$lib/registration/affine";
+import { Matrix } from "$lib/matrix";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/viewer/Viewer.svelte", () => ({
@@ -167,6 +169,49 @@ describe("registration overlays", () => {
             ]),
         });
         expect(viewerWindowContext.closeRegistrationEditor).toHaveBeenCalled();
+    });
+
+    it("follows the open annotation affine instead of another graph edge", async () => {
+        const graphMatrix = new Matrix(9, 0, 0, 0, 9, 0);
+        formAnnotations.set(21, {
+            id: 21,
+            form_data: {
+                fixed: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                    { x: 0, y: 10 },
+                ],
+                moving: [
+                    { x: 5, y: 7 },
+                    { x: 25, y: 7 },
+                    { x: 5, y: 27 },
+                ],
+            },
+        } as never);
+        const viewerWindowContext = windowContext({
+            registration: {
+                revision: 1,
+                getRegistrationItem: () =>
+                    new AffineRegistration("fixed", "moving", graphMatrix),
+                getPath: () => ["fixed", "moving"],
+            },
+        });
+        render(RegistrationEditor, {
+            context: new Map<string, unknown>([
+                ["viewerWindowContext", viewerWindowContext],
+                ["globalContext", { canEdit: () => true }],
+            ]),
+        });
+
+        const renderer = renderers.at(-1)!;
+        const movingLayer = renderer.setLayers.mock.lastCall![0][1];
+        expect(movingLayer.mapping.affine).not.toBe(graphMatrix);
+        expect(movingLayer.mapping.affine.apply({ x: 0, y: 0 }).x).toBeCloseTo(
+            5,
+        );
+        expect(movingLayer.mapping.affine.apply({ x: 0, y: 0 }).y).toBeCloseTo(
+            7,
+        );
     });
 
     it("shows the series blend and updates the slider", async () => {

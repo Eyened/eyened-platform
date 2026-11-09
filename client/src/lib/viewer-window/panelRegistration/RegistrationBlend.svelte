@@ -2,6 +2,7 @@
     import { composeGlslPath } from "$lib/registration/composeGlslPath";
     import { glslPathBetween } from "$lib/registration/glslPathBetween";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import { formAnnotations } from "$lib/data";
     import {
         BlendRenderer,
         type BlendComposite,
@@ -16,13 +17,14 @@
         mountBlendViewer,
         registeredImageSize,
     } from "./blendViewer";
-    import { directAffineMatrix } from "./directAffine";
+    import { affineFromFormData } from "./directAffine";
 
     interface Props {
         images: AbstractImage[];
+        annotationId: number;
     }
 
-    let { images }: Props = $props();
+    let { images, annotationId }: Props = $props();
 
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
@@ -58,7 +60,7 @@
     });
 
     /**
-     * The direct affine is a uniform, so point drags do not recompile.
+     * The open annotation's affine is a uniform, so point drags do not recompile.
      * Until that edge exists, any other baked path is shown instead.
      */
     const movingMapping = $derived.by((): BlendMapping => {
@@ -67,8 +69,11 @@
         const registration = viewerWindowContext.registration;
         void registration.revision;
         if (!fixed || !moving) return { affine: null };
-        const affine = directAffineMatrix(
-            registration.getRegistrationItem(fixed.image_id, moving.image_id),
+        const formData = formAnnotations.get(annotationId)?.form_data;
+        const affine = affineFromFormData(
+            formData,
+            fixed.image_id,
+            moving.image_id,
         );
         if (affine) return { affine };
         return (
