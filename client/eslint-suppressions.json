@@ -217,11 +217,6 @@
       "count": 2
     }
   },
-  "src/lib/viewer-window/panelRendering/PanelRendering.svelte": {
-    "svelte/require-each-key": {
-      "count": 2
-    }
-  },
   "src/lib/viewer-window/panelSegmentation/CreateSegmentationDialog.svelte": {
     "svelte/require-each-key": {
       "count": 1

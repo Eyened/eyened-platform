@@ -1,252 +1,67 @@
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button";
-    import {
-        createFormAnnotation,
-        deleteFormAnnotation,
-        formAnnotations,
-        instances,
-        setFormAnnotationValue,
-    } from "$lib/data";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import {
-        CLIENT_DEFAULTS,
-        mergeClientConfig,
-    } from "$lib/config/clientDefaults";
-    import {
-        analyzePointSchema,
-        getPointsForImage,
-        setPointsForImage,
-    } from "$lib/forms/pointSchema";
-    import type { JSONSchema } from "$lib/forms/schemaType";
-    import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import type { FormSchemaGET } from "../../../types/openapi_types";
     import { getContext } from "svelte";
-    import type {
-        FormAnnotationGET,
-        FormSchemaGET,
-    } from "../../../types/openapi_types";
-    import RegistrationItem from "./RegistrationItem.svelte";
+    import type { ViewerWindowContext } from "../viewerWindowContext.svelte";
+    import RegistrationEyeGroup from "./RegistrationEyeGroup.svelte";
+    import {
+        groupKey,
+        groupLabel,
+        groupOpenImages,
+        orderByInstanceIds,
+        type OpenImage,
+    } from "./groupOpenImages";
 
-    const viewerContext = getContext<ViewerContext>("viewerContext");
-    const taskContext = getContext<TaskContext>("taskContext");
-    const globalContext = getContext<GlobalContext>("globalContext");
-
-    const pointMarker = $derived(
-        mergeClientConfig(
-            CLIENT_DEFAULTS,
-            taskContext?.task.task_definition.config,
-        ).point_marker,
-    );
-
-    interface props {
+    interface Props {
         active: boolean;
         registrationSchema: FormSchemaGET;
     }
-    const { active: panelActive, registrationSchema }: props = $props();
+    const { active, registrationSchema }: Props = $props();
+    // `active` stays in the panel contract. Read it in an effect so Svelte
+    // does not treat the prop as captured once at init.
+    $effect(() => {
+        void active;
+    });
 
-    const {
-        image: { instance },
-    } = viewerContext;
-
-    const filtered = $derived(
-        formAnnotations
-            .filter((formAnnotation) => {
-                if (formAnnotation.form_schema_id !== registrationSchema.id)
-                    return false;
-                if (formAnnotation.patient_id !== instance.patient.id)
-                    return false;
-                const formLaterality =
-                    formAnnotation.laterality ??
-                    (formAnnotation.image_id
-                        ? instances.get(formAnnotation.image_id)?.laterality
-                        : undefined);
-                if (
-                    formLaterality &&
-                    instance.laterality &&
-                    formLaterality !== instance.laterality
-                ) {
-                    return false;
-                }
-                return true;
-            })
-            .sort((a, b) => a.id - b.id),
+    const viewerWindowContext = getContext<ViewerWindowContext>(
+        "viewerWindowContext",
     );
 
-    const REGISTRATION_POINTS: JSONSchema = {
-        type: "array",
-        items: {
-            oneOf: [
-                {
-                    type: "object",
-                    properties: {
-                        x: { type: "number" },
-                        y: { type: "number" },
-                        index: { type: ["number", "null"] },
-                    },
-                    required: ["x", "y"],
-                },
-                { type: "null" },
-            ],
-        },
-    };
-
-    function registrationAnalysis() {
-        const fromApi = (registrationSchema.schema ?? {}) as JSONSchema;
-        const withMarker = (schema: JSONSchema): JSONSchema => ({
-            ...schema,
-            type: "object",
-            "x-eyened-widget": "keypoint",
-        });
-
-        const analyzed =
-            analyzePointSchema(withMarker(fromApi)) ??
-            analyzePointSchema(
-                withMarker({ additionalProperties: REGISTRATION_POINTS }),
-            );
-        // Registration stores landmarks on fundus, OCT volumes, and enface
-        // `*_proj`. Older seeded schemas omitted `index`; still treat as oct.
-        if (analyzed && analyzed.coordinateSpace === "enface2d") {
-            return { ...analyzed, coordinateSpace: "oct" as const };
+    const openImages = $derived.by(() => {
+        const images: OpenImage[] = [];
+        for (const image of viewerWindowContext.topViewers.keys()) {
+            // Skip only real volumes and slice stacks. Missing is2D stays.
+            if (image.is2D === false) continue;
+            images.push({
+                imageId: image.image_id,
+                instanceId: image.instance.id,
+                patientId: image.instance.patient.id,
+                patientIdentifier: image.instance.patient.identifier,
+                laterality: image.instance.laterality ?? null,
+                studyId: image.instance.study?.id,
+            });
         }
-        return analyzed;
-    }
-
-    async function create() {
-        const formAnnotation = await createFormAnnotation({
-            form_schema_id: registrationSchema.id,
-            patient_id: instance.patient.id,
-            study_id: instance.study?.id ?? undefined,
-            image_id: instance.id,
-            laterality: instance.laterality ?? undefined,
-            sub_task_id: taskContext?.subTask?.id,
-            form_data: {},
-        });
-        onactivate(formAnnotation);
-    }
-
-    /** Per-viewer tool — other MainViewers can arm the same annotation independently. */
-    let activeID: number | undefined = $state(undefined);
-    let removeTool: (() => void) | undefined;
-
-    function deactivate() {
-        removeTool?.();
-        removeTool = undefined;
-        activeID = undefined;
-    }
-
-    function onactivate(formAnnotation: FormAnnotationGET) {
-        const stillExists = filtered.some((f) => f.id === formAnnotation.id);
-        if (!stillExists) {
-            console.log("Annotation no longer exists, ignoring onactivate");
-            return;
-        }
-
-        if (activeID === formAnnotation.id) {
-            deactivate();
-            return;
-        }
-
-        const analysis = registrationAnalysis();
-        if (!analysis) {
-            console.error(
-                "Pointset registration schema could not be analyzed",
-                registrationSchema.schema,
-            );
-            return;
-        }
-
-        deactivate();
-
-        const annotationId = formAnnotation.id;
-        const canEdit = globalContext.canEdit(formAnnotation);
-        const publicId = () => viewerContext.image.instance.id;
-
-        const tool = new PointTool({
-            canEdit,
-            label: "registration",
-            pointStyle: pointMarker.style,
-            radius: pointMarker.radius,
-            color: pointMarker.color,
-            cardinality: analysis.cardinality,
-            sparse: analysis.sparse,
-            coordinateSpace: analysis.coordinateSpace,
-            onChange: (points) => {
-                const existing =
-                    formAnnotations.get(annotationId) ?? formAnnotation;
-                const next = setPointsForImage(
-                    existing.form_data,
-                    publicId(),
-                    points,
-                    analysis,
-                );
-                formAnnotations.set(annotationId, {
-                    ...existing,
-                    form_data: next,
-                });
-            },
-            onPersist: (points) => {
-                const existing =
-                    formAnnotations.get(annotationId) ?? formAnnotation;
-                const next = setPointsForImage(
-                    existing.form_data,
-                    publicId(),
-                    points,
-                    analysis,
-                );
-                formAnnotations.set(annotationId, {
-                    ...existing,
-                    form_data: next,
-                });
-                setFormAnnotationValue(annotationId, next);
-            },
-        });
-
-        const existing =
-            formAnnotations.get(annotationId)?.form_data ??
-            formAnnotation.form_data;
-        tool.points = getPointsForImage(existing, publicId(), analysis);
-
-        const dispose = viewerContext.addOverlay(tool);
-        removeTool = () => {
-            tool.destroy();
-            dispose();
-        };
-        activeID = annotationId;
-    }
-
-    function onremove(formAnnotation: FormAnnotationGET) {
-        if (activeID === formAnnotation.id) deactivate();
-        deleteFormAnnotation(formAnnotation.id);
-    }
-
-    $effect(() => {
-        if (!panelActive) deactivate();
+        return orderByInstanceIds(
+            images,
+            viewerWindowContext.instanceIds ?? [],
+        );
     });
 
-    // Unmount when the armed annotation is deleted (this viewer or another).
-    $effect(() => {
-        if (activeID === undefined) return;
-        if (!formAnnotations.has(activeID)) deactivate();
-    });
+    const groups = $derived(groupOpenImages(openImages));
+    const boxed = $derived(groups.length > 1);
 </script>
 
 <div class="main">
-    <div class="available">
-        <ul>
-            {#each filtered as formAnnotation (formAnnotation.id)}
-                <RegistrationItem
-                    {formAnnotation}
-                    active={activeID === formAnnotation.id}
-                    {onactivate}
-                    {onremove}
-                />
-            {/each}
-        </ul>
-    </div>
-    <div class="new">
-        <Button variant="outline" onclick={create}>Create new</Button>
-    </div>
+    {#each groups as group (groupKey(group.patientId, group.laterality))}
+        {#if boxed}
+            {@const label = groupLabel(group)}
+            <section class="group" aria-label={label}>
+                <div class="group-label">{label}</div>
+                <RegistrationEyeGroup {group} {registrationSchema} />
+            </section>
+        {:else}
+            <RegistrationEyeGroup {group} {registrationSchema} />
+        {/if}
+    {/each}
 </div>
 
 <style>
@@ -255,15 +70,13 @@
         min-height: 0;
         flex: 1 1 auto;
         overflow-y: auto;
-        min-height: 0px;
     }
-    div.new,
-    div.available {
-        padding: 0.2em;
-        margin-bottom: 0.5em;
+    section.group {
+        margin: 0 0 0.75em;
     }
-    ul {
-        list-style-type: none;
-        padding-inline-start: 0em;
+    .group-label {
+        font-size: 0.75em;
+        opacity: 0.8;
+        margin-bottom: 0.35em;
     }
 </style>

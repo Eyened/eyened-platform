@@ -10,6 +10,8 @@ Keeps track of the main panels and the top row of images.
     import TopRowImages from "./TopRowImages.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
     import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
+    import RegistrationEditor from "./panelRegistration/RegistrationEditor.svelte";
+    import SeriesBlendEditor from "./panelRegistration/SeriesBlendEditor.svelte";
     import { instances, patients } from "$lib/data";
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
@@ -78,7 +80,12 @@ Keeps track of the main panels and the top row of images.
 <RegistrationItemLoader {registration} {registrationSet} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div id="main" bind:this={main}>
+<div
+    id="main"
+    bind:this={main}
+    class:main-hidden={viewerWindowContext.registrationEditor ||
+        viewerWindowContext.seriesBlend}
+>
     <div id="top" class="row">
         <TopRowImages />
     </div>
@@ -98,6 +105,14 @@ Keeps track of the main panels and the top row of images.
     </div>
 </div>
 
+{#if viewerWindowContext.registrationEditor}
+    <RegistrationEditor />
+{/if}
+
+{#if viewerWindowContext.seriesBlend}
+    <SeriesBlendEditor />
+{/if}
+
 <style>
     div.row {
         overflow: hidden;
@@ -110,6 +125,9 @@ Keeps track of the main panels and the top row of images.
         flex: 1;
         /* Keeps the viewer's z-indexes below menus portalled to <body>. */
         isolation: isolate;
+    }
+    div#main.main-hidden {
+        visibility: hidden;
     }
     div#top {
         display: flex;
