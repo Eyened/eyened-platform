@@ -31,7 +31,7 @@ describe("Viewer foreground registration", () => {
             initTransform: vi.fn(),
         };
         render(Viewer, {
-            props: { showInfo: false, foreground: true },
+            props: { foreground: true },
             context: new Map<string, unknown>([
                 ["viewerContext", viewerContext],
                 ["viewerWindowContext", { addViewer }],

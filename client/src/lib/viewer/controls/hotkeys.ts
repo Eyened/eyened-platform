@@ -5,16 +5,17 @@ import type {
 } from "../viewer-utils";
 import { isRenderModeAvailable } from "../viewer-utils";
 
+export const RENDER_MODE_CODES: { [code: string]: RenderMode } = {
+    KeyR: "Original",
+    KeyL: "Luminance",
+    KeyE: "Contrast enhanced",
+    KeyB: "Color balanced",
+    KeyH: "CLAHE",
+    KeyS: "Sharpened",
+    KeyM: "Histogram matched",
+};
+
 export class HotKeys implements ViewerEventListener {
-    codes: { [key: string]: RenderMode } = {
-        KeyR: "Original",
-        KeyL: "Luminance",
-        KeyE: "Contrast enhanced",
-        KeyB: "Color balanced",
-        KeyH: "CLAHE",
-        KeyS: "Sharpened",
-        KeyM: "Histogram matched",
-    };
     constructor() {}
 
     keydown(e: ViewerEvent<KeyboardEvent>) {
@@ -27,8 +28,8 @@ export class HotKeys implements ViewerEventListener {
         const hideOverlays = code === "Space";
         viewerContext.hideOverlays = hideOverlays;
 
-        if (code in this.codes) {
-            const mode = this.codes[code];
+        if (viewerContext.renderControls && code in RENDER_MODE_CODES) {
+            const mode = RENDER_MODE_CODES[code];
             if (
                 isRenderModeAvailable(
                     viewerContext.image.supportsColorRenderModes,
