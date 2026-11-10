@@ -44,4 +44,4 @@ While the stack is open, a fix to the old viewer on `development` is listed here
 ## Traps
 
 - The pick-up overlay of a splitter covers the grid, not the page, so no viewport takes the pointer while it is picked up. Pressing it keeps focus on the splitter (it prevents the mousedown default); a click outside the grid blurs the splitter and cancels.
-- A press that closes a bits-ui popover also reaches the image underneath, against overview §3 (a dismissing press only dismisses). No tool can be armed before sub-project 3, which must fix this for the view bar's popovers and the Layout popover.
+- A press made while a popover, dropdown list or ⋯ list is open only closes it: `Viewer.svelte` drops it. A new floating component must carry one of the `data-slot` values that `Viewer.svelte` checks.
