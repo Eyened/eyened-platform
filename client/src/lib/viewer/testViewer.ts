@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import { Matrix } from "$lib/matrix";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { ViewerWindowContext } from "$lib/viewer-window/viewerWindowContext.svelte";
+import { Workspace } from "$lib/workspace/workspace.svelte";
 import { ViewerContext } from "./viewerContext.svelte";
 
 export type ImageKind = "colour" | "grey" | "bscan" | "enface";
@@ -25,11 +26,23 @@ function fakeImage(kind: ImageKind): AbstractImage {
     } as unknown as AbstractImage;
 }
 
-/** A real ViewerContext on a synthetic image and a fake window. Mock `$lib/webgl/imageRenderer` in the test file. */
-export function viewerOf(kind: ImageKind): ViewerContext {
+/** A real ViewerContext on a synthetic image and a fake window with a real Workspace. Mock `$lib/webgl/imageRenderer` in the test file. */
+export function viewerOf(
+    kind: ImageKind,
+    {
+        workspace = new Workspace(),
+        tile = false,
+    }: { workspace?: Workspace; tile?: boolean } = {},
+): ViewerContext {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     const registration = { getPosition: vi.fn(), setPosition: vi.fn() };
-    return new ViewerContext(fakeImage(kind), {
+    const image = fakeImage(kind);
+    const topViewers = new Map<AbstractImage, ViewerContext>();
+    const viewer = new ViewerContext(image, {
         registration,
+        viewState: workspace,
+        topViewers,
     } as unknown as ViewerWindowContext);
+    if (tile) topViewers.set(image, viewer);
+    return viewer;
 }

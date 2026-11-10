@@ -1,10 +1,13 @@
 /** Per-user viewer panel state; each read and write survives private mode and quota errors. */
 
 import { MediaQuery } from "svelte/reactivity";
+import type { LocalizerMode } from "./workspaceRules";
 
 const LEFT_KEY = "eyened:viewer:leftPanel";
 const RIGHT_KEY = "eyened:viewer:rightOpen";
 const STRIP_KEY = "eyened:viewer:strip";
+const TRACKING_KEY = "eyened:viewer:stripTracking";
+const LOCALIZER_KEY = "eyened:viewer:stripLocalizer";
 
 export type LeftPanel = "images" | "info" | "help";
 const PANELS: readonly string[] = ["images", "info", "help"];
@@ -71,6 +74,41 @@ export function startStripOn(taskStrip?: boolean): boolean {
 export function writeStripOn(on: boolean): void {
     try {
         localStorage.setItem(STRIP_KEY, String(on));
+    } catch {
+        // Private mode or quota: the choice lasts this session only.
+    }
+}
+
+/** Whether strip tiles follow the crosshair; on unless the user turned it off. */
+export function readStripTracking(): boolean {
+    try {
+        return localStorage.getItem(TRACKING_KEY) !== "false";
+    } catch {
+        return true;
+    }
+}
+
+export function writeStripTracking(on: boolean): void {
+    try {
+        localStorage.setItem(TRACKING_KEY, String(on));
+    } catch {
+        // Private mode or quota: the choice lasts this session only.
+    }
+}
+
+/** Which localizer lines strip tiles draw; All unless the user chose another. */
+export function readStripLocalizer(): LocalizerMode {
+    try {
+        const raw = localStorage.getItem(LOCALIZER_KEY);
+        return raw === "off" || raw === "current" ? raw : "all";
+    } catch {
+        return "all";
+    }
+}
+
+export function writeStripLocalizer(mode: LocalizerMode): void {
+    try {
+        localStorage.setItem(LOCALIZER_KEY, mode);
     } catch {
         // Private mode or quota: the choice lasts this session only.
     }

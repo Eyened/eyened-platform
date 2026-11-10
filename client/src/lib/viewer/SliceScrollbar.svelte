@@ -33,6 +33,7 @@ Numbers are shown 1-based; the stored index stays 0-based.
         Math.max(0, Math.min(depth - 1, Math.round(viewerContext.index))),
     );
     const numbers = $derived(buildBscanDisplayItems(scanIndices, index));
+    const locked = $derived(viewerContext.sliceLocked);
     const showCount = $derived(scanIndices.length > BSCAN_LINKS_SHOW_ALL_MAX);
     const countText = $derived(`${scanIndices.length} with data`);
 
@@ -122,15 +123,16 @@ Numbers are shown 1-based; the stored index stays 0-based.
         >
         <IconButton
             size="icon-xs"
-            label="Lock slice scrolling"
-            aria-pressed={viewerContext.lockScroll}
-            class={viewerContext.lockScroll
-                ? "bg-background-selected"
-                : undefined}
+            label="Lock slice"
+            aria-pressed={locked}
+            class={locked ? "bg-background-selected" : undefined}
             onclick={() =>
-                (viewerContext.lockScroll = !viewerContext.lockScroll)}
+                viewerContext.viewerWindowContext.viewState?.setLocked(
+                    viewerContext.image.image_id,
+                    !locked,
+                )}
         >
-            {#if viewerContext.lockScroll}<Locked />{:else}<Unlocked />{/if}
+            {#if locked}<Locked />{:else}<Unlocked />{/if}
         </IconButton>
     </div>
     <div class="track" bind:this={track} {onpointerdowncapture}>

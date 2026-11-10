@@ -12,6 +12,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     import { viewportTitle } from "$lib/workspace/imageMeta";
     import WorkspaceFrame from "$lib/workspace/WorkspaceFrame.svelte";
     import type { TaskHeader } from "$lib/workspace/WorkspaceHeader.svelte";
+    import type { Workspace } from "$lib/workspace/workspace.svelte";
     import { getContext, setContext } from "svelte";
     import BrowserOverlay from "./BrowserOverlay.svelte";
     import MainViewer from "./MainViewer.svelte";
@@ -26,6 +27,11 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     let { viewerWindowContext }: Props = $props();
     setContext("viewerWindowContext", viewerWindowContext);
     const registration = viewerWindowContext.registration;
+    const workspace = getContext<Workspace>("workspace");
+    // The Localizer lines setting shows only when some open image has B-scan positions.
+    $effect(() => {
+        workspace.hasLocalizers = viewerWindowContext.photoLocators.size > 0;
+    });
 
     let registrationSet: RegistrationSet[] = $derived.by(() => {
         const result: RegistrationSet[] = [];

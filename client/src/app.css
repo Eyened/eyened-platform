@@ -64,6 +64,9 @@
     --color-focus-inset: #161616;
     --color-support-error: #fa4d56;
     --color-support-success: #42be65;
+    /* @carbon/themes 11.83.0, g100 */
+    --color-toggle-off: #6f6f6f;
+    --color-icon-on-color: #ffffff;
     --color-support-warning: #f1c21b;
     --color-notification-background-error: #262626;
     --color-notification-background-success: #262626;
@@ -291,6 +294,12 @@ body {
 
 /* Carbon draws the checkbox ring outside the box; an outline-offset utility loses to the rule above. */
 [data-slot="checkbox"]:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
+}
+
+/* Carbon draws the toggle's focus ring around the track. */
+[data-slot="toggle"]:focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 1px;
 }
