@@ -189,7 +189,7 @@ describe("WorkspaceFrame", () => {
             screen.getByRole("button", { name: "Layout…" }),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("group", { name: "Tools" }),
+            screen.getByRole("toolbar", { name: "Tools" }),
         ).toBeInTheDocument();
         expect(screen.getByRole("tab", { name: "Images" })).toHaveAttribute(
             "aria-selected",
@@ -287,5 +287,20 @@ describe("WorkspaceFrame", () => {
         );
         expect(screen.queryByRole("region", { name: "Info" })).toBeNull();
         expect(localStorage.getItem("eyened:viewer:leftPanel")).toBe("info");
+    });
+
+    it("F1 opens Help, but not from a text field", async () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(2));
+        const field = document.body.appendChild(
+            document.createElement("input"),
+        );
+        await fireEvent.keyDown(field, { key: "F1" });
+        expect(screen.queryByRole("region", { name: "Help" })).toBeNull();
+        field.remove();
+        await fireEvent.keyDown(document.body, { key: "F1" });
+        expect(
+            screen.getByRole("region", { name: "Help" }),
+        ).toBeInTheDocument();
     });
 });
