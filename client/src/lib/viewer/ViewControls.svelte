@@ -18,7 +18,7 @@ A viewport's bottom bar: render mode, W/L and, on B-scans, stretch. It shows the
     import { ToggleGroup } from "$lib/components/ui/toggle-group/index.js";
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
     import { getContext, type Snippet } from "svelte";
-    import { RENDER_MODE_CODES } from "./controls/hotkeys";
+    import { RENDER_MODE_DIGITS } from "$lib/workspace/tools/keymap";
     import {
         barState,
         nonDefaultLabel,
@@ -42,9 +42,9 @@ A viewport's bottom bar: render mode, W/L and, on B-scans, stretch. It shows the
     const items = modes.map((mode) => ({
         id: mode,
         text: mode,
-        hint: Object.entries(RENDER_MODE_CODES)
+        hint: Object.entries(RENDER_MODE_DIGITS)
             .find(([, m]) => m === mode)?.[0]
-            .slice(3),
+            .slice("Digit".length),
     }));
     const presets = STRETCH_PRESETS.map((p) => ({
         value: String(p),
