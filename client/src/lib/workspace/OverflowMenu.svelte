@@ -1,6 +1,6 @@
 <!--
 @component
-A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab order. Esc or an item closes it and returns focus to the button.
+A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab order. Esc or an item closes it and returns focus to the button. A tool slot passes its own icon and opens the list beside it.
 -->
 <script lang="ts">
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
@@ -11,11 +11,23 @@ A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab orde
         label,
         size = "icon",
         tabindex,
+        icon,
+        side = "bottom",
+        active = false,
+        stop,
         children,
     }: {
         label: string;
         size?: "icon" | "icon-xs";
         tabindex?: number;
+        /** Replaces the ⋯ icon. */
+        icon?: Snippet;
+        /** "end" opens the list beside the button, for the palette. */
+        side?: "bottom" | "end";
+        /** Shows the button selected, as for an armed tool. */
+        active?: boolean;
+        /** The palette's roving-focus key. */
+        stop?: string;
         children: Snippet<[close: () => void]>;
     } = $props();
 
@@ -43,20 +55,31 @@ A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab orde
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<span bind:this={root} class="relative inline-flex" {onfocusout} {onkeydown}>
+<span
+    bind:this={root}
+    class="relative inline-flex"
+    data-stop={stop}
+    {onfocusout}
+    {onkeydown}
+>
     <IconButton
         {label}
         {size}
         {tabindex}
+        class={active ? "bg-background-selected" : undefined}
         aria-expanded={open}
         aria-controls="{uid}-menu"
         onclick={() => (open = !open)}
     >
-        <OverflowMenuHorizontal />
+        {#if icon}{@render icon()}{:else}<OverflowMenuHorizontal />{/if}
     </IconButton>
     <div
         id="{uid}-menu"
-        class="absolute end-0 top-full z-50 flex min-w-max flex-col bg-layer-01 shadow-popover"
+        data-slot="overflow-menu"
+        class="absolute z-50 flex min-w-max flex-col bg-layer-01 shadow-popover {side ===
+        'end'
+            ? 'start-full top-0'
+            : 'end-0 top-full'}"
         hidden={!open}
     >
         {@render children(close)}
