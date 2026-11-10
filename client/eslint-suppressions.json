@@ -138,16 +138,6 @@
       "count": 2
     }
   },
-  "src/lib/viewer-window/ImageWindow.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/MainViewer.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
   "src/lib/viewer-window/MapSelect.svelte": {
     "@typescript-eslint/no-explicit-any": {
       "count": 4
@@ -163,11 +153,6 @@
   },
   "src/lib/viewer-window/RegistrationItemLoader.svelte": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/TopRowImages.svelte": {
-    "svelte/require-each-key": {
       "count": 1
     }
   },
@@ -212,11 +197,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/panelRegistration/RegistrationItem.svelte": {
-    "svelte/require-each-key": {
-      "count": 2
-    }
-  },
   "src/lib/viewer-window/panelSegmentation/CreateSegmentationDialog.svelte": {
     "svelte/require-each-key": {
       "count": 1
@@ -248,9 +228,6 @@
     }
   },
   "src/lib/viewer-window/viewerWindowContext.svelte.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
     "svelte/prefer-svelte-reactivity": {
       "count": 5
     }

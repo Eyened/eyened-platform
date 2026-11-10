@@ -17,11 +17,11 @@ export class UpdatePosition implements ViewerEventListener {
             return;
         }
 
-        const isTopViewer =
+        // Strip tiles never write the shared pointer, so hovering one moves nothing else.
+        if (
             viewerContext.viewerWindowContext.topViewers.get(image) ===
-            viewerContext;
-        // Top viewers require Shift; main viewers always update.
-        if (isTopViewer && !e.modifiers.shift) {
+            viewerContext
+        ) {
             return;
         }
 

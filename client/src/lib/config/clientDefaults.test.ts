@@ -66,4 +66,14 @@ describe("mergeClientConfig", () => {
         });
         expect(resolved.point_marker).toEqual(CLIENT_DEFAULTS.point_marker);
     });
+
+    it("reads layout.strip, on when missing", () => {
+        expect(
+            mergeClientConfig(CLIENT_DEFAULTS, { layout: {} }).layout.strip,
+        ).toBe(true);
+        expect(
+            mergeClientConfig(CLIENT_DEFAULTS, { layout: { strip: false } })
+                .layout.strip,
+        ).toBe(false);
+    });
 });
