@@ -41,4 +41,27 @@ describe("Viewer", () => {
         await fireEvent.pointerDown(viewport, { pointerId: 1 });
         expect(pointerdown).toHaveBeenCalledOnce();
     });
+
+    it("a closing press released outside the viewer does not swallow the next release", async () => {
+        const viewerContext = viewerOf("colour");
+        const pointerup = vi.fn();
+        viewerContext.addOverlay({ pointerdown: vi.fn(), pointerup });
+        const { container } = render(Viewer, {
+            context: new Map<string, unknown>([
+                ["viewerContext", viewerContext],
+                ["viewerWindowContext", { addViewer: () => () => {} }],
+            ]),
+        });
+        const viewport = container.querySelector<HTMLElement>(".viewer")!;
+        const popover = document.body.appendChild(
+            document.createElement("div"),
+        );
+        popover.dataset.slot = "popover-content";
+        await fireEvent.pointerDown(viewport, { pointerId: 1 });
+        // The release lands outside the viewer, so no pointerup fires here.
+        popover.remove();
+        await fireEvent.pointerDown(viewport, { pointerId: 1 });
+        await fireEvent.pointerUp(viewport, { pointerId: 1 });
+        expect(pointerup).toHaveBeenCalledOnce();
+    });
 });

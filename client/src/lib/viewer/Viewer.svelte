@@ -182,10 +182,8 @@
     }
 
     function onpointerdown(e: PointerEvent) {
-        if (document.querySelector(OPEN_FLOATING)) {
-            dismissing = true;
-            return;
-        }
+        dismissing = !!document.querySelector(OPEN_FLOATING);
+        if (dismissing) return;
         // Capture the pointer to ensure we get all events even if the pointer moves outside the viewer until the pointer is released
         viewerElement.setPointerCapture(e.pointerId);
         pointerDown = true;
