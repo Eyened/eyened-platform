@@ -91,6 +91,23 @@ describe("Keymap", () => {
         expect(viewer.hideOverlays).toBe(false);
     });
 
+    it("shows overlays again when the viewport loses focus while H is held", async () => {
+        const workspace = new Workspace();
+        const viewerContext = viewerOf("colour", { workspace });
+        const { container } = render(Viewer, {
+            context: new Map<string, unknown>([
+                ["viewerContext", viewerContext],
+                ["viewerWindowContext", { addViewer: () => () => {} }],
+            ]),
+        });
+        const viewport = container.querySelector<HTMLElement>(".viewer")!;
+        viewport.focus();
+        await fireEvent.keyDown(viewport, { key: "h", code: "KeyH" });
+        expect(viewerContext.hideOverlays).toBe(true);
+        await fireEvent.blur(viewport);
+        expect(viewerContext.hideOverlays).toBe(false);
+    });
+
     it("Esc fits zoom and pan again", () => {
         const viewer = viewerOf("colour");
         viewer.zoom(10, 10, 3);

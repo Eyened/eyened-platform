@@ -222,6 +222,8 @@
 
     function onblur() {
         resetModifierState();
+        // The H keyup never arrives once focus has left, so end the hold here.
+        viewerContext.hideOverlays = false;
     }
 </script>
 
