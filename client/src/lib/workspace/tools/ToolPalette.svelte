@@ -137,7 +137,9 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
         }}
     >
         {tool.name}
-        {#if tool.key}<kbd class="font-sans text-text-secondary">{tool.key}</kbd
+        {#if tool.key}<kbd
+                aria-hidden="true"
+                class="font-sans text-text-secondary">{tool.key}</kbd
             >{/if}
     </Button>
 {/snippet}

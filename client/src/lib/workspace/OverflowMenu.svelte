@@ -1,6 +1,6 @@
 <!--
 @component
-A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab order. Esc or an item closes it and returns focus to the button. A tool slot passes its own icon and opens the list beside it.
+A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab order. Esc or an item closes it and returns focus to the button. The palette's ⋯ More tools passes the armed tool's icon when one of its tools is armed.
 -->
 <script lang="ts">
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
@@ -31,7 +31,7 @@ A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab orde
         children: Snippet<[close: () => void]>;
     } = $props();
 
-    // ASSUMPTION: a disclosure, not Carbon's overflow menu, since it holds one item (plan decision 11).
+    // ASSUMPTION: a disclosure, not Carbon's overflow menu, since its list is a few plain buttons.
     const uid = $props.id();
     let open = $state(false);
     let root: HTMLElement | undefined = $state();

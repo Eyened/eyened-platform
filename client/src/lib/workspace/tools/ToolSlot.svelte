@@ -35,6 +35,8 @@ A short-rail job slot: the button arms the tool it shows; the chevron, or a long
     let timer: ReturnType<typeof setTimeout> | undefined;
     let held = false;
 
+    $effect(() => () => clearTimeout(timer));
+
     function close() {
         open = false;
         chevron?.focus();
@@ -42,6 +44,7 @@ A short-rail job slot: the button arms the tool it shows; the chevron, or a long
 
     function onpointerdown(e: PointerEvent) {
         if (e.button !== 0) return;
+        clearTimeout(timer);
         held = false;
         timer = setTimeout(() => {
             held = true;
@@ -53,12 +56,11 @@ A short-rail job slot: the button arms the tool it shows; the chevron, or a long
         clearTimeout(timer);
     }
 
-    function onclick() {
-        // The click that ends a long press only leaves the list open.
-        if (held) {
-            held = false;
-            return;
-        }
+    function onclick(e: MouseEvent) {
+        // The pointer click that ends a long press only leaves the list open; a key click (detail 0) never does.
+        const wasHeld = held && e.detail !== 0;
+        held = false;
+        if (wasHeld) return;
         workspace.toggleTool(tool.id);
     }
 

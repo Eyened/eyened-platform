@@ -40,7 +40,7 @@ describe("ToolPalette", () => {
         await fireEvent.click(
             screen.getByRole("button", { name: "Draw tools" }),
         );
-        await fireEvent.click(screen.getByRole("button", { name: /^Eraser/ }));
+        await fireEvent.click(screen.getByRole("button", { name: "Eraser" }));
         expect(ws.armedTool).toBe("eraser");
         expect(
             screen.getByRole("button", { name: "Eraser" }),
@@ -57,11 +57,27 @@ describe("ToolPalette", () => {
             await fireEvent.pointerDown(brush, { button: 0 });
             await vi.advanceTimersByTimeAsync(500);
             await fireEvent.pointerUp(brush);
-            await fireEvent.click(brush);
+            await fireEvent.click(brush, { detail: 1 });
             expect(
-                screen.getByRole("button", { name: /^Polygon/ }),
+                screen.getByRole("button", { name: "Polygon" }),
             ).toBeInTheDocument();
             expect(ws.armedTool).toBe("brush");
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("a long press released off the button does not swallow a later key click", async () => {
+        vi.useFakeTimers();
+        try {
+            const ws = workspaceWith(1);
+            ws.arm("brush");
+            renderPalette(ws, ALL_TOOLS_FLAT - 1);
+            const brush = screen.getByRole("button", { name: "Brush" });
+            await fireEvent.pointerDown(brush, { button: 0 });
+            await vi.advanceTimersByTimeAsync(500);
+            await fireEvent.click(brush, { detail: 0 });
+            expect(ws.armedTool).toBeNull();
         } finally {
             vi.useRealTimers();
         }
@@ -90,7 +106,7 @@ describe("ToolPalette", () => {
             screen.getByRole("button", { name: "More tools" }),
         );
         expect(screen.getByText("Draw")).toBeInTheDocument();
-        await fireEvent.click(screen.getByRole("button", { name: /^Brush/ }));
+        await fireEvent.click(screen.getByRole("button", { name: "Brush" }));
         expect(ws.armedTool).toBe("brush");
         expect(
             screen.getByRole("button", { name: "Brush (More tools)" }),
