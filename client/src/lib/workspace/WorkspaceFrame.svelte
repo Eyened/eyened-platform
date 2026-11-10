@@ -183,8 +183,10 @@ Below md there are no icon columns: a menu button opens the left column's conten
     }
 
     async function openHelp() {
-        opener = document.activeElement as HTMLElement | null;
+        // A repeat F1 while the menu is open would otherwise record an element inside it.
+        if (!overlayOpen) opener = document.activeElement as HTMLElement | null;
         if (narrow) {
+            layoutOpen = false;
             overlay = "menu";
             menuTab = "help";
             await tick();

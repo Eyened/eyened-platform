@@ -303,4 +303,16 @@ describe("WorkspaceFrame", () => {
             screen.getByRole("region", { name: "Help" }),
         ).toBeInTheDocument();
     });
+
+    it("a second F1 keeps the first opener, so Esc returns focus there", async () => {
+        mockWidth({ md: false, xlg: false });
+        renderFrame(workspaceWith(3));
+        const menu = screen.getByRole("button", { name: "Show menu" });
+        menu.focus();
+        await fireEvent.keyDown(document.body, { key: "F1" });
+        const help = await screen.findByRole("region", { name: "Help" });
+        await fireEvent.keyDown(document.body, { key: "F1" });
+        await fireEvent.keyDown(help, { key: "Escape" });
+        await waitFor(() => expect(menu).toHaveFocus());
+    });
 });
