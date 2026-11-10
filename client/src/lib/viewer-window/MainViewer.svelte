@@ -18,6 +18,8 @@
     import { FeaturePipetteOverlay } from "./panelSegmentation/FeaturePipetteOverlay";
     import { pointArming } from "$lib/forms/pointArming.svelte";
     import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
+    import { createViewTool } from "$lib/viewer/tools/viewTools";
+    import type { Workspace } from "$lib/workspace/workspace.svelte";
     interface Props {
         image: AbstractImage;
     }
@@ -85,6 +87,35 @@
     });
     onDestroy(() => {
         topViewer.initTransform();
+    });
+
+    const workspace = getContext<Workspace>("workspace");
+
+    // The armed view tool acts in every viewport; strip tiles never take it.
+    $effect(() => {
+        const tool = createViewTool(workspace.armedTool);
+        if (!tool) return;
+        const remove = viewerContext.addOverlay(tool);
+        return () => {
+            remove();
+            viewerContext.resetCursor();
+        };
+    });
+
+    // Reset view and the options bar act on the selected viewport through this handle.
+    const position = getContext<(() => number) | undefined>("viewportPosition");
+    $effect(() => {
+        if (!position) return;
+        return workspace.attachViewport(position(), {
+            get zoomPercent() {
+                return Math.round(viewerContext.transform.scale * 100);
+            },
+            zoomBy(factor: number) {
+                const { width, height } = viewerContext.viewerSize;
+                viewerContext.zoom(width / 2, height / 2, factor);
+            },
+            reset: () => viewerContext.initTransform(),
+        });
     });
 
     // Form PointField: mount PointTool while a session is armed. Live SoT is
