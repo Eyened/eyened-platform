@@ -31,13 +31,15 @@ The ledger is the local spec `2026-11-02-viewer-workspace-ledger.md`. Rows are n
 | `HelpOverlay.svelte`                                                                                                                                                                                                                                                                                                               | 6 (Help panel)                       |
 | Task config `task_panel.enabled` / `task_panel.sections.*` and `layout.hide` / `layout.prepend`: not honoured while the old panels are unmounted, except `hide: ["Rendering"]`, which `MainViewer` honours (no bar, no mode keys), so a task that hides navigation still shows Previous / Next set and Task overview in the header | 5                                    |
 | `TopViewer.svelte`'s tile controls, dropped when it became `StripViewer.svelte`: copy-ID bar, localizer lines toggle, en-face projection cycling                                                                                                                                                                                   | 6 (V-167), 2b (V-028), 4 (V-030)     |
+| `RegistrationEditor` and `SeriesBlendEditor` overlays with their blend controls; `panelRendering/RenderModeSelect.svelte`, `panelRendering/WindowLevelSlider.svelte`, `DoubleRangeSlider.svelte` and `icons/Brightness.svelte`, kept only for those controls                                                                       | 4d, which deletes the last four      |
 
 ## Freeze rule
 
 While the stack is open, a fix to the old viewer on `development` is listed here as a carry-over, with its commit, and ported into the sub-project that owns the behaviour.
 
-| Commit | Fix | Ported in |
-| ------ | --- | --------- |
+| Commit            | Fix                                  | Ported in |
+| ----------------- | ------------------------------------ | --------- |
+| `80faf9bb` (#273) | Registration editor and series blend | 4d        |
 
 ## Traps
 
