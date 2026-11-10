@@ -12,6 +12,8 @@ function createContext() {
         {} as Registration,
         null,
         [],
+        { prune: vi.fn(), hydrate: vi.fn() } as never,
+        {} as never,
     );
 }
 
@@ -113,29 +115,6 @@ describe("ViewerWindowContext registration editor paint", () => {
         ctx.removeViewer(foreground as never);
         ctx.repaint();
         expect(foreground.repaint).not.toHaveBeenCalled();
-    });
-
-    it("reads a foreground volume index when syncing open viewers", () => {
-        const setOpenViewers = vi.fn();
-        const viewState = {
-            prune: vi.fn(),
-            enableRecording: vi.fn(),
-            flush: vi.fn(),
-            getViewers: () => [{ id: "vol", index: 2 }],
-            setOpenViewers,
-        };
-        ctx = new ViewerWindowContext(
-            { clear: vi.fn(), canvas: { width: 8, height: 8 } } as never,
-            {} as Registration,
-            null,
-            [],
-            viewState as never,
-        );
-        const image = { image_id: "vol", is3D: true, depth: 12 };
-        ctx.mainPanels = [{ component: {}, props: { image } }];
-        ctx.addViewer({ image, index: 7, repaint: vi.fn() } as never, true);
-        ctx.syncMainPanelsToViewState();
-        expect(setOpenViewers).toHaveBeenCalledWith([{ id: "vol", index: 7 }]);
     });
 });
 

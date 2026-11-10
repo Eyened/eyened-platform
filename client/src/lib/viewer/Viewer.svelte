@@ -19,7 +19,11 @@
         /** False keeps the viewer out of the Tab order, as in a strip tile; a press still focuses it. */
         tabbable?: boolean;
     }
-    let { showInfo = true, foreground = false, tabbable = true }: Props = $props();
+    let {
+        showInfo = true,
+        foreground = false,
+        tabbable = true,
+    }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const viewerWindowContext = getContext<ViewerWindowContext>(
