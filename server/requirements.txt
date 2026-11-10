@@ -5,6 +5,7 @@ httpxyz>=0.31.2
 numpy==2.*
 pandas>=1.5.3
 pydantic-settings==2.7.1
+pyyaml==6.*
 python-multipart==0.0.20
 passlib==1.7.4
 pyjwt>=2.12.0

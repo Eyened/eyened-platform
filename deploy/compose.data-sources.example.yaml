@@ -1,0 +1,17 @@
+# External data sources (study panels fed by another service). Copy to
+# compose.data-sources.yaml (gitignored), append :compose.data-sources.yaml to
+# COMPOSE_FILE, and write deploy/data_sources.yaml (gitignored) in the format
+# documented in server/data_sources.yaml, for example:
+#
+#   sources:
+#     - name: Registry
+#       url: http://registry.internal/api/project/{project}/patient/{patient}/study/{date}
+#       projects: [Project A, Project B]
+#
+# The server fetches these URLs; the browser never does, and only users who can
+# see a study get its data. Restart the server after editing the file.
+
+services:
+  server:
+    volumes:
+      - ./data_sources.yaml:/app/server/data_sources.yaml:ro

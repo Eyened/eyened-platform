@@ -1,25 +1,10 @@
 {
-  "src/lib/browser/AdditionalDataSources.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/lib/browser/StudyBlockForms.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
   "src/lib/browser/browserContext.svelte.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 14
     },
     "svelte/prefer-svelte-reactivity": {
       "count": 4
-    }
-  },
-  "src/lib/browser/dataSources.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
     }
   },
   "src/lib/components/ui/data-table/data-table.svelte.ts": {

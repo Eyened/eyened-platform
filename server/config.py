@@ -3,10 +3,12 @@ from dataclasses import dataclass
 from datetime import date
 from functools import lru_cache
 from json import JSONDecodeError
+from pathlib import Path
 
 import httpxyz
+import yaml
 from eyened_orm.utils.pretty_settings import pretty_settings
-from pydantic import Field, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict, BaseSettings
 
 
@@ -218,6 +220,33 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+DATA_SOURCES_PATH = Path(__file__).parent / "data_sources.yaml"
+
+
+class DataSource(BaseModel):
+    """An external service the server fetches study data from."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    name: str = Field(min_length=1)
+    url: str
+    projects: list[str]
+    collapse: bool = False
+
+
+class DataSourcesFile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    sources: list[DataSource] = []
+
+
+def load_data_sources(path: Path) -> tuple[DataSource, ...]:
+    with path.open() as f:
+        return tuple(DataSourcesFile.model_validate(yaml.safe_load(f) or {}).sources)
+
+
+@lru_cache
+def get_data_sources() -> tuple[DataSource, ...]:
+    return load_data_sources(DATA_SOURCES_PATH)
 
 
 def get_redis_connection():
