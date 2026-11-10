@@ -16,6 +16,7 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
     import {
         readStripLocalizer,
         readStripTracking,
+        readToolMode,
         startStripOn,
     } from "$lib/workspace/workspacePrefs";
     import {
@@ -76,6 +77,8 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
         strip,
         stripTracking: readStripTracking(),
         stripLocalizer: readStripLocalizer(),
+        // A task always offers every tool (no switcher); /view starts in the stored mode.
+        toolMode: taskContext ? "all" : readToolMode(),
     });
     setContext("workspace", workspace);
 

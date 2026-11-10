@@ -84,3 +84,20 @@ describe("Workspace edits", () => {
         expect(ws.catalogue).toEqual(["b", "a", "c"]);
     });
 });
+
+describe("Workspace tools", () => {
+    it("a click on the armed tool returns to No tool; Reset view resets the selected viewport and never arms", () => {
+        const ws = workspaceWith(2);
+        const reset = vi.fn();
+        ws.attachViewport(0, { zoomPercent: 100, zoomBy: vi.fn(), reset });
+        ws.toggleTool("pan");
+        expect(ws.armedTool).toBe("pan");
+        ws.toggleTool("pan");
+        expect(ws.armedTool).toBeNull();
+        ws.arm("brush");
+        ws.toggleTool("reset");
+        expect(reset).toHaveBeenCalledOnce();
+        expect(ws.armedTool).toBe("brush");
+        expect(ws.lastPick.Draw).toBe("brush");
+    });
+});

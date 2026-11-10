@@ -1,4 +1,4 @@
-import { SvelteSet } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { instanceIdFromImageId } from "$lib/viewer-window/viewerViewState";
 import {
     DEFAULT_PRESET_ID,
@@ -21,6 +21,12 @@ import {
     type Slot,
 } from "./workspaceRules";
 import type { WorkspaceUrlState } from "./workspaceUrl";
+import {
+    toolById,
+    type ToolGroup,
+    type ToolId,
+    type ToolMode,
+} from "./tools/registry";
 
 export interface WorkspaceOptions {
     /** Receives the URL state after every change; the loader passes workspaceUrl's writer. */
@@ -31,6 +37,16 @@ export interface WorkspaceOptions {
     stripTracking?: boolean;
     /** Which localizer lines strip tiles start with; All when missing. */
     stripLocalizer?: LocalizerMode;
+    /** The palette's mode; All tools when missing. */
+    toolMode?: ToolMode;
+}
+
+/** What the palette and the options bar need from one viewport. */
+export interface ViewportHandle {
+    /** Screen pixels per image pixel, in percent. */
+    readonly zoomPercent: number;
+    zoomBy(factor: number): void;
+    reset(): void;
 }
 
 /** The state of one viewer window: the catalogue, the slots and how they page. Positions are 0-based. */
@@ -57,6 +73,16 @@ export class Workspace {
     loaded = $state(false);
     /** Text for the polite live region. */
     announcement = $state("");
+    /** The armed palette tool; null is No tool. */
+    armedTool: ToolId | null = $state(null);
+    /** Each job's last picked tool, shown by its slot when the rail is short. */
+    lastPick: Record<ToolGroup, ToolId> = $state({
+        View: "zoom",
+        Measure: "distance",
+        Draw: "brush",
+        Place: "point",
+    });
+    toolMode: ToolMode = $state("all");
 
     catalogue = $derived(this.entries.map((e) => e.imageId));
     pageCount = $derived(countPages(this.catalogue.length, this.slots.length));
@@ -68,6 +94,10 @@ export class Workspace {
         const last = Math.min(this.page * this.slots.length, n);
         return `Images ${first}–${last} of ${n}`;
     });
+
+    private readonly viewports = new SvelteMap<number, ViewportHandle>();
+    /** The selected viewport's handle; null while it is empty. */
+    selectedViewport = $derived(this.viewports.get(this.selected) ?? null);
 
     private nextId = 1;
     /** True once the grader (or the URL) named a layout; only then is it carried to the next set. */
@@ -85,6 +115,7 @@ export class Workspace {
         this.strip = options.strip ?? true;
         this.stripTracking = options.stripTracking ?? true;
         this.stripLocalizer = options.stripLocalizer ?? "all";
+        this.toolMode = options.toolMode ?? "all";
     }
 
     /** The first state once the catalogue has loaded: v= wins, then a named layout, then one viewport with the first image. */
@@ -234,6 +265,32 @@ export class Workspace {
     setLocked(imageId: string, on: boolean): void {
         if (on) this.lockedIds.add(imageId);
         else this.lockedIds.delete(imageId);
+    }
+
+    /** A key or a menu pick: arms a modal tool; Reset view, the one action, resets the selected viewport. */
+    arm(id: ToolId): void {
+        const tool = toolById(id);
+        if (tool.kind === "action") {
+            this.selectedViewport?.reset();
+            return;
+        }
+        this.armedTool = id;
+        this.lastPick = { ...this.lastPick, [tool.group]: id };
+    }
+
+    /** A palette click: the armed tool again returns to No tool. */
+    toggleTool(id: ToolId): void {
+        if (this.armedTool === id) this.armedTool = null;
+        else this.arm(id);
+    }
+
+    /** A viewport's viewer registers its handle; the returned function removes it. */
+    attachViewport(position: number, handle: ViewportHandle): () => void {
+        this.viewports.set(position, handle);
+        return () => {
+            if (this.viewports.get(position) === handle)
+                this.viewports.delete(position);
+        };
     }
 
     urlState(): WorkspaceUrlState {
