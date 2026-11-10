@@ -35,6 +35,15 @@ A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab orde
     const uid = $props.id();
     let open = $state(false);
     let root: HTMLElement | undefined = $state();
+    let listStyle = $state("");
+
+    // A list beside the button is fixed at its right edge so a scrolling rail cannot clip it.
+    function toggle() {
+        const rect = root?.getBoundingClientRect();
+        if (!open && side === "end" && rect)
+            listStyle = `left: ${rect.right}px; top: ${rect.top}px`;
+        open = !open;
+    }
 
     /** Hides the list and returns focus to the ⋯ button. */
     function close() {
@@ -69,17 +78,18 @@ A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab orde
         class={active ? "bg-background-selected" : undefined}
         aria-expanded={open}
         aria-controls="{uid}-menu"
-        onclick={() => (open = !open)}
+        onclick={toggle}
     >
         {#if icon}{@render icon()}{:else}<OverflowMenuHorizontal />{/if}
     </IconButton>
     <div
         id="{uid}-menu"
         data-slot="overflow-menu"
-        class="absolute z-50 flex min-w-max flex-col bg-layer-01 shadow-popover {side ===
+        class="z-50 flex min-w-max flex-col bg-layer-01 shadow-popover {side ===
         'end'
-            ? 'start-full top-0'
-            : 'end-0 top-full'}"
+            ? 'fixed'
+            : 'absolute end-0 top-full'}"
+        style={side === "end" ? listStyle : undefined}
         hidden={!open}
     >
         {@render children(close)}

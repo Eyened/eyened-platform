@@ -34,8 +34,16 @@ A short-rail job slot: the button arms the tool it shows; the chevron, or a long
     let chevron: HTMLButtonElement | undefined = $state();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let held = false;
+    let listStyle = $state("");
 
     $effect(() => () => clearTimeout(timer));
+
+    // The list is fixed at the slot's right edge so the scrolling rail cannot clip it.
+    function openList() {
+        const rect = root?.getBoundingClientRect();
+        if (rect) listStyle = `left: ${rect.right}px; top: ${rect.top}px`;
+        open = true;
+    }
 
     function close() {
         open = false;
@@ -48,7 +56,7 @@ A short-rail job slot: the button arms the tool it shows; the chevron, or a long
         held = false;
         timer = setTimeout(() => {
             held = true;
-            open = true;
+            openList();
         }, LONG_PRESS_MS);
     }
 
@@ -103,7 +111,7 @@ A short-rail job slot: the button arms the tool it shows; the chevron, or a long
         aria-controls="{uid}-list"
         data-stop="{group}-list"
         tabindex={listTabindex}
-        onclick={() => (open = !open)}
+        onclick={() => (open ? (open = false) : openList())}
     >
         <!-- A glyph narrower than Carbon's 16 px icons, to fit the 8 px chevron. -->
         <svg width="6" height="10" viewBox="0 0 6 10" aria-hidden="true"
@@ -118,7 +126,8 @@ A short-rail job slot: the button arms the tool it shows; the chevron, or a long
     <div
         id="{uid}-list"
         data-slot="overflow-menu"
-        class="absolute start-full top-0 z-50 flex min-w-max flex-col bg-layer-01 shadow-popover"
+        class="fixed z-50 flex min-w-max flex-col bg-layer-01 shadow-popover"
+        style={listStyle}
         hidden={!open}
     >
         {@render children(close)}

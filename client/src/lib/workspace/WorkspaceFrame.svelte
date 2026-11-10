@@ -507,6 +507,8 @@ Below md there are no icon columns: a menu button opens the left column's conten
         display: flex;
         flex-direction: column;
         overflow-y: auto;
+        /* The 48 px split slot is 1 px wider than the content box beside the border. */
+        overflow-x: hidden;
         background: var(--color-layer-01);
         border-inline-end: 1px solid var(--color-border-subtle-01);
     }

@@ -47,6 +47,19 @@ describe("ToolPalette", () => {
         ).toBeInTheDocument();
     });
 
+    it("split layout has one tab stop; ArrowDown moves from the View tool to its chevron", async () => {
+        renderPalette(workspaceWith(1), ALL_TOOLS_FLAT - 1);
+        const stops = screen
+            .getAllByRole("button")
+            .filter((b) => b.getAttribute("tabindex") === "0");
+        expect(stops).toHaveLength(1);
+        stops[0].focus();
+        await fireEvent.keyDown(stops[0], { key: "ArrowDown" });
+        expect(
+            screen.getByRole("button", { name: "View tools" }),
+        ).toHaveFocus();
+    });
+
     it("a long press on a split slot opens its list and leaves the armed tool alone", async () => {
         vi.useFakeTimers();
         try {
