@@ -43,7 +43,7 @@
             // Carbon radios select with Space and arrows; Enter must not submit a surrounding form.
             if (e.key === "Enter") e.preventDefault();
         }}
-        class="mt-0 grid size-5 shrink-0 cursor-pointer appearance-none place-content-center rounded-full border border-icon-primary bg-transparent before:size-2 before:scale-0 before:rounded-full before:bg-icon-primary before:content-[''] checked:before:scale-100 disabled:cursor-not-allowed disabled:border-icon-disabled disabled:before:bg-icon-disabled"
+        class="grid size-5 shrink-0 cursor-pointer appearance-none place-content-center rounded-full border border-icon-primary bg-transparent before:size-2 before:scale-0 before:rounded-full before:bg-icon-primary before:content-[''] checked:before:scale-100 disabled:cursor-not-allowed disabled:border-icon-disabled disabled:before:bg-icon-disabled"
     />
     <label
         for={uid}

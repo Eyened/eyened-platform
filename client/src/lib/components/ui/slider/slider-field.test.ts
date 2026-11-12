@@ -44,4 +44,25 @@ describe("SliderField", () => {
 
         await expectNoAxeViolations(container);
     });
+
+    it("Enter on an untouched field commits nothing, even when the value has more decimals than shown", async () => {
+        const onchange = vi.fn();
+        const oncommit = vi.fn();
+        render(SliderField, {
+            props: {
+                labelText: "Threshold",
+                value: 0.333,
+                onchange,
+                oncommit,
+                min: 0,
+                max: 1,
+                step: 0.01,
+                decimals: 2,
+            },
+        });
+        const field = screen.getByRole("spinbutton", { name: "Threshold" });
+        await fireEvent.keyDown(field, { key: "Enter" });
+        expect(onchange).not.toHaveBeenCalled();
+        expect(oncommit).not.toHaveBeenCalled();
+    });
 });

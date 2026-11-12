@@ -36,6 +36,8 @@
     let text = $derived(shown);
 
     function commit() {
+        // An untouched field keeps the stored value, even one with more decimals than shown.
+        if (text === shown) return;
         const typed = Number.parseFloat(text);
         if (Number.isNaN(typed)) {
             text = shown;
