@@ -212,16 +212,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/panelSegmentation/MultiFeatureSelector.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelSegmentation/PanelSegmentation.svelte": {
-    "svelte/require-each-key": {
-      "count": 2
-    }
-  },
   "src/lib/viewer-window/panelSegmentation/ReferenceAnnotationSelector.svelte": {
     "svelte/require-each-key": {
       "count": 1

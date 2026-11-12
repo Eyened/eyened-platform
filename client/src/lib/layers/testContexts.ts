@@ -30,6 +30,7 @@ export function graderSegmentation(
         reference_segmentation_id: null,
         creator: { id: creatorId, name: `Grader ${creatorId}` },
         feature: { id: 100 + id, name },
+        tags: [],
         ...over,
     } as unknown as SegmentationGET;
 }
@@ -48,6 +49,7 @@ export function modelSegmentation(
         threshold: 0.5,
         creator: { id: 99, name: "Model" },
         feature: { id: 200 + id, name },
+        tags: [],
     } as unknown as ModelSegmentationGET;
 }
 
@@ -56,6 +58,7 @@ export function layersContexts(
     instanceId = "inst-1",
     over: {
         resolution?: { x: number; y: number; z: number };
+        is3D?: boolean;
         getMask?: (index: number) => unknown;
     } = {},
 ) {
@@ -64,7 +67,8 @@ export function layersContexts(
     const image = {
         width: 100,
         height: 100,
-        is2D: true,
+        is3D: over.is3D ?? false,
+        is2D: !(over.is3D ?? false),
         resolution: over.resolution ?? { x: -1, y: -1, z: -1 },
         getOrCreateSegmentationItem(segmentation: Segmentation) {
             const key = `${segmentation.annotation_type}_${segmentation.id}`;
@@ -75,7 +79,8 @@ export function layersContexts(
                 items.set(key, {
                     segmentation,
                     loading: false,
-                    threshold: undefined,
+                    threshold: 0.5,
+                    importOther: vi.fn(async () => {}),
                     savedScanIndices: [],
                     getSegmentationState: () => {
                         // The real syncState is reactive state; this reads the test's store the same way.

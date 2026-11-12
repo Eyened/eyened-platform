@@ -1,27 +1,45 @@
+<!--
+@component
+The classes of a current MultiClass or MultiLabel row: eye, colour and number, the class you draw (MultiClass) or the labels (MultiLabel), the name, and this slice's area while Area is on.
+MultiClass rows also get the viewport's two class opacity sliders, which are not saved.
+-->
 <script lang="ts">
+    import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import { RadioButton } from "$lib/components/ui/radio-button/index.js";
+    import { SliderField } from "$lib/components/ui/slider/index.js";
+    import { classPixelCounts } from "$lib/layers/classArea";
     import { colors } from "$lib/viewer/overlays/colors";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import View from "carbon-icons-svelte/lib/View.svelte";
+    import ViewOff from "carbon-icons-svelte/lib/ViewOff.svelte";
     import { getContext } from "svelte";
-    import { Hide, PanelIcon, Show } from "../icons/icons";
-    import { isDrawableSubfeatureIndex } from "./subfeatureBits";
     import { type Segmentation } from "./segmentationContext.svelte";
+    import { isDrawableSubfeatureIndex } from "./subfeatureBits";
 
     interface Props {
         segmentation: Segmentation;
         active: boolean;
+        /** The Area switch in the section header. */
+        showArea: boolean;
     }
-    let { segmentation, active }: Props = $props();
+    let { segmentation, active, showArea }: Props = $props();
 
     const { feature, data_representation } = segmentation;
+    const uid = $props.id();
 
     const mainViewerContext =
         getContext<MainViewerContext>("mainViewerContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
-
     const { segmentationContext } = mainViewerContext;
+    const { resolution } = viewerContext.image;
+    const hasResolution = resolution.x > 0 && resolution.y > 0;
 
     const isMultiClass = data_representation === "MultiClass";
+    // Must not run inside $derived: getOrCreateSegmentationItem mutates the image cache.
+    const segmentationItem =
+        segmentationContext.getSegmentationItem(segmentation);
 
     let activeClassIndex = $state(1);
     let activeLabelIndices = $state<number[]>([]);
@@ -31,6 +49,23 @@
             isDrawableSubfeatureIndex(subfeature.index),
         ),
     );
+
+    /** mm² per class this slice; undefined while Area is off, the row is not current or the image has no resolution. */
+    const areas = $derived.by(() => {
+        if (!active || !showArea || !hasResolution) return undefined;
+        const mask = segmentationItem.getMask(viewerContext.index) as
+            | { version?: number; exportData(): ArrayLike<number> }
+            | undefined;
+        if (!mask) return undefined;
+        void mask.version; // reruns after every draw, undo or import
+        const counts = classPixelCounts(
+            mask.exportData(),
+            data_representation === "MultiLabel",
+            drawableSubfeatures.map((s) => s.index),
+        );
+        const mm2 = (resolution.x * resolution.y) / 1e6;
+        return new Map([...counts].map(([i, n]) => [i, n * mm2]));
+    });
 
     function indicesEqual(a: number | number[], b: number | number[]): boolean {
         if (Array.isArray(a) && Array.isArray(b)) {
@@ -73,18 +108,21 @@
         }
     });
 
+    function toggleLabel(index: number, on: boolean) {
+        activeLabelIndices = on
+            ? [...activeLabelIndices, index].sort((a, b) => a - b)
+            : activeLabelIndices.filter((i) => i !== index);
+    }
+
     function pointerEnter(featureIndex: number) {
         mainViewerContext.highlightedFeatureIndex = featureIndex;
-        mainViewerContext.highlightedSegmentationItem =
-            segmentationContext.getSegmentationItem(segmentation);
+        mainViewerContext.highlightedSegmentationItem = segmentationItem;
     }
     function pointerLeave() {
         mainViewerContext.highlightedFeatureIndex = undefined;
     }
 
-    function toggleLayerVisibility(featureIndex: number, e: MouseEvent) {
-        e.preventDefault();
-        e.stopPropagation();
+    function toggleLayerVisibility(featureIndex: number) {
         segmentationContext.toggleFeatureLayerVisibility(
             segmentation,
             featureIndex,
@@ -93,182 +131,111 @@
     }
 </script>
 
-<div class:hidden={!active}>
-    {#if data_representation === "MultiClass"}
-        <div class="mc-opacity" role="group" aria-label="Class overlay opacity">
-            <label class="mc-op" title="Active class opacity">
-                <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    bind:value={segmentationContext.multiClassActiveAlpha}
+{#if active}
+    <div class="flex w-full flex-col gap-3">
+        {#if isMultiClass}
+            <fieldset class="flex flex-col gap-3">
+                <legend class="mb-2 text-label-01 text-text-secondary"
+                    >Class opacity</legend
+                >
+                <!-- Shown as percent; stored as 0 to 1. -->
+                <SliderField
+                    labelText="Active class"
+                    value={segmentationContext.multiClassActiveAlpha * 100}
+                    onchange={(v) =>
+                        (segmentationContext.multiClassActiveAlpha = v / 100)}
+                    min={0}
+                    max={100}
+                    step={5}
+                    decimals={0}
+                    unit="%"
                 />
-            </label>
-            <label class="mc-op" title="Other classes opacity">
-                <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    bind:value={segmentationContext.multiClassInactiveAlpha}
+                <SliderField
+                    labelText="Other classes"
+                    value={segmentationContext.multiClassInactiveAlpha * 100}
+                    onchange={(v) =>
+                        (segmentationContext.multiClassInactiveAlpha = v / 100)}
+                    min={0}
+                    max={100}
+                    step={5}
+                    decimals={0}
+                    unit="%"
                 />
-            </label>
-        </div>
-    {/if}
-    <ul>
-        {#each drawableSubfeatures as subfeature}
-            <li
-                onpointerenter={() => pointerEnter(subfeature.index)}
-                onpointerleave={pointerLeave}
+            </fieldset>
+        {/if}
+        <fieldset class="min-w-0">
+            <!-- While areas show, the legend is the visible caption row; otherwise only screen readers get it. -->
+            <legend
+                class={areas
+                    ? "mb-1 flex w-full justify-between text-label-01 text-text-secondary"
+                    : "sr-only"}
+                ><span>Class</span>{#if areas}<span aria-hidden="true"
+                        >Area this slice</span
+                    >{/if}</legend
             >
-                <div class="feature-container">
-                    <div class="layer-visibility">
-                        <PanelIcon
-                            tooltip={segmentationContext.isFeatureLayerVisible(
-                                segmentation,
-                                subfeature.index,
-                            )
-                                ? "Hide layer"
-                                : "Show layer"}
-                            onclick={(e) =>
-                                toggleLayerVisibility(subfeature.index, e)}
-                            Icon={segmentationContext.isFeatureLayerVisible(
-                                segmentation,
-                                subfeature.index,
-                            )
-                                ? Show
-                                : Hide}
-                            size={1.2}
-                        />
-                    </div>
-                    <div
-                        class="color-box"
-                        style="background-color: rgb({colors[
-                            subfeature.index - 1
-                        ]});"
+            <ul class="flex flex-col gap-1">
+                {#each drawableSubfeatures as subfeature (subfeature.index)}
+                    {@const shown = segmentationContext.isFeatureLayerVisible(
+                        segmentation,
+                        subfeature.index,
+                    )}
+                    <li
+                        class="flex items-start gap-1"
+                        onpointerenter={() => pointerEnter(subfeature.index)}
+                        onpointerleave={pointerLeave}
                     >
-                        <span class="feature-index">{subfeature.index}</span>
-
-                        <label>
-                            {#if isMultiClass}
-                                <input
-                                    type="radio"
-                                    bind:group={activeClassIndex}
-                                    value={subfeature.index}
-                                />
-                            {:else}
-                                <input
-                                    type="checkbox"
-                                    bind:group={activeLabelIndices}
-                                    value={subfeature.index}
-                                />
-                            {/if}
-                            <span class="feature-name">{subfeature.name}</span>
-                        </label>
-                    </div>
-                </div>
-            </li>
-        {/each}
-    </ul>
-</div>
-
-<style>
-    ul {
-        list-style-type: none;
-        padding: 0;
-    }
-    li {
-        display: flex;
-        align-items: center;
-        gap: 0.5em;
-    }
-    li:hover {
-        background-color: rgba(100, 255, 255, 0.3);
-    }
-    div.feature-container {
-        display: flex;
-        align-items: center;
-        gap: 0.35em;
-        flex: 1;
-        min-width: 0;
-    }
-    .layer-visibility {
-        flex: 0 0 auto;
-        display: flex;
-        align-items: center;
-    }
-    .layer-visibility :global(svg) {
-        width: 1em;
-        height: 1em;
-        display: block;
-    }
-    div.color-box {
-        display: flex;
-        align-items: left;
-        /* width: 1.5em; */
-        /* height: 1.5em; */
-        flex-grow: 1;
-        font-size: x-small;
-        padding-top: 0.1em;
-        padding-bottom: 0.1em;
-        border-top-left-radius: 0.25em;
-        border-bottom-left-radius: 0.25em;
-        /* text-align: center; */
-        align-items: left;
-        /* justify-content: center;
-		flex-shrink: 0; */
-    }
-    label {
-        display: flex;
-        flex: 1;
-        align-items: center;
-        gap: 0.35em;
-    }
-    span.feature-index {
-        flex: 0 0 auto;
-        text-align: right;
-        min-width: 2em;
-    }
-    span.feature-name {
-        flex: 1;
-        text-align: left;
-        background-color: rgba(0, 0, 0, 0.5);
-    }
-    div.hidden {
-        display: none;
-    }
-    .mc-opacity {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 0.35em;
-        padding: 0.15em 0.25em 0.35em;
-        font-size: 0.65rem;
-        line-height: 1;
-        border-bottom: 1px solid rgba(100, 255, 255, 0.15);
-    }
-    .mc-op {
-        display: flex;
-        flex: 1;
-        align-items: center;
-        gap: 0.25em;
-        min-width: 0;
-        margin: 0;
-        cursor: default;
-    }
-    .mc-op .k {
-        flex: 0 0 auto;
-        opacity: 0.8;
-        font-weight: 600;
-        width: 1.6em;
-    }
-    .mc-op input[type="range"] {
-        flex: 1;
-        min-width: 0;
-        height: 0.85em;
-        margin: 0;
-        padding: 0;
-        accent-color: rgb(100, 255, 255);
-    }
-</style>
+                        <IconButton
+                            size="icon-xs"
+                            label="{shown ? 'Hide' : 'Show'} {subfeature.name}"
+                            onclick={() =>
+                                toggleLayerVisibility(subfeature.index)}
+                        >
+                            {#if shown}<View />{:else}<ViewOff />{/if}
+                        </IconButton>
+                        <span
+                            class="mt-0.5 flex size-5 shrink-0 items-center justify-center text-label-01 text-text-inverse tabular-nums"
+                            style="background-color: rgb({colors[
+                                subfeature.index - 1
+                            ]});"
+                            aria-hidden="true">{subfeature.index}</span
+                        >
+                        {#if isMultiClass}
+                            <RadioButton
+                                class="min-w-0 flex-1 [overflow-wrap:anywhere]"
+                                name="{uid}-class"
+                                value={String(subfeature.index)}
+                                labelText={subfeature.name}
+                                checked={activeClassIndex === subfeature.index}
+                                onchange={() =>
+                                    (activeClassIndex = subfeature.index)}
+                            />
+                        {:else}
+                            <Checkbox
+                                id="{uid}-label-{subfeature.index}"
+                                class="mt-1"
+                                checked={activeLabelIndices.includes(
+                                    subfeature.index,
+                                )}
+                                onCheckedChange={(on) =>
+                                    toggleLabel(subfeature.index, on === true)}
+                            />
+                            <label
+                                for="{uid}-label-{subfeature.index}"
+                                class="min-w-0 flex-1 pt-0.5 text-body-compact-01 [overflow-wrap:anywhere] text-text-primary"
+                                >{subfeature.name}</label
+                            >
+                        {/if}
+                        {#if areas}
+                            <span
+                                class="shrink-0 pt-0.5 text-label-01 text-text-primary tabular-nums"
+                                ><span class="sr-only">Area this slice </span>{(
+                                    areas.get(subfeature.index) ?? 0
+                                ).toFixed(2)} mm²</span
+                            >
+                        {/if}
+                    </li>
+                {/each}
+            </ul>
+        </fieldset>
+    </div>
+{/if}

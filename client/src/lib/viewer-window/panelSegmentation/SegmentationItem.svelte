@@ -202,7 +202,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
             </Button>
         {/if}
         {#if isMulti}
-            <MultiFeatureSelector {segmentation} active={isActive} />
+            <MultiFeatureSelector {segmentation} active={isActive} {showArea} />
         {/if}
         {#if segmentationItem.loading}
             <p class="text-helper-text-01 text-text-secondary">
