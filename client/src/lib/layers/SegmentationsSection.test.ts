@@ -114,8 +114,13 @@ describe("SegmentationsSection", () => {
         await fireEvent.click(area);
         expect(screen.queryByText(/Area this slice/)).toBeNull();
         expect(localStorage.getItem("eyened:viewer:layerArea")).toBe("false");
-        view.unmount();
+        await view.rerender({ shown: false });
         expect(viewerContext.activePanels.has("Segmentation")).toBe(false);
+        await view.rerender({ shown: true });
+        expect(viewerContext.activePanels.has("Segmentation")).toBe(true);
+        await view.rerender({ open: false });
+        expect(viewerContext.activePanels.has("Segmentation")).toBe(false);
+        view.unmount();
     });
 
     it("Delete asks first and removes the row on confirm", async () => {

@@ -29,9 +29,11 @@ describe("SegmentationItem", () => {
         expect(name).toHaveAttribute("aria-pressed", "false");
         await fireEvent.click(name);
         expect(name).toHaveAttribute("aria-pressed", "true");
-        expect(screen.getByText("Saved")).toBeInTheDocument();
+        expect(screen.getByRole("status")).toHaveTextContent("Saved");
         sync.get(1)!.set("error");
-        expect(await screen.findByText("Couldn't save")).toBeInTheDocument();
+        expect(await screen.findByRole("status")).toHaveTextContent(
+            "Couldn't save",
+        );
         await fireEvent.click(name);
         expect(name).toHaveAttribute("aria-pressed", "false");
         expect(screen.queryByText("Couldn't save")).toBeNull();

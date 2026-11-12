@@ -19,7 +19,6 @@ vi.mock("./icons/icons", () => ({
     ETDRS: {},
     Registration: {},
     Form: {},
-    Draw: {},
 }));
 vi.mock("./icons/Measure.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/InfoPanelHelp.svelte", () => ({ default: {} }));

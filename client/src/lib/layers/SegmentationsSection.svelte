@@ -103,10 +103,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
         {/snippet}
         {#if count > 0}
             <div class="flex items-center gap-3 px-4 py-2">
-                <span
-                    id="{uid}-opacity"
-                    class="text-label-01 text-text-secondary">Opacity</span
-                >
+                <span class="text-label-01 text-text-secondary">Opacity</span>
                 <Slider
                     class="min-w-0 flex-1"
                     values={[percent]}

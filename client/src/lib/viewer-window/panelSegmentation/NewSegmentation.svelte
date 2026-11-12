@@ -63,8 +63,10 @@ New on the Segmentations header: a popover with the feature search, where focus 
 
     // Typing a feature name is the next step, so focus starts in the search.
     function onOpenAutoFocus(e: Event) {
+        const input = content?.querySelector<HTMLInputElement>("input");
+        if (!input) return;
         e.preventDefault();
-        content?.querySelector<HTMLInputElement>("input")?.focus();
+        input.focus();
     }
 </script>
 

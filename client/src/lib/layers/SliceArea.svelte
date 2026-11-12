@@ -19,7 +19,7 @@
     const { resolution } = viewerContext.image;
     let area = $state<number | undefined>(undefined);
 
-    // getMask may create the slice's state, so this runs in an effect, not a derived.
+    // The area is set from the effect so it can be cleared first when the mask is missing.
     $effect(() => {
         area = undefined;
         if (!(resolution.x > 0 && resolution.y > 0)) return;
