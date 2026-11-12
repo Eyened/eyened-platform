@@ -21,6 +21,9 @@ Below md there are no icon columns: a menu button opens the left column's conten
     import ImagesListShell from "./ImagesListShell.svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
     import Pager from "./Pager.svelte";
+    import { GAP_PX } from "./tools/paletteLayout";
+    import ToolOptionsBar from "./tools/ToolOptionsBar.svelte";
+    import ToolPalette from "./tools/ToolPalette.svelte";
     import ThumbnailStrip from "./ThumbnailStrip.svelte";
     import ViewportGrid from "./ViewportGrid.svelte";
     import type { Workspace } from "./workspace.svelte";
@@ -85,6 +88,10 @@ Below md there are no icon columns: a menu button opens the left column's conten
     const overlayOpen = $derived(narrow && overlay !== null);
     const formsName = $derived(task ? "Grading" : "Forms");
     let opener: HTMLElement | null = null;
+    // The palette gets what the rail leaves after the bottom group and one gap.
+    let railHeight = $state(0);
+    let bottomHeight = $state(0);
+    const paletteSpace = $derived(railHeight - bottomHeight - GAP_PX);
 
     const LEFT_PANELS = [
         { id: "images", label: "Images", Icon: Image },
@@ -159,6 +166,36 @@ Below md there are no icon columns: a menu button opens the left column's conten
         if (e.key !== "Escape" || !overlayOpen) return;
         e.preventDefault();
         void dismiss();
+    }
+
+    // F1 opens Help from anywhere but a text field, a dialog or an open ⋯ list.
+    function onwindowkeydown(e: KeyboardEvent) {
+        if (e.key !== "F1") return;
+        const target = e.target as Element | null;
+        if (
+            target?.closest(
+                'input, textarea, select, [contenteditable="true"], [role="dialog"], [data-slot="overflow-menu"]',
+            )
+        )
+            return;
+        e.preventDefault();
+        void openHelp();
+    }
+
+    async function openHelp() {
+        // A repeat F1 while the menu is open would otherwise record an element inside it.
+        if (!overlayOpen) opener = document.activeElement as HTMLElement | null;
+        if (narrow) {
+            layoutOpen = false;
+            overlay = "menu";
+            menuTab = "help";
+            await tick();
+            document.getElementById(`${uid}-help-title`)?.focus();
+            return;
+        }
+        left = "help";
+        writeLeftPanel(left);
+        void focusPanel("help");
     }
 
     function openLayout() {
@@ -251,8 +288,8 @@ Below md there are no icon columns: a menu button opens the left column's conten
     });
 </script>
 
-{#snippet tools()}
-    <div role="group" aria-label="Tools"></div>
+{#snippet tools(orientation: "vertical" | "horizontal")}
+    <ToolPalette available={paletteSpace} {orientation} />
 {/snippet}
 
 {#snippet headerStart()}
@@ -280,6 +317,8 @@ Below md there are no icon columns: a menu button opens the left column's conten
     </IconButton>
 {/snippet}
 
+<svelte:window onkeydown={onwindowkeydown} />
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="frame"
@@ -295,9 +334,13 @@ Below md there are no icon columns: a menu button opens the left column's conten
 >
     <WorkspaceHeader {task} {narrow} start={headerStart} end={headerEnd} />
     {#if !narrow}
-        <nav class="rail" aria-label="Tools and panels">
-            {@render tools()}
-            <div class="rail-bottom">
+        <nav
+            class="rail"
+            aria-label="Tools and panels"
+            bind:clientHeight={railHeight}
+        >
+            {@render tools("vertical")}
+            <div class="rail-bottom" bind:offsetHeight={bottomHeight}>
                 {#each LEFT_PANELS as panel (panel.id)}
                     <IconButton
                         label={panel.label}
@@ -337,7 +380,7 @@ Below md there are no icon columns: a menu button opens the left column's conten
                     onclick={openLayout}>Layout…</Button
                 >
             </nav>
-            {@render tools()}
+            {@render tools("horizontal")}
             <!-- ASSUMPTION: tabs switch the sections below without Tabs.Content, so both widths share one markup. -->
             <Tabs.Root
                 bind:value={() => menuTab, (v) => (menuTab = v as LeftPanel)}
@@ -375,7 +418,7 @@ Below md there are no icon columns: a menu button opens the left column's conten
             </section>
         {/each}
     </div>
-    <div class="tool-options" inert={overlayOpen}></div>
+    <div class="tool-options" inert={overlayOpen}><ToolOptionsBar /></div>
     <main class="canvas" inert={overlayOpen}>
         {#if emptyMessage}
             <p class="m-8 text-body-compact-01 text-text-primary">
@@ -464,6 +507,8 @@ Below md there are no icon columns: a menu button opens the left column's conten
         display: flex;
         flex-direction: column;
         overflow-y: auto;
+        /* The 48 px split slot is 1 px wider than the content box beside the border. */
+        overflow-x: hidden;
         background: var(--color-layer-01);
         border-inline-end: 1px solid var(--color-border-subtle-01);
     }

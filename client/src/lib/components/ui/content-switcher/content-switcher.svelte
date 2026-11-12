@@ -17,7 +17,7 @@
         items: { id: string; text: string }[];
         selectedId?: string;
         label: string;
-        size?: "md" | "lg";
+        size?: "sm" | "md" | "lg";
         selectionMode?: "automatic" | "manual";
         onchange?: (selectedId: string) => void;
         class?: string;
@@ -47,7 +47,7 @@
     aria-label={label}
     class={cn(
         "grid w-full auto-cols-fr grid-flow-col overflow-hidden rounded-content-switcher border border-border-strong-01 in-dialog:border-border-strong-02",
-        size === "lg" ? "h-12" : "h-10",
+        size === "lg" ? "h-12" : size === "sm" ? "h-8" : "h-10",
         className,
     )}
 >

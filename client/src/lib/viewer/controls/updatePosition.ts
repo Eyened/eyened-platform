@@ -13,6 +13,12 @@ export class UpdatePosition implements ViewerEventListener {
         if (!viewerContext.updatePosition) {
             return;
         }
+        // The Cross-hair tool sets the crosshair by click or drag only.
+        if (
+            viewerContext.viewerWindowContext.viewState?.armedTool ===
+            "crosshair"
+        )
+            return;
         // Strip tiles never write the shared pointer, so hovering one moves nothing else.
         if (
             viewerContext.viewerWindowContext.topViewers.get(image) ===

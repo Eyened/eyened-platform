@@ -2,12 +2,14 @@
 
 import { MediaQuery } from "svelte/reactivity";
 import type { LocalizerMode } from "./workspaceRules";
+import type { ToolMode } from "./tools/registry";
 
 const LEFT_KEY = "eyened:viewer:leftPanel";
 const RIGHT_KEY = "eyened:viewer:rightOpen";
 const STRIP_KEY = "eyened:viewer:strip";
 const TRACKING_KEY = "eyened:viewer:stripTracking";
 const LOCALIZER_KEY = "eyened:viewer:stripLocalizer";
+const TOOL_MODE_KEY = "eyened:viewer:toolMode";
 
 export type LeftPanel = "images" | "info" | "help";
 const PANELS: readonly string[] = ["images", "info", "help"];
@@ -109,6 +111,23 @@ export function readStripLocalizer(): LocalizerMode {
 export function writeStripLocalizer(mode: LocalizerMode): void {
     try {
         localStorage.setItem(LOCALIZER_KEY, mode);
+    } catch {
+        // Private mode or quota: the choice lasts this session only.
+    }
+}
+
+/** The palette's mode on /view; Browse unless the user chose All tools. */
+export function readToolMode(): ToolMode {
+    try {
+        return localStorage.getItem(TOOL_MODE_KEY) === "all" ? "all" : "browse";
+    } catch {
+        return "browse";
+    }
+}
+
+export function writeToolMode(mode: ToolMode): void {
+    try {
+        localStorage.setItem(TOOL_MODE_KEY, mode);
     } catch {
         // Private mode or quota: the choice lasts this session only.
     }

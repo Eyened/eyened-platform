@@ -18,7 +18,6 @@
         label = "Render mode",
     }: Props = $props();
 
-    /** Underlined letters are the hotkeys in `viewer/controls/hotkeys.ts`. */
     const labels: Record<RenderMode, string> = {
         Original: "O<u>r</u>iginal",
         "Contrast enhanced": "Contrast <u>e</u>nhanced",

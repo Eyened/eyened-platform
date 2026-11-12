@@ -14,8 +14,13 @@ export class CursorOverlay implements Overlay {
     constructor() {}
 
     repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
-        if (viewerContext.active) {
-            return; // do not show if cursor is over this image
+        // Under the pointer the pointer is the crosshair, unless Cross-hair is armed and a click set it.
+        if (
+            viewerContext.active &&
+            viewerContext.viewerWindowContext.viewState?.armedTool !==
+                "crosshair"
+        ) {
+            return;
         }
 
         const { image, context2D, registration } = viewerContext;

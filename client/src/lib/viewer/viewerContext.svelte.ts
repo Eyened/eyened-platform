@@ -8,7 +8,7 @@ import { SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
 import type { Registration } from "../registration/registration.svelte";
 import type { ViewerWindowContext } from "../viewer-window/viewerWindowContext.svelte";
-import { HotKeys } from "./controls/hotkeys";
+import { Keymap } from "$lib/workspace/tools/keymap";
 import { ScrollOCT } from "./controls/scrollOCT";
 import { UpdatePosition } from "./controls/updatePosition";
 import { ZoomPan } from "./controls/zoomPan";
@@ -203,7 +203,7 @@ export class ViewerContext {
         this.addOverlay(new UpdatePosition());
         this.addOverlay(new ZoomPan());
         this.addOverlay(new CursorOverlay());
-        this.addOverlay(new HotKeys());
+        this.addOverlay(new Keymap());
 
         if (image.is3D && image.depth > 1) {
             const pending = this.viewerWindowContext.viewState?.peekIndex(
