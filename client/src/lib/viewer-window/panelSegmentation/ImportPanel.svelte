@@ -1,81 +1,82 @@
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import SegmentationPickerModal from "$lib/layers/SegmentationPickerModal.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { AbstractImage } from "$lib/webgl/abstractImage";
-    import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
+    import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import { converters } from "$lib/webgl/segmentationConverter";
+    import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
     import { getContext } from "svelte";
-    import type { MainViewerContext } from "../../viewer/overlays/MainViewerContext.svelte";
-
-    import ImportSegmentation from "../icons/ImportSegmentation.svelte";
-    import ImportSegmentationSelector from "./ImportSegmentationSelector.svelte";
-    import { type Segmentation } from "./segmentationContext.svelte";
-
-    const mainViewerContext =
-        getContext<MainViewerContext>("mainViewerContext");
+    import type { Segmentation } from "./segmentationContext.svelte";
+    import { orderSegmentationsByCreator } from "./segmentationUtils";
 
     interface Props {
         segmentation: Segmentation;
         image: AbstractImage;
         segmentationItem: SegmentationItem;
     }
-
     let { segmentation, image, segmentationItem }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const globalContext = getContext<GlobalContext>("globalContext");
+    const { segmentationContext } =
+        getContext<MainViewerContext>("mainViewerContext");
+    const uid = $props.id();
+    let open = $state(false);
 
-    async function importFromOther() {
-        globalContext.dialogue = {
-            component: ImportSegmentationSelector,
-            props: {
-                segmentation,
-                segmentationContext: mainViewerContext.segmentationContext,
-                resolve: (other: Segmentation) => {
-                    const otherSegmentation = image
-                        .getOrCreateSegmentationItem(other)
-                        ?.getMask(viewerContext.index);
-                    if (otherSegmentation) {
-                        segmentationItem?.importOther(
-                            viewerContext.index,
-                            otherSegmentation,
-                        );
-                    } else {
-                        console.warn(
-                            "Import from other: no segmentation found for segmentation",
-                            other.id,
-                        );
-                    }
-                },
-            },
-        };
+    // AI first, then the grader's own, then colleagues'; only rows whose data converts into this one, never the row itself.
+    const rows = $derived(
+        orderSegmentationsByCreator(
+            segmentationContext.modelSegmentations,
+            segmentationContext.graderSegmentations,
+            globalContext.user.id,
+        ).filter(
+            (s) =>
+                !(
+                    s.id === segmentation.id &&
+                    s.annotation_type === segmentation.annotation_type
+                ) &&
+                (s.data_representation === segmentation.data_representation ||
+                    `${segmentation.data_representation}->${s.data_representation}` in
+                        converters),
+        ),
+    );
+
+    // Replaces this slice's mask; undo reverses it. A segmentation not shown yet loads its slices first.
+    async function importFrom(other: Segmentation) {
+        const item = image.getOrCreateSegmentationItem(other);
+        await item?.ready;
+        const mask = item?.getMask(viewerContext.index);
+        if (!mask) throw new Error("Its data for this slice isn't loaded yet.");
+        await segmentationItem.importOther(viewerContext.index, mask);
     }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="main" onclick={importFromOther}>
-    <ImportSegmentation size="1.5em" />
-    Import
-</div>
-
-<style>
-    div.main {
-        flex-direction: row;
-        background-color: rgba(255, 255, 255, 0.1);
-        flex: 1;
-        padding: 0.2em;
-        margin-bottom: 0.2em;
-        margin-top: 0.2em;
-
-        font-size: small;
-        font-weight: bold;
-
-        display: flex;
-        align-items: center;
-        gap: 0.5em;
-        cursor: pointer !important;
-    }
-    div.main:hover {
-        background-color: rgba(255, 255, 255, 0.2);
-    }
-</style>
+<section class="flex flex-col gap-3" aria-labelledby="{uid}-heading">
+    <h5 id="{uid}-heading" class="text-heading-compact-01 text-text-primary">
+        Import
+    </h5>
+    <Button
+        variant="outline"
+        size="sm"
+        class="self-start"
+        onclick={() => (open = true)}
+        >{image.is3D ? "Import into this B-scan…" : "Import…"}</Button
+    >
+</section>
+<SegmentationPickerModal
+    bind:open
+    modalHeading={image.is3D
+        ? "Import into this B-scan"
+        : "Import into this image"}
+    modalLabel="{segmentation.feature.name} [{segmentation.id}]"
+    primaryButtonText="Import"
+    primaryButtonLoadingDescription="Importing…"
+    successDescription="Imported"
+    errorTitle="Segmentation could not be imported"
+    {rows}
+    emptyTitle="Nothing to import"
+    emptyDescription="No other segmentation of this image can be imported into this one."
+    onpick={importFrom}
+/>

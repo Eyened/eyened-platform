@@ -1,122 +1,135 @@
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
+    import * as Field from "$lib/components/ui/field/index.js";
+    import { Toggle } from "$lib/components/ui/toggle/index.js";
     import { updateSegmentation } from "$lib/data/api";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { segmentations } from "$lib/data/stores.svelte";
+    import SegmentationPickerModal from "$lib/layers/SegmentationPickerModal.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
-    import { AbstractImage } from "$lib/webgl/abstractImage";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
     import { getContext } from "svelte";
     import type { SegmentationGET } from "../../../types/openapi_types";
-    import { Hide, Intersection, PanelIcon, Show, Trash } from "../icons/icons";
-    import ReferenceAnnotationSelector from "./ReferenceAnnotationSelector.svelte";
+    import type { Segmentation } from "./segmentationContext.svelte";
+    import { orderSegmentationsByCreator } from "./segmentationUtils";
 
     interface Props {
-        segmentationItem: SegmentationItem;
         segmentation: SegmentationGET;
-        image: AbstractImage;
         isEditable: boolean;
+        segmentationItem: SegmentationItem;
     }
-    let { segmentation, image, isEditable, segmentationItem }: Props = $props();
+    let { segmentation, isEditable, segmentationItem }: Props = $props();
 
     const mainViewerContext =
         getContext<MainViewerContext>("mainViewerContext");
     const globalContext = getContext<GlobalContext>("globalContext");
+    const me = globalContext.user.id;
+    const uid = $props.id();
+    let open = $state(false);
+    let opener = $state<HTMLElement | null>(null);
 
-    async function setAnnotationReference() {
-        globalContext.dialogue = {
-            component: ReferenceAnnotationSelector,
-            props: {
-                segmentation,
-                image,
-                resolve: async (other: SegmentationGET) => {
-                    await updateSegmentation(segmentation.id, {
-                        reference_segmentation_id: other.id,
-                    });
-                },
-            },
-        };
+    const referenceId = $derived(
+        segmentation.reference_segmentation_id ?? null,
+    );
+    const referenceText = $derived.by(() => {
+        if (referenceId === null) return "";
+        const reference = segmentations.get(referenceId);
+        if (!reference) return `[${referenceId}]`;
+        const author =
+            reference.creator.id === me ? "Mine" : reference.creator.name;
+        return `${reference.feature.name} · ${author} · ${referenceId}`;
+    });
+    // Grader Binary and Questionable rows on this plane, the grader's own first, never the row itself.
+    const rows = $derived(
+        orderSegmentationsByCreator(
+            [],
+            mainViewerContext.segmentationContext.graderSegmentations,
+            me,
+        ).filter(
+            (s) =>
+                s.id !== segmentation.id &&
+                (s.data_representation === "Binary" ||
+                    s.data_representation === "DualBitMask"),
+        ),
+    );
+    const masking = $derived(mainViewerContext.isMaskingApplied(segmentation));
+
+    function setReference(other: Segmentation) {
+        return updateSegmentation(segmentation.id, {
+            reference_segmentation_id: other.id,
+        });
     }
 
+    // Remove unmounts itself, so focus moves to the opener, which stays mounted.
     async function removeReference() {
         await updateSegmentation(segmentation.id, {
             reference_segmentation_id: null,
         });
-    }
-
-    function toggleApplyMask() {
-        mainViewerContext.toggleMasking(segmentationItem);
+        opener?.focus();
     }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="main">
-    <h3><Intersection size="1.5em" />Reference mask</h3>
-    {#if isEditable}
-        <div
-            class="row"
-            class:editable={isEditable}
-            onclick={() => isEditable && setAnnotationReference()}
+{#if referenceId !== null || isEditable}
+    <section class="flex flex-col gap-3" aria-labelledby="{uid}-heading">
+        <h5
+            id="{uid}-heading"
+            class="text-heading-compact-01 text-text-primary"
         >
-            <span> Update reference mask</span>
-        </div>
-    {/if}
-    {#if segmentation.reference_segmentation_id}
-        <div class="row">
-            Mask ID: [{segmentation.reference_segmentation_id}]
-            {#if isEditable}
-                <PanelIcon
-                    onclick={removeReference}
-                    tooltip="Remove reference mask"
-                    Icon={Trash}
+            Reference mask
+        </h5>
+        {#if referenceId !== null}
+            <p class="text-body-compact-01 text-text-primary">
+                {referenceText}
+            </p>
+        {/if}
+        {#if isEditable}
+            <!-- One opener for Set reference… and Change…, so the modal can return focus to it. -->
+            <div class="flex">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    bind:ref={opener}
+                    onclick={() => (open = true)}
+                    >{referenceId === null
+                        ? "Set reference…"
+                        : "Change…"}</Button
+                >
+                {#if referenceId !== null}
+                    <Button variant="ghost" size="sm" onclick={removeReference}
+                        >Remove</Button
+                    >
+                {/if}
+            </div>
+        {/if}
+        {#if referenceId !== null}
+            <Field.Field orientation="horizontal">
+                <Toggle
+                    id="{uid}-mask"
+                    bind:checked={
+                        () => masking,
+                        () => mainViewerContext.toggleMasking(segmentationItem)
+                    }
                 />
-            {/if}
-        </div>
-
-        <div class="row editable" onclick={toggleApplyMask}>
-            {#if mainViewerContext.isMaskingApplied(segmentation)}
-                <Hide size="1.5em" />
-                <span>Showing masked annotation</span>
-            {:else}
-                <Show size="1.5em" />
-                <span>Showing unmasked annotation</span>
-            {/if}
-        </div>
-    {/if}
-</div>
-
-<style>
-    div {
-        display: flex;
-    }
-    h3 {
-        margin: 0;
-        margin-bottom: 0.2em;
-        display: flex;
-        align-items: center;
-        gap: 0.5em;
-        font-size: small;
-    }
-    div.row {
-        flex-direction: row;
-        align-items: center;
-        gap: 0.5em;
-        font-size: x-small;
-        padding: 0.4em;
-    }
-    div.row.editable {
-        cursor: pointer;
-    }
-    div.row.editable:hover {
-        background-color: rgba(100, 255, 255, 0.3);
-    }
-    div.main {
-        flex-direction: column;
-        background-color: rgba(255, 255, 255, 0.1);
-        flex: 1;
-        padding: 0.2em;
-    }
-
-    span:hover {
-        opacity: 1;
-    }
-</style>
+                <Field.Label
+                    for="{uid}-mask"
+                    class="text-body-compact-01 text-text-primary"
+                    >Mask with reference</Field.Label
+                >
+            </Field.Field>
+        {/if}
+    </section>
+    <SegmentationPickerModal
+        bind:open
+        modalHeading="Set reference mask"
+        modalLabel="{segmentation.feature.name} [{segmentation.id}]"
+        primaryButtonText="Set reference"
+        primaryButtonLoadingDescription="Setting…"
+        successDescription="Reference set"
+        errorTitle="Reference could not be set"
+        {rows}
+        currentId={referenceId}
+        emptyTitle="No reference available"
+        emptyDescription="No other Binary or Questionable segmentation on this plane."
+        onpick={setReference}
+    />
+{/if}

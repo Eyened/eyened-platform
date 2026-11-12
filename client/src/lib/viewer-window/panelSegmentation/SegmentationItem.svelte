@@ -31,6 +31,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
         getSegmentationKey,
         type Segmentation,
     } from "./segmentationContext.svelte";
+    import { representationLetter } from "./segmentationUtils";
     import ThresholdSlider from "./ThresholdSlider.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -111,14 +112,6 @@ Under it: the current row's save state, this slice's area, then the row's detail
         mainViewerContext.highlightedSegmentationItem = undefined;
     }
 
-    const segmentationType = {
-        Binary: "B",
-        DualBitMask: "Q",
-        Probability: "P",
-        MultiClass: "MC",
-        MultiLabel: "ML",
-    }[dataRepresentation];
-
     function applyDuplicateAI() {
         duplicate(
             globalContext,
@@ -178,7 +171,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
             aria-pressed={isActive}
             onclick={toggleActive}>{feature.name}</button
         >
-        <Tag>{segmentationType}</Tag>
+        <Tag>{representationLetter(dataRepresentation)}</Tag>
         {#if isEditable}
             <IconButton
                 size="icon-xs"
@@ -246,7 +239,6 @@ Under it: the current row's save state, this slice's area, then the row's detail
                     {#if segmentation.annotation_type === "grader_segmentation"}
                         <ReferenceSegmentationPanel
                             {segmentation}
-                            {image}
                             {isEditable}
                             {segmentationItem}
                         />

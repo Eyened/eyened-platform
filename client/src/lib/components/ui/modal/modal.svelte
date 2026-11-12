@@ -19,6 +19,8 @@
         successDescription: string;
         errorTitle: string;
         danger?: boolean;
+        /** The primary stays disabled (aria-disabled), for example until a row is picked. */
+        primaryButtonDisabled?: boolean;
         size?: "xs" | "sm" | "lg";
         /** Carbon React hasScrollingContent: the body scrolls with a fade and is a focusable
          *  region; a server error sits above the footer, outside the scrolling body. */
@@ -39,6 +41,7 @@
         successDescription,
         errorTitle,
         danger = false,
+        primaryButtonDisabled = false,
         size = "sm",
         hasScrollingContent = false,
         onsubmit,
@@ -56,6 +59,7 @@
     let error = $state<string | null>(null);
     let primary = $state<HTMLElement | null>(null);
     let cancel = $state<HTMLElement | null>(null);
+    let form = $state<HTMLFormElement | null>(null);
     const busy = $derived(status !== "inactive");
 
     // Every close path (Esc, the X, Cancel) comes through here, so none closes a busy modal.
@@ -78,7 +82,7 @@
         // Only this form's own primary button (or Enter in a field, whose submitter is the primary) saves.
         if (event.target !== event.currentTarget) return;
         if (event.submitter && event.submitter !== primary) return;
-        if (busy) return;
+        if (busy || primaryButtonDisabled) return;
         const pending = onsubmit();
         if (pending === false) return;
         // A focused field that becomes disabled drops focus out of the modal; park it first.
@@ -105,15 +109,25 @@
         class={cn("gap-0 p-0", modalSizeClasses[size])}
         interactOutsideBehavior="ignore"
         onOpenAutoFocus={(e) => {
-            // Carbon: a danger modal focuses Cancel; others their first field.
-            if (danger) {
+            // Carbon: a danger modal focuses Cancel; others the element marked data-modal-primary-focus, else their first field.
+            const first = danger
+                ? cancel
+                : form?.querySelector<HTMLElement>(
+                      "[data-modal-primary-focus]",
+                  );
+            if (first) {
                 e.preventDefault();
-                cancel?.focus();
+                first.focus();
             }
         }}
         {onCloseAutoFocus}
     >
-        <form class="flex min-h-0 flex-1 flex-col" novalidate onsubmit={submit}>
+        <form
+            class="flex min-h-0 flex-1 flex-col"
+            novalidate
+            bind:this={form}
+            onsubmit={submit}
+        >
             <Dialog.Header class="mb-2 pt-4 pr-12 pl-4">
                 {#if modalLabel}
                     <p class="text-label-01 text-text-secondary">
@@ -170,7 +184,7 @@
                     variant={danger ? "destructive" : "default"}
                     class={footerButton}
                     bind:ref={primary}
-                    aria-disabled={busy || undefined}
+                    aria-disabled={busy || primaryButtonDisabled || undefined}
                 >
                     {#if status === "inactive"}
                         {primaryButtonText}
