@@ -29,7 +29,7 @@
 
 <SliderField
     labelText="Threshold"
-    value={segmentationItem.threshold ?? segmentation.threshold ?? 0.5}
+    value={segmentationItem.threshold}
     onchange={(v) => (segmentationItem.threshold = v)}
     oncommit={save}
     min={0}
