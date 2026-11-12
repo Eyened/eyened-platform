@@ -3,12 +3,15 @@
 Layers › Segmentations for the selected viewport: opacity and Area, the old drawing tools until 3b replaces them, and rows grouped AI, Mine, then other graders.
 -->
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
     import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+    import * as Empty from "$lib/components/ui/empty/index.js";
     import { Slider } from "$lib/components/ui/slider/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import DrawingTools from "$lib/viewer-window/panelSegmentation/DrawingTools.svelte";
+    import NewSegmentation from "$lib/viewer-window/panelSegmentation/NewSegmentation.svelte";
     import NewSegmentationRegion from "$lib/viewer-window/panelSegmentation/NewSegmentationRegion.svelte";
     import SegmentationItem from "$lib/viewer-window/panelSegmentation/SegmentationItem.svelte";
     import {
@@ -20,6 +23,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
         readLayerArea,
         writeLayerArea,
     } from "$lib/workspace/workspacePrefs";
+    import Add from "carbon-icons-svelte/lib/Add.svelte";
     import { getContext } from "svelte";
     import LayerSection from "./LayerSection.svelte";
     import SegmentationDeleteModal from "./SegmentationDeleteModal.svelte";
@@ -42,6 +46,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
         getContext<MainViewerContext>("mainViewerContext");
     const { segmentationContext } = mainViewerContext;
     const me = globalContext.user.id;
+    let newOpen = $state(false);
 
     type Group = { key: string; title: string; rows: Segmentation[] };
     const groups: Group[] = $derived.by(() => {
@@ -93,6 +98,9 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
 
 <div bind:this={header}>
     <LayerSection title="Segmentations" {count} {open} {ontoggle}>
+        {#snippet action()}
+            <NewSegmentation bind:open={newOpen} />
+        {/snippet}
         {#if count > 0}
             <div class="flex items-center gap-3 px-4 py-2">
                 <span
@@ -144,6 +152,22 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
                     </ul>
                 </LayerSection>
             {/each}
+        {:else}
+            <Empty.Root class="px-4 py-6">
+                <Empty.Header>
+                    <!-- ASSUMPTION: the spec asks for one description line but gives no text. -->
+                    <Empty.Title>No segmentations</Empty.Title>
+                    <Empty.Description
+                        >Create one to draw on this image.</Empty.Description
+                    >
+                </Empty.Header>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onclick={() => (newOpen = true)}
+                    >New segmentation <Add /></Button
+                >
+            </Empty.Root>
         {/if}
     </LayerSection>
 </div>

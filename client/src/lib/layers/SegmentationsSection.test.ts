@@ -141,4 +141,26 @@ describe("SegmentationsSection", () => {
             ).toBeNull(),
         );
     });
+
+    it("an image without segmentations shows the next step; it opens New with focus in the search", async () => {
+        renderSection();
+        const empty = screen
+            .getByText("No segmentations")
+            .closest('[data-slot="empty"]') as HTMLElement;
+        expect(screen.queryByRole("checkbox", { name: "Area" })).toBeNull();
+        // The header's New has the same name; this is the empty state's button.
+        await fireEvent.click(
+            within(empty).getByRole("button", { name: "New segmentation" }),
+        );
+        const search = await screen.findByRole("textbox", {
+            name: "Search feature to create",
+        });
+        await vi.waitFor(() => expect(search).toHaveFocus());
+        expect(
+            screen.getByRole("button", { name: "Advanced…" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Region box…" }),
+        ).toBeInTheDocument();
+    });
 });
