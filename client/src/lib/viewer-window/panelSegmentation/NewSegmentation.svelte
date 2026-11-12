@@ -11,7 +11,6 @@ New on the Segmentations header: a popover with the feature search, where focus 
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import Add from "carbon-icons-svelte/lib/Add.svelte";
     import { getContext } from "svelte";
     import type { FeatureGET } from "../../../types/openapi_types";
     import CreateSegmentationDialog from "./CreateSegmentationDialog.svelte";
@@ -28,6 +27,7 @@ New on the Segmentations header: a popover with the feature search, where focus 
     const segmentationContext = mainViewerContext.segmentationContext;
     const { image, axis } = viewerContext;
     let content: HTMLElement | null = $state(null);
+    let trigger: HTMLElement | null = $state(null);
 
     async function createQuestionable(feature: FeatureGET) {
         open = false;
@@ -68,16 +68,22 @@ New on the Segmentations header: a popover with the feature search, where focus 
         e.preventDefault();
         input.focus();
     }
+
+    // The empty state's button can open this popover and then unmount, so focus always goes to the header button.
+    function onCloseAutoFocus(e: Event) {
+        e.preventDefault();
+        trigger?.focus();
+    }
 </script>
 
 <Popover.Root bind:open>
-    <Popover.Trigger>
+    <Popover.Trigger bind:ref={trigger}>
         {#snippet child({ props })}
             <Button
                 {...props}
                 variant="ghost"
                 size="sm"
-                aria-label="New segmentation">New <Add /></Button
+                aria-label="New segmentation">New</Button
             >
         {/snippet}
     </Popover.Trigger>
@@ -85,6 +91,7 @@ New on the Segmentations header: a popover with the feature search, where focus 
         bind:ref={content}
         align="end"
         {onOpenAutoFocus}
+        {onCloseAutoFocus}
         class="flex flex-col gap-2"
     >
         <FeatureSelect

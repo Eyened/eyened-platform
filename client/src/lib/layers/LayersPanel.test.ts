@@ -75,17 +75,23 @@ describe("LayersPanel", () => {
         expect(screen.queryByRole("button", { name: "Drusen v2" })).toBeNull();
     });
 
-    it("says No layers for an empty slot and when the task hides every section", () => {
-        const ws = workspaceWith(2);
-        attach(ws, 1, "inst-b");
+    it("says No layers for a slot with no image and when the task hides every section", () => {
+        const ws = workspaceWith(1, { layout: "2x1" });
+        attach(ws, 0, "inst-a");
+        ws.select(1);
         const first = renderPanel(ws);
         expect(screen.getByText("No layers")).toBeInTheDocument();
         first.unmount();
-        ws.select(1);
+        ws.select(0);
         renderPanel(ws, ["Segmentation", "ETDRS", "Registration", "Measure"]);
         expect(screen.getByText("No layers")).toBeInTheDocument();
         expect(
             screen.queryByRole("button", { name: /Segmentations/ }),
         ).toBeNull();
+    });
+
+    it("does not say No layers while the slot's image is still loading", () => {
+        renderPanel(workspaceWith(1));
+        expect(screen.queryByText("No layers")).toBeNull();
     });
 });

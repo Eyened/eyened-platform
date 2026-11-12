@@ -44,7 +44,7 @@ A closed body is not rendered, so its controls leave the Tab order.
                 class="shrink-0 transition-transform {open ? 'rotate-90' : ''}"
                 aria-hidden="true"
             />
-            <span class="min-w-0 flex-1">{title}</span>
+            <span class="min-w-0 flex-1 truncate">{title}</span>
             <span class="pe-2 text-text-secondary">{count}</span>
         </button>
     </svelte:element>

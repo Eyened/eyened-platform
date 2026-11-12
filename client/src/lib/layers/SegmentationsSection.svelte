@@ -126,7 +126,8 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
                     class="text-body-compact-01 text-text-primary">Area</label
                 >
             </div>
-            <DrawingTools />
+            <!-- The old tools' hidden tooltips stick out past the panel edge and make it scroll sideways. -->
+            <div class="overflow-x-clip"><DrawingTools /></div>
             {#each groups as group (group.key)}
                 <LayerSection
                     level={4}

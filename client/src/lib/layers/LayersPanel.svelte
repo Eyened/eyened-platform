@@ -48,6 +48,13 @@ The Layers panel body: the selected viewport's name, then the sections that appl
             : [],
     );
 
+    // Nothing to show only when the slot is empty or the task hides every section, not while its image loads.
+    const noLayers = $derived(
+        target
+            ? sections.length === 0
+            : workspace.loaded && !workspace.slots[workspace.selected]?.imageId,
+    );
+
     // Kept here, not per viewport, so a section stays open when the selection moves.
     let open: Record<LayerSectionId, boolean> = $state({
         segmentations: true,
@@ -58,9 +65,9 @@ The Layers panel body: the selected viewport's name, then the sections that appl
 </script>
 
 <p class="px-4 pb-2 text-helper-text-01 text-text-secondary">{subtitle}</p>
-{#if sections.length === 0}
+{#if noLayers}
     <p class="px-4 text-body-compact-01 text-text-secondary">No layers</p>
-{:else if target}
+{:else if target && sections.length > 0}
     {#key target}
         <LayersContexts
             {target}

@@ -168,4 +168,30 @@ describe("SegmentationsSection", () => {
             screen.getByRole("button", { name: "Region box…" }),
         ).toBeInTheDocument();
     });
+
+    it("closing the popover opened from the empty state returns focus to the header New", async () => {
+        renderSection();
+        const empty = screen
+            .getByText("No segmentations")
+            .closest('[data-slot="empty"]') as HTMLElement;
+        await fireEvent.click(
+            within(empty).getByRole("button", { name: "New segmentation" }),
+        );
+        const search = await screen.findByRole("textbox", {
+            name: "Search feature to create",
+        });
+        await vi.waitFor(() => expect(search).toHaveFocus());
+        await fireEvent.keyDown(search, { key: "Escape" });
+        await vi.waitFor(() =>
+            expect(
+                screen.queryByRole("textbox", {
+                    name: "Search feature to create",
+                }),
+            ).toBeNull(),
+        );
+        const header = screen
+            .getAllByRole("button", { name: "New segmentation" })
+            .find((b) => !empty.contains(b));
+        await vi.waitFor(() => expect(header).toHaveFocus());
+    });
 });
