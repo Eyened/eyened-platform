@@ -285,6 +285,7 @@ body {
 :focus-visible:not(
         [data-slot="button"],
         [data-slot="checkbox"],
+        [data-slot="radio-button"],
         [data-slot="command"],
         [class*="shadow-button-focus"]
     ) {
@@ -292,8 +293,9 @@ body {
     outline-offset: -2px;
 }
 
-/* Carbon draws the checkbox ring outside the box; an outline-offset utility loses to the rule above. */
-[data-slot="checkbox"]:focus-visible {
+/* Carbon draws the checkbox and radio rings outside the control; an outline-offset utility loses to the rule above. */
+[data-slot="checkbox"]:focus-visible,
+[data-slot="radio-button"]:focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 1px;
 }
