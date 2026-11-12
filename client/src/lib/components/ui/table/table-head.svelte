@@ -14,7 +14,7 @@
     bind:this={ref}
     data-slot="table-head"
     class={cn(
-        "bg-layer-accent-01 px-4 align-middle text-heading-compact-01 whitespace-nowrap text-text-primary table-xl:py-4 table-xl:align-top",
+        "bg-layer-accent-01 px-4 align-middle text-heading-compact-01 whitespace-nowrap text-text-primary in-dialog:bg-layer-accent-02 table-xl:py-4 table-xl:align-top",
         className,
     )}
     {...restProps}

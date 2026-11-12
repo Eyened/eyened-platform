@@ -98,14 +98,19 @@
                     {@const key = getSegmentationKey(s)}
                     {@const isCurrent =
                         currentId !== null && s.id === currentId}
-                    <!-- A click anywhere on the row picks it; the radio stays the keyboard and screen-reader control. -->
+                    <!-- A click anywhere on the row picks it, except while busy; the radio stays the keyboard and screen-reader control.
+                         The picked colours carry in-dialog: so they replace the row's in-dialog layer-02 ones. -->
                     <Table.Row
                         class={cn(
                             "cursor-pointer",
                             picked === key &&
-                                "bg-layer-selected-01 hover:bg-layer-selected-hover-01",
+                                "in-dialog:bg-layer-selected-02 in-dialog:hover:bg-layer-selected-hover-02",
                         )}
-                        onclick={() => (picked = key)}
+                        onclick={(e) => {
+                            if (e.currentTarget.closest("fieldset:disabled"))
+                                return;
+                            picked = key;
+                        }}
                     >
                         <Table.Cell>
                             <RadioButton
