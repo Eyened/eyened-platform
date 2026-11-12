@@ -52,14 +52,20 @@ export function modelSegmentation(
 }
 
 /** The contexts a Layers section reads, with one save-state store per segmentation id. */
-export function layersContexts(instanceId = "inst-1") {
+export function layersContexts(
+    instanceId = "inst-1",
+    over: {
+        resolution?: { x: number; y: number; z: number };
+        getMask?: (index: number) => unknown;
+    } = {},
+) {
     const sync = new Map<number, Writable<SyncState>>();
     const items = new Map<string, unknown>();
     const image = {
         width: 100,
         height: 100,
         is2D: true,
-        resolution: { x: -1, y: -1, z: -1 },
+        resolution: over.resolution ?? { x: -1, y: -1, z: -1 },
         getOrCreateSegmentationItem(segmentation: Segmentation) {
             const key = `${segmentation.annotation_type}_${segmentation.id}`;
             if (!items.has(key)) {
@@ -81,7 +87,7 @@ export function layersContexts(instanceId = "inst-1") {
                         };
                     },
                     isEmptyForSlice: () => false,
-                    getMask: () => undefined,
+                    getMask: over.getMask ?? (() => undefined),
                 });
             }
             return items.get(key);
