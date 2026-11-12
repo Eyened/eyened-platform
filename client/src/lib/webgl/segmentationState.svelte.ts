@@ -200,6 +200,8 @@ export class SegmentationState {
         await this.isDrawing; // wait for previous drawing to finish
         this.ensureInitialCheckpoint();
         this.mask.draw(drawing, settings);
+        // The slice now has user content, whatever the server said on load.
+        this.isEmptyForSlice = false;
         this.notifySliceChanged();
         this.isDrawing = this.checkpoint();
     }
@@ -231,6 +233,7 @@ export class SegmentationState {
             );
         }
 
+        this.isEmptyForSlice = false;
         this.notifySliceChanged();
         this.isDrawing = this.checkpoint();
     }

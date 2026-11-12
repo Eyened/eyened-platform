@@ -124,7 +124,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
             viewerContext,
             false,
             "Q",
-            segmentationItem.threshold ?? segmentation.threshold ?? 0.5, //original threshold
+            segmentationItem.threshold, //original threshold
             0.5, //new threshold
             taskContext,
         );
