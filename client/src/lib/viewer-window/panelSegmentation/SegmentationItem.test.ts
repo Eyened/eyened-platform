@@ -85,4 +85,42 @@ describe("SegmentationItem", () => {
         );
         expect(screen.queryByRole("button", { name: "Edit tags" })).toBeNull();
     });
+
+    it("More on an editable Binary row holds Import, Duplicate, Reference mask and Connected components; the switch toggles connected components", async () => {
+        const ctx = layersContexts();
+        const lesion = graderSegmentation(1, ME, "Drusen v2", {
+            data_representation: "Binary",
+        });
+        render(SegmentationItem, {
+            props: { segmentation: lesion, showArea: false, ondelete: vi.fn() },
+            context: ctx.context,
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Drusen v2" }),
+        );
+        await fireEvent.click(screen.getByRole("button", { name: "More" }));
+
+        expect(
+            screen
+                .getAllByRole("heading", { level: 5 })
+                .map((h) => h.textContent?.trim()),
+        ).toEqual([
+            "Import",
+            "Duplicate",
+            "Reference mask",
+            "Connected components",
+        ]);
+        const item = ctx.segmentationContext.getSegmentationItem(lesion);
+        const cc = screen.getByRole("switch", {
+            name: "Show connected components",
+        });
+        await fireEvent.click(cc);
+        expect(ctx.mainViewerContext.applyConnectedComponents.has(item)).toBe(
+            true,
+        );
+        await fireEvent.click(cc);
+        expect(ctx.mainViewerContext.applyConnectedComponents.has(item)).toBe(
+            false,
+        );
+    });
 });

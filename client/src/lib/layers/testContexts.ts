@@ -120,6 +120,11 @@ export function layersContexts(
         isMaskingApplied: () => true,
         toggleMasking: vi.fn(),
         highlightedSegmentationItem: undefined,
+        applyConnectedComponents: new SvelteSet<unknown>(),
+        toggleConnectedComponents(item: unknown) {
+            if (!this.applyConnectedComponents.delete(item))
+                this.applyConnectedComponents.add(item);
+        },
     };
     const viewerContext = {
         image,
