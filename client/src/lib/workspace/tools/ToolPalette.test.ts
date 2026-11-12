@@ -119,7 +119,9 @@ describe("ToolPalette", () => {
             screen.getByRole("button", { name: "More tools" }),
         );
         expect(screen.getByText("Draw")).toBeInTheDocument();
-        await fireEvent.click(screen.getByRole("button", { name: "Brush" }));
+        const brushRow = screen.getByRole("button", { name: "Brush" });
+        expect(brushRow.querySelector("svg")).not.toBeNull();
+        await fireEvent.click(brushRow);
         expect(ws.armedTool).toBe("brush");
         expect(
             screen.getByRole("button", { name: "Brush (More tools)" }),

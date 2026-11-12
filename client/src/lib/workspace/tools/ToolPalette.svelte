@@ -136,7 +136,9 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
             close();
         }}
     >
-        {tool.name}
+        <span class="flex items-center gap-2"
+            ><tool.icon aria-hidden="true" />{tool.name}</span
+        >
         {#if tool.key}<kbd
                 aria-hidden="true"
                 class="font-sans text-text-secondary">{tool.key}</kbd
