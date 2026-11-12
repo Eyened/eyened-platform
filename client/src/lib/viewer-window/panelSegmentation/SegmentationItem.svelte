@@ -7,12 +7,14 @@ Under it: the current row's save state, this slice's area, then the row's detail
     import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
+    import { cn } from "$lib/utils.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import SliceArea from "$lib/layers/SliceArea.svelte";
     import SyncStatus from "$lib/layers/SyncStatus.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
     import Intersect from "carbon-icons-svelte/lib/Intersect.svelte";
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
     import View from "carbon-icons-svelte/lib/View.svelte";
@@ -47,6 +49,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
     }
 
     let { segmentation, showArea, ondelete }: Props = $props();
+    const uid = $props.id();
 
     const feature = segmentation.feature;
     const dataRepresentation = segmentation.data_representation;
@@ -190,9 +193,6 @@ Under it: the current row's save state, this slice's area, then the row's detail
         {#if isActive && isEditable && segmentationState}
             <SyncStatus sync={segmentationState.syncState} />
         {/if}
-        {#if showArea && !isMulti}
-            <SliceArea {segmentation} {segmentationItem} />
-        {/if}
         {#if dataRepresentation == "Probability" && isActive}
             <ThresholdSlider {segmentation} {segmentationItem} />
         {/if}
@@ -200,6 +200,9 @@ Under it: the current row's save state, this slice's area, then the row's detail
             <Button variant="outline" size="sm" onclick={applyDuplicateAI}>
                 Duplicate
             </Button>
+        {/if}
+        {#if showArea && !isMulti}
+            <SliceArea {segmentation} {segmentationItem} />
         {/if}
         {#if isMulti}
             <MultiFeatureSelector {segmentation} active={isActive} {showArea} />
@@ -212,32 +215,46 @@ Under it: the current row's save state, this slice's area, then the row's detail
         {#if isActive}
             <button
                 type="button"
-                class="more text-body-compact-01"
+                class="more flex items-center gap-1 text-body-compact-01"
                 aria-expanded={!collapsed}
-                onclick={() => (collapsed = !collapsed)}>More</button
+                aria-controls="{uid}-more"
+                onclick={() => (collapsed = !collapsed)}
+                ><ChevronDown
+                    aria-hidden="true"
+                    class={cn(
+                        "shrink-0 transition-transform duration-110",
+                        !collapsed && "rotate-180",
+                    )}
+                />More</button
             >
             {#if !collapsed}
-                {#if isEditable}
-                    <ImportPanel {segmentation} {image} {segmentationItem} />
-                {/if}
-                {#if segmentationState}
-                    <DuplicateAnnotationPanel
-                        {segmentation}
-                        {image}
-                        {segmentationItem}
-                    />
-                {/if}
-                {#if segmentation.annotation_type === "grader_segmentation"}
-                    <ReferenceSegmentationPanel
-                        {segmentation}
-                        {image}
-                        {isEditable}
-                        {segmentationItem}
-                    />
-                {/if}
-                {#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
-                    <CCPanel {segmentationItem} />
-                {/if}
+                <div id="{uid}-more" class="flex w-full flex-col gap-4 pb-2">
+                    {#if isEditable}
+                        <ImportPanel
+                            {segmentation}
+                            {image}
+                            {segmentationItem}
+                        />
+                    {/if}
+                    {#if segmentationState}
+                        <DuplicateAnnotationPanel
+                            {segmentation}
+                            {image}
+                            {segmentationItem}
+                        />
+                    {/if}
+                    {#if segmentation.annotation_type === "grader_segmentation"}
+                        <ReferenceSegmentationPanel
+                            {segmentation}
+                            {image}
+                            {isEditable}
+                            {segmentationItem}
+                        />
+                    {/if}
+                    {#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
+                        <CCPanel {segmentationItem} />
+                    {/if}
+                </div>
             {/if}
         {/if}
     </div>

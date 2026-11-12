@@ -1,53 +1,40 @@
 <script lang="ts">
+    import * as Field from "$lib/components/ui/field/index.js";
+    import { Toggle } from "$lib/components/ui/toggle/index.js";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
     import { getContext } from "svelte";
-    import { ConnectedComponents } from "../icons/icons";
 
-    interface Props {
-        segmentationItem: SegmentationItem;
-    }
-    let { segmentationItem }: Props = $props();
+    let { segmentationItem }: { segmentationItem: SegmentationItem } = $props();
 
     const mainViewerContext =
         getContext<MainViewerContext>("mainViewerContext");
+    const uid = $props.id();
 
-    let connectedComponentsActive = $derived(
+    const on = $derived(
         mainViewerContext.applyConnectedComponents.has(segmentationItem),
     );
-    function toggleConnectedComponents() {
-        mainViewerContext.toggleConnectedComponents(segmentationItem);
-    }
 </script>
 
-<div class="main">
-    <h3><ConnectedComponents size="1.5em" />Connected components</h3>
-    <label>
-        <input
-            type="checkbox"
-            checked={connectedComponentsActive}
-            onchange={toggleConnectedComponents}
+<section class="flex flex-col gap-3" aria-labelledby="{uid}-heading">
+    <h5 id="{uid}-heading" class="text-heading-compact-01 text-text-primary">
+        Connected components
+    </h5>
+    <Field.Field orientation="horizontal">
+        <Toggle
+            id="{uid}-cc"
+            bind:checked={
+                () => on,
+                () =>
+                    mainViewerContext.toggleConnectedComponents(
+                        segmentationItem,
+                    )
+            }
         />
-        Show connected components
-    </label>
-</div>
-
-<style>
-    div.main {
-        flex-direction: column;
-        background-color: rgba(255, 255, 255, 0.1);
-        flex: 1;
-        padding: 0.2em;
-        margin-bottom: 0.2em;
-        margin-top: 0.2em;
-    }
-    h3 {
-        font-size: small;
-        font-weight: bold;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        gap: 0.5em;
-    }
-</style>
+        <Field.Label
+            for="{uid}-cc"
+            class="text-body-compact-01 text-text-primary"
+            >Show connected components</Field.Label
+        >
+    </Field.Field>
+</section>
