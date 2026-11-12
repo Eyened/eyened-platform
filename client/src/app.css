@@ -281,7 +281,7 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus ring for everything except buttons, which draw Carbon's button focus, checkboxes, and command lists (their highlighted option shows the focus). */
+/* Focus ring for everything except buttons, which draw Carbon's button focus, checkboxes and radios, and command lists (their highlighted option shows the focus). */
 :focus-visible:not(
         [data-slot="button"],
         [data-slot="checkbox"],
