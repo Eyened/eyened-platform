@@ -43,13 +43,16 @@
         ),
     );
 
-    // Replaces this slice's mask; undo reverses it. A segmentation not shown yet loads its slices first.
+    // Replaces this slice's mask; undo reverses it. The picked segmentation's slice is loaded first if it isn't yet.
     async function importFrom(other: Segmentation) {
+        const index = viewerContext.index;
         const item = image.getOrCreateSegmentationItem(other);
-        await item?.ready;
-        const mask = item?.getMask(viewerContext.index);
-        if (!mask) throw new Error("Its data for this slice isn't loaded yet.");
-        await segmentationItem.importOther(viewerContext.index, mask);
+        await item.ready;
+        const state = item.getSegmentationState(index, true)!;
+        await state.loaded;
+        if (state.isEmptyForSlice)
+            throw new Error("It has nothing on this slice.");
+        await segmentationItem.importOther(index, state.mask);
     }
 </script>
 

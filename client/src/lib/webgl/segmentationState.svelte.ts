@@ -125,6 +125,8 @@ export class SegmentationState {
     private readonly checkUnsavedForUnload = () => this.hasUnsavedServerData();
     public syncState = $state<SyncState>("synced");
     public isEmptyForSlice = $state(false);
+    /** Settles when this slice's first fetch is done; resolved at once when it started with data. */
+    public readonly loaded: Promise<void>;
 
     constructor(
         readonly image: AbstractImage,
@@ -150,6 +152,7 @@ export class SegmentationState {
         } else {
             this.isDrawing = this.initialize();
         }
+        this.loaded = this.isDrawing;
         if (typeof window !== "undefined") {
             registerSegmentationSaveFlush(this.flushOnHide);
             registerSegmentationUnloadWarn(this.checkUnsavedForUnload);

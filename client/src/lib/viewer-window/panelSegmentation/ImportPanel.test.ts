@@ -86,10 +86,73 @@ describe("ImportPanel", () => {
         );
         expect(importButton).not.toHaveAttribute("aria-disabled");
         await fireEvent.click(importButton);
-        // The import first waits for the picked segmentation's load.
         await vi.waitFor(() =>
             expect(segmentationItem.importOther).toHaveBeenCalledWith(0, mask),
         );
         await expectNoAxeViolations(dialog);
     });
+
+    it("Import waits for the picked segmentation's slice to load", async () => {
+        let finishLoad = () => {};
+        const loaded = new Promise<void>((resolve) => (finishLoad = resolve));
+        const { segmentationItem, mask } = await pickOther({ loaded });
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(segmentationItem.importOther).not.toHaveBeenCalled();
+        finishLoad();
+        await vi.waitFor(() =>
+            expect(segmentationItem.importOther).toHaveBeenCalledWith(0, mask),
+        );
+    });
+
+    it("a segmentation with nothing on this slice shows that in the modal and imports nothing", async () => {
+        const { segmentationItem, dialog } = await pickOther({
+            isEmptyForSlice: true,
+        });
+
+        expect(
+            await within(dialog).findByText("It has nothing on this slice."),
+        ).toBeInTheDocument();
+        expect(segmentationItem.importOther).not.toHaveBeenCalled();
+    });
 });
+
+/** Opens the picker for a Binary row, picks the other Binary row and presses Import. */
+async function pickOther(slice: {
+    loaded?: Promise<void>;
+    isEmptyForSlice?: boolean;
+}) {
+    const target = graderSegmentation(1, ME, "Drusen", {
+        data_representation: "Binary",
+    });
+    segmentations.set(1, target);
+    segmentations.set(
+        2,
+        graderSegmentation(2, 9, "Hyperreflective foci", {
+            data_representation: "Binary",
+        }),
+    );
+    const mask = { exportData: () => new Uint8Array(4) };
+    const ctx = layersContexts("inst-1", { getMask: () => mask, slice });
+    const segmentationItem =
+        ctx.segmentationContext.getSegmentationItem(target);
+    render(ImportPanel, {
+        props: {
+            segmentation: target,
+            image: ctx.viewerContext.image as never,
+            segmentationItem,
+        },
+        context: ctx.context,
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Import…" }));
+    const dialog = await screen.findByRole("dialog", {
+        name: "Import into this image",
+    });
+    await fireEvent.click(
+        within(dialog).getByRole("radio", { name: "Hyperreflective foci [2]" }),
+    );
+    await fireEvent.click(
+        within(dialog).getByRole("button", { name: "Import" }),
+    );
+    return { segmentationItem, mask, dialog };
+}

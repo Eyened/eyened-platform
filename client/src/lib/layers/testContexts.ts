@@ -60,9 +60,12 @@ export function layersContexts(
         resolution?: { x: number; y: number; z: number };
         is3D?: boolean;
         getMask?: (index: number) => unknown;
+        /** Every slice state's initial load, and whether its slice has nothing. */
+        slice?: { loaded?: Promise<void>; isEmptyForSlice?: boolean };
     } = {},
 ) {
     const sync = new Map<number, Writable<SyncState>>();
+    const getMask = over.getMask ?? (() => undefined);
     const items = new Map<string, unknown>();
     const image = {
         width: 100,
@@ -82,17 +85,21 @@ export function layersContexts(
                     threshold: 0.5,
                     importOther: vi.fn(async () => {}),
                     savedScanIndices: [],
-                    getSegmentationState: () => {
+                    getSegmentationState: (index: number) => {
                         // The real syncState is reactive state; this reads the test's store the same way.
                         const state = fromStore(syncState);
                         return {
                             get syncState() {
                                 return state.current;
                             },
+                            loaded: over.slice?.loaded ?? Promise.resolve(),
+                            isEmptyForSlice:
+                                over.slice?.isEmptyForSlice ?? false,
+                            mask: getMask(index),
                         };
                     },
                     isEmptyForSlice: () => false,
-                    getMask: over.getMask ?? (() => undefined),
+                    getMask,
                 });
             }
             return items.get(key);
