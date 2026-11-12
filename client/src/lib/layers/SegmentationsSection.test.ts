@@ -6,7 +6,11 @@ import {
     within,
 } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
+import {
+    features,
+    modelSegmentations,
+    segmentations,
+} from "$lib/data/stores.svelte";
 import { expectNoAxeViolations } from "$lib/workspace/testUtils";
 import { BinaryMask } from "$lib/webgl/mask.svelte";
 import {
@@ -31,6 +35,28 @@ vi.mock("$lib/data/api", async (original) => ({
     }),
 }));
 
+// Creating shows the app's progress dialog, which takes focus and drops it when it closes.
+vi.mock(
+    "$lib/viewer-window/panelSegmentation/createSegmentationHelpers",
+    async (original) => ({
+        ...(await original<
+            typeof import("$lib/viewer-window/panelSegmentation/createSegmentationHelpers")
+        >()),
+        createQuestionableSegmentation: vi.fn(async () => {
+            await new Promise((r) => setTimeout(r, 20));
+            const progress = document.createElement("div");
+            progress.tabIndex = -1;
+            document.body.append(progress);
+            progress.focus();
+            await new Promise((r) => setTimeout(r, 20));
+            progress.remove();
+        }),
+    }),
+);
+
+const { createQuestionableSegmentation } = await import(
+    "$lib/viewer-window/panelSegmentation/createSegmentationHelpers"
+);
 const { default: SegmentationsSection } = await import(
     "./SegmentationsSection.svelte"
 );
@@ -193,5 +219,29 @@ describe("SegmentationsSection", () => {
             .getAllByRole("button", { name: "New segmentation" })
             .find((b) => !empty.contains(b));
         await vi.waitFor(() => expect(header).toHaveFocus());
+    });
+
+    it("picking a feature from the empty state leaves focus on the header New", async () => {
+        features.set(5, { id: 5, name: "Drusen" } as never);
+        renderSection();
+        const empty = screen
+            .getByText("No segmentations")
+            .closest('[data-slot="empty"]') as HTMLElement;
+        await fireEvent.click(
+            within(empty).getByRole("button", { name: "New segmentation" }),
+        );
+        const search = await screen.findByRole("textbox", {
+            name: "Search feature to create",
+        });
+        await fireEvent.input(search, { target: { value: "Dru" } });
+        await fireEvent.click(
+            await screen.findByRole("button", { name: "Drusen" }),
+        );
+        const header = screen
+            .getAllByRole("button", { name: "New segmentation" })
+            .find((b) => !empty.contains(b));
+        await vi.mocked(createQuestionableSegmentation).mock.results[0]!.value;
+        await vi.waitFor(() => expect(header).toHaveFocus());
+        features.clear();
     });
 });

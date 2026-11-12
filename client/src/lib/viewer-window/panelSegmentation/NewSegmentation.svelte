@@ -39,6 +39,8 @@ New on the Segmentations header: a popover with the feature search, where focus 
             feature,
             taskContext?.subTask?.id,
         );
+        // The progress dialog takes focus and drops it when it closes.
+        trigger?.focus();
     }
 
     function openAdvanced() {
