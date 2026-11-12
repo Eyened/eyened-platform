@@ -316,3 +316,18 @@ describe("WorkspaceFrame", () => {
         await waitFor(() => expect(menu).toHaveFocus());
     });
 });
+
+describe("Layers", () => {
+    it("names the selected viewport under the heading", async () => {
+        mockWidth({ md: true, xlg: true });
+        const ws = workspaceWith(2, { layout: "1x2" });
+        renderFrame(ws);
+        expect(
+            screen.getByText("Viewport 1 · P-000417 OD · CF F1 · img01"),
+        ).toBeInTheDocument();
+        ws.select(1);
+        expect(
+            await screen.findByText("Viewport 2 · P-000417 OD · CF F1 · img02"),
+        ).toBeInTheDocument();
+    });
+});
