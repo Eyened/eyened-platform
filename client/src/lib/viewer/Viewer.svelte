@@ -86,7 +86,7 @@
 
     // A press that closes an open popover, dropdown list or ⋯ list only closes it.
     const OPEN_FLOATING =
-        '[data-slot="popover-content"], [data-slot="select-content"], [data-slot="overflow-menu"]:not([hidden])';
+        '[data-slot="popover-content"], [data-slot="tag-popover"], [data-slot="select-content"], [data-slot="overflow-menu"]:not([hidden])';
     let dismissing = false;
 
     let pointerDown = false;

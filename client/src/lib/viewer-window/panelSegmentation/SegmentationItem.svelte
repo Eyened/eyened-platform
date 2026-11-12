@@ -8,6 +8,9 @@ Under it: the current row's save state, this slice's area, then the row's detail
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
     import { cn } from "$lib/utils.js";
+    import { tagSegmentation, untagSegmentation } from "$lib/data/helpers";
+    import Tagger from "$lib/tags/Tagger.svelte";
+    import type { SegmentationGET } from "../../../types/openapi_types";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import SliceArea from "$lib/layers/SliceArea.svelte";
     import SyncStatus from "$lib/layers/SyncStatus.svelte";
@@ -204,6 +207,26 @@ Under it: the current row's save state, this slice's area, then the row's detail
             <p class="text-helper-text-01 text-text-secondary">
                 Loading segmentation…
             </p>
+        {/if}
+        {#if isActive && segmentation.annotation_type === "grader_segmentation"}
+            <!-- No comment editing: the segmentation tag API keeps no comment. -->
+            <div
+                class="flex flex-col gap-1"
+                role="group"
+                aria-labelledby="{uid}-tags"
+            >
+                <p id="{uid}-tags" class="text-label-01 text-text-secondary">
+                    Tags
+                </p>
+                <Tagger
+                    tagType="Segmentation"
+                    tags={segmentation.tags}
+                    tag={(id) =>
+                        tagSegmentation(segmentation as SegmentationGET, id)}
+                    untag={(id) =>
+                        untagSegmentation(segmentation as SegmentationGET, id)}
+                />
+            </div>
         {/if}
         {#if isActive}
             <button

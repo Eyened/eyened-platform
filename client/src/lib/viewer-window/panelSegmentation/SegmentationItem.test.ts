@@ -4,6 +4,7 @@ import { expectNoAxeViolations } from "$lib/workspace/testUtils";
 import {
     graderSegmentation,
     layersContexts,
+    modelSegmentation,
     ME,
 } from "$lib/layers/testContexts";
 import SegmentationItem from "./SegmentationItem.svelte";
@@ -56,5 +57,32 @@ describe("SegmentationItem", () => {
         await fireEvent.click(screen.getByRole("button", { name: "Delete" }));
         expect(ondelete).toHaveBeenCalledWith(drusen);
         await expectNoAxeViolations(view.container);
+    });
+
+    it("the current grader row shows Tags; a current AI row does not", async () => {
+        renderRow();
+        expect(screen.queryByRole("button", { name: "Edit tags" })).toBeNull();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Drusen v2" }),
+        );
+        expect(screen.getByRole("group", { name: "Tags" })).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Edit tags" }),
+        ).toBeInTheDocument();
+        cleanup();
+
+        const ctx = layersContexts();
+        render(SegmentationItem, {
+            props: {
+                segmentation: modelSegmentation(11, "Drusen AI"),
+                showArea: false,
+                ondelete: vi.fn(),
+            },
+            context: ctx.context,
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Drusen AI" }),
+        );
+        expect(screen.queryByRole("button", { name: "Edit tags" })).toBeNull();
     });
 });
