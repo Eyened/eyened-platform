@@ -3,6 +3,7 @@
 import { MediaQuery } from "svelte/reactivity";
 import type { LocalizerMode } from "./workspaceRules";
 import type { ToolMode } from "./tools/registry";
+import type { LayerSectionId } from "$lib/layers/layerSections";
 
 const LEFT_KEY = "eyened:viewer:leftPanel";
 const RIGHT_KEY = "eyened:viewer:rightOpen";
@@ -11,6 +12,7 @@ const TRACKING_KEY = "eyened:viewer:stripTracking";
 const LOCALIZER_KEY = "eyened:viewer:stripLocalizer";
 const TOOL_MODE_KEY = "eyened:viewer:toolMode";
 const LAYER_AREA_KEY = "eyened:viewer:layerArea";
+const LAYER_SECTIONS_KEY = "eyened:viewer:layerSections";
 
 export type LeftPanel = "images" | "info" | "help";
 const PANELS: readonly string[] = ["images", "info", "help"];
@@ -146,6 +148,39 @@ export function readLayerArea(): boolean {
 export function writeLayerArea(on: boolean): void {
     try {
         localStorage.setItem(LAYER_AREA_KEY, String(on));
+    } catch {
+        // Private mode or quota: the choice lasts this session only.
+    }
+}
+
+/** The Layers sections open at the last visit; Segmentations only on the first. Distance lines always starts closed, since opening it arms the Measure tool. */
+export function readLayerSections(): Record<LayerSectionId, boolean> {
+    const open = {
+        segmentations: true,
+        etdrs: false,
+        pointsets: false,
+        distance: false,
+    };
+    try {
+        const raw = localStorage.getItem(LAYER_SECTIONS_KEY);
+        const stored: unknown = raw === null ? null : JSON.parse(raw);
+        if (!Array.isArray(stored)) return open;
+        for (const id of ["segmentations", "etdrs", "pointsets"] as const)
+            open[id] = stored.includes(id);
+        return open;
+    } catch {
+        return open;
+    }
+}
+
+export function writeLayerSections(
+    open: Record<LayerSectionId, boolean>,
+): void {
+    try {
+        const ids = Object.keys(open).filter(
+            (id) => open[id as LayerSectionId],
+        );
+        localStorage.setItem(LAYER_SECTIONS_KEY, JSON.stringify(ids));
     } catch {
         // Private mode or quota: the choice lasts this session only.
     }
