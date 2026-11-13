@@ -29,6 +29,8 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
     import { getContext, tick, untrack } from "svelte";
     import type { FormAnnotationGET } from "../../types/openapi_types";
     import { AI_GRID, aiGrid, type GridLayers } from "./gridLayers.svelte";
+    import CommitNumberInput from "./CommitNumberInput.svelte";
+    import GridDeleteModal from "./GridDeleteModal.svelte";
     import LayerSection from "./LayerSection.svelte";
 
     let {
@@ -51,6 +53,13 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const { instance } = viewerContext.image;
     let section: HTMLElement | undefined = $state();
+
+    let deleting: FormAnnotationGET | null = $state(null);
+    let deleteOpen = $state(false);
+    function askDelete(grid: FormAnnotationGET) {
+        deleting = grid;
+        deleteOpen = true;
+    }
 
     const all = $derived(grids.list());
     const own = $derived(all.filter((g) => g.image_id == instance.id));
@@ -186,6 +195,16 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
             >
         {/snippet}
         {#if count > 0}
+            <div class="px-4 py-2">
+                <CommitNumberInput
+                    labelText="Radius fraction"
+                    value={grids.settings.radiusFraction}
+                    step={0.01}
+                    min={0.01}
+                    max={1}
+                    oncommit={(v) => (grids.settings.radiusFraction = v)}
+                />
+            </div>
             <ul>
                 {#if ai}
                     <li>
@@ -231,6 +250,7 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
                                         : grid.id,
                                 )}
                             onarm={arm}
+                            ondelete={() => askDelete(grid)}
                         />
                     </li>
                 {/each}
@@ -274,3 +294,9 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
         {/if}
     </LayerSection>
 </div>
+<GridDeleteModal
+    grid={deleting}
+    {grids}
+    bind:open={deleteOpen}
+    onfallback={() => section?.querySelector<HTMLElement>("button")?.focus()}
+/>

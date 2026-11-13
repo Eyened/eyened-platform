@@ -17,9 +17,14 @@ import { layersContexts, ME } from "./testContexts";
 vi.mock("$lib/data/api", async (original) => ({
     ...(await original<typeof import("$lib/data/api")>()),
     createFormAnnotation: vi.fn(),
+    deleteFormAnnotation: vi.fn(async (id: number) => {
+        formAnnotations.delete(id);
+    }),
 }));
 
-const { createFormAnnotation } = await import("$lib/data/api");
+const { createFormAnnotation, deleteFormAnnotation } = await import(
+    "$lib/data/api"
+);
 const { default: EtdrsSection } = await import("./EtdrsSection.svelte");
 
 const SCHEMA_NAME = BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID;
@@ -201,5 +206,54 @@ describe("EtdrsSection", () => {
         ).getByRole("button", { name: "Fovea (f) —" });
         expect(fovea).toHaveAttribute("aria-pressed", "true");
         await vi.waitFor(() => expect(fovea).toHaveFocus());
+    });
+
+    it("Delete asks first, then deletes your grid and unsets it", async () => {
+        formAnnotations.set(11, grid(11, ME));
+        formAnnotations.set(12, grid(12, 9));
+        const { grids } = renderSection();
+        grids.setCurrent(11);
+        expect(
+            within(
+                screen.getByRole("group", {
+                    name: "ETDRS grid, Grader 9 [12]",
+                }),
+            ).queryByRole("button", { name: "Delete" }),
+        ).toBeNull();
+        await fireEvent.click(
+            within(
+                screen.getByRole("group", {
+                    name: "ETDRS grid, Grader 5 [11]",
+                }),
+            ).getByRole("button", { name: "Delete" }),
+        );
+        const dialog = await screen.findByRole("dialog");
+        expect(within(dialog).getByText("Delete grid")).toBeInTheDocument();
+        expect(
+            within(dialog).getByText("ETDRS grid · Grader 5 [11]"),
+        ).toBeInTheDocument();
+        expect(deleteFormAnnotation).not.toHaveBeenCalled();
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Delete" }),
+        );
+        await vi.waitFor(() => expect(grids.currentId).toBeUndefined());
+        expect(deleteFormAnnotation).toHaveBeenCalledWith(11);
+        expect(grids.isShown(11)).toBe(false);
+    });
+
+    it("Radius fraction applies on commit, not per keystroke, and reverts an empty or out-of-range entry", async () => {
+        formAnnotations.set(11, grid(11, ME));
+        const { grids } = renderSection();
+        const field = screen.getByLabelText("Radius fraction");
+        await fireEvent.input(field, { target: { value: "0.9" } });
+        expect(grids.settings.radiusFraction).toBe(0.85);
+        await fireEvent.change(field);
+        expect(grids.settings.radiusFraction).toBe(0.9);
+        for (const bad of ["", "1.5"]) {
+            await fireEvent.input(field, { target: { value: bad } });
+            await fireEvent.keyDown(field, { key: "Enter" });
+            expect(field).toHaveValue(0.9);
+        }
+        expect(grids.settings.radiusFraction).toBe(0.9);
     });
 });

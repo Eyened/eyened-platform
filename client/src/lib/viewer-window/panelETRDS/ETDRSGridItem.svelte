@@ -1,6 +1,6 @@
 <!--
 @component
-One ETDRS grid on this image in Layers: eye, the creator's name (sets or unsets the current grid) and "This task".
+One ETDRS grid on this image in Layers: eye, the creator's name (sets or unsets the current grid), "This task" and Delete on your own grids.
 The current grid shows its fovea and disc edge: on your own grid as today's f / d buttons, which arm the next click, else as text.
 -->
 <script lang="ts">
@@ -9,9 +9,11 @@ The current grid shows its fovea and disc edge: on your own grid as today's f / 
     import { Tag } from "$lib/components/ui/tag/index.js";
     import * as Tooltip from "$lib/components/ui/tooltip/index.js";
     import { isThisTask } from "$lib/layers/gridLayers.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { Position2D } from "$lib/types";
     import { mergeProps } from "bits-ui";
+    import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
     import View from "carbon-icons-svelte/lib/View.svelte";
     import ViewOff from "carbon-icons-svelte/lib/ViewOff.svelte";
     import { getContext } from "svelte";
@@ -25,6 +27,7 @@ The current grid shows its fovea and disc edge: on your own grid as today's f / 
         ontoggleshown,
         ontogglecurrent,
         onarm,
+        ondelete,
     }: {
         formAnnotation: FormAnnotationGET;
         shown: boolean;
@@ -34,9 +37,13 @@ The current grid shows its fovea and disc edge: on your own grid as today's f / 
         ontoggleshown: () => void;
         ontogglecurrent: () => void;
         onarm: (slot: number) => void;
+        ondelete: () => void;
     } = $props();
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
+
+    const globalContext = getContext<GlobalContext>("globalContext");
+    const canEdit = $derived(globalContext.canEdit(formAnnotation));
 
     const creator = $derived(formAnnotation.creator.name);
     const thisTask = $derived(
@@ -94,6 +101,11 @@ The current grid shows its fovea and disc edge: on your own grid as today's f / 
             </Tooltip.Root>
         </Tooltip.Provider>
         {#if thisTask}<Tag>This task</Tag>{/if}
+        {#if canEdit}
+            <IconButton size="icon-xs" label="Delete" onclick={ondelete}>
+                <TrashCan />
+            </IconButton>
+        {/if}
     </div>
     {#if current}
         <!-- Starts under the eye, as a segmentation row's details do. -->
