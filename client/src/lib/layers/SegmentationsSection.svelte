@@ -4,9 +4,10 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
-    import { Checkbox } from "$lib/components/ui/checkbox/index.js";
     import * as Empty from "$lib/components/ui/empty/index.js";
+    import * as Field from "$lib/components/ui/field/index.js";
     import { Slider } from "$lib/components/ui/slider/index.js";
+    import { Toggle } from "$lib/components/ui/toggle/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -117,14 +118,19 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
                 <span class="w-10 text-end text-label-01 text-text-primary"
                     >{percent}%</span
                 >
-                <Checkbox
-                    id="{uid}-area"
-                    bind:checked={() => showArea, setArea}
-                />
-                <label
-                    for="{uid}-area"
-                    class="text-body-compact-01 text-text-primary">Area</label
-                >
+            </div>
+            <div class="px-4 pb-2">
+                <Field.Field orientation="horizontal" class="w-auto">
+                    <Toggle
+                        id="{uid}-area"
+                        bind:checked={() => showArea, setArea}
+                    />
+                    <Field.Label
+                        for="{uid}-area"
+                        class="text-body-compact-01 text-text-primary"
+                        >Area</Field.Label
+                    >
+                </Field.Field>
             </div>
             <!-- The old tools' hidden tooltips stick out past the panel edge and make it scroll sideways. -->
             <div class="overflow-x-clip"><DrawingTools /></div>

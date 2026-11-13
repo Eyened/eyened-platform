@@ -30,6 +30,7 @@ export function graderSegmentation(
         reference_segmentation_id: null,
         creator: { id: creatorId, name: `Grader ${creatorId}` },
         feature: { id: 100 + id, name },
+        tags: [],
         ...over,
     } as unknown as SegmentationGET;
 }
@@ -48,6 +49,7 @@ export function modelSegmentation(
         threshold: 0.5,
         creator: { id: 99, name: "Model" },
         feature: { id: 200 + id, name },
+        tags: [],
     } as unknown as ModelSegmentationGET;
 }
 
@@ -56,15 +58,20 @@ export function layersContexts(
     instanceId = "inst-1",
     over: {
         resolution?: { x: number; y: number; z: number };
+        is3D?: boolean;
         getMask?: (index: number) => unknown;
+        /** Every slice state's initial load, and whether its slice has nothing. */
+        slice?: { loaded?: Promise<void>; isEmptyForSlice?: boolean };
     } = {},
 ) {
     const sync = new Map<number, Writable<SyncState>>();
+    const getMask = over.getMask ?? (() => undefined);
     const items = new Map<string, unknown>();
     const image = {
         width: 100,
         height: 100,
-        is2D: true,
+        is3D: over.is3D ?? false,
+        is2D: !(over.is3D ?? false),
         resolution: over.resolution ?? { x: -1, y: -1, z: -1 },
         getOrCreateSegmentationItem(segmentation: Segmentation) {
             const key = `${segmentation.annotation_type}_${segmentation.id}`;
@@ -75,19 +82,24 @@ export function layersContexts(
                 items.set(key, {
                     segmentation,
                     loading: false,
-                    threshold: undefined,
+                    threshold: 0.5,
+                    importOther: vi.fn(async () => {}),
                     savedScanIndices: [],
-                    getSegmentationState: () => {
+                    getSegmentationState: (index: number) => {
                         // The real syncState is reactive state; this reads the test's store the same way.
                         const state = fromStore(syncState);
                         return {
                             get syncState() {
                                 return state.current;
                             },
+                            loaded: over.slice?.loaded ?? Promise.resolve(),
+                            isEmptyForSlice:
+                                over.slice?.isEmptyForSlice ?? false,
+                            mask: getMask(index),
                         };
                     },
                     isEmptyForSlice: () => false,
-                    getMask: over.getMask ?? (() => undefined),
+                    getMask,
                 });
             }
             return items.get(key);
@@ -108,6 +120,11 @@ export function layersContexts(
         isMaskingApplied: () => true,
         toggleMasking: vi.fn(),
         highlightedSegmentationItem: undefined,
+        applyConnectedComponents: new SvelteSet<unknown>(),
+        toggleConnectedComponents(item: unknown) {
+            if (!this.applyConnectedComponents.delete(item))
+                this.applyConnectedComponents.add(item);
+        },
     };
     const viewerContext = {
         image,

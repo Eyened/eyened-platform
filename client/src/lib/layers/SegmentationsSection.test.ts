@@ -135,7 +135,7 @@ describe("SegmentationsSection", () => {
         });
         expect(viewerContext.activePanels.has("Segmentation")).toBe(true);
         expect((await screen.findAllByText(/Area this slice/)).length).toBe(3);
-        const area = screen.getByRole("checkbox", { name: "Area" });
+        const area = screen.getByRole("switch", { name: "Area" });
         expect(area).toHaveAttribute("aria-checked", "true");
         await fireEvent.click(area);
         expect(screen.queryByText(/Area this slice/)).toBeNull();
@@ -178,7 +178,7 @@ describe("SegmentationsSection", () => {
         const empty = screen
             .getByText("No segmentations")
             .closest('[data-slot="empty"]') as HTMLElement;
-        expect(screen.queryByRole("checkbox", { name: "Area" })).toBeNull();
+        expect(screen.queryByRole("switch", { name: "Area" })).toBeNull();
         // The header's New has the same name; this is the empty state's button.
         await fireEvent.click(
             within(empty).getByRole("button", { name: "New segmentation" }),

@@ -421,8 +421,16 @@ export class ProbabilityMask extends AbstractDataMask {
 }
 
 abstract class BaseMultiMask extends AbstractDataMask {
+    /** Bumped on every change, so a reader of exportData() reruns. */
+    public version = $state(0);
+
     constructor(image: AbstractImage, segmentation: SegmentationGET) {
         super(image, segmentation);
+    }
+
+    importData(data: DrawingArray): void {
+        super.importData(data);
+        this.version++;
     }
 
     abstract getBitmask(activeIndex: number | number[]): number;
@@ -454,10 +462,12 @@ abstract class BaseMultiMask extends AbstractDataMask {
                 u_mode: isMultiLabel,
             });
         }
+        this.version++;
     }
 
     clear(): void {
         this.textureData.clearData();
+        this.version++;
     }
 
     dispose(): void {
