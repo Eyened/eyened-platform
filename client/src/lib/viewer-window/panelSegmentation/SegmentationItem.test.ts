@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { expectNoAxeViolations } from "$lib/workspace/testUtils";
 import {
@@ -7,9 +13,18 @@ import {
     modelSegmentation,
     ME,
 } from "$lib/layers/testContexts";
-import SegmentationItem from "./SegmentationItem.svelte";
 
-afterEach(cleanup);
+vi.mock("./duplicate_utils", async (original) => ({
+    ...(await original<typeof import("./duplicate_utils")>()),
+    duplicate: vi.fn(async () => undefined),
+}));
+const { duplicate } = await import("./duplicate_utils");
+const { default: SegmentationItem } = await import("./SegmentationItem.svelte");
+
+afterEach(() => {
+    cleanup();
+    vi.mocked(duplicate).mockClear();
+});
 
 function renderRow(ondelete = vi.fn()) {
     const ctx = layersContexts();
@@ -86,7 +101,7 @@ describe("SegmentationItem", () => {
         expect(screen.queryByRole("button", { name: "Edit tags" })).toBeNull();
     });
 
-    it("More on an editable Binary row holds Import, Duplicate, Reference mask and Connected components; the switch toggles connected components", async () => {
+    it("a current editable Binary row offers Import, Reference mask and Connected components without a further click; the switch toggles connected components", async () => {
         const ctx = layersContexts();
         const lesion = graderSegmentation(1, ME, "Drusen v2", {
             data_representation: "Binary",
@@ -98,21 +113,16 @@ describe("SegmentationItem", () => {
         await fireEvent.click(
             screen.getByRole("button", { name: "Drusen v2" }),
         );
-        await fireEvent.click(screen.getByRole("button", { name: "More" }));
 
         expect(
-            screen
-                .getAllByRole("heading", { level: 5 })
-                .map((h) => h.textContent?.trim()),
-        ).toEqual([
-            "Import",
-            "Duplicate",
-            "Reference mask",
-            "Connected components",
-        ]);
+            screen.getByRole("button", { name: "Import…" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Set reference…" }),
+        ).toBeInTheDocument();
         const item = ctx.segmentationContext.getSegmentationItem(lesion);
         const cc = screen.getByRole("switch", {
-            name: "Show connected components",
+            name: "Connected components",
         });
         await fireEvent.click(cc);
         expect(ctx.mainViewerContext.applyConnectedComponents.has(item)).toBe(
@@ -121,6 +131,43 @@ describe("SegmentationItem", () => {
         await fireEvent.click(cc);
         expect(ctx.mainViewerContext.applyConnectedComponents.has(item)).toBe(
             false,
+        );
+    });
+
+    it("Duplicate… opens the Copy and Type options; Create copy closes them and duplicates", async () => {
+        const ctx = layersContexts("inst-1", { is3D: true });
+        render(SegmentationItem, {
+            props: {
+                segmentation: graderSegmentation(1, ME, "Drusen v2", {
+                    data_representation: "Binary",
+                }),
+                showArea: false,
+                ondelete: vi.fn(),
+            },
+            context: ctx.context,
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Drusen v2" }),
+        );
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Duplicate…" }),
+        );
+
+        const dialog = await screen.findByRole("dialog", { name: "Duplicate" });
+        expect(dialog).toContainElement(
+            screen.getByRole("group", { name: "Copy" }),
+        );
+        expect(dialog).toContainElement(
+            screen.getByRole("group", { name: "Type" }),
+        );
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Create copy" }),
+        );
+        expect(duplicate).toHaveBeenCalledOnce();
+        await waitFor(() =>
+            expect(
+                screen.queryByRole("dialog", { name: "Duplicate" }),
+            ).toBeNull(),
         );
     });
 });

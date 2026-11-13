@@ -6,8 +6,8 @@ Under it: the current row's save state, this slice's area, then the row's detail
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import * as Popover from "$lib/components/ui/popover/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
-    import { cn } from "$lib/utils.js";
     import { tagSegmentation, untagSegmentation } from "$lib/data/helpers";
     import Tagger from "$lib/tags/Tagger.svelte";
     import type { SegmentationGET } from "../../../types/openapi_types";
@@ -17,7 +17,6 @@ Under it: the current row's save state, this slice's area, then the row's detail
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
     import Intersect from "carbon-icons-svelte/lib/Intersect.svelte";
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
     import View from "carbon-icons-svelte/lib/View.svelte";
@@ -79,7 +78,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
     const isEmptyForCurrentSlice = $derived(
         segmentationItem.isEmptyForSlice(viewerContext.index),
     );
-    let collapsed = $state(true);
+    let duplicateOpen = $state(false);
 
     function showOnly(e: MouseEvent) {
         e.preventDefault();
@@ -229,22 +228,18 @@ Under it: the current row's save state, this slice's area, then the row's detail
             </div>
         {/if}
         {#if isActive}
-            <button
-                type="button"
-                class="more flex items-center gap-1 text-body-compact-01"
-                aria-expanded={!collapsed}
-                aria-controls="{uid}-more"
-                onclick={() => (collapsed = !collapsed)}
-                ><ChevronDown
-                    aria-hidden="true"
-                    class={cn(
-                        "shrink-0 transition-transform duration-110",
-                        !collapsed && "rotate-180",
-                    )}
-                />More</button
-            >
-            {#if !collapsed}
-                <div id="{uid}-more" class="flex w-full flex-col gap-4 pb-2">
+            {#if segmentation.annotation_type === "grader_segmentation"}
+                <ReferenceSegmentationPanel
+                    {segmentation}
+                    {isEditable}
+                    {segmentationItem}
+                />
+            {/if}
+            {#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
+                <CCPanel {segmentationItem} />
+            {/if}
+            {#if isEditable || segmentationState}
+                <div class="flex flex-wrap gap-x-4 pb-2">
                     {#if isEditable}
                         <ImportPanel
                             {segmentation}
@@ -253,21 +248,27 @@ Under it: the current row's save state, this slice's area, then the row's detail
                         />
                     {/if}
                     {#if segmentationState}
-                        <DuplicateAnnotationPanel
-                            {segmentation}
-                            {image}
-                            {segmentationItem}
-                        />
-                    {/if}
-                    {#if segmentation.annotation_type === "grader_segmentation"}
-                        <ReferenceSegmentationPanel
-                            {segmentation}
-                            {isEditable}
-                            {segmentationItem}
-                        />
-                    {/if}
-                    {#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
-                        <CCPanel {segmentationItem} />
+                        <Popover.Root bind:open={duplicateOpen}>
+                            <Popover.Trigger>
+                                {#snippet child({ props })}
+                                    <Button {...props} variant="ghost" size="sm"
+                                        >Duplicate…</Button
+                                    >
+                                {/snippet}
+                            </Popover.Trigger>
+                            <Popover.Content
+                                role="dialog"
+                                aria-label="Duplicate"
+                                align="start"
+                            >
+                                <DuplicateAnnotationPanel
+                                    {segmentation}
+                                    {image}
+                                    {segmentationItem}
+                                    oncreate={() => (duplicateOpen = false)}
+                                />
+                            </Popover.Content>
+                        </Popover.Root>
                     {/if}
                 </div>
             {/if}
@@ -298,8 +299,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
         background: var(--color-layer-hover-01);
     }
     /* The name wraps; no ellipsis, no tooltip. */
-    .name,
-    .more {
+    .name {
         min-height: 1.5rem;
         padding-inline: 0.25rem;
         border: 0;
@@ -313,12 +313,10 @@ Under it: the current row's save state, this slice's area, then the row's detail
         min-width: 0;
         overflow-wrap: anywhere;
     }
-    .name:hover,
-    .more:hover {
+    .name:hover {
         background: var(--color-layer-hover-01);
     }
-    .name:focus-visible,
-    .more:focus-visible {
+    .name:focus-visible {
         outline: 2px solid var(--color-focus);
         outline-offset: -2px;
     }
@@ -327,7 +325,8 @@ Under it: the current row's save state, this slice's area, then the row's detail
         flex-direction: column;
         align-items: flex-start;
         gap: 0.25rem;
-        padding-inline: 3.5rem 0.5rem;
+        /* Starts under the eye, as the row line's ps-7 does. */
+        padding-inline: 1.75rem 0.5rem;
     }
     .details:empty {
         display: none;

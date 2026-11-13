@@ -16,25 +16,15 @@
     );
 </script>
 
-<section class="flex flex-col gap-3" aria-labelledby="{uid}-heading">
-    <h5 id="{uid}-heading" class="text-heading-compact-01 text-text-primary">
-        Connected components
-    </h5>
-    <Field.Field orientation="horizontal">
-        <Toggle
-            id="{uid}-cc"
-            bind:checked={
-                () => on,
-                () =>
-                    mainViewerContext.toggleConnectedComponents(
-                        segmentationItem,
-                    )
-            }
-        />
-        <Field.Label
-            for="{uid}-cc"
-            class="text-body-compact-01 text-text-primary"
-            >Show connected components</Field.Label
-        >
-    </Field.Field>
-</section>
+<Field.Field orientation="horizontal">
+    <Toggle
+        id="{uid}-cc"
+        bind:checked={
+            () => on,
+            () => mainViewerContext.toggleConnectedComponents(segmentationItem)
+        }
+    />
+    <Field.Label for="{uid}-cc" class="text-body-compact-01 text-text-primary"
+        >Connected components</Field.Label
+    >
+</Field.Field>

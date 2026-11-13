@@ -22,7 +22,6 @@
     const globalContext = getContext<GlobalContext>("globalContext");
     const { segmentationContext } =
         getContext<MainViewerContext>("mainViewerContext");
-    const uid = $props.id();
     let open = $state(false);
 
     // AI first, then the grader's own, then colleagues'; only rows whose data converts into this one, never the row itself.
@@ -56,18 +55,9 @@
     }
 </script>
 
-<section class="flex flex-col gap-3" aria-labelledby="{uid}-heading">
-    <h5 id="{uid}-heading" class="text-heading-compact-01 text-text-primary">
-        Import
-    </h5>
-    <Button
-        variant="ghost"
-        size="sm"
-        class="self-start"
-        onclick={() => (open = true)}
-        >{image.is3D ? "Import into this B-scan…" : "Import…"}</Button
-    >
-</section>
+<Button variant="ghost" size="sm" onclick={() => (open = true)}
+    >{image.is3D ? "Import into this B-scan…" : "Import…"}</Button
+>
 <SegmentationPickerModal
     bind:open
     modalHeading={image.is3D

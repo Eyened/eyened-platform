@@ -14,9 +14,11 @@
         segmentation: Segmentation;
         image: AbstractImage;
         segmentationItem: SegmentationItem;
+        /** Called before the copy starts, so the popover holding this panel can close. */
+        oncreate?: () => void;
     }
 
-    let { segmentation, image, segmentationItem }: Props = $props();
+    let { segmentation, image, segmentationItem, oncreate }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -38,6 +40,7 @@
     );
 
     function applyDuplicate() {
+        oncreate?.();
         duplicate(
             globalContext,
             segmentation,
