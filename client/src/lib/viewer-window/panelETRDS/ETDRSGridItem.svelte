@@ -1,299 +1,125 @@
+<!--
+@component
+One ETDRS grid on this image in Layers: eye, the creator's name (sets or unsets the current grid) and "This task".
+The current grid shows its fovea and disc edge: on your own grid as today's f / d buttons, which arm the next click, else as text.
+-->
 <script lang="ts">
-    import { deleteFormAnnotation } from "$lib/data";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import { Tag } from "$lib/components/ui/tag/index.js";
+    import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+    import { isThisTask } from "$lib/layers/gridLayers.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { Position2D } from "$lib/types";
+    import { mergeProps } from "bits-ui";
+    import View from "carbon-icons-svelte/lib/View.svelte";
+    import ViewOff from "carbon-icons-svelte/lib/ViewOff.svelte";
     import { getContext } from "svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
-    import { Hide, PanelIcon, Show, Trash } from "../icons/icons";
 
-    const globalContext = getContext<GlobalContext>("globalContext");
-    const taskContext = getContext<TaskContext>("taskContext");
-    const subTask = taskContext?.subTask;
-
-    type LandmarkField = "fovea" | "disc_edge";
-
-    interface Props {
-        formAnnotation: FormAnnotationGET;
-        overlayActive: boolean;
-        selected: boolean;
-        armedField?: LandmarkField;
-        onToggleOverlay: (
-            formAnnotation: FormAnnotationGET,
-            active?: boolean,
-        ) => void;
-        onSelect: (formAnnotation: FormAnnotationGET) => void;
-        onRemove: (formAnnotation: FormAnnotationGET) => void;
-        onArmLandmark: (
-            formAnnotation: FormAnnotationGET,
-            field: LandmarkField,
-        ) => void;
-    }
     let {
         formAnnotation,
-        overlayActive,
-        selected,
-        armedField,
-        onToggleOverlay,
-        onSelect,
-        onRemove,
-        onArmLandmark,
-    }: Props = $props();
+        shown,
+        current,
+        armedSlot,
+        ontoggleshown,
+        ontogglecurrent,
+        onarm,
+    }: {
+        formAnnotation: FormAnnotationGET;
+        shown: boolean;
+        current: boolean;
+        /** While this is your current grid: the slot the next click places, 0 fovea, 1 disc edge. */
+        armedSlot?: number;
+        ontoggleshown: () => void;
+        ontogglecurrent: () => void;
+        onarm: (slot: number) => void;
+    } = $props();
 
-    const sameSubTask = formAnnotation.sub_task_id === subTask?.id;
+    const taskContext = getContext<TaskContext | undefined>("taskContext");
 
-    const fovea: Position2D | undefined = $derived(
-        (formAnnotation.form_data as any)?.fovea as Position2D | undefined,
+    const creator = $derived(formAnnotation.creator.name);
+    const thisTask = $derived(
+        isThisTask(formAnnotation, taskContext?.subTask?.id),
     );
-    const disc_edge: Position2D | undefined = $derived(
-        (formAnnotation.form_data as any)?.disc_edge as Position2D | undefined,
-    );
+    const landmarks = $derived.by(() => {
+        const data = (formAnnotation.form_data ?? {}) as Record<
+            string,
+            Position2D | undefined
+        >;
+        return [
+            { label: "Fovea", key: "f", point: data.fovea },
+            { label: "Disc edge", key: "d", point: data.disc_edge },
+        ];
+    });
 
-    const canEditForm = globalContext.canEdit(formAnnotation);
-    const showHide = $derived(overlayActive ? Show : Hide);
-
-    function formatCoords(p: Position2D | undefined) {
-        if (!p) return "—";
-        return `[${Math.round(p.x)}, ${Math.round(p.y)}]`;
-    }
-
-    function selectRoot(e: MouseEvent) {
-        e.stopPropagation();
-        onSelect(formAnnotation);
-    }
-
-    function toggleOverlay(e: MouseEvent) {
-        e.stopPropagation();
-        onToggleOverlay(formAnnotation);
-    }
-
-    function remove(e: MouseEvent) {
-        e.stopPropagation();
-        onRemove(formAnnotation);
-        deleteFormAnnotation(formAnnotation.id);
-    }
-
-    function armLandmark(e: MouseEvent, field: LandmarkField) {
-        e.stopPropagation();
-        if (!canEditForm) return;
-        onArmLandmark(formAnnotation, field);
+    function coords(p: Position2D | undefined) {
+        return p ? `${Math.round(p.x)}, ${Math.round(p.y)}` : "—";
     }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<article
-    class="info"
-    class:same-sub-task={sameSubTask}
-    class:selected
-    onclick={selectRoot}
+<div
+    class="border-s-3 {current
+        ? 'border-border-interactive bg-layer-selected-01'
+        : shown
+          ? 'border-border-strong-01'
+          : 'border-transparent'}"
+    role="group"
+    aria-label="ETDRS grid, {creator} [{formAnnotation.id}]"
 >
-    <header class="top">
-        <nav class="icons" aria-label="Annotation actions">
-            <PanelIcon
-                active={overlayActive}
-                onclick={toggleOverlay}
-                tooltip="show/hide"
-                Icon={showHide}
-            />
-
-            {#if canEditForm}
-                <span class="spacer" aria-hidden="true"></span>
-                <PanelIcon onclick={remove} tooltip="delete" Icon={Trash} />
-            {/if}
-        </nav>
-        <div class="annotation-id">
-            <span class="creator-name">{formAnnotation.creator.name}</span>
-            <code class="annotation-id-value">[{formAnnotation.id}]</code>
-        </div>
-    </header>
-    <div class="landmarks">
-        <button
-            type="button"
-            class="landmark"
-            class:armed={selected && armedField === "fovea"}
-            disabled={!canEditForm}
-            title={!canEditForm ? "Editing not allowed" : undefined}
-            onclick={(e) => armLandmark(e, "fovea")}
+    <div class="flex items-start gap-1 py-1 ps-7 pe-2">
+        <IconButton
+            size="icon-xs"
+            label={shown ? "Hide" : "Show"}
+            onclick={ontoggleshown}
         >
-            <span class="name">Fovea (f)</span>
-            <code class="coords">{formatCoords(fovea)}</code>
-        </button>
-        <button
-            type="button"
-            class="landmark"
-            class:armed={selected && armedField === "disc_edge"}
-            disabled={!canEditForm}
-            title={!canEditForm ? "Editing not allowed" : undefined}
-            onclick={(e) => armLandmark(e, "disc_edge")}
-        >
-            <span class="name">Disc (d)</span>
-            <code class="coords">{formatCoords(disc_edge)}</code>
-        </button>
+            {#if shown}<View />{:else}<ViewOff />{/if}
+        </IconButton>
+        <Tooltip.Provider delayDuration={100}>
+            <Tooltip.Root>
+                <Tooltip.Trigger>
+                    {#snippet child({ props })}
+                        <button
+                            {...mergeProps(props, { onclick: ontogglecurrent })}
+                            type="button"
+                            class="min-h-6 min-w-0 flex-1 px-1 text-start text-body-compact-01 [overflow-wrap:anywhere] text-text-primary hover:bg-layer-hover-01 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+                            aria-label="ETDRS grid, {creator}"
+                            aria-pressed={current}>{creator}</button
+                        >
+                    {/snippet}
+                </Tooltip.Trigger>
+                <Tooltip.Content
+                    >ETDRS grid [{formAnnotation.id}]</Tooltip.Content
+                >
+            </Tooltip.Root>
+        </Tooltip.Provider>
+        {#if thisTask}<Tag>This task</Tag>{/if}
     </div>
-    <dl class="details">
-        <div>
-            <dt>ImageID:</dt>
-            <dd>
-                <code class="value">{formAnnotation.image_id}</code>
-            </dd>
+    {#if current}
+        <!-- Starts under the eye, as a segmentation row's details do. -->
+        <div class="flex flex-col items-start gap-1 ps-7 pe-2 pb-1">
+            {#each landmarks as landmark, slot (landmark.key)}
+                {#if armedSlot !== undefined}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        class="tabular-nums aria-pressed:bg-background-selected aria-pressed:text-text-primary aria-pressed:shadow-content-switcher-selected"
+                        aria-pressed={armedSlot === slot}
+                        data-landmark={slot}
+                        onclick={() => onarm(slot)}
+                        >{landmark.label} ({landmark.key}) {coords(
+                            landmark.point,
+                        )}</Button
+                    >
+                {:else}
+                    <p
+                        class="px-1 text-body-compact-01 text-text-primary tabular-nums"
+                    >
+                        {landmark.label}
+                        {coords(landmark.point)}
+                    </p>
+                {/if}
+            {/each}
         </div>
-    </dl>
-</article>
-
-<style>
-    article.info {
-        display: flex;
-        background-color: rgba(255, 255, 255, 0.1);
-        flex-direction: column;
-        border: 1px solid black;
-        border-radius: 2px;
-        padding: 0.2em;
-        cursor: pointer;
-    }
-
-    article.info.same-sub-task {
-        background-color: rgba(100, 255, 100, 0.2);
-    }
-
-    article.info:hover {
-        background-color: rgba(255, 255, 255, 0.2);
-    }
-
-    article.info:hover.same-sub-task {
-        background-color: rgba(100, 255, 100, 0.4);
-    }
-
-    article.info.selected {
-        border-color: rgb(57, 158, 165);
-        box-shadow: inset 0 0 0 1px rgb(57, 158, 165);
-        background-color: rgba(57, 158, 165, 0.22);
-    }
-
-    article.info.selected.same-sub-task {
-        background-color: rgba(57, 158, 165, 0.28);
-    }
-
-    header.top {
-        display: flex;
-        align-items: center;
-        gap: 0.5em;
-    }
-
-    nav.icons {
-        display: flex;
-        flex: 1;
-        align-items: center;
-        gap: 0.2em;
-        user-select: none;
-    }
-
-    span.spacer {
-        flex: 1;
-    }
-
-    div.landmarks {
-        display: flex;
-        gap: 0.25em;
-        padding: 0.15em 0;
-        flex-wrap: wrap;
-    }
-
-    button.landmark {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35em;
-        padding: 0.1em 0.35em;
-        font-size: 0.7rem;
-        line-height: 1.2;
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        border-radius: 2px;
-        background: rgba(0, 0, 0, 0.25);
-        color: inherit;
-        cursor: pointer;
-        opacity: 1;
-    }
-
-    button.landmark:hover:not(:disabled) {
-        background: rgba(255, 255, 255, 0.15);
-    }
-
-    button.landmark:disabled {
-        cursor: not-allowed;
-        opacity: 0.45;
-    }
-
-    button.landmark.armed {
-        background: rgb(57, 158, 165);
-        border-color: rgb(57, 158, 165);
-        color: white;
-    }
-
-    button.landmark .name {
-        font-weight: 600;
-        white-space: nowrap;
-    }
-
-    button.landmark .coords {
-        font-family: monospace;
-        font-size: 0.95em;
-        opacity: 0.9;
-    }
-
-    div.annotation-id {
-        display: flex;
-        gap: 0.3em;
-        font-size: x-small;
-        align-items: center;
-    }
-
-    span.creator-name {
-        user-select: text;
-    }
-
-    code.annotation-id-value {
-        user-select: text;
-        font-family: inherit;
-        font-size: inherit;
-        background: transparent;
-        padding: 0;
-        border: none;
-    }
-
-    dl.details {
-        display: flex;
-        flex-direction: column;
-        list-style-type: none;
-        padding: 0;
-        margin: 0;
-        font-size: xx-small;
-        gap: 0.2em;
-    }
-
-    dl.details > div {
-        display: flex;
-        align-items: center;
-        gap: 0.5em;
-    }
-
-    dt {
-        font-weight: normal;
-        user-select: text;
-        min-width: fit-content;
-    }
-
-    dd {
-        margin: 0;
-        display: flex;
-        flex: 1;
-    }
-
-    code.value {
-        user-select: text;
-        font-family: inherit;
-        font-size: inherit;
-        background: transparent;
-        padding: 0;
-        border: none;
-    }
-</style>
+    {/if}
+</div>

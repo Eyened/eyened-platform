@@ -6,6 +6,7 @@ import type { SyncState } from "$lib/webgl/segmentationState.svelte";
 import { SvelteSet } from "svelte/reactivity";
 import { fromStore, writable, type Writable } from "svelte/store";
 import { vi } from "vitest";
+import { GridLayers } from "./gridLayers.svelte";
 import type {
     ModelSegmentationGET,
     SegmentationGET,
@@ -62,6 +63,10 @@ export function layersContexts(
         getMask?: (index: number) => unknown;
         /** Every slice state's initial load, and whether its slice has nothing. */
         slice?: { loaded?: Promise<void>; isEmptyForSlice?: boolean };
+        /** The image's model keypoints, for the AI grid. */
+        cfKeypoints?: { fovea_xy: number[]; disc_edge_xy: number[] };
+        /** Image ids registered to this one. */
+        linked?: string[];
     } = {},
 ) {
     const sync = new Map<number, Writable<SyncState>>();
@@ -73,6 +78,14 @@ export function layersContexts(
         is3D: over.is3D ?? false,
         is2D: !(over.is3D ?? false),
         resolution: over.resolution ?? { x: -1, y: -1, z: -1 },
+        image_id: instanceId,
+        instance: {
+            id: instanceId,
+            patient: { id: 1 },
+            study: { id: 2 },
+            laterality: "R",
+            cf_keypoints: over.cfKeypoints ?? null,
+        },
         getOrCreateSegmentationItem(segmentation: Segmentation) {
             const key = `${segmentation.annotation_type}_${segmentation.id}`;
             if (!items.has(key)) {
@@ -131,13 +144,18 @@ export function layersContexts(
         index: 0,
         axis: 0,
         activePanels: new SvelteSet<string>(),
+        addOverlay: vi.fn(() => vi.fn()),
     };
     const globalContext = {
         user: { id: ME },
-        canEdit: (a: Segmentation) =>
-            a.annotation_type === "grader_segmentation" && a.creator.id === ME,
+        canEdit: (a: { annotation_type?: string; creator: { id: number } }) =>
+            a.annotation_type !== "model_segmentation" && a.creator.id === ME,
         dialogue: null,
     };
+    const registration = {
+        getLinkedImgIds: () => new Set(over.linked ?? []),
+    };
+    const grids = new GridLayers(viewerContext as never, registration as never);
     const context = new Map<string, unknown>([
         ["globalContext", globalContext],
         ["viewerContext", viewerContext],
@@ -150,5 +168,6 @@ export function layersContexts(
         viewerContext,
         mainViewerContext,
         globalContext,
+        grids,
     };
 }

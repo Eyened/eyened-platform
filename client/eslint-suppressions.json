@@ -156,11 +156,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/panelETRDS/ETDRSGridItem.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "src/lib/viewer-window/panelForm/FormItemContent.svelte": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1

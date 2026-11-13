@@ -29,6 +29,7 @@ function attach(ws: Workspace, position: number, instanceId: string) {
         layers: {
             viewerContext: ctx.viewerContext as never,
             mainViewerContext: ctx.mainViewerContext as never,
+            grids: ctx.grids,
         },
     });
     return ctx;
