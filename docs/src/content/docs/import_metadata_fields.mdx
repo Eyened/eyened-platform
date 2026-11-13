@@ -157,8 +157,8 @@ Files are referenced by storage backend + path within that backend (resolved via
 | `storage_backend_kind` | str | Property | Backend kind when **creating** a new backend |
 | `image_storage_id` | int | PK | Existing `ImageStorage` row |
 | `object_key` | str | Lookup | **Required for new images.** Path to the file within the backend (unique per backend) |
-| `image_storage_format` | str | Property | MIME or format string (`image/png`, `dicom`, …); often inferred from `object_key` during [preparation](/eyened-platform/orm/importer#row-preparation) |
-| `image_storage_is_primary` | bool | Property | Whether this row is the primary storage location for the instance |
+| `image_storage_format` | str | Property | MIME or format string (`image/png`, `dicom`, `angio_flow`, …); often inferred from `object_key` during [preparation](/eyened-platform/orm/importer#row-preparation). For OCTA flow companions set `angio_flow` explicitly (interim; a future `Role` column will supersede this overload). |
+| `image_storage_is_primary` | bool | Property | Whether this row is the primary storage location for the instance. OCTA flow rows must be `false` when paired with a structural `dicom` primary. |
 | `image_storage_hash` | bytes | Property | SHA-256 digest (32 bytes) |
 | `image_storage_checksum` | str | Property | Checksum string (e.g. MD5 hex) |
 
