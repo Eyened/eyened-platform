@@ -262,6 +262,9 @@ export interface paths {
         /**
          * Get Public Image Data
          * @description Redirect to the stored image data for an instance (by PublicID).
+         *
+         *     Optional ``storage_id`` selects a non-primary ImageStorage row (e.g. OCTA
+         *     ``angio_flow``). When omitted, the primary storage is used.
          */
         get: operations["get_public_image_data_images__image_id__data_get"];
         put?: never;
@@ -1717,6 +1720,8 @@ export interface components {
             date_modified?: string | null;
             /** Date Preprocessed */
             date_preprocessed?: string | null;
+            /** Storages */
+            storages?: components["schemas"]["ImageStorageGET"][];
             /** Id */
             id: string;
             project: components["schemas"]["ProjectMeta"];
@@ -1743,6 +1748,18 @@ export interface components {
             attrs: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ImageStorageGET
+         * @description One on-disk (or object-store) file belonging to an ImageInstance.
+         */
+        ImageStorageGET: {
+            /** Id */
+            id: number;
+            /** Format */
+            format: string;
+            /** Is Primary */
+            is_primary: boolean;
         };
         /**
          * ImportOptions
@@ -2855,6 +2872,10 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /** SegmentationPOST */
         SegmentationPOST: {
@@ -3368,6 +3389,7 @@ export interface operations {
             query?: {
                 index?: number | null;
                 meta?: boolean;
+                storage_id?: number | null;
             };
             header?: {
                 authorization?: string;

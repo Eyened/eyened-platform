@@ -5,6 +5,9 @@ import { ImageSliceStack } from "$lib/webgl/imageSliceStack";
 import type { Dimensions } from "$lib/webgl/types";
 import type { WebGL } from "$lib/webgl/webgl";
 import type { ImageGET } from "../../types/openapi_types";
+import { buildImageDataUrl } from "./imageDataUrl";
+import type { ImageLoadProgress } from "./loadProgress";
+import { dicomDecodeConcurrency, mapPool } from "./mapPool";
 import { loadMhdRawFromEndpoints } from "./mhdLoader";
 
 import * as cornerstone from "cornerstone-core";
@@ -20,6 +23,10 @@ cornerstoneWADOImageLoader.configure({
     },
     useWebWorkers: true,
 });
+// Do not call webWorkerManager.initialize here: CWIL v4 expects a full
+// taskConfiguration (incl. decodeTask) and a bare initialize throws
+// "Cannot read properties of undefined (reading 'decodeTask')".
+// Workers still start on demand via useWebWorkers; we parallelize frames below.
 
 export type LoadedImages =
     | [Image2D]
@@ -31,11 +38,13 @@ export class ImageLoader {
     minBscansForEnface = 5;
     constructor(public readonly webgl: WebGL) {}
 
-    async load(instance: ImageGET): Promise<LoadedImages> {
+    async load(
+        instance: ImageGET,
+        progress?: ImageLoadProgress,
+    ): Promise<LoadedImages> {
         const img_id = `${instance.id}`;
         const imageId = instance.id;
         const dataUrl = this.buildDataUrl(imageId);
-        // Convert to lowercase for case-insensitive comparison
         const dataFormat = instance.data_format;
         console.info(
             `[imageLoader] load image ${img_id} format=${dataFormat} ` +
@@ -55,6 +64,16 @@ export class ImageLoader {
             );
             return this.returnLoadedVolume(image);
         } else if (dataFormat === "dicom") {
+            const flowStorageId = angioFlowStorageId(instance);
+            if (flowStorageId != null) {
+                return this.loadOctaDicom(
+                    instance,
+                    img_id,
+                    imageId,
+                    flowStorageId,
+                    progress,
+                );
+            }
             return this.loadDicom(instance, img_id, imageId);
         } else if (dataFormat === "png_series") {
             const meta = await this.loadPngSeriesMeta(imageId);
@@ -246,13 +265,121 @@ export class ImageLoader {
         );
     }
 
-    async loadDicom(
+    /**
+     * Show structural OCT first; attach angio_flow in the background so the
+     * viewer is usable while the second J2K volume still unpacks.
+     */
+    async loadOctaDicom(
         instance: ImageGET,
         img_id: string,
         imageId: string,
+        flowStorageId: number,
+        progress?: ImageLoadProgress,
     ): Promise<LoadedImages> {
-        const url = this.buildDataUrl(imageId);
+        console.info(
+            `[imageLoader] dicom ${img_id}: OCTA structural first, then angio_flow ` +
+                `(storage_id=${flowStorageId})`,
+        );
+        const structural = await this.decodeDicomVolume(
+            this.buildDataUrl(imageId),
+            img_id,
+        );
+        const { width, height, depth } = structural.dimensions;
+        const expected = width * height * depth;
+        if (structural.volume.length !== expected) {
+            return this.returnLoadedVolume(
+                createVolumeImage(
+                    instance,
+                    this.webgl,
+                    img_id,
+                    structural.volume,
+                    structural.dimensions,
+                    structural.meta,
+                ),
+            );
+        }
 
+        const loaded = await this.returnLoadedVolume(
+            createVolumeImage(
+                instance,
+                this.webgl,
+                img_id,
+                structural.volume,
+                structural.dimensions,
+                structural.meta,
+            ),
+        );
+        const volumeImage = loaded.find(
+            (img): img is Image3D | ImageSliceStack =>
+                img instanceof Image3D || img instanceof ImageSliceStack,
+        );
+
+        void this.attachOctaFlowInBackground(
+            volumeImage,
+            imageId,
+            flowStorageId,
+            expected,
+            { width, height, depth },
+            progress,
+        );
+
+        return loaded;
+    }
+
+    private async attachOctaFlowInBackground(
+        volumeImage: Image3D | ImageSliceStack | undefined,
+        imageId: string,
+        flowStorageId: number,
+        expected: number,
+        structuralShape: { width: number; height: number; depth: number },
+        progress?: ImageLoadProgress,
+    ): Promise<void> {
+        if (!volumeImage) {
+            return;
+        }
+        try {
+            const flow = await this.decodeDicomVolume(
+                this.buildDataUrl(imageId, { storage_id: flowStorageId }),
+                `${imageId}-flow`,
+            );
+            const { width: fw, height: fh, depth: fd } = flow.dimensions;
+            const { width, height, depth } = structuralShape;
+            if (fw !== width || fh !== height || fd !== depth) {
+                throw new Error(
+                    `OCTA shape mismatch: structural ${width}x${height}x${depth} ` +
+                        `vs flow ${fw}x${fh}x${fd}`,
+                );
+            }
+            if (flow.volume.length !== expected) {
+                throw new Error(
+                    `OCTA flow length ${flow.volume.length} != ${expected}`,
+                );
+            }
+            volumeImage.attachFlow(flow.volume);
+            progress?.onFlowReady?.(imageId);
+            console.info(
+                `[imageLoader] dicom ${imageId}: angio_flow attached`,
+            );
+        } catch (err) {
+            console.error(
+                `[imageLoader] dicom ${imageId}: angio_flow load failed`,
+                err,
+            );
+        }
+    }
+
+    /**
+     * Decode a DICOM at ``url`` into a mono volume (or single-frame pixel buffer).
+     */
+    async decodeDicomVolume(
+        url: string,
+        logId: string,
+    ): Promise<{
+        volume: Uint8Array;
+        dimensions: Dimensions;
+        meta: any;
+        photometricInterpretation?: string;
+    }> {
         const dicomImageId = `wadouri:${url}`;
         const image = await cornerstone.loadImage(dicomImageId);
         const ds = image.data;
@@ -266,10 +393,9 @@ export class ImageLoader {
 
         const pixelData = ds.elements.x7fe00010;
 
-        // pixeldata is already in the correct format
         if (pixelData.length === width * height * depth) {
             console.info(
-                `[imageLoader] dicom ${img_id}: uncompressed pixel data ` +
+                `[imageLoader] dicom ${logId}: uncompressed pixel data ` +
                     `${width}x${height}x${depth} (transferSyntax=${transferSyntax})`,
             );
             const dicomBytes = ds.byteArray as Uint8Array;
@@ -277,33 +403,62 @@ export class ImageLoader {
                 pixelData.dataOffset,
                 pixelData.dataOffset + pixelData.length,
             );
-            return this.returnLoadedVolume(
-                createVolumeImage(
-                    instance,
-                    this.webgl,
-                    img_id,
-                    volume,
-                    dimensions,
-                    meta,
-                ),
-            );
+            return { volume, dimensions, meta, photometricInterpretation };
         }
 
         if (depth > 1 || meta.x00080060 === "OPT") {
-            // 3D OCT — cornerstone/OpenJPEG may emit j2k INFO lines per frame
+            // Compressed multi-frame (typically J2K): each frame is a separate
+            // decode. Parallelize with a capped pool; dataset fetch is cached by URL.
+            const concurrency = dicomDecodeConcurrency();
             console.info(
-                `[imageLoader] dicom ${img_id}: decoding ${depth} frame(s) via cornerstone ` +
-                    `(${width}x${height}, modality=${meta.x00080060}, transferSyntax=${transferSyntax})`,
+                `[imageLoader] dicom ${logId}: decoding ${depth} frame(s) via cornerstone ` +
+                    `(${width}x${height}, modality=${meta.x00080060}, ` +
+                    `transferSyntax=${transferSyntax}, concurrency=${concurrency})`,
             );
             const volume = new Uint8Array(width * height * depth);
-            for (let i = 0; i < depth; i++) {
-                const frameImageId = `wadouri:${url}?frame=${i}`;
-                const frameImage = await cornerstone.loadImage(frameImageId);
-                volume.set(
-                    new Uint8Array(frameImage.getPixelData()),
-                    i * width * height,
+            const frameSize = width * height;
+            // First loadImage already decoded frame 0 — reuse it.
+            volume.set(pixelDataAsUint8(image.getPixelData()), 0);
+
+            const frameIndices = Array.from(
+                { length: depth - 1 },
+                (_, i) => i + 1,
+            );
+            await mapPool(frameIndices, concurrency, async (frameIndex) => {
+                const frameImage = await cornerstone.loadImage(
+                    `wadouri:${url}?frame=${frameIndex}`,
                 );
-            }
+                volume.set(
+                    pixelDataAsUint8(frameImage.getPixelData()),
+                    frameIndex * frameSize,
+                );
+            });
+            return { volume, dimensions, meta, photometricInterpretation };
+        }
+
+        console.info(
+            `[imageLoader] dicom ${logId}: single-frame 2D via cornerstone ` +
+                `(${width}x${height}, photometric=${photometricInterpretation}, transferSyntax=${transferSyntax})`,
+        );
+        return {
+            volume: pixelDataAsUint8(image.getPixelData()),
+            dimensions,
+            meta,
+            photometricInterpretation,
+        };
+    }
+
+    async loadDicom(
+        instance: ImageGET,
+        img_id: string,
+        imageId: string,
+    ): Promise<LoadedImages> {
+        const url = this.buildDataUrl(imageId);
+        const decoded = await this.decodeDicomVolume(url, img_id);
+        const { volume, dimensions, meta, photometricInterpretation } = decoded;
+        const { width, height, depth } = dimensions;
+
+        if (volume.length === width * height * depth) {
             return this.returnLoadedVolume(
                 createVolumeImage(
                     instance,
@@ -320,17 +475,12 @@ export class ImageLoader {
             photometricInterpretation === "RGB" ||
             photometricInterpretation === "MONOCHROME2"
         ) {
-            console.info(
-                `[imageLoader] dicom ${img_id}: single-frame 2D via cornerstone ` +
-                    `(${width}x${height}, photometric=${photometricInterpretation}, transferSyntax=${transferSyntax})`,
-            );
-            const pixelData = new Uint8Array(image.getPixelData());
             return [
                 Image2D.fromPixelData(
                     instance,
                     this.webgl,
                     img_id,
-                    pixelData,
+                    volume,
                     dimensions,
                     meta,
                 ),
@@ -419,17 +569,7 @@ export class ImageLoader {
         imageId: string,
         query?: Record<string, string | number | boolean | undefined>,
     ): string {
-        const url = `/api/images/${imageId}/data`;
-        if (!query) {
-            return url;
-        }
-        const search = new URLSearchParams();
-        for (const [key, value] of Object.entries(query)) {
-            if (value !== undefined && value !== null) {
-                search.set(key, String(value));
-            }
-        }
-        return `${url}?${search.toString()}`;
+        return buildImageDataUrl(imageId, query);
     }
 
     private async loadBinaryMeta(imageId: string): Promise<any> {
@@ -453,6 +593,20 @@ export class ImageLoader {
         }
         return await response.json();
     }
+}
+
+/** Interim: non-primary storage with Format=angio_flow (future: Role column). */
+function angioFlowStorageId(instance: ImageGET): number | null {
+    const row = (instance.storages ?? []).find(
+        (s) => !s.is_primary && s.format === "angio_flow",
+    );
+    return row?.id ?? null;
+}
+
+function pixelDataAsUint8(pixelData: ArrayLike<number>): Uint8Array {
+    return pixelData instanceof Uint8Array
+        ? pixelData
+        : Uint8Array.from(pixelData);
 }
 
 async function getImage(url: string): Promise<ImageBitmap> {

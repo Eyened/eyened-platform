@@ -639,7 +639,7 @@
     "/images/{image_id}/data": {
       "get": {
         "summary": "Get Public Image Data",
-        "description": "Redirect to the stored image data for an instance (by PublicID).",
+        "description": "Redirect to the stored image data for an instance (by PublicID).\n\nOptional ``storage_id`` selects a non-primary ImageStorage row (e.g. OCTA\n``angio_flow``). When omitted, the primary storage is used.",
         "operationId": "get_public_image_data_images__image_id__data_get",
         "parameters": [
           {
@@ -675,6 +675,22 @@
               "type": "boolean",
               "default": false,
               "title": "Meta"
+            }
+          },
+          {
+            "name": "storage_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Storage Id"
             }
           },
           {
@@ -6412,7 +6428,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "binary"
+                "contentMediaType": "application/octet-stream"
               },
               {
                 "type": "null"
@@ -7354,6 +7370,13 @@
             ],
             "title": "Date Preprocessed"
           },
+          "storages": {
+            "items": {
+              "$ref": "#/components/schemas/ImageStorageGET"
+            },
+            "type": "array",
+            "title": "Storages"
+          },
           "id": {
             "type": "string",
             "title": "Id"
@@ -7464,6 +7487,30 @@
           "attrs"
         ],
         "title": "ImageGET"
+      },
+      "ImageStorageGET": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "is_primary": {
+            "type": "boolean",
+            "title": "Is Primary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "format",
+          "is_primary"
+        ],
+        "title": "ImageStorageGET",
+        "description": "One on-disk (or object-store) file belonging to an ImageInstance."
       },
       "ImportOptions": {
         "properties": {
@@ -8423,7 +8470,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "binary"
+                "contentMediaType": "application/octet-stream"
               },
               {
                 "type": "null"
@@ -10756,6 +10803,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",

@@ -35,6 +35,7 @@ export type ImportOptions = components["schemas"]["ImportOptions"];
 export type ImportRequest = components["schemas"]["ImportRequest"];
 export type ImportResponse = components["schemas"]["ImportResponse"];
 export type ImageGET = components["schemas"]["ImageGET"];
+export type ImageStorageGET = components["schemas"]["ImageStorageGET"];
 export type Laterality = components["schemas"]["Laterality"];
 export type Modality = components["schemas"]["Modality"];
 export type ModalityType = components["schemas"]["ModalityType"];

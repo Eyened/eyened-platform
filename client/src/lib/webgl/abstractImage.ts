@@ -15,6 +15,17 @@ export abstract class AbstractImage {
     public readonly depth: number;
     abstract texture: WebGLTexture;
 
+    /**
+     * Optional OCTA angio_flow companion (same W×H×D as structural).
+     * Structural `texture` / `data` remain the segmentation lattice.
+     */
+    flowTexture: WebGLTexture | null = null;
+    flowData: Uint8Array | null = null;
+
+    get hasFlow(): boolean {
+        return this.flowTexture !== null;
+    }
+
     // in micrometers / pixel
     public readonly resolution: { x: number; y: number; z: number };
     transform: Matrix = Matrix.identity;

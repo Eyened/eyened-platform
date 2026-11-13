@@ -25,9 +25,32 @@ export class Image3D extends AbstractImage {
         public readonly data: Uint8Array,
         dimensions: Dimensions, // w: horizontal, h: axial, d: vertical
         meta: any,
+        flowData: Uint8Array | null = null,
     ) {
         super(instance, webgl, img_id, dimensions, meta);
         this.texture = initTexture3D(webgl.gl, dimensions, data);
+        if (flowData) {
+            this.attachFlow(flowData);
+        }
+    }
+
+    /** Attach OCTA angio_flow after structural is already on screen. */
+    attachFlow(flowData: Uint8Array): void {
+        const expected = this.width * this.height * this.depth;
+        if (flowData.length !== expected) {
+            throw new Error(
+                `Flow volume length ${flowData.length} != ${expected}`,
+            );
+        }
+        if (this.flowTexture) {
+            this.webgl.gl.deleteTexture(this.flowTexture);
+        }
+        this.flowData = flowData;
+        this.flowTexture = initTexture3D(
+            this.webgl.gl,
+            this.dimensions,
+            flowData,
+        );
     }
 
     async createEnfaceProjection(): Promise<Image2D> {
@@ -296,6 +319,10 @@ export class Image3D extends AbstractImage {
         // Dispose 3D texture
         if (this.texture) {
             this.webgl.gl.deleteTexture(this.texture);
+        }
+        if (this.flowTexture) {
+            this.webgl.gl.deleteTexture(this.flowTexture);
+            this.flowTexture = null;
         }
     }
 }
