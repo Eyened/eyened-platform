@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildImageDataUrl } from "./imageDataUrl";
+import { buildImageDataUrl, withQueryParam } from "./imageDataUrl";
 
 describe("buildImageDataUrl", () => {
     it("returns bare data URL without query", () => {
@@ -16,5 +16,19 @@ describe("buildImageDataUrl", () => {
         expect(
             buildImageDataUrl("abc", { meta: true, storage_id: undefined }),
         ).toBe("/api/images/abc/data?meta=true");
+    });
+});
+
+describe("withQueryParam", () => {
+    it("adds frame on a bare data URL", () => {
+        expect(withQueryParam("/api/images/abc/data", "frame", 3)).toBe(
+            "/api/images/abc/data?frame=3",
+        );
+    });
+
+    it("keeps storage_id when adding frame", () => {
+        expect(
+            withQueryParam("/api/images/abc/data?storage_id=42", "frame", 3),
+        ).toBe("/api/images/abc/data?storage_id=42&frame=3");
     });
 });

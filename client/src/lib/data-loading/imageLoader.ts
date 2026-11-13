@@ -5,7 +5,7 @@ import { ImageSliceStack } from "$lib/webgl/imageSliceStack";
 import type { Dimensions } from "$lib/webgl/types";
 import type { WebGL } from "$lib/webgl/webgl";
 import type { ImageGET } from "../../types/openapi_types";
-import { buildImageDataUrl } from "./imageDataUrl";
+import { buildImageDataUrl, withQueryParam } from "./imageDataUrl";
 import type { ImageLoadProgress } from "./loadProgress";
 import { dicomDecodeConcurrency, mapPool } from "./mapPool";
 import { loadMhdRawFromEndpoints } from "./mhdLoader";
@@ -425,8 +425,9 @@ export class ImageLoader {
                 (_, i) => i + 1,
             );
             await mapPool(frameIndices, concurrency, async (frameIndex) => {
+                const frameUrl = withQueryParam(url, "frame", frameIndex);
                 const frameImage = await cornerstone.loadImage(
-                    `wadouri:${url}?frame=${frameIndex}`,
+                    `wadouri:${frameUrl}`,
                 );
                 volume.set(
                     pixelDataAsUint8(frameImage.getPixelData()),
