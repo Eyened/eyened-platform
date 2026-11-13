@@ -168,9 +168,9 @@ class ImageStorage(Base):
         String(128), nullable=True, default=None
     )
 
-    # The format of the object
-    # Currently supported formats: image/png, image/jpeg, dicom, png_series, binary
-    # Should perhaps be an enum?
+    # Decode hint: image/png, image/jpeg, dicom, png_series, binary, mhd.
+    # Interim: angio_flow = OCTA flow DICOM (same decode as dicom). Prefer a
+    # future Role column over overloading Format for semantic channel identity.
     Format: Mapped[str] = mapped_column(String(256))
 
     # Whether this is the primary storage location for the image
@@ -681,7 +681,8 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     def pixel_array(self) -> np.ndarray:
         array = None
         format = self.primary_storage.Format
-        if format == "dicom":
+        # angio_flow is an interim Format for OCTA flow DICOMs (same decode as dicom)
+        if format in ("dicom", "angio_flow"):
             array = self._load_dicom_array()
         elif format == "binary":
             array = self._load_binary_array()

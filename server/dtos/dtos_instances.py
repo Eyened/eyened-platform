@@ -133,6 +133,14 @@ class ScanMeta(BaseModel):
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
+class ImageStorageGET(BaseModel):
+    """One on-disk (or object-store) file belonging to an ImageInstance."""
+
+    id: int
+    format: str
+    is_primary: bool
+
+
 class ImageBase(BaseModel):
     """Image metadata exposed via public id."""
 
@@ -157,6 +165,7 @@ class ImageBase(BaseModel):
     date_inserted: datetime
     date_modified: Optional[datetime] = None
     date_preprocessed: Optional[datetime] = None
+    storages: List[ImageStorageGET] = Field(default_factory=list)
 
 
 class ImageGET(ImageBase):

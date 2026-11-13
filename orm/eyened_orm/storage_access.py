@@ -22,19 +22,31 @@ class StorageRef:
         return root / self.relative_path
 
 
+def _storage_for_ref(image_instance, storage_id: int | None):
+    if storage_id is None:
+        storage = image_instance.primary_storage
+        if not storage:
+            raise ValueError("Primary image storage not found")
+        return storage
+
+    for storage in getattr(image_instance, "ImageStorages", None) or []:
+        if storage.ImageStorageID == storage_id:
+            return storage
+    raise ValueError(f"Image storage {storage_id} not found on this instance")
+
+
 def resolve_image_data_ref(
     image_instance,
     *,
     index: int | None = 0,
     meta: bool = False,
+    storage_id: int | None = None,
 ) -> StorageRef:
-    storage = image_instance.primary_storage
-    if not storage:
-        raise ValueError("Primary image storage not found")
+    storage = _storage_for_ref(image_instance, storage_id)
     if not storage.StorageBackend or not storage.StorageBackend.Key:
-        raise ValueError("Primary image storage has no storage backend")
+        raise ValueError("Image storage has no storage backend")
     if not storage.ObjectKey:
-        raise ValueError("Primary image storage has no ObjectKey")
+        raise ValueError("Image storage has no ObjectKey")
 
     key = storage.StorageBackend.Key
     obj = storage.ObjectKey
@@ -57,7 +69,8 @@ def resolve_image_data_ref(
     if fmt == "mhd":
         return StorageRef(key, obj if meta else f"{obj[:-4]}.raw")
 
-    # dicom / image/png / image/jpeg
+    # Whole-object formats: dicom, angio_flow (interim OCTA flow DICOM),
+    # image/png, image/jpeg — and any other Format that is a single file.
     return StorageRef(key, obj)
 
 

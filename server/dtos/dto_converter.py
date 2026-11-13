@@ -16,6 +16,7 @@ from .dtos_aux import CreatorGET, CreatorMeta, TagGET, TagMeta
 from .dtos_instances import (
     DeviceMeta,
     ImageGET,
+    ImageStorageGET,
     PatientAttributeValueGET,
     PatientDetailGET,
     PatientMeta,
@@ -227,6 +228,18 @@ class DTOConverter:
             data_source_id = object_key.split("/")[-1]
         else:
             data_source_id = None
+        raw_storages = list(getattr(image_instance, "ImageStorages", None) or [])
+        raw_storages.sort(
+            key=lambda s: (0 if s.IsPrimary else 1, s.ImageStorageID or 0)
+        )
+        storages = [
+            ImageStorageGET(
+                id=s.ImageStorageID,
+                format=s.Format,
+                is_primary=bool(s.IsPrimary),
+            )
+            for s in raw_storages
+        ]
         device_meta = DeviceMeta(
             manufacturer=(
                 image_instance.DeviceInstance.DeviceModel.Manufacturer
@@ -267,6 +280,7 @@ class DTOConverter:
             sop_instance_uid=image_instance.SOPInstanceUid or "",
             data_format=data_format,
             data_source_id=data_source_id,
+            storages=storages,
             thumbnail_identifier=image_instance.ThumbnailPath or "",
             modality=image_instance.Modality,
             dicom_modality=image_instance.DICOMModality,
