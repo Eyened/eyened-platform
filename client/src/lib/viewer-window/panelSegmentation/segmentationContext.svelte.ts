@@ -35,8 +35,8 @@ export class SegmentationContext {
         ),
     );
 
-    public creatorVisible = new SvelteSet<number>();
-    public modelVisible = $state(true);
+    /** A group's explicit open state; keys are "ai" or a creator id. */
+    public readonly groupOpen = new SvelteMap<string, boolean>();
     public shownSegmentations = new SvelteSet<string>();
 
     public visibleGraderSegmentations: SegmentationGET[] = $derived(
@@ -101,12 +101,15 @@ export class SegmentationContext {
             : undefined;
     }
 
-    toggleShowCreator(creatorId: number) {
-        if (this.creatorVisible.has(creatorId)) {
-            this.creatorVisible.delete(creatorId);
-        } else {
-            this.creatorVisible.add(creatorId);
-        }
+    /** AI and the grader's own group start open, colleagues' groups closed. */
+    isGroupOpen(key: string, userId: number): boolean {
+        return (
+            this.groupOpen.get(key) ?? (key === "ai" || key === String(userId))
+        );
+    }
+
+    toggleGroup(key: string, userId: number): void {
+        this.groupOpen.set(key, !this.isGroupOpen(key, userId));
     }
 
     toggleShowSegmentation(segmentation: Segmentation) {
@@ -117,10 +120,6 @@ export class SegmentationContext {
         } else {
             this.shownSegmentations.add(key);
         }
-    }
-
-    toggleShowModel() {
-        this.modelVisible = !this.modelVisible;
     }
 
     hideAll() {
@@ -143,10 +142,9 @@ export class SegmentationContext {
         this.segmentationItem = item;
         this.showOnlySegmentation(segmentation);
 
-        this.creatorVisible.clear();
-        this.creatorVisible.add(creatorId);
-
-        this.modelVisible = false;
+        this.groupOpen.clear();
+        this.groupOpen.set(String(creatorId), true);
+        this.groupOpen.set("ai", false);
 
         const rep = segmentation.data_representation;
         if (rep === "MultiClass" || rep === "MultiLabel") {

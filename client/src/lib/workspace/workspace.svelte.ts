@@ -1,4 +1,6 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
+import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { instanceIdFromImageId } from "$lib/viewer-window/viewerViewState";
 import {
     DEFAULT_PRESET_ID,
@@ -41,12 +43,20 @@ export interface WorkspaceOptions {
     toolMode?: ToolMode;
 }
 
+/** What Layers acts on: one viewport's viewer and its segmentation state. */
+export interface LayersTarget {
+    readonly viewerContext: ViewerContext;
+    readonly mainViewerContext: MainViewerContext;
+}
+
 /** What the palette and the options bar need from one viewport. */
 export interface ViewportHandle {
     /** Screen pixels per image pixel, in percent. */
     readonly zoomPercent: number;
     zoomBy(factor: number): void;
     reset(): void;
+    /** The viewport's layers; Layers lists them while it is selected. */
+    readonly layers?: LayersTarget;
 }
 
 /** The state of one viewer window: the catalogue, the slots and how they page. Positions are 0-based. */

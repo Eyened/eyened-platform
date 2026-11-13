@@ -22,7 +22,7 @@ export function groupByCreator(
 }
 
 /**
- * Orders segmentations in the same order as PanelSegmentation:
+ * Orders segmentations in the same order as the Segmentations section:
  * 1. Model segmentations first
  * 2. User's own grader segmentations (grouped by creator)
  * 3. Other graders' segmentations (grouped by creator)

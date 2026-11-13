@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { mockWidth } from "./testUtils";
 import {
+    readLayerArea,
     readStripLocalizer,
     readToolMode,
     readStripTracking,
     startStripOn,
+    writeLayerArea,
     writeStripOn,
 } from "./workspacePrefs";
 
@@ -39,5 +41,13 @@ describe("tool mode", () => {
         expect(readToolMode()).toBe("browse");
         localStorage.setItem("eyened:viewer:toolMode", "all");
         expect(readToolMode()).toBe("all");
+    });
+});
+
+describe("layer area", () => {
+    it("starts on and remembers Off", () => {
+        expect(readLayerArea()).toBe(true);
+        writeLayerArea(false);
+        expect(readLayerArea()).toBe(false);
     });
 });

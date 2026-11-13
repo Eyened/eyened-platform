@@ -10,6 +10,7 @@ const STRIP_KEY = "eyened:viewer:strip";
 const TRACKING_KEY = "eyened:viewer:stripTracking";
 const LOCALIZER_KEY = "eyened:viewer:stripLocalizer";
 const TOOL_MODE_KEY = "eyened:viewer:toolMode";
+const LAYER_AREA_KEY = "eyened:viewer:layerArea";
 
 export type LeftPanel = "images" | "info" | "help";
 const PANELS: readonly string[] = ["images", "info", "help"];
@@ -128,6 +129,23 @@ export function readToolMode(): ToolMode {
 export function writeToolMode(mode: ToolMode): void {
     try {
         localStorage.setItem(TOOL_MODE_KEY, mode);
+    } catch {
+        // Private mode or quota: the choice lasts this session only.
+    }
+}
+
+/** Whether Layers shows each segmentation's area on this slice; on unless switched off. */
+export function readLayerArea(): boolean {
+    try {
+        return localStorage.getItem(LAYER_AREA_KEY) !== "false";
+    } catch {
+        return true;
+    }
+}
+
+export function writeLayerArea(on: boolean): void {
+    try {
+        localStorage.setItem(LAYER_AREA_KEY, String(on));
     } catch {
         // Private mode or quota: the choice lasts this session only.
     }
