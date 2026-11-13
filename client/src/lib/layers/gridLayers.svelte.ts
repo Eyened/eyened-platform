@@ -116,6 +116,7 @@ export class GridLayers {
     setCurrent(id: number | undefined): void {
         this.currentId = id;
         if (id === undefined) return;
+        this.armedSlot = undefined;
         this.setShown(id, true);
     }
 

@@ -155,6 +155,12 @@ describe("EtdrsSection", () => {
         await fireEvent.click(name());
         expect(name()).toHaveAttribute("aria-pressed", "false");
         expect(screen.queryByRole("button", { name: /^Fovea/ })).toBeNull();
+        // Setting it current again starts at Fovea, not the Disc edge armed before.
+        await fireEvent.click(name());
+        expect(screen.getByRole("button", { name: /^Fovea/ })).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
 
         // A colleague's grid can be current; its points show as text.
         addOverlay.mockClear();
