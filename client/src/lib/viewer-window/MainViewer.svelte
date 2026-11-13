@@ -18,6 +18,7 @@
     import { FeaturePipetteOverlay } from "./panelSegmentation/FeaturePipetteOverlay";
     import { pointArming } from "$lib/forms/pointArming.svelte";
     import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
+    import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
     import { createViewTool } from "$lib/viewer/tools/viewTools";
     import { GridLayers } from "$lib/layers/gridLayers.svelte";
     import type {
@@ -57,6 +58,7 @@
         viewerContext,
         mainViewerContext,
         grids: new GridLayers(viewerContext, viewerWindowContext.registration),
+        measure: new MeasureTool(viewerContext.image),
     };
 
     if (image.is3D) {

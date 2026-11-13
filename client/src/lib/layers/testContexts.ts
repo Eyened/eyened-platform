@@ -6,6 +6,7 @@ import type { SyncState } from "$lib/webgl/segmentationState.svelte";
 import { SvelteSet } from "svelte/reactivity";
 import { fromStore, writable, type Writable } from "svelte/store";
 import { vi } from "vitest";
+import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
 import { GridLayers } from "./gridLayers.svelte";
 import type {
     ModelSegmentationGET,
@@ -156,6 +157,7 @@ export function layersContexts(
         getLinkedImgIds: () => new Set(over.linked ?? []),
     };
     const grids = new GridLayers(viewerContext as never, registration as never);
+    const measure = new MeasureTool(image as never);
     const context = new Map<string, unknown>([
         ["globalContext", globalContext],
         ["viewerContext", viewerContext],
@@ -169,5 +171,6 @@ export function layersContexts(
         mainViewerContext,
         globalContext,
         grids,
+        measure,
     };
 }

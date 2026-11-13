@@ -6,6 +6,7 @@ Provides the selected viewport's viewer and segmentation contexts to the section
     import type { LayersTarget } from "$lib/workspace/workspace.svelte";
     import { setContext, untrack } from "svelte";
     import type { LayerSectionId } from "./layerSections";
+    import DistanceSection from "./DistanceSection.svelte";
     import EtdrsSection from "./EtdrsSection.svelte";
     import SegmentationsSection from "./SegmentationsSection.svelte";
 
@@ -41,6 +42,15 @@ Provides the selected viewport's viewer and segmentation contexts to the section
         grids={target.grids}
         open={open.etdrs}
         ontoggle={() => ontoggle("etdrs")}
+        {shown}
+    />
+{/if}
+{#if sections.includes("distance")}
+    <DistanceSection
+        measure={target.measure}
+        grids={target.grids}
+        open={open.distance}
+        ontoggle={() => ontoggle("distance")}
         {shown}
     />
 {/if}

@@ -1,6 +1,7 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { GridLayers } from "$lib/layers/gridLayers.svelte";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
+import type { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { instanceIdFromImageId } from "$lib/viewer-window/viewerViewState";
 import {
@@ -50,6 +51,8 @@ export interface LayersTarget {
     readonly mainViewerContext: MainViewerContext;
     /** ETDRS grids state, kept while Layers remounts its sections. */
     readonly grids: GridLayers;
+    /** Today's Measure tool with this viewport's lines, until the Distance tool replaces it. */
+    readonly measure: MeasureTool;
 }
 
 /** What the palette and the options bar need from one viewport. */

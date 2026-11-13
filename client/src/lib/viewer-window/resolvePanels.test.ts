@@ -9,7 +9,6 @@ vi.mock("./panelInfo/panelInfo.svelte", () => ({ default: {} }));
 vi.mock("./panelRegistration/PanelRegistration.svelte", () => ({
     default: {},
 }));
-vi.mock("./panelMeasure/PanelMeasure.svelte", () => ({ default: {} }));
 vi.mock("./panelForm/PanelForm.svelte", () => ({ default: {} }));
 vi.mock("./panelQuickForm/PanelQuickForm.svelte", () => ({ default: {} }));
 vi.mock("./icons/icons", () => ({
@@ -18,10 +17,8 @@ vi.mock("./icons/icons", () => ({
     Registration: {},
     Form: {},
 }));
-vi.mock("./icons/Measure.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/InfoPanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/RegistrationPanelHelp.svelte", () => ({ default: {} }));
-vi.mock("./panelHelp/MeasurePanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/FormPanelHelp.svelte", () => ({ default: {} }));
 
 const { resolvePanels } = await import("./resolvePanels");
@@ -38,7 +35,7 @@ describe("resolvePanels", () => {
             baseInput,
             CLIENT_DEFAULTS,
         );
-        expect(panels.map((p) => p.name)).toEqual(["Info", "Measure", "Form"]);
+        expect(panels.map((p) => p.name)).toEqual(["Info", "Form"]);
         expect(expandedPanelNames).toEqual([]);
     });
 
@@ -71,7 +68,7 @@ describe("resolvePanels", () => {
 
     it("returns defaults immediately when taskConfig has no layout object", () => {
         const { panels, expandedPanelNames } = resolvePanels(baseInput);
-        expect(panels.map((p) => p.name)).toEqual(["Info", "Measure", "Form"]);
+        expect(panels.map((p) => p.name)).toEqual(["Info", "Form"]);
         expect(expandedPanelNames).toEqual([]);
     });
 
@@ -84,7 +81,6 @@ describe("resolvePanels", () => {
         expect(panels.map((p) => p.name)).toEqual([
             "Info",
             "Registration",
-            "Measure",
             "Form",
         ]);
     });
