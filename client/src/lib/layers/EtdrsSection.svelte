@@ -101,13 +101,13 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
         });
         untrack(() => {
             tool.points = pointsOf(formAnnotations.get(id));
-            tool.placementIndex = grids.slot;
+            tool.placementIndex = grids.slotOf(id);
         });
         const remove = viewerContext.addOverlay(tool);
         armed = { id, tool };
         return () => {
-            // Keep the armed slot for when this grid shows again; a newly set grid starts at Fovea.
-            if (grids.currentId === id) grids.slot = tool.placementIndex ?? 0;
+            // Keep the armed slot for when this grid shows again.
+            grids.saveSlot(id, tool.placementIndex ?? 0);
             armed = undefined;
             tool.destroy();
             remove();
@@ -118,12 +118,12 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
         if (grid.id !== editableId) return undefined;
         // The tool may still be the previous grid's until the effect swaps it.
         return armed?.id === grid.id
-            ? (armed.tool.placementIndex ?? grids.slot)
-            : grids.slot;
+            ? (armed.tool.placementIndex ?? grids.slotOf(grid.id))
+            : grids.slotOf(grid.id);
     }
 
     function arm(slot: number) {
-        grids.slot = slot;
+        if (editableId !== undefined) grids.saveSlot(editableId, slot);
         if (armed) armed.tool.placementIndex = slot;
     }
 
@@ -178,7 +178,7 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
         await tick();
         section
             ?.querySelector<HTMLElement>(
-                `[aria-label="ETDRS grid, ${grid.creator.name} [${grid.id}]"] [data-landmark="0"]`,
+                `[aria-label$="[${grid.id}]"] [data-landmark="0"]`,
             )
             ?.focus();
     }

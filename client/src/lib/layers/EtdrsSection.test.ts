@@ -174,7 +174,12 @@ describe("EtdrsSection", () => {
         });
         ontoggle.mockImplementation(() => view.rerender({ open: true }));
         const { grids } = view;
-        grids.setShown(11, true);
+        grids.setCurrent(11);
+        await view.rerender({ open: true });
+        await fireEvent.click(
+            screen.getByRole("button", { name: /^Disc edge \(d\)/ }),
+        );
+        await view.rerender({ open: false });
         grids.setShown(AI_GRID, true);
         vi.mocked(createFormAnnotation).mockImplementation(async () => {
             const created = grid(99, ME, "inst-1", {
@@ -213,6 +218,7 @@ describe("EtdrsSection", () => {
         formAnnotations.set(12, grid(12, 9));
         const { grids } = renderSection();
         grids.setCurrent(11);
+        expect(grids.isShown(11)).toBe(true);
         expect(
             within(
                 screen.getByRole("group", {
@@ -245,6 +251,7 @@ describe("EtdrsSection", () => {
         formAnnotations.set(11, grid(11, ME));
         const { grids } = renderSection();
         const field = screen.getByLabelText("Radius fraction");
+        expect(field).toHaveAttribute("step", "0.01");
         await fireEvent.input(field, { target: { value: "0.9" } });
         expect(grids.settings.radiusFraction).toBe(0.85);
         await fireEvent.change(field);

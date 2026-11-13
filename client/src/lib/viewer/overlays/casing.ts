@@ -28,6 +28,8 @@ export function casedText(
     casing = CASING,
 ): void {
     const { lineWidth, strokeStyle, lineJoin } = ctx;
+    const dash = ctx.getLineDash();
+    ctx.setLineDash([]);
     ctx.lineWidth = 3;
     ctx.strokeStyle = casing;
     ctx.lineJoin = "round";
@@ -35,5 +37,6 @@ export function casedText(
     ctx.lineWidth = lineWidth;
     ctx.strokeStyle = strokeStyle;
     ctx.lineJoin = lineJoin;
+    ctx.setLineDash(dash);
     ctx.fillText(text, x, y);
 }

@@ -40,8 +40,7 @@ export class GridLayers {
     /** Sizes every grid in this viewport, the AI grid included. */
     readonly settings = $state({ radiusFraction: 0.85 });
     currentId: number | undefined = $state();
-    /** The current grid's armed slot: 0 fovea, 1 disc edge. */
-    slot = $state(0);
+    private armedSlot: { id: number; index: number } | undefined = $state();
     private readonly shown = new SvelteMap<GridKey, () => void>();
 
     constructor(
@@ -103,11 +102,20 @@ export class GridLayers {
         for (const key of [...this.shown.keys()]) this.setShown(key, false);
     }
 
+    /** Remembers a grid's armed slot: 0 fovea, 1 disc edge. */
+    saveSlot(id: number, index: number): void {
+        this.armedSlot = { id, index };
+    }
+
+    /** The slot saved for a grid; Fovea when none was. */
+    slotOf(id: number): number {
+        return this.armedSlot?.id === id ? this.armedSlot.index : 0;
+    }
+
     /** Sets the current grid, which shows it and arms Fovea; undefined unsets it. */
     setCurrent(id: number | undefined): void {
         this.currentId = id;
         if (id === undefined) return;
-        this.slot = 0;
         this.setShown(id, true);
     }
 

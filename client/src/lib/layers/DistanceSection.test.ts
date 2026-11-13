@@ -60,6 +60,41 @@ describe("DistanceSection", () => {
         expect(measure.highligtLine?.end).toEqual({ x: 30, y: 40 });
     });
 
+    it("sets the resolution from the AI grid at the fraction, and reverts a bad X", async () => {
+        const ctx = layersContexts("inst-1", {
+            resolution: { x: 10, y: 10, z: 1 },
+            cfKeypoints: { fovea_xy: [10, 11], disc_edge_xy: [20, 21] },
+        });
+        render(DistanceSection, {
+            props: {
+                measure: ctx.measure,
+                grids: ctx.grids,
+                open: true,
+                ontoggle: vi.fn(),
+                shown: true,
+            },
+            context: ctx.context,
+        });
+        expect(screen.getByText("10.00 × 10.00 µm/px")).toBeInTheDocument();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Image resolution" }),
+        );
+        // Fovea to disc edge is sqrt(200) px; 3000 µm / 0.85 / 14.1421 px is 249.57 µm/px.
+        await fireEvent.click(
+            screen.getByRole("button", {
+                name: "From AI grid: 249.57 µm/px",
+            }),
+        );
+        expect(screen.getByText("249.57 × 249.57 µm/px")).toBeInTheDocument();
+        const x = screen.getByLabelText("X (µm/px)");
+        for (const bad of ["", "0"]) {
+            await fireEvent.input(x, { target: { value: bad } });
+            await fireEvent.keyDown(x, { key: "Enter" });
+            expect(x).toHaveValue(ctx.measure.imageResX);
+        }
+        expect(ctx.measure.imageResX).toBeCloseTo(249.567, 3);
+    });
+
     it("arms the Measure tool while open and on screen, and disarms it when closed", async () => {
         const { measure, viewerContext, rerender } = renderSection();
         expect(viewerContext.addOverlay).toHaveBeenCalledWith(measure);
