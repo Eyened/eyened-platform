@@ -31,6 +31,9 @@ function mockViewer(
         fillText: vi.fn(),
         strokeRect: vi.fn(),
         fillRect: vi.fn(),
+        strokeText: vi.fn(),
+        getLineDash: () => [],
+        setLineDash: vi.fn(),
     };
     return {
         image: {

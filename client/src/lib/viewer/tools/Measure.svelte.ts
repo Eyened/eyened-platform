@@ -4,6 +4,7 @@ import type { RenderTarget } from "$lib/webgl/types";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { SvelteSet } from "svelte/reactivity";
+import { cased, casedText } from "../overlays/casing";
 
 const radius = 12;
 const strokeStyle = "rgba(255, 255, 255, 1)";
@@ -167,8 +168,8 @@ export class MeasureTool implements Overlay {
         ctx.lineTo(x0 + nx, y0 + ny);
         ctx.moveTo(x1 - nx, y1 - ny);
         ctx.lineTo(x1 + nx, y1 + ny);
-        ctx.stroke();
-        ctx.fillText(this.getDistance(line), cx + 3 * nx, cy - ny);
+        cased(ctx, () => ctx.stroke());
+        casedText(ctx, this.getDistance(line), cx + 3 * nx, cy - ny);
     }
 
     getDistance(line: Line) {
