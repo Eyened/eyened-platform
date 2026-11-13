@@ -51,6 +51,8 @@ export class ViewerWindowContext {
         string,
         EnfaceProjectionManager
     >();
+    /** Instance ids whose angio_flow volume finished attaching after structural. */
+    public readonly octaFlowReady = new SvelteMap<string, boolean>();
 
     photoLocators = new SvelteMap<string, PhotoLocator[]>();
     photoLocatorSets: PhotoLocator[][] = $state([]);
@@ -247,20 +249,23 @@ export class ViewerWindowContext {
         // Start loading if not already in progress
         if (!this.imagesIndex.has(instance.id)) {
             const loadPromise = this.imageLoader
-                .load(instance)
+                .load(instance, {
+                    // Async-only: never mutate reactive state synchronously from
+                    // the {#await getImages()} template expression.
+                    onFlowReady: (imageId) => {
+                        this.octaFlowReady.set(imageId, true);
+                    },
+                })
                 .then((loadedImages) => {
-                    // Process images once loaded
                     for (const image of loadedImages) {
                         this.importPhotoLocators(image);
                     }
 
-                    // Set up indices
                     this.bySOPInstanceUID.set(
                         instance.sop_instance_uid,
                         loadedImages,
                     );
 
-                    // Create viewer contexts
                     for (const image of loadedImages) {
                         const viewerContext = new ViewerContext(image, this);
                         if (image.image_id.endsWith("_proj")) {
@@ -286,7 +291,6 @@ export class ViewerWindowContext {
             this.imagesIndex.set(instance.id, loadPromise);
         }
 
-        // Return cached promise (either existing or newly created)
         return this.imagesIndex.get(instance.id)!;
     }
     importPhotoLocators(image: AbstractImage) {
