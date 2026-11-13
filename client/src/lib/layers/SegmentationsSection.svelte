@@ -118,7 +118,9 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
                 <span class="w-10 text-end text-label-01 text-text-primary"
                     >{percent}%</span
                 >
-                <Field.Field orientation="horizontal" class="w-auto shrink-0">
+            </div>
+            <div class="px-4 pb-2">
+                <Field.Field orientation="horizontal" class="w-auto">
                     <Toggle
                         id="{uid}-area"
                         bind:checked={() => showArea, setArea}

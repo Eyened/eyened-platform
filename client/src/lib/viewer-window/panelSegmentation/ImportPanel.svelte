@@ -61,7 +61,7 @@
         Import
     </h5>
     <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
         class="self-start"
         onclick={() => (open = true)}

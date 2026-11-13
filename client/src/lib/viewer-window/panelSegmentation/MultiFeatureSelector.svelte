@@ -167,11 +167,8 @@ MultiClass rows also get the viewport's two class opacity sliders, which are not
             <!-- While areas show, the legend is the visible caption row; otherwise only screen readers get it. -->
             <legend
                 class={areas
-                    ? "mb-1 flex w-full justify-between text-label-01 text-text-secondary"
-                    : "sr-only"}
-                ><span>Class</span>{#if areas}<span aria-hidden="true"
-                        >Area this slice</span
-                    >{/if}</legend
+                    ? "mb-1 text-label-01 text-text-secondary"
+                    : "sr-only"}>Class</legend
             >
             <ul class="flex flex-col gap-1">
                 {#each drawableSubfeatures as subfeature (subfeature.index)}
@@ -199,40 +196,50 @@ MultiClass rows also get the viewport's two class opacity sliders, which are not
                             ]});"
                             aria-hidden="true">{subfeature.index}</span
                         >
-                        {#if isMultiClass}
-                            <RadioButton
-                                class="min-w-0 flex-1 [overflow-wrap:anywhere]"
-                                name="{uid}-class"
-                                value={String(subfeature.index)}
-                                labelText={subfeature.name}
-                                checked={activeClassIndex === subfeature.index}
-                                onchange={() =>
-                                    (activeClassIndex = subfeature.index)}
-                            />
-                        {:else}
-                            <Checkbox
-                                id="{uid}-label-{subfeature.index}"
-                                class="mt-1"
-                                checked={activeLabelIndices.includes(
-                                    subfeature.index,
-                                )}
-                                onCheckedChange={(on) =>
-                                    toggleLabel(subfeature.index, on === true)}
-                            />
-                            <label
-                                for="{uid}-label-{subfeature.index}"
-                                class="min-w-0 flex-1 pt-0.5 text-body-compact-01 [overflow-wrap:anywhere] text-text-primary"
-                                >{subfeature.name}</label
-                            >
-                        {/if}
-                        {#if areas}
-                            <span
-                                class="shrink-0 pt-0.5 text-label-01 text-text-primary tabular-nums"
-                                ><span class="sr-only">Area this slice </span>{(
-                                    areas.get(subfeature.index) ?? 0
-                                ).toFixed(2)} mm²</span
-                            >
-                        {/if}
+                        <div class="min-w-0 flex-1">
+                            {#if isMultiClass}
+                                <RadioButton
+                                    class="[overflow-wrap:anywhere]"
+                                    name="{uid}-class"
+                                    value={String(subfeature.index)}
+                                    labelText={subfeature.name}
+                                    checked={activeClassIndex ===
+                                        subfeature.index}
+                                    onchange={() =>
+                                        (activeClassIndex = subfeature.index)}
+                                />
+                            {:else}
+                                <div class="flex items-start gap-1">
+                                    <Checkbox
+                                        id="{uid}-label-{subfeature.index}"
+                                        class="mt-1"
+                                        checked={activeLabelIndices.includes(
+                                            subfeature.index,
+                                        )}
+                                        onCheckedChange={(on) =>
+                                            toggleLabel(
+                                                subfeature.index,
+                                                on === true,
+                                            )}
+                                    />
+                                    <label
+                                        for="{uid}-label-{subfeature.index}"
+                                        class="pt-0.5 text-body-compact-01 [overflow-wrap:anywhere] text-text-primary"
+                                        >{subfeature.name}</label
+                                    >
+                                </div>
+                            {/if}
+                            {#if areas}
+                                <span
+                                    class="block text-label-01 text-text-primary tabular-nums"
+                                    ><span class="sr-only"
+                                        >Area this slice
+                                    </span>{(
+                                        areas.get(subfeature.index) ?? 0
+                                    ).toFixed(2)} mm²</span
+                                >
+                            {/if}
+                        </div>
                     </li>
                 {/each}
             </ul>

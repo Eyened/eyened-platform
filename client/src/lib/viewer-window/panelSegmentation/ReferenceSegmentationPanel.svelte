@@ -84,7 +84,7 @@
         {/if}
         {#if isEditable}
             <!-- One opener for Set reference… and Change…, so the modal can return focus to it. -->
-            <div class="flex">
+            <div class="flex flex-wrap">
                 <Button
                     variant="ghost"
                     size="sm"

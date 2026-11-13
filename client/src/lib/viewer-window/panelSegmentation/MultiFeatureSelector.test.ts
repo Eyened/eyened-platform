@@ -63,9 +63,6 @@ describe("MultiFeatureSelector", () => {
             .getByRole("radio", { name: "Ganglion cell layer" })
             .closest("li")!;
         expect(within(ganglion).getByText("1.00 mm²")).toBeInTheDocument();
-        expect(
-            screen.getByText("Area this slice", { selector: "legend span" }),
-        ).toBeInTheDocument();
         expect(screen.queryByText("Background")).toBeNull();
         expect(
             screen.getByRole("slider", { name: "Active class" }),
