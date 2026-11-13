@@ -39,11 +39,11 @@
     >
     <!-- Not bind:value: Svelte binds a number input as a number, and clearing it would give null. -->
     <Input
+        step="any"
         {...restProps}
         bind:ref
         {id}
         type="number"
-        step="any"
         {value}
         oninput={(e) => (value = e.currentTarget.value)}
         class="number-input-no-steppers min-w-37.5"

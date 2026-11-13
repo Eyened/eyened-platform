@@ -2,11 +2,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mockWidth } from "./testUtils";
 import {
     readLayerArea,
+    readLayerSections,
     readStripLocalizer,
     readToolMode,
     readStripTracking,
     startStripOn,
     writeLayerArea,
+    writeLayerSections,
     writeStripOn,
 } from "./workspacePrefs";
 
@@ -49,5 +51,30 @@ describe("layer area", () => {
         expect(readLayerArea()).toBe(true);
         writeLayerArea(false);
         expect(readLayerArea()).toBe(false);
+    });
+});
+
+describe("Layers sections", () => {
+    it("start with Segmentations open, restore the last open set except Distance lines, and ignore a bad value", () => {
+        expect(readLayerSections()).toEqual({
+            segmentations: true,
+            etdrs: false,
+            pointsets: false,
+            distance: false,
+        });
+        writeLayerSections({
+            segmentations: false,
+            etdrs: true,
+            pointsets: false,
+            distance: true,
+        });
+        expect(readLayerSections()).toEqual({
+            segmentations: false,
+            etdrs: true,
+            pointsets: false,
+            distance: false,
+        });
+        localStorage.setItem("eyened:viewer:layerSections", "{");
+        expect(readLayerSections().segmentations).toBe(true);
     });
 });

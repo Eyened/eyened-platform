@@ -3,6 +3,14 @@ import type { Registration } from "$lib/registration/registration.svelte";
 import type { Position, Position2D } from "$lib/types";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
+import { cased, casedText } from "./casing";
+
+// Carbon magenta 40, over a darker casing: on a bright fundus the default casing leaves it under 3:1.
+const AI_COLOUR = "#ff7eb6";
+const AI_CASING = "rgba(0, 0, 0, 0.8)";
+
+/** The interim f / d placing's cross, until the Place ETDRS tool comes. */
+export const ETDRS_LANDMARK_COLOUR = "rgba(0, 255, 0, 1)";
 
 const [C, I, O] = [1, 3, 6];
 const additionalCircles: Record<string, number> = {
@@ -22,7 +30,7 @@ export type etdrsGridType = {
     };
 };
 
-/** Live FormAnnotation from the store, or a static snapshot (e.g. AI auto grid). */
+/** Live FormAnnotation from the store, or a static snapshot: the AI grid, which also rings its two points. */
 export type ETDRSGridSource =
     | { kind: "annotation"; id: number }
     | { kind: "snapshot"; data: etdrsGridType };
@@ -110,6 +118,8 @@ export class ETDRSGridItemOverlay implements Overlay {
         if (!fovea || !discEdge) return;
 
         this.paint(context2D, viewerContext, fovea, discEdge);
+        if (this.source.kind === "snapshot")
+            this.paintAiPoints(context2D, viewerContext, [fovea, discEdge]);
     }
 
     /**
@@ -149,21 +159,13 @@ export class ETDRSGridItemOverlay implements Overlay {
             this.settings.radiusFraction *
             Math.sqrt(dx * dx + dy * dy);
 
+        // One path, so a casing never covers a line drawn before it.
+        ctx.beginPath();
         for (const diameter of [C, I, O]) {
-            const r = diameter / 2;
-            ctx.beginPath();
-            ctx.ellipse(
-                p_fovea.x,
-                p_fovea.y,
-                r * pix_per_mm,
-                r * pix_per_mm,
-                0,
-                0,
-                2 * Math.PI,
-            );
-            ctx.stroke();
+            const r = (diameter / 2) * pix_per_mm;
+            ctx.moveTo(p_fovea.x + r, p_fovea.y);
+            ctx.ellipse(p_fovea.x, p_fovea.y, r, r, 0, 0, 2 * Math.PI);
         }
-
         const r = 0.5 * Math.sqrt(2) * pix_per_mm;
         for (const sdx of [-1, 1]) {
             for (const sdy of [-1, 1]) {
@@ -172,9 +174,9 @@ export class ETDRSGridItemOverlay implements Overlay {
                     p_fovea.y + 0.5 * sdy * r,
                 );
                 ctx.lineTo(p_fovea.x + 3 * sdx * r, p_fovea.y + 3 * sdy * r);
-                ctx.stroke();
             }
         }
+        cased(ctx, () => ctx.stroke());
 
         // Draw additionalCircles legend with labels (bottom-left), if size allows
         const r_max = 0.5 * additionalCircles["O2"] * pix_per_mm;
@@ -202,8 +204,8 @@ export class ETDRSGridItemOverlay implements Overlay {
                     0,
                     2 * Math.PI,
                 );
-                ctx.stroke();
-                ctx.fillText(name, x, y - r_max - 5);
+                cased(ctx, () => ctx.stroke());
+                casedText(ctx, name, x, y - r_max - 5);
                 x += Math.max(r * pix_per_mm, 20);
                 x += 10;
             }
@@ -230,8 +232,30 @@ export class ETDRSGridItemOverlay implements Overlay {
                 0,
                 2 * Math.PI,
             );
-            ctx.stroke();
+            cased(ctx, () => ctx.stroke());
             viewerContext.claimCursor("none", CursorPriority.Hide);
+        }
+    }
+
+    /** The model's fovea and disc edge: dashed rings labelled "AI". */
+    private paintAiPoints(
+        ctx: CanvasRenderingContext2D,
+        viewerContext: ViewerContext,
+        points: Position2D[],
+    ) {
+        ctx.strokeStyle = AI_COLOUR;
+        ctx.fillStyle = AI_COLOUR;
+        ctx.lineWidth = 2;
+        ctx.font = "12px 'IBM Plex Sans', sans-serif";
+        ctx.textAlign = "start";
+        for (const point of points) {
+            const p = viewerContext.imageToViewerCoordinates(point);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI);
+            ctx.setLineDash([3, 2]);
+            cased(ctx, () => ctx.stroke(), AI_CASING);
+            ctx.setLineDash([]);
+            casedText(ctx, "AI", p.x + 8, p.y - 5, AI_CASING);
         }
     }
 }

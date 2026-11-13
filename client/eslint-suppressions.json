@@ -156,11 +156,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/panelETRDS/ETDRSGridItem.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "src/lib/viewer-window/panelForm/FormItemContent.svelte": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
@@ -177,22 +172,6 @@
     }
   },
   "src/lib/viewer-window/panelInfo/panelInfo.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelMeasure/CreatorAreas.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelMeasure/PanelMeasure.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    },
     "svelte/require-each-key": {
       "count": 1
     }

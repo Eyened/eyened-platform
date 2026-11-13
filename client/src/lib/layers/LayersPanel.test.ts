@@ -1,6 +1,14 @@
-import { cleanup, render, screen } from "@testing-library/svelte";
+import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
+import { tick } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { segmentations } from "$lib/data/stores.svelte";
+import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
+import {
+    formAnnotations,
+    formSchemasByName,
+    segmentations,
+} from "$lib/data/stores.svelte";
+import { Line } from "$lib/viewer/tools/Measure.svelte";
+import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
 import { workspaceWith } from "$lib/workspace/testUtils";
 import type { Workspace } from "$lib/workspace/workspace.svelte";
 import { graderSegmentation, layersContexts, ME } from "./testContexts";
@@ -18,6 +26,9 @@ const { default: LayersPanel } = await import("./LayersPanel.svelte");
 afterEach(() => {
     cleanup();
     segmentations.clear();
+    formAnnotations.clear();
+    formSchemasByName.delete(BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID);
+    localStorage.clear();
 });
 
 function attach(ws: Workspace, position: number, instanceId: string) {
@@ -29,6 +40,8 @@ function attach(ws: Workspace, position: number, instanceId: string) {
         layers: {
             viewerContext: ctx.viewerContext as never,
             mainViewerContext: ctx.mainViewerContext as never,
+            grids: ctx.grids,
+            measure: ctx.measure,
         },
     });
     return ctx;
@@ -93,5 +106,57 @@ describe("LayersPanel", () => {
     it("does not say No layers while the slot's image is still loading", () => {
         renderPanel(workspaceWith(1));
         expect(screen.queryByText("No layers")).toBeNull();
+    });
+
+    it("keeps a viewport's grids, current grid, armed slot, radius fraction and lines while another is selected", async () => {
+        const name = BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID;
+        formSchemasByName.set(name, { id: 3, name } as never);
+        formAnnotations.set(11, {
+            id: 11,
+            form_schema_id: 3,
+            image_id: "inst-a",
+            annotation_type: "grader_form",
+            sub_task_id: null,
+            creator: { id: ME, name: `Grader ${ME}` },
+            form_data: {},
+        } as never);
+        const ws = workspaceWith(2);
+        const a = attach(ws, 0, "inst-a");
+        attach(ws, 1, "inst-b");
+        a.measure.lines.add(new Line({ x: 0, y: 0 }, { x: 3, y: 4 }, 0));
+        renderPanel(ws);
+        await fireEvent.click(
+            screen.getByRole("button", { name: "ETDRS grids 1" }),
+        );
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Distance lines 1" }),
+        );
+        await fireEvent.click(
+            screen.getByRole("button", { name: "ETDRS grid, Grader 5" }),
+        );
+        // Arm Disc edge the way the d key does, through the tool, so only the section's save keeps it.
+        const tool = vi
+            .mocked(a.viewerContext.addOverlay as ReturnType<typeof vi.fn>)
+            .mock.calls.map(([overlay]) => overlay)
+            .find((overlay) => overlay instanceof PointTool) as PointTool;
+        tool.placementIndex = 1;
+        const fraction = screen.getByLabelText("Radius fraction");
+        await fireEvent.input(fraction, { target: { value: "0.9" } });
+        await fireEvent.change(fraction);
+
+        ws.select(1);
+        await tick();
+        expect(screen.queryByText(/^Line 1/)).toBeNull();
+        ws.select(0);
+
+        expect(
+            await screen.findByRole("button", { name: "ETDRS grid, Grader 5" }),
+        ).toHaveAttribute("aria-pressed", "true");
+        expect(
+            screen.getByRole("button", { name: /^Disc edge \(d\)/ }),
+        ).toHaveAttribute("aria-pressed", "true");
+        expect(screen.getByLabelText("Radius fraction")).toHaveValue(0.9);
+        expect(screen.getByText(/^Line 1 ·/)).toBeInTheDocument();
+        expect(a.grids.isShown(11)).toBe(true);
     });
 });

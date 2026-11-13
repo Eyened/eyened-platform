@@ -1,60 +1,52 @@
+<!--
+@component
+One distance line in Layers: "Line n · length", its two points, and Delete. Hover or focus inside the row highlights the line.
+-->
 <script lang="ts">
-    import { MeasureTool, type Line } from "$lib/viewer/tools/Measure.svelte";
-    import { PanelIcon, Trash } from "../icons/icons";
-    interface Props {
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import type { Line, MeasureTool } from "$lib/viewer/tools/Measure.svelte";
+    import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
+
+    let {
+        line,
+        n,
+        measure,
+        ondelete,
+    }: {
         line: Line;
-        measureTool: MeasureTool;
-    }
+        /** The line's number among this image's or B-scan's lines, in drawing order. */
+        n: number;
+        measure: MeasureTool;
+        ondelete: () => void;
+    } = $props();
 
-    let { line, measureTool }: Props = $props();
-
-    const lines = measureTool.lines;
-    let distance = $derived(measureTool.getDistance(line));
+    const point = (p: { x: number; y: number }) =>
+        `(${p.x.toFixed(0)}, ${p.y.toFixed(0)})`;
 </script>
 
-{#snippet point(pt: { x: number; y: number })}
-    ({pt.x.toFixed(0)}, {pt.y.toFixed(0)})
-{/snippet}
-
-<li
-    onpointerenter={() => measureTool.highlight(line)}
-    onpointerleave={() => measureTool.highlight(undefined)}
+<div
+    class="flex items-start gap-1 py-1 ps-7 pe-2 focus-within:bg-layer-hover-01 hover:bg-layer-hover-01"
+    role="group"
+    aria-label="Line {n}"
+    onpointerenter={() => measure.highlight(line)}
+    onpointerleave={() => measure.highlight(undefined)}
+    onfocusin={() => measure.highlight(line)}
+    onfocusout={() => measure.highlight(undefined)}
 >
-    <div class="text">
-        <span>
-            {@render point(line.start)} - {@render point(line.end)}
-        </span>
-        <span>
-            {distance}
-        </span>
+    <div class="min-w-0 flex-1 px-1">
+        <p class="text-body-compact-01 text-text-primary tabular-nums">
+            Line {n} · {measure.getDistance(line)}
+        </p>
+        <p class="text-helper-text-01 text-text-secondary tabular-nums">
+            {point(line.start)} – {point(line.end)}
+        </p>
     </div>
-    <div>
-        <PanelIcon onclick={() => lines.delete(line)}>
-            <Trash />
-        </PanelIcon>
-    </div>
-</li>
-
-<style>
-    li {
-        display: flex;
-        align-items: center;
-        background-color: rgba(255, 255, 255, 0.1);
-        padding-left: 0.5em;
-        margin-bottom: 0.5em;
-        border-radius: 5px;
-    }
-    li:hover {
-        background-color: rgba(255, 255, 255, 0.2);
-    }
-    span {
-        font-size: x-small;
-        flex: 1;
-    }
-    li div.text {
-        flex: 1;
-    }
-    span {
-        display: block;
-    }
-</style>
+    <IconButton
+        size="icon-xs"
+        label="Delete line {n}"
+        data-delete-line
+        onclick={ondelete}
+    >
+        <TrashCan />
+    </IconButton>
+</div>
