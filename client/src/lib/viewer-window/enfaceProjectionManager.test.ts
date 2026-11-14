@@ -30,7 +30,10 @@ vi.mock("$lib/webgl/enfaceProjection", () => ({
     },
 }));
 
-import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
+import {
+    EnfaceProjectionManager,
+    type ProjectionSourceViewport,
+} from "./enfaceProjectionManager.svelte";
 
 const segmentation = {
     id: 1,
@@ -67,15 +70,8 @@ function shownMultiClass() {
         depth: 1,
         height: 4,
     } as unknown as Image3D);
-    manager.registerMainViewerContext(mainViewerContext);
-    // The manager keeps its context in $state, which proxies it: edit through the proxy.
-    return {
-        manager,
-        ctx: manager.mainViewerContext!
-            .segmentationContext as unknown as typeof ctx,
-        hidden,
-        item,
-    };
+    manager.register({ mainViewerContext, position: () => 0 });
+    return { manager, ctx, hidden, item };
 }
 
 beforeEach(() => {
@@ -107,5 +103,33 @@ describe("EnfaceProjectionManager paint layers", () => {
         ]);
         ctx.activeIndices = [1, 2];
         expect(manager.getPaintLayers("heatmap")).toEqual([]);
+    });
+});
+
+/** A viewport showing the OCT with nothing in it. */
+function viewport(position: number): ProjectionSourceViewport {
+    return {
+        mainViewerContext: {
+            segmentationContext: {
+                graderSegmentations: [],
+                modelSegmentations: [],
+            },
+        } as never,
+        position: () => position,
+    };
+}
+
+describe("EnfaceProjectionManager source", () => {
+    it("takes the OCT viewport opened last, falls back to the next newest when it closes, and has none when none is left", () => {
+        const manager = new EnfaceProjectionManager({} as Image3D);
+        const first = viewport(0);
+        const second = viewport(1);
+        const closeFirst = manager.register(first);
+        const closeSecond = manager.register(second);
+        expect(manager.source).toBe(second);
+        closeSecond();
+        expect(manager.source).toBe(first);
+        closeFirst();
+        expect(manager.source).toBeUndefined();
     });
 });

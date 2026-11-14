@@ -61,11 +61,19 @@
         measure: new MeasureTool(viewerContext.image),
     };
 
+    // While mounted, this viewport is a source for its OCT's projection; the newest one wins.
+    const position = getContext<(() => number) | undefined>("viewportPosition");
     if (image.is3D) {
         const enfaceManager = viewerWindowContext.enfaceProjectionManagers.get(
             image.instance.id,
         );
-        enfaceManager?.registerMainViewerContext(mainViewerContext);
+        if (enfaceManager)
+            onDestroy(
+                enfaceManager.register({
+                    mainViewerContext,
+                    position: () => position?.() ?? 0,
+                }),
+            );
     }
 
     onDestroy(
@@ -115,7 +123,6 @@
     });
 
     // Reset view and the options bar act on the selected viewport through this handle.
-    const position = getContext<(() => number) | undefined>("viewportPosition");
     $effect(() => {
         if (!position) return;
         return workspace.attachViewport(position(), {

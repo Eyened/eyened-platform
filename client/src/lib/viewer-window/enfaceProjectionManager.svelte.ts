@@ -45,6 +45,13 @@ export type EnfacePaintLayer =
           inactiveAlpha: number;
       };
 
+/** A viewport showing this OCT; the newest one is the projection's source. */
+export interface ProjectionSourceViewport {
+    readonly mainViewerContext: MainViewerContext;
+    /** The viewport's 0-based position; it follows a swap. */
+    position(): number;
+}
+
 export class EnfaceProjectionManager {
     // Imperative caches only (RAF repaint / slice callbacks) — not read from
     // $effect/$derived, so SvelteMap would add proxy cost with no benefit.
@@ -59,13 +66,26 @@ export class EnfaceProjectionManager {
     >();
     /** Bumped whenever a projection changes, so class maps rebuild. */
     private revision = 0;
-    mainViewerContext: MainViewerContext | undefined = $state(undefined);
+    private viewports: ProjectionSourceViewport[] = $state.raw([]);
 
     constructor(readonly octImage: Image3D) {}
 
-    registerMainViewerContext(mainViewerContext: MainViewerContext): void {
-        this.mainViewerContext = mainViewerContext;
+    /** The OCT viewport opened last; undefined while the OCT is open nowhere. */
+    get source(): ProjectionSourceViewport | undefined {
+        return this.viewports.at(-1);
+    }
+
+    get mainViewerContext(): MainViewerContext | undefined {
+        return this.source?.mainViewerContext;
+    }
+
+    /** Adds a viewport showing this OCT; call the returned function when it closes. */
+    register(viewport: ProjectionSourceViewport): () => void {
+        this.viewports = [...this.viewports, viewport];
         this.attachExistingSegmentations();
+        return () => {
+            this.viewports = this.viewports.filter((v) => v !== viewport);
+        };
     }
 
     private attachExistingSegmentations(): void {
@@ -322,7 +342,7 @@ export class EnfaceProjectionManager {
         this.classMaps.clear();
         this.projections.clear();
         this.attachedItems.clear();
-        this.mainViewerContext = undefined;
+        this.viewports = [];
     }
 
     private getProjection(
