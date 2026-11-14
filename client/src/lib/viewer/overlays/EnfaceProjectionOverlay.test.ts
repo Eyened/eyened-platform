@@ -28,8 +28,9 @@ function source(
     return {
         octPublicId: mappingGlsl,
         manager: {
-            getVisibleProjections: () => [
+            getPaintLayers: () => [
                 {
+                    kind: "projection",
                     projection: {
                         textureData: { texture: `${mappingGlsl}-texture` },
                         getThicknessRange: () => ({ min: 2, max: 8 }),
@@ -145,6 +146,37 @@ describe("EnfaceProjectionOverlay", () => {
             expect.objectContaining({
                 u_mode: 1,
                 u_nearest_sample: 0,
+            }),
+        );
+    });
+
+    it("paints a class map nearest-sampled on a linked image, at the viewer's opacity only", () => {
+        const pass = vi.fn();
+        compileShaderTemplate.mockReturnValueOnce({ pass });
+        const linked = source("binary", "linked");
+        linked.manager = {
+            getPaintLayers: () => [
+                {
+                    kind: "classMap",
+                    texture: "map",
+                    active: 2,
+                    activeAlpha: 1,
+                    inactiveAlpha: 0.2,
+                },
+            ],
+        } as unknown as EnfaceProjectionManager;
+        new EnfaceProjectionOverlay([linked], webgl).repaint(
+            { image: { webgl } } as unknown as ViewerContext,
+            {} as RenderTarget,
+        );
+        expect(pass).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                u_thickness: "map",
+                u_mode: 2,
+                u_nearest_sample: 1,
+                u_alpha: 0.5,
+                u_active_class: 2,
             }),
         );
     });
