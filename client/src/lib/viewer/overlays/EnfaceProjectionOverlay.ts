@@ -69,6 +69,14 @@ export class EnfaceProjectionOverlay implements Overlay {
                 u_outline: false,
                 u_size_primary: source.sizePrimary,
                 u_size_secondary: source.sizeSecondary,
+                // The program needs every uniform it uses, so each pass starts from these and overrides its own.
+                u_color: [0, 0, 0],
+                u_min_thickness: 0,
+                u_max_thickness: 1,
+                u_colors: colorsFlat,
+                u_active_class: 0,
+                u_multi_active_alpha: 0,
+                u_multi_inactive_alpha: 0,
             };
             for (const layer of source.manager.getPaintLayers(source.mode)) {
                 if (layer.kind === "classMap") {
@@ -76,7 +84,6 @@ export class EnfaceProjectionOverlay implements Overlay {
                     program.pass(renderTarget, {
                         ...common,
                         u_thickness: layer.texture,
-                        u_colors: colorsFlat,
                         u_active_class: layer.active,
                         u_multi_active_alpha: layer.activeAlpha,
                         u_multi_inactive_alpha: layer.inactiveAlpha,

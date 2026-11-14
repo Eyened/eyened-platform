@@ -181,6 +181,37 @@ describe("EnfaceProjectionOverlay", () => {
         );
     });
 
+    it("gives the projection and class map passes the same uniform names, as the program needs every uniform it uses", () => {
+        const pass = vi.fn();
+        compileShaderTemplate.mockReturnValueOnce({ pass });
+        const both = source("binary", "linked");
+        both.manager = {
+            getPaintLayers: () => [
+                {
+                    kind: "projection",
+                    projection: { textureData: { texture: "t" } },
+                    color: [255, 0, 0],
+                    layerAlpha: 1,
+                },
+                {
+                    kind: "classMap",
+                    texture: "map",
+                    active: 2,
+                    activeAlpha: 1,
+                    inactiveAlpha: 0.2,
+                },
+            ],
+        } as unknown as EnfaceProjectionManager;
+        new EnfaceProjectionOverlay([both], webgl).repaint(
+            { image: { webgl } } as unknown as ViewerContext,
+            {} as RenderTarget,
+        );
+        const [projection, classMap] = pass.mock.calls.map(([, u]) =>
+            Object.keys(u).sort(),
+        );
+        expect(classMap).toEqual(projection);
+    });
+
     it("skips a source whose mapped shader fails to compile", () => {
         const pass = vi.fn();
         vi.spyOn(console, "error").mockImplementation(() => {});
