@@ -17,6 +17,7 @@
         children,
         closeOnClick = true,
         shortcut,
+        tooltip,
         ...restProps
     }: Omit<HTMLButtonAttributes, "aria-label" | "children"> & {
         label: string;
@@ -24,6 +25,8 @@
         children: Snippet;
         closeOnClick?: boolean;
         shortcut?: string;
+        /** Tooltip text when it differs from the name, e.g. "Copied" feedback. */
+        tooltip?: string;
     } = $props();
 </script>
 
@@ -45,7 +48,8 @@
             {/snippet}
         </Tooltip.Trigger>
         <Tooltip.Content size="icon"
-            >{label}{#if shortcut}<kbd class="ms-4 font-sans">{shortcut}</kbd
+            >{tooltip ?? label}{#if shortcut}<kbd class="ms-4 font-sans"
+                    >{shortcut}</kbd
                 >{/if}</Tooltip.Content
         >
     </Tooltip.Root>
