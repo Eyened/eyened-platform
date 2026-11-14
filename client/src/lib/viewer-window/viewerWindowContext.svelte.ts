@@ -26,7 +26,7 @@ import type {
     SeriesBlendSession,
 } from "./panelRegistration/registrationSession";
 
-/** What a ViewerContext reads from the workspace: the remembered slice, Lock, strip tracking and the armed tool. */
+/** What a ViewerContext reads from the workspace: the remembered slice, Lock, strip tracking, the armed tool and the selected viewport. */
 export type WorkspaceView = Pick<
     Workspace,
     | "peekIndex"
@@ -36,6 +36,7 @@ export type WorkspaceView = Pick<
     | "stripTracking"
     | "arm"
     | "armedTool"
+    | "selectedViewport"
 >;
 
 export class ViewerWindowContext {

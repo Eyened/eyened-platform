@@ -84,7 +84,6 @@ export class ETDRSGridItemOverlay implements Overlay {
         const circles: Record<string, string[]> = {
             C: ["C0", "C1", "C2"],
             I: ["I1", "I2"],
-            O: ["O1", "O2"],
         };
         const cycle = circles[event.key.toUpperCase()];
         if (cycle !== undefined) {

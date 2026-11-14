@@ -1,3 +1,4 @@
+import { LocalizerLines } from "./localizerLines.svelte";
 import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { tick } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -43,6 +44,7 @@ function attach(ws: Workspace, position: number, instanceId: string) {
             grids: ctx.grids,
             measure: ctx.measure,
             projectionSources: [],
+            localizer: new LocalizerLines(() => []),
         },
     });
     return ctx;

@@ -3,6 +3,7 @@
 Provides the selected viewport's viewer and segmentation contexts to the sections below, which read them like the old per-viewport panels did.
 -->
 <script lang="ts">
+    import LocalizerSection from "./LocalizerSection.svelte";
     import ProjectionSection from "./ProjectionSection.svelte";
     import type { LayersTarget } from "$lib/workspace/workspace.svelte";
     import { setContext, untrack } from "svelte";
@@ -60,5 +61,12 @@ Provides the selected viewport's viewer and segmentation contexts to the section
         sources={target.projectionSources}
         open={open.projection}
         ontoggle={() => ontoggle("projection")}
+    />
+{/if}
+{#if sections.includes("localizer")}
+    <LocalizerSection
+        localizer={target.localizer}
+        open={open.localizer}
+        ontoggle={() => ontoggle("localizer")}
     />
 {/if}

@@ -14,6 +14,7 @@ export const RENDER_MODE_DIGITS: Record<string, RenderMode> =
     );
 
 const HIDE_OVERLAYS = "h";
+const LOCALIZER = "o";
 
 /** A viewport's keys. The viewer forwards only keys pressed while it has focus. */
 export class Keymap implements ViewerEventListener {
@@ -40,6 +41,12 @@ export class Keymap implements ViewerEventListener {
         const key = event.key.toLowerCase();
         if (key === HIDE_OVERLAYS) {
             viewerContext.hideOverlays = true;
+            return;
+        }
+        // Focus in a viewport selects it, so this is the viewport the key was pressed in. A tile selects none.
+        if (key === LOCALIZER) {
+            if (!viewerContext.isStripTile)
+                viewerContext.viewerWindowContext.viewState?.selectedViewport?.layers?.localizer.toggle();
             return;
         }
         const tool = toolForKey(key);

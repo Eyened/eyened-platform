@@ -6,6 +6,7 @@ const flat = {
     hasEtdrsSchema: true,
     hasRegistrationSchema: true,
     projection: false,
+    localizer: false,
     hide: [],
 };
 
@@ -54,5 +55,15 @@ describe("layerSections", () => {
                 hide: ["Segmentation"],
             }),
         ).toEqual(["etdrs", "pointsets", "distance"]);
+    });
+
+    it("adds Localizer lines last, which no layout.hide name hides", () => {
+        expect(
+            layerSections({
+                ...flat,
+                localizer: true,
+                hide: ["Segmentation", "ETDRS", "Registration", "Measure"],
+            }),
+        ).toEqual(["localizer"]);
     });
 });

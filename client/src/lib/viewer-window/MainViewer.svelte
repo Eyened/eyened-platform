@@ -25,6 +25,8 @@
     import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
     import { createViewTool } from "$lib/viewer/tools/viewTools";
     import { GridLayers } from "$lib/layers/gridLayers.svelte";
+    import { LocalizerLines } from "$lib/layers/localizerLines.svelte";
+    import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
     import type {
         LayersTarget,
         Workspace,
@@ -57,12 +59,22 @@
     );
     setContext("mainViewerContext", mainViewerContext);
     onDestroy(viewerContext.addOverlay(mainViewerContext));
+    // This viewport's localizer lines: the B-scan positions of loaded OCTs on this 2D image.
+    // The live array, as the strip passed it: a later OCT's positions are pushed into it.
+    const localizer = new LocalizerLines(() => {
+        // That push notifies nothing, so read the tracked list of loaded sets to see it.
+        void viewerWindowContext.photoLocatorSets.length;
+        return image.is2D
+            ? (viewerWindowContext.photoLocators.get(image.image_id) ?? [])
+            : [];
+    });
     // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
     const layers: LayersTarget = {
         viewerContext,
         mainViewerContext,
         grids: new GridLayers(viewerContext, viewerWindowContext.registration),
         measure: new MeasureTool(viewerContext.image),
+        localizer,
         get projectionSources() {
             return projectionSources;
         },
@@ -169,6 +181,14 @@
             remove();
             overlay.destroy();
         };
+    });
+
+    $effect(() => {
+        const locators = localizer.locators();
+        if (!locators.length) return;
+        return viewerContext.addOverlay(
+            new OCTLinesOverlay(locators, () => localizer.mode),
+        );
     });
 
     // The armed view tool acts in every viewport; strip tiles never take it.

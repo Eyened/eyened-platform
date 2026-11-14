@@ -32,6 +32,8 @@ function strokes(mode: LocalizerMode, onVolume = true): number {
         lineTo: vi.fn(),
         closePath: vi.fn(),
         stroke: vi.fn(),
+        getLineDash: () => [],
+        setLineDash: vi.fn(),
         lineWidth: 0,
         strokeStyle: "",
     };
@@ -41,10 +43,10 @@ function strokes(mode: LocalizerMode, onVolume = true): number {
 }
 
 describe("OCTLinesOverlay", () => {
-    it("draws nothing, the outline and the current line, or every line", () => {
+    it("draws nothing, the cased outline and current line, or every line with only the current one cased", () => {
         expect(strokes("off")).toBe(0);
-        expect(strokes("current")).toBe(2);
-        expect(strokes("current", false)).toBe(1);
-        expect(strokes("all")).toBe(5);
+        expect(strokes("current")).toBe(4);
+        expect(strokes("current", false)).toBe(2);
+        expect(strokes("all")).toBe(6);
     });
 });
