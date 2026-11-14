@@ -4,6 +4,7 @@ import {
     readLayerArea,
     readLayerSections,
     readToolMode,
+    readStripTracking,
     startStripOn,
     writeLayerArea,
     writeLayerSections,
@@ -22,6 +23,12 @@ describe("startStripOn", () => {
         expect(startStripOn(true)).toBe(true);
         expect(startStripOn()).toBe(true);
         expect(localStorage.getItem("eyened:viewer:strip")).toBe("true");
+    });
+});
+
+describe("strip tracking", () => {
+    it("starts on", () => {
+        expect(readStripTracking()).toBe(true);
     });
 });
 
