@@ -3,6 +3,7 @@
 Provides the selected viewport's viewer and segmentation contexts to the sections below, which read them like the old per-viewport panels did.
 -->
 <script lang="ts">
+    import ProjectionSection from "./ProjectionSection.svelte";
     import type { LayersTarget } from "$lib/workspace/workspace.svelte";
     import { setContext, untrack } from "svelte";
     import type { LayerSectionId } from "./layerSections";
@@ -52,5 +53,12 @@ Provides the selected viewport's viewer and segmentation contexts to the section
         open={open.distance}
         ontoggle={() => ontoggle("distance")}
         {shown}
+    />
+{/if}
+{#if sections.includes("projection")}
+    <ProjectionSection
+        sources={target.projectionSources}
+        open={open.projection}
+        ontoggle={() => ontoggle("projection")}
     />
 {/if}

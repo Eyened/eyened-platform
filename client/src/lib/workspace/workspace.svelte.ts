@@ -1,5 +1,6 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { GridLayers } from "$lib/layers/gridLayers.svelte";
+import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 import type { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -53,6 +54,8 @@ export interface LayersTarget {
     readonly grids: GridLayers;
     /** Today's Measure tool with this viewport's lines, until the Distance tool replaces it. */
     readonly measure: MeasureTool;
+    /** The OCT projections this viewport's image shows, in strip order, with this viewport's modes. */
+    readonly projectionSources: EnfaceOverlaySourceResolved[];
 }
 
 /** What the palette and the options bar need from one viewport. */

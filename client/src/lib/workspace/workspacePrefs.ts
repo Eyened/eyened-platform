@@ -160,12 +160,18 @@ export function readLayerSections(): Record<LayerSectionId, boolean> {
         etdrs: false,
         pointsets: false,
         distance: false,
+        projection: false,
     };
     try {
         const raw = localStorage.getItem(LAYER_SECTIONS_KEY);
         const stored: unknown = raw === null ? null : JSON.parse(raw);
         if (!Array.isArray(stored)) return open;
-        for (const id of ["segmentations", "etdrs", "pointsets"] as const)
+        for (const id of [
+            "segmentations",
+            "etdrs",
+            "pointsets",
+            "projection",
+        ] as const)
             open[id] = stored.includes(id);
         return open;
     } catch {

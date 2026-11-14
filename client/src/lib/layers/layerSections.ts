@@ -3,7 +3,8 @@ export type LayerSectionId =
     | "segmentations"
     | "etdrs"
     | "pointsets"
-    | "distance";
+    | "distance"
+    | "projection";
 
 /** The old panel name a task's `layout.hide` uses for each section. */
 const HIDDEN_BY: Record<LayerSectionId, string> = {
@@ -11,6 +12,8 @@ const HIDDEN_BY: Record<LayerSectionId, string> = {
     etdrs: "ETDRS",
     pointsets: "Registration",
     distance: "Measure",
+    // The projection shows segmentation content, so blinding segmentations hides it too.
+    projection: "Segmentation",
 };
 
 const ORDER: readonly LayerSectionId[] = [
@@ -18,12 +21,15 @@ const ORDER: readonly LayerSectionId[] = [
     "etdrs",
     "pointsets",
     "distance",
+    "projection",
 ];
 
 export interface LayerSectionsInput {
     is2D: boolean;
     hasEtdrsSchema: boolean;
     hasRegistrationSchema: boolean;
+    /** The image is an OCT's `_proj` or links to a loaded OCT. */
+    projection: boolean;
     /** The task's `layout.hide`. */
     hide: readonly string[];
 }
@@ -35,6 +41,7 @@ export function layerSections(input: LayerSectionsInput): LayerSectionId[] {
         etdrs: input.is2D && input.hasEtdrsSchema,
         pointsets: input.is2D && input.hasRegistrationSchema,
         distance: true,
+        projection: input.projection,
     };
     return ORDER.filter(
         (id) => applies[id] && !input.hide.includes(HIDDEN_BY[id]),

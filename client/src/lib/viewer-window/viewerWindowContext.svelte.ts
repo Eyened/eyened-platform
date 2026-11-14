@@ -280,9 +280,6 @@ export class ViewerWindowContext {
                         const viewerContext = new ViewerContext(image, this);
                         // Strip tiles show the middle slice; only the main viewer scrolls.
                         viewerContext.lockScroll = true;
-                        if (image.image_id.endsWith("_proj")) {
-                            viewerContext.enfaceProjectionMode = "binary";
-                        }
                         this.topViewers.set(image, viewerContext);
                         this.images.set(image.image_id, image);
                     }

@@ -42,6 +42,7 @@ function attach(ws: Workspace, position: number, instanceId: string) {
             mainViewerContext: ctx.mainViewerContext as never,
             grids: ctx.grids,
             measure: ctx.measure,
+            projectionSources: [],
         },
     });
     return ctx;

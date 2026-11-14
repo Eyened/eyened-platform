@@ -20,8 +20,8 @@ type PreparedSource = {
 };
 
 /**
- * Programs are compiled once when the overlay is created. StripViewer rebuilds
- * this overlay when registration / modes change, so repaint only draws.
+ * Programs are compiled once when the overlay is created. MainViewer rebuilds
+ * this overlay when registration, modes or the source change, so repaint only draws.
  */
 export class EnfaceProjectionOverlay implements Overlay {
     private readonly prepared: PreparedSource[] = [];

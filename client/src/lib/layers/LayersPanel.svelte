@@ -44,6 +44,7 @@ The Layers panel body: the selected viewport's name, then the sections that appl
                   hasEtdrsSchema: formSchemasByName.has(
                       BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID,
                   ),
+                  projection: target.projectionSources.length > 0,
                   hasRegistrationSchema: formSchemasByName.has(
                       BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
                   ),

@@ -9,12 +9,15 @@
         onchange,
         items,
         label,
+        describedby,
         class: className,
     }: {
         value: string;
         onchange: (value: string) => void;
         items: { value: string; text: string; label: string }[];
         label: string;
+        /** The id of the element that describes the group. */
+        describedby?: string;
         class?: string;
     } = $props();
 </script>
@@ -28,6 +31,7 @@
         }
     }
     aria-label={label}
+    aria-describedby={describedby}
     class={cn(
         "flex border border-border-strong-01 in-dialog:border-border-strong-02",
         className,

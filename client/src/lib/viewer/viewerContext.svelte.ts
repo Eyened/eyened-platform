@@ -165,6 +165,8 @@ export class ViewerContext {
         if (image.image_id.endsWith("proj")) {
             // TODO: cleaner implementation of this
             this.axis = 1;
+            // An OCT's own projection starts in Mask; projections onto linked images start Off.
+            this.enfaceProjectionMode = "binary";
         }
 
         this.shaders = image.webgl.shaders;
@@ -273,14 +275,14 @@ export class ViewerContext {
         if (p) this.index = p.index;
     }
 
-    cycleEnfaceProjectionModeForOct(octPublicId: string): void {
-        const modes: EnfaceProjectionMode[] = ["off", "binary", "heatmap"];
-        const current =
-            this.enfaceProjectionModesByOct.get(octPublicId) ?? "off";
-        const next = modes[(modes.indexOf(current) + 1) % modes.length];
+    /** Sets this viewport's projection mode for an OCT linked to its image. */
+    setEnfaceProjectionModeForOct(
+        octPublicId: string,
+        mode: EnfaceProjectionMode,
+    ): void {
         // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
         const map = new Map(this.enfaceProjectionModesByOct);
-        map.set(octPublicId, next);
+        map.set(octPublicId, mode);
         this.enfaceProjectionModesByOct = map;
     }
 

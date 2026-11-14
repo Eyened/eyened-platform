@@ -61,18 +61,21 @@ describe("Layers sections", () => {
             etdrs: false,
             pointsets: false,
             distance: false,
+            projection: false,
         });
         writeLayerSections({
             segmentations: false,
             etdrs: true,
             pointsets: false,
             distance: true,
+            projection: true,
         });
         expect(readLayerSections()).toEqual({
             segmentations: false,
             etdrs: true,
             pointsets: false,
             distance: false,
+            projection: true,
         });
         localStorage.setItem("eyened:viewer:layerSections", "{");
         expect(readLayerSections().segmentations).toBe(true);
