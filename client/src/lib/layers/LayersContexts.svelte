@@ -3,13 +3,13 @@
 Provides the selected viewport's viewer and segmentation contexts to the sections below, which read them like the old per-viewport panels did.
 -->
 <script lang="ts">
-    import LocalizerSection from "./LocalizerSection.svelte";
-    import ProjectionSection from "./ProjectionSection.svelte";
     import type { LayersTarget } from "$lib/workspace/workspace.svelte";
     import { setContext, untrack } from "svelte";
     import type { LayerSectionId } from "./layerSections";
     import DistanceSection from "./DistanceSection.svelte";
     import EtdrsSection from "./EtdrsSection.svelte";
+    import LocalizerSection from "./LocalizerSection.svelte";
+    import ProjectionSection from "./ProjectionSection.svelte";
     import SegmentationsSection from "./SegmentationsSection.svelte";
 
     let {

@@ -1,4 +1,3 @@
-import { LocalizerLines } from "./localizerLines.svelte";
 import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { tick } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +11,7 @@ import { Line } from "$lib/viewer/tools/Measure.svelte";
 import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
 import { workspaceWith } from "$lib/workspace/testUtils";
 import type { Workspace } from "$lib/workspace/workspace.svelte";
+import { LocalizerLines } from "./localizerLines.svelte";
 import { graderSegmentation, layersContexts, ME } from "./testContexts";
 
 vi.mock("$lib/viewer-window/panelSegmentation/DrawingTools.svelte", () => ({

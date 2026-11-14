@@ -7,7 +7,10 @@ Layers › En-face projection for the selected viewport: one Off / Mask / Thickn
     import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
     import type { EnfaceProjectionMode } from "$lib/viewer/viewer-utils";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { isProjectable } from "$lib/viewer-window/enfaceProjectionKeys";
+    import {
+        getEnfaceFeatureIndices,
+        isProjectable,
+    } from "$lib/viewer-window/enfaceProjectionKeys";
     import type { Segmentation } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
     import { getContext } from "svelte";
     import LayerSection from "./LayerSection.svelte";
@@ -47,11 +50,12 @@ Layers › En-face projection for the selected viewport: one Off / Mask / Thickn
         if (!from)
             return "Not open in a viewport. Drag its tile into one to project it.";
         const ctx = from.mainViewerContext.segmentationContext;
-        // In Thickness a MultiClass segmentation paints only its one active class, so with several active it paints nothing.
+        // In Thickness a MultiClass segmentation paints only the one active class, so with several active, or one it lacks, it paints nothing.
         const paintsNothing = (s: Segmentation) =>
             source.mode === "heatmap" &&
             s.data_representation === "MultiClass" &&
-            typeof ctx.activeIndices !== "number";
+            (typeof ctx.activeIndices !== "number" ||
+                !getEnfaceFeatureIndices(s).includes(ctx.activeIndices));
         const n = [
             ...ctx.visibleGraderSegmentations,
             ...ctx.visibleModelSegmentations,
