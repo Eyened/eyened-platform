@@ -306,7 +306,10 @@ export class ViewerWindowContext {
         return this.imagesIndex.get(instance.id)!;
     }
     importPhotoLocators(image: AbstractImage) {
-        const photoLocators = loadPhotoLocators(image);
+        // An OCT's `_proj` reads the same header as its volume, so its positions are added once, with the volume.
+        const photoLocators = image.image_id.endsWith("_proj")
+            ? []
+            : loadPhotoLocators(image);
         this.photoLocatorSets.push(photoLocators);
 
         for (const locator of photoLocators) {
