@@ -39,7 +39,7 @@ Layers › Localizer lines for the selected viewport: one Off / Current / All sw
     );
 </script>
 
-<LayerSection title="Localizer lines" count={octs.length} {open} {ontoggle}>
+<LayerSection title="Localizer lines" {open} {ontoggle}>
     <div class="flex flex-col gap-1 px-4 py-2">
         <ToggleGroup
             label="Localizer lines"

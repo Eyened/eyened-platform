@@ -17,7 +17,7 @@ const locators = () =>
     );
 
 describe("LocalizerSection", () => {
-    it("lists each OCT once with its line count, and passes axe", async () => {
+    it("lists each OCT once with its line count under a header without a count, and passes axe", async () => {
         const { container } = render(LocalizerSection, {
             props: {
                 localizer: new LocalizerLines(locators),
@@ -28,6 +28,8 @@ describe("LocalizerSection", () => {
         expect(
             screen.getAllByRole("listitem").map((li) => li.textContent),
         ).toEqual(["OCT oct-1 · 2 B-scans", "OCT oct-2 · 1 B-scans"]);
+        // A count here would read as lines drawn; it only ever counted OCTs.
+        screen.getByRole("button", { name: "Localizer lines" });
         await expectNoAxeViolations(container);
     });
 });

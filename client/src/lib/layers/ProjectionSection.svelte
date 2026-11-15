@@ -67,12 +67,7 @@ Layers › En-face projection for the selected viewport: one Off / Mask / Thickn
     }
 </script>
 
-<LayerSection
-    title="En-face projection"
-    count={sources.length}
-    {open}
-    {ontoggle}
->
+<LayerSection title="En-face projection" {open} {ontoggle}>
     <ul>
         {#each sources as source, i (source.octPublicId)}
             {@const label = octLabel(

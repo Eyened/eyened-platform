@@ -40,6 +40,8 @@ describe("ProjectionSection", () => {
             },
             context: layersContexts("faf-1").context,
         });
+        // A count here would read as projections painted; it only ever counted OCTs.
+        screen.getByRole("button", { name: "En-face projection" });
         expect(
             screen.getByText("From viewport 3: no segmentations shown"),
         ).toBeInTheDocument();
