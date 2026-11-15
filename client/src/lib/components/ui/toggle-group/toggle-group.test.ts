@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/svelte";
+import { act, cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ToggleGroup from "./toggle-group.svelte";
 
@@ -15,7 +15,7 @@ function tabIndexes() {
 }
 
 describe("ToggleGroup", () => {
-    it("puts the one Tab stop on the value set by code, or on the first option when none matches", async () => {
+    it("puts the one Tab stop on the focused option inside the group, else on the value set by code or the first option", async () => {
         const { rerender } = render(ToggleGroup, {
             props: {
                 value: "current",
@@ -27,6 +27,13 @@ describe("ToggleGroup", () => {
         expect(tabIndexes()).toEqual([-1, 0, -1]);
 
         await rerender({ value: "all" });
+        expect(tabIndexes()).toEqual([-1, -1, 0]);
+
+        const [off] = screen.getAllByRole("radio");
+        await act(() => off.focus());
+        expect(tabIndexes()).toEqual([0, -1, -1]);
+
+        await act(() => off.blur());
         expect(tabIndexes()).toEqual([-1, -1, 0]);
 
         await rerender({ value: "none" });

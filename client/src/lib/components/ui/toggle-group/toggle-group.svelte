@@ -22,8 +22,13 @@
     } = $props();
 
     // bits-ui moves its Tab stop only on click or arrow, so a value set in code would leave it behind.
+    // Inside the group the focused option holds the stop, so Tab leaves the group from any option.
+    let focused = $state<string | null>(null);
     const tabStop = $derived(
-        items.some((item) => item.value === value) ? value : items[0]?.value,
+        focused ??
+            (items.some((item) => item.value === value)
+                ? value
+                : items[0]?.value),
     );
 </script>
 
@@ -37,6 +42,10 @@
     }
     aria-label={label}
     aria-describedby={describedby}
+    onfocusout={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            focused = null;
+    }}
     class={cn(
         "flex border border-border-strong-01 in-dialog:border-border-strong-02",
         className,
@@ -49,7 +58,11 @@
             class="flex h-6 min-w-6 cursor-pointer items-center justify-center px-1 text-label-01 text-text-secondary hover:bg-content-switcher-background-hover hover:text-text-primary data-[state=on]:bg-content-switcher-selected data-[state=on]:text-text-primary data-[state=on]:shadow-content-switcher-selected"
         >
             {#snippet child({ props })}
-                <button {...props} tabindex={item.value === tabStop ? 0 : -1}>
+                <button
+                    {...props}
+                    tabindex={item.value === tabStop ? 0 : -1}
+                    onfocus={() => (focused = item.value)}
+                >
                     {item.text}
                 </button>
             {/snippet}
