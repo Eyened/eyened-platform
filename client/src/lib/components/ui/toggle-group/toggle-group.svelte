@@ -2,8 +2,8 @@
     import { ToggleGroup as ToggleGroupPrimitive } from "bits-ui";
     import { cn } from "$lib/utils.js";
 
-    // Single-select toggle group (Carbon has none): one tab stop, arrow keys inside. No item is selected
-    // when `value` matches none; pressing the selected item keeps it selected.
+    // Single-select toggle group (Carbon has none): one Tab stop on the selected option, arrow keys inside.
+    // No item is selected when `value` matches none; pressing the selected item keeps it selected.
     let {
         value,
         onchange,
@@ -20,6 +20,11 @@
         describedby?: string;
         class?: string;
     } = $props();
+
+    // bits-ui moves its Tab stop only on click or arrow, so a value set in code would leave it behind.
+    const tabStop = $derived(
+        items.some((item) => item.value === value) ? value : items[0]?.value,
+    );
 </script>
 
 <ToggleGroupPrimitive.Root
@@ -43,7 +48,11 @@
             aria-label={item.label}
             class="flex h-6 min-w-6 cursor-pointer items-center justify-center px-1 text-label-01 text-text-secondary hover:bg-content-switcher-background-hover hover:text-text-primary data-[state=on]:bg-content-switcher-selected data-[state=on]:text-text-primary data-[state=on]:shadow-content-switcher-selected"
         >
-            {item.text}
+            {#snippet child({ props })}
+                <button {...props} tabindex={item.value === tabStop ? 0 : -1}>
+                    {item.text}
+                </button>
+            {/snippet}
         </ToggleGroupPrimitive.Item>
     {/each}
 </ToggleGroupPrimitive.Root>
