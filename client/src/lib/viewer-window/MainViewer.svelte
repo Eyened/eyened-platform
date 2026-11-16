@@ -228,9 +228,10 @@
     });
 
     // The eye's current registration: its points show here, and P places them while armed.
+    // An armed form point field takes the clicks, so the registration stays read-only then.
     const pointTarget = $derived(
         pointBinding({
-            armed: workspace.armedTool === "point",
+            armed: workspace.armedTool === "point" && !pointArming.session,
             hidden: registrationHidden,
             is2D: image.is2D,
             current: viewerWindowContext.pointsets.current(

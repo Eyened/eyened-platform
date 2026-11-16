@@ -1,4 +1,5 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import { pointArming } from "$lib/forms/pointArming.svelte";
 import type { GridLayers } from "$lib/layers/gridLayers.svelte";
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
@@ -297,6 +298,8 @@ export class Workspace {
             this.selectedViewport?.reset();
             return;
         }
+        // One point tool at a time: P drops an armed form point field.
+        if (id === "point") pointArming.disarm();
         this.armedTool = id;
         this.lastPick = { ...this.lastPick, [tool.group]: id };
     }
