@@ -71,7 +71,7 @@
                             <Tooltip.Trigger>
                                 {#snippet child({ props: tip })}
                                     <button
-                                        {...mergeProps(props, tip, {
+                                        {...mergeProps(tip, props, {
                                             onfocus: () =>
                                                 (focused = item.value),
                                         })}
