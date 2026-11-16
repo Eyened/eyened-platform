@@ -78,7 +78,7 @@ describe("bindRegistrationPointTool", () => {
 
     it("loads points and persists edits", () => {
         const addOverlay = vi.fn(() => vi.fn());
-        const dispose = bindRegistrationPointTool({
+        const { dispose } = bindRegistrationPointTool({
             viewerContext: {
                 image: { image_id: "img", instance: { id: "img" } },
                 addOverlay,
@@ -124,6 +124,33 @@ describe("bindRegistrationPointTool", () => {
             .mock.calls.at(-1)?.[1];
         expect(written).toEqual({ img: [{ x: 3, y: 4 }] });
         expect(written).not.toHaveProperty("img_proj");
+    });
+
+    it("takes another viewport's edit of the same image before its own next edit", () => {
+        const bind = () =>
+            bindRegistrationPointTool({
+                viewerContext: {
+                    image: { image_id: "img", instance: { id: "img" } },
+                    addOverlay: () => () => {},
+                } as never,
+                annotationId: 21,
+                schema: schema as never,
+                canEdit: true,
+                pointMarker: { style: "cross", radius: 4, color: "red" },
+            });
+        bind();
+        const b = bind();
+        const [toolA, toolB] = toolSpies.tools;
+        toolA!.opts.onPersist([...toolA!.points, { x: 2, y: 2 }]);
+        b.sync(formAnnotations.get(21)?.form_data);
+        toolB!.opts.onPersist([...toolB!.points, { x: 3, y: 3 }]);
+        expect(formAnnotations.get(21)?.form_data).toEqual({
+            img: [
+                { x: 1, y: 2 },
+                { x: 2, y: 2 },
+                { x: 3, y: 3 },
+            ],
+        });
     });
 
     it("treats a schema with no index as an OCT registration", () => {

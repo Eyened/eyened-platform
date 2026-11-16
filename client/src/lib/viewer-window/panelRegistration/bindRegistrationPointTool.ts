@@ -52,12 +52,14 @@ export function bindRegistrationPointTool(args: {
     canEdit: boolean;
     pointMarker: { style: PointMarkerStyle; radius: number; color: string };
     onSync?: (sync: SyncState) => void;
-}): () => void {
+}): { dispose: () => void; sync: (formData: unknown) => void } {
     const analysis = registrationAnalysis(args.schema);
-    if (!analysis) return () => {};
+    if (!analysis) return { dispose: () => {}, sync: () => {} };
     const publicId = args.viewerContext.image.instance.id;
     const annotationId = args.annotationId;
     // A failed save shows on the registration's row; the next move saves the whole set again.
+    // This tool's own last write, so its echo from the store is not taken back in mid-drag.
+    let lastWritten: unknown;
     const save = async (formData: unknown) => {
         args.onSync?.("saving");
         try {
@@ -79,6 +81,7 @@ export function bindRegistrationPointTool(args: {
             points,
             analysis,
         );
+        lastWritten = next;
         formAnnotations.set(annotationId, { ...existing, form_data: next });
         if (persist) void save(next);
     };
@@ -98,8 +101,15 @@ export function bindRegistrationPointTool(args: {
     const existing = formAnnotations.get(annotationId)?.form_data;
     tool.points = getPointsForImage(existing, publicId, analysis);
     const removeOverlay = args.viewerContext.addOverlay(tool);
-    return () => {
-        tool.destroy();
-        removeOverlay();
+    return {
+        dispose: () => {
+            tool.destroy();
+            removeOverlay();
+        },
+        // Another viewport's edit of this image, so this tool's next edit starts from it.
+        sync: (formData) => {
+            if (formData === lastWritten) return;
+            tool.points = getPointsForImage(formData, publicId, analysis);
+        },
     };
 }

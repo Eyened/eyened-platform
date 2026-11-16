@@ -25,7 +25,7 @@
     import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
     import { createViewTool, NoEditCursor } from "$lib/viewer/tools/viewTools";
     import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
-    import { formSchemasByName } from "$lib/data";
+    import { formAnnotations, formSchemasByName } from "$lib/data";
     import type { JSONSchema } from "$lib/forms/schemaType";
     import { eyeKey, pointBinding } from "$lib/layers/pointsets";
     import { bindRegistrationPointTool } from "./panelRegistration/bindRegistrationPointTool";
@@ -243,6 +243,7 @@
     // Primitives: a drag rewrites the registration, which must not remount the tool mid-drag.
     const pointId = $derived(pointTarget?.id);
     const pointEditable = $derived(pointTarget?.canEdit ?? false);
+    let pointTool = $state.raw<ReturnType<typeof bindRegistrationPointTool>>();
     $effect(() => {
         const id = pointId;
         const canEdit = pointEditable;
@@ -250,7 +251,7 @@
             BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
         )?.schema;
         if (id === undefined || !schema) return;
-        return untrack(() =>
+        const binding = untrack(() =>
             bindRegistrationPointTool({
                 viewerContext,
                 annotationId: id,
@@ -261,6 +262,20 @@
                     viewerWindowContext.pointsets.sync.set(id, sync),
             }),
         );
+        pointTool = binding;
+        return () => {
+            binding.dispose();
+            if (pointTool === binding) pointTool = undefined;
+        };
+    });
+    // Another viewport's edit of this registration reaches this viewport's tool.
+    $effect(() => {
+        const formData =
+            pointId === undefined
+                ? undefined
+                : formAnnotations.get(pointId)?.form_data;
+        const binding = pointTool;
+        if (binding) untrack(() => binding.sync(formData));
     });
     // While P is armed, a viewport that cannot take points says so.
     $effect(() => {
