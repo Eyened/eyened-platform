@@ -10,12 +10,10 @@
     import { keepViewOnResize, sameTransform } from "./viewportGeometry";
 
     export interface Props {
-        /** Paint only while the registration editor or series blend is open. */
-        foreground?: boolean;
         /** False keeps the viewer out of the Tab order, as in a strip tile; a press still focuses it. */
         tabbable?: boolean;
     }
-    let { foreground = false, tabbable = true }: Props = $props();
+    let { tabbable = true }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const viewerWindowContext = getContext<ViewerWindowContext>(
@@ -28,7 +26,7 @@
 
     // add viewer to viewerWindowContext
     // this registers the viewerContext for repaint callbacks
-    onDestroy(viewerWindowContext.addViewer(viewerContext, foreground));
+    onDestroy(viewerWindowContext.addViewer(viewerContext));
 
     let viewerElement: HTMLDivElement;
 

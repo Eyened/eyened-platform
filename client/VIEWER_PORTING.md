@@ -11,16 +11,16 @@ Committed in sub-project 1 of the viewer S2 stack; deleted when the stack merges
 
 The ledger is the local spec `2026-11-02-viewer-workspace-ledger.md`. Rows are named here, not copied.
 
-| Sub-project            | Rows                                                                                                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 (overview)           | V-015, V-042, V-046, V-048–V-054, V-165, V-171–V-173, N-3                                                                                               |
-| 1 (frame and grid)     | V-004, V-017, V-019, V-020, V-026, V-033, V-034, V-035, V-036, V-037, V-038, V-041, V-043, V-044, V-047, V-151, V-175, V-176, N-2                       |
-| 2a (view controls)     | V-001–V-003, V-005–V-008, V-010–V-014, V-016, V-021, V-023, V-024, V-027                                                                                |
-| 2b (linking)           | V-045; amends V-043, V-048–V-050                                                                                                                        |
-| 3 (tools)              | V-009, V-018, V-022, V-025, V-057, V-058, V-060, V-061, V-068–V-082, V-084, V-086, V-087, V-091, V-092, V-097, V-098, V-124, V-142, V-144, V-145, V-166 |
-| 4 (layers)             | V-028, V-030–V-032, V-055, V-056, V-059, V-062–V-067, V-083, V-085, V-088, V-089, V-090, V-093–V-096, V-099–V-123, V-167                                |
-| 5 (grading)            | V-125–V-127, V-129–V-141, V-143, V-146–V-156                                                                                                            |
-| 6 (images, info, help) | V-029, V-035, V-036, V-040, V-157–V-163, V-168–V-170, N-1                                                                                               |
+| Sub-project            | Rows                                                                                                                                      |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 (overview)           | V-015, V-042, V-046, V-048–V-054, V-165, V-171–V-173, N-3                                                                                 |
+| 1 (frame and grid)     | V-004, V-017, V-019, V-020, V-026, V-033, V-034, V-035, V-036, V-037, V-038, V-041, V-043, V-044, V-047, V-151, V-175, V-176, N-2         |
+| 2a (view controls)     | V-001–V-003, V-005–V-008, V-010–V-014, V-016, V-021, V-023, V-024, V-027                                                                  |
+| 2b (linking)           | V-045; amends V-043, V-048–V-050                                                                                                          |
+| 3 (tools)              | V-009, V-018, V-022, V-025, V-058, V-060, V-068–V-082, V-084, V-086, V-087, V-091, V-092, V-097, V-098, V-124, V-142, V-144, V-145, V-166 |
+| 4 (layers)             | V-028, V-030–V-032, V-055, V-056, V-059, V-062–V-067, V-083, V-085, V-088, V-089, V-090, V-093–V-096, V-099–V-123, V-167                  |
+| 5 (grading)            | V-125–V-127, V-129–V-141, V-143, V-146–V-156                                                                                              |
+| 6 (images, info, help) | V-029, V-035, V-036, V-040, V-157–V-163, V-168–V-170, N-1                                                                                 |
 
 ## Old components not mounted
 
@@ -31,15 +31,15 @@ The ledger is the local spec `2026-11-02-viewer-workspace-ledger.md`. Rows are n
 | `HelpOverlay.svelte`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | 6 (Help panel)                                                                                                   |
 | Task config `task_panel.enabled` / `task_panel.sections.*` and `layout.hide` / `layout.prepend`: not honoured while the old panels are unmounted, except `hide: ["Rendering"]`, which `MainViewer` honours (no bar, no mode keys), so a task that hides navigation still shows Previous / Next set and Task overview in the header. Layers honours `Segmentation`, `ETDRS`, `Registration` and `Measure` from 4a.                                                                                                                                                                                     | 5                                                                                                                |
 | `TopViewer.svelte`'s tile controls, dropped when it became `StripViewer.svelte`: copy-ID bar, localizer lines toggle, en-face projection cycling                                                                                                                                                                                                                                                                                                                                                                                                                                                      | 4d (V-028, V-030, V-167): copy-ID bar on the tile; localizer lines and projection in viewports, chosen in Layers |
-| `RegistrationEditor` and `SeriesBlendEditor` overlays with their blend controls; `panelRendering/RenderModeSelect.svelte`, `panelRendering/WindowLevelSlider.svelte`, `DoubleRangeSlider.svelte` and `icons/Brightness.svelte`, kept only for those controls                                                                                                                                                                                                                                                                                                                                          | 4e, which deletes the last four                                                                                  |
+| `RegistrationEditor` and `SeriesBlendEditor` overlays with their blend controls; `panelRendering/RenderModeSelect.svelte`, `panelRendering/WindowLevelSlider.svelte`, `DoubleRangeSlider.svelte` and `icons/Brightness.svelte`, kept only for those controls                                                                                                                                                                                                                                                                                                                                          | 4e: removed, not ported; Layers › Pointsets and Blend replace them; the four old controls are deleted            |
 
 ## Freeze rule
 
 While the stack is open, a fix to the old viewer on `development` is listed here as a carry-over, with its commit, and ported into the sub-project that owns the behaviour.
 
-| Commit            | Fix                                  | Ported in |
-| ----------------- | ------------------------------------ | --------- |
-| `80faf9bb` (#273) | Registration editor and series blend | 4e        |
+| Commit            | Fix                                  | Ported in                        |
+| ----------------- | ------------------------------------ | -------------------------------- |
+| `80faf9bb` (#273) | Registration editor and series blend | 4e (engine kept, views replaced) |
 
 ## Traps
 

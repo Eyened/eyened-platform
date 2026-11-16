@@ -18,13 +18,9 @@ import { catalogueEntry } from "$lib/workspace/imageMeta";
 import type { Workspace } from "$lib/workspace/workspace.svelte";
 import type { CatalogueEntry } from "$lib/workspace/workspaceRules";
 import type { WorkspaceUrlState } from "$lib/workspace/workspaceUrl";
-import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import { SvelteMap } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
 import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
-import type {
-    RegistrationEditorSession,
-    SeriesBlendSession,
-} from "./panelRegistration/registrationSession";
 
 /** What a ViewerContext reads from the workspace: the remembered slice, Lock, strip tracking, the armed tool and the selected viewport. */
 export type WorkspaceView = Pick<
@@ -44,12 +40,6 @@ export class ViewerWindowContext {
     private bySOPInstanceUID = new Map<string, LoadedImages>();
 
     private viewers = new Set<ViewerContext>();
-    /** Paint these instead of `viewers` while the editor or series blend is open. */
-    private foregroundViewers = new SvelteSet<ViewerContext>();
-
-    public registrationEditor: RegistrationEditorSession | null = $state(null);
-    public seriesBlend: SeriesBlendSession | null = $state(null);
-
     public instanceIds: string[] = $state([]);
 
     public readonly imageLoader: ImageLoader;
@@ -104,35 +94,15 @@ export class ViewerWindowContext {
             });
     }
 
-    addViewer(viewer: ViewerContext, foreground = false) {
-        const viewers = foreground ? this.foregroundViewers : this.viewers;
-        viewers.add(viewer);
+    addViewer(viewer: ViewerContext) {
+        this.viewers.add(viewer);
         return () => {
-            viewers.delete(viewer);
+            this.viewers.delete(viewer);
         };
-    }
-
-    openRegistrationEditor(session: RegistrationEditorSession) {
-        this.seriesBlend = null;
-        this.registrationEditor = session;
-    }
-
-    closeRegistrationEditor() {
-        this.registrationEditor = null;
-    }
-
-    openSeriesBlend(session: SeriesBlendSession) {
-        this.registrationEditor = null;
-        this.seriesBlend = session;
-    }
-
-    closeSeriesBlend() {
-        this.seriesBlend = null;
     }
 
     removeViewer(viewer: ViewerContext) {
         this.viewers.delete(viewer);
-        this.foregroundViewers.delete(viewer);
     }
 
     repaint() {
@@ -142,11 +112,7 @@ export class ViewerWindowContext {
             width: this.webgl.canvas.width,
             height: this.webgl.canvas.height,
         });
-        const paint =
-            this.registrationEditor || this.seriesBlend
-                ? this.foregroundViewers
-                : this.viewers;
-        for (const viewer of paint) viewer.repaint();
+        for (const viewer of this.viewers) viewer.repaint();
     }
 
     private hydrate(entries: CatalogueEntry[]) {
@@ -247,7 +213,6 @@ export class ViewerWindowContext {
         this.topViewers.clear();
         this.images.clear();
         this.viewers.clear();
-        this.foregroundViewers.clear();
         this.imagesIndex.clear();
         this.bySOPInstanceUID.clear();
         this.photoLocators.clear();

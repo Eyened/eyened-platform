@@ -3,12 +3,10 @@ import type { PanelName } from "$lib/viewer/viewer-utils";
 import type { FormSchemaGET } from "../../types/openapi_types";
 import type { QuickFormPanelConfig, TaskConfig } from "./taskConfigLayout";
 import PanelInfo from "./panelInfo/panelInfo.svelte";
-import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
 import PanelForm from "./panelForm/PanelForm.svelte";
 import PanelQuickForm from "./panelQuickForm/PanelQuickForm.svelte";
-import { Form, Info, Registration } from "./icons/icons";
+import { Form, Info } from "./icons/icons";
 import InfoPanelHelp from "./panelHelp/InfoPanelHelp.svelte";
-import RegistrationPanelHelp from "./panelHelp/RegistrationPanelHelp.svelte";
 import FormPanelHelp from "./panelHelp/FormPanelHelp.svelte";
 
 export type ResolvedPanel = {
@@ -22,7 +20,6 @@ export type ResolvedPanel = {
 export type BuildDefaultPanelsInput = {
     is2D: boolean;
     etdrsSchema?: FormSchemaGET;
-    registrationSchema?: FormSchemaGET;
 };
 
 export type ResolvePanelsResult = {
@@ -42,24 +39,11 @@ const CUSTOM_PANEL_REGISTRY: Record<
 };
 
 export function buildDefaultPanels(
-    input: BuildDefaultPanelsInput,
+    _input: BuildDefaultPanelsInput,
 ): ResolvedPanel[] {
     const panels: ResolvedPanel[] = [
         { name: "Info", component: PanelInfo, Icon: Info, Help: InfoPanelHelp },
     ];
-
-    if (input.is2D && input.registrationSchema) {
-        panels.push({
-            name: "Registration",
-            component: PanelRegistration,
-            Icon: Registration,
-            Help: RegistrationPanelHelp,
-            props: {
-                registrationSchema: input.registrationSchema,
-                active: false,
-            },
-        });
-    }
 
     panels.push({
         name: "Form",
