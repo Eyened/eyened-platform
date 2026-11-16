@@ -3,11 +3,12 @@ import {
     type Segmentation,
 } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import type { SyncState } from "$lib/webgl/segmentationState.svelte";
-import { SvelteSet } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { fromStore, writable, type Writable } from "svelte/store";
 import { vi } from "vitest";
 import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
 import { GridLayers } from "./gridLayers.svelte";
+import { PointsetState } from "./pointsets";
 import type {
     ModelSegmentationGET,
     SegmentationGET,
@@ -55,6 +56,37 @@ export function modelSegmentation(
     } as unknown as ModelSegmentationGET;
 }
 
+/** A synthetic loaded 2D image of patient 1. */
+export function fakeImage(
+    id: string,
+    over: { modality?: string; date?: string; laterality?: string } = {},
+) {
+    return {
+        image_id: id,
+        is2D: true,
+        is3D: false,
+        width: 100,
+        height: 100,
+        supportsColorRenderModes: true,
+        instance: {
+            id,
+            patient: { id: 1 },
+            study: { id: 2, date: over.date ?? "2024-03-12" },
+            laterality: over.laterality ?? "R",
+            modality: over.modality ?? "Autofluorescence",
+            device: { manufacturer: "Heidelberg", model: "Spectralis" },
+        },
+    };
+}
+
+/** The window fake; two calls share one, as two viewports share their window. */
+export interface TestWindow {
+    pointsets: PointsetState;
+    images: SvelteMap<string, unknown>;
+    registration: unknown;
+    topViewers: Map<unknown, unknown>;
+}
+
 /** The contexts a Layers section reads, with one save-state store per segmentation id. */
 export function layersContexts(
     instanceId = "inst-1",
@@ -68,6 +100,10 @@ export function layersContexts(
         cfKeypoints?: { fovea_xy: number[]; disc_edge_xy: number[] };
         /** Image ids registered to this one. */
         linked?: string[];
+        /** Other loaded images, in strip order. */
+        images?: ReturnType<typeof fakeImage>[];
+        /** A window from an earlier call. */
+        win?: TestWindow;
     } = {},
 ) {
     const sync = new Map<number, Writable<SyncState>>();
@@ -80,11 +116,14 @@ export function layersContexts(
         is2D: !(over.is3D ?? false),
         resolution: over.resolution ?? { x: -1, y: -1, z: -1 },
         image_id: instanceId,
+        supportsColorRenderModes: true,
         instance: {
             id: instanceId,
             patient: { id: 1 },
-            study: { id: 2 },
+            study: { id: 2, date: "2022-05-10" },
             laterality: "R",
+            modality: "ColorFundus",
+            device: { manufacturer: "Topcon", model: "Maestro2" },
             cf_keypoints: over.cfKeypoints ?? null,
         },
         getOrCreateSegmentationItem(segmentation: Segmentation) {
@@ -140,12 +179,30 @@ export function layersContexts(
                 this.applyConnectedComponents.add(item);
         },
     };
+    const registration = {
+        getLinkedImgIds: () => new Set(over.linked ?? []),
+    };
+    const others = over.images ?? [];
+    const win: TestWindow = over.win ?? {
+        pointsets: new PointsetState(),
+        images: new SvelteMap<string, unknown>(),
+        registration,
+        topViewers: new Map(),
+    };
+    for (const loaded of [image, ...others])
+        win.images.set(loaded.image_id, loaded);
+    const workspace = {
+        catalogue: [image.image_id, ...others.map((i) => i.image_id)],
+        arm: vi.fn(),
+        armedTool: null,
+    };
     const viewerContext = {
         image,
         index: 0,
         axis: 0,
         activePanels: new SvelteSet<string>(),
         addOverlay: vi.fn(() => vi.fn()),
+        viewerWindowContext: win,
     };
     const globalContext = {
         user: { id: ME },
@@ -153,15 +210,13 @@ export function layersContexts(
             a.annotation_type !== "model_segmentation" && a.creator.id === ME,
         dialogue: null,
     };
-    const registration = {
-        getLinkedImgIds: () => new Set(over.linked ?? []),
-    };
     const grids = new GridLayers(viewerContext as never, registration as never);
     const measure = new MeasureTool(image as never);
     const context = new Map<string, unknown>([
         ["globalContext", globalContext],
         ["viewerContext", viewerContext],
         ["mainViewerContext", mainViewerContext],
+        ["workspace", workspace],
     ]);
     return {
         context,
@@ -172,5 +227,7 @@ export function layersContexts(
         globalContext,
         grids,
         measure,
+        win,
+        workspace,
     };
 }

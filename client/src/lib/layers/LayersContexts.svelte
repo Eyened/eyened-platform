@@ -9,6 +9,7 @@ Provides the selected viewport's viewer and segmentation contexts to the section
     import DistanceSection from "./DistanceSection.svelte";
     import EtdrsSection from "./EtdrsSection.svelte";
     import LocalizerSection from "./LocalizerSection.svelte";
+    import PointsetsSection from "./PointsetsSection.svelte";
     import ProjectionSection from "./ProjectionSection.svelte";
     import SegmentationsSection from "./SegmentationsSection.svelte";
 
@@ -45,6 +46,12 @@ Provides the selected viewport's viewer and segmentation contexts to the section
         open={open.etdrs}
         ontoggle={() => ontoggle("etdrs")}
         {shown}
+    />
+{/if}
+{#if sections.includes("pointsets")}
+    <PointsetsSection
+        open={open.pointsets}
+        ontoggle={() => ontoggle("pointsets")}
     />
 {/if}
 {#if sections.includes("distance")}
