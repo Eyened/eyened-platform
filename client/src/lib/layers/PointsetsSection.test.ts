@@ -152,12 +152,14 @@ describe("PointsetsSection", () => {
     });
 
     it("Delete asks first, then removes the registration", async () => {
+        vi.mocked(deleteFormAnnotation).mockClear();
         reg(11, ME, {}, { image_id: "inst-1" });
         renderSection();
         await fireEvent.click(screen.getByRole("button", { name: "Delete" }));
         const dialog = await screen.findByRole("dialog", {
             name: /Delete registration/,
         });
+        expect(deleteFormAnnotation).not.toHaveBeenCalled();
         await fireEvent.click(
             within(dialog).getByRole("button", { name: "Delete" }),
         );
