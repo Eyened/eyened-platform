@@ -5,28 +5,10 @@ import { ImageSliceStack } from "$lib/webgl/imageSliceStack";
 import type { Dimensions } from "$lib/webgl/types";
 import type { WebGL } from "$lib/webgl/webgl";
 import type { ImageGET } from "../../types/openapi_types";
-import { buildImageDataUrl, withQueryParam } from "./imageDataUrl";
+import { decodeDicomBuffer } from "./dicomDecoder";
+import { buildImageDataUrl } from "./imageDataUrl";
 import type { ImageLoadProgress } from "./loadProgress";
-import { dicomDecodeConcurrency, mapPool } from "./mapPool";
 import { loadMhdRawFromEndpoints } from "./mhdLoader";
-
-import * as cornerstone from "cornerstone-core";
-import * as cornerstoneWADOImageLoader from "cornerstone-wado-image-loader";
-import * as dicomParser from "dicom-parser";
-
-// Configure cornerstone WADO image loader
-cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
-cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
-cornerstoneWADOImageLoader.configure({
-    beforeSend: (xhr: XMLHttpRequest) => {
-        xhr.setRequestHeader("Accept", "application/dicom");
-    },
-    useWebWorkers: true,
-});
-// Do not call webWorkerManager.initialize here: CWIL v4 expects a full
-// taskConfiguration (incl. decodeTask) and a bare initialize throws
-// "Cannot read properties of undefined (reading 'decodeTask')".
-// Workers still start on demand via useWebWorkers; we parallelize frames below.
 
 export type LoadedImages =
     | [Image2D]
@@ -369,7 +351,7 @@ export class ImageLoader {
     }
 
     /**
-     * Decode a DICOM at ``url`` into a mono volume (or single-frame pixel buffer).
+     * Fetch + decode a DICOM at ``url`` into a mono volume (or single-frame buffer).
      */
     async decodeDicomVolume(
         url: string,
@@ -377,76 +359,19 @@ export class ImageLoader {
     ): Promise<{
         volume: Uint8Array;
         dimensions: Dimensions;
-        meta: any;
+        meta: Record<string, unknown>;
         photometricInterpretation?: string;
     }> {
-        const dicomImageId = `wadouri:${url}`;
-        const image = await cornerstone.loadImage(dicomImageId);
-        const ds = image.data;
-
-        const meta: any = dicomParser.explicitDataSetToJS(ds);
-        const dimensions = this.extractDimensions(meta);
-
-        const photometricInterpretation = meta.x00280004;
-        const transferSyntax = meta.x00020010;
-        const { width, height, depth } = dimensions;
-
-        const pixelData = ds.elements.x7fe00010;
-
-        if (pixelData.length === width * height * depth) {
-            console.info(
-                `[imageLoader] dicom ${logId}: uncompressed pixel data ` +
-                    `${width}x${height}x${depth} (transferSyntax=${transferSyntax})`,
+        const response = await fetch(url, {
+            headers: { Accept: "application/dicom" },
+        });
+        if (!response.ok) {
+            throw new Error(
+                `Failed to fetch DICOM ${logId}: ${response.status}`,
             );
-            const dicomBytes = ds.byteArray as Uint8Array;
-            const volume = dicomBytes.subarray(
-                pixelData.dataOffset,
-                pixelData.dataOffset + pixelData.length,
-            );
-            return { volume, dimensions, meta, photometricInterpretation };
         }
-
-        if (depth > 1 || meta.x00080060 === "OPT") {
-            // Compressed multi-frame (typically J2K): each frame is a separate
-            // decode. Parallelize with a capped pool; dataset fetch is cached by URL.
-            const concurrency = dicomDecodeConcurrency();
-            console.info(
-                `[imageLoader] dicom ${logId}: decoding ${depth} frame(s) via cornerstone ` +
-                    `(${width}x${height}, modality=${meta.x00080060}, ` +
-                    `transferSyntax=${transferSyntax}, concurrency=${concurrency})`,
-            );
-            const volume = new Uint8Array(width * height * depth);
-            const frameSize = width * height;
-            // First loadImage already decoded frame 0 — reuse it.
-            volume.set(pixelDataAsUint8(image.getPixelData()), 0);
-
-            const frameIndices = Array.from(
-                { length: depth - 1 },
-                (_, i) => i + 1,
-            );
-            await mapPool(frameIndices, concurrency, async (frameIndex) => {
-                const frameUrl = withQueryParam(url, "frame", frameIndex);
-                const frameImage = await cornerstone.loadImage(
-                    `wadouri:${frameUrl}`,
-                );
-                volume.set(
-                    pixelDataAsUint8(frameImage.getPixelData()),
-                    frameIndex * frameSize,
-                );
-            });
-            return { volume, dimensions, meta, photometricInterpretation };
-        }
-
-        console.info(
-            `[imageLoader] dicom ${logId}: single-frame 2D via cornerstone ` +
-                `(${width}x${height}, photometric=${photometricInterpretation}, transferSyntax=${transferSyntax})`,
-        );
-        return {
-            volume: pixelDataAsUint8(image.getPixelData()),
-            dimensions,
-            meta,
-            photometricInterpretation,
-        };
+        const buffer = await response.arrayBuffer();
+        return decodeDicomBuffer(buffer, { logId });
     }
 
     async loadDicom(
@@ -525,47 +450,6 @@ export class ImageLoader {
         );
     }
 
-    private extractDimensions(meta: any): Dimensions {
-        const width = Number(meta.x00280011); // Rows (width)
-        const height = Number(meta.x00280010); // Columns (height)
-        const depth = Number(meta.x00280008) || 1; // Number of frames (depth)
-
-        let res_w = -1,
-            res_h = -1,
-            res_d = -1;
-
-        // x00280030: PixelSpacing
-        const pixelSpacing = meta.x00280030?.split("\\").map(Number);
-        if (pixelSpacing) {
-            [res_h, res_w] = pixelSpacing;
-        }
-
-        try {
-            // Note: this extracts the values from the first frame
-            // Perhaps we should implement an Image2DArray for multi-frame images
-            // if the resolution varies between frames (e.g. radial + circular scans)
-
-            // x52009229: Shared Functional Groups Sequence
-            const resolutions = meta.x52009229[0].x00289110[0];
-            [res_h, res_w] = resolutions.x00280030.split("\\").map(Number);
-            // x00180050: Slice Thickness
-            res_d = Number(resolutions.x00180050);
-        } catch (e) {
-            if (depth > 1) {
-                console.warn("No depth resolution found in DICOM metadata:", e);
-            }
-        }
-
-        return {
-            width,
-            height,
-            depth,
-            width_mm: width * res_w,
-            height_mm: height * res_h,
-            depth_mm: depth * res_d,
-        };
-    }
-
     private buildDataUrl(
         imageId: string,
         query?: Record<string, string | number | boolean | undefined>,
@@ -602,12 +486,6 @@ function angioFlowStorageId(instance: ImageGET): number | null {
         (s) => !s.is_primary && s.format === "angio_flow",
     );
     return row?.id ?? null;
-}
-
-function pixelDataAsUint8(pixelData: ArrayLike<number>): Uint8Array {
-    return pixelData instanceof Uint8Array
-        ? pixelData
-        : Uint8Array.from(pixelData);
 }
 
 async function getImage(url: string): Promise<ImageBitmap> {
