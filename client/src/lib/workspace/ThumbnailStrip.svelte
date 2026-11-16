@@ -83,6 +83,7 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
         if (!e.dataTransfer) return;
         e.dataTransfer.setData(IMAGE_MIME, imageId);
         e.dataTransfer.effectAllowed = "copy";
+        workspace.draggedImageId = imageId;
     }
 
     // Enter and Space are the button's own click, which the tile handles.
@@ -120,6 +121,7 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
                 onfocus={() => (focusId = imageId)}
                 onkeydown={(e) => onkeydown(e, i)}
                 ondragstart={(e) => ondragstart(e, imageId)}
+                ondragend={() => (workspace.draggedImageId = null)}
             >
                 {#if slots}
                     <span class="slot"

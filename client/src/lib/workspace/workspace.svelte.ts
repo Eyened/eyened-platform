@@ -105,6 +105,8 @@ export class Workspace {
         Place: "point",
     });
     toolMode: ToolMode = $state("all");
+    /** The image a strip tile drag carries, from dragstart to dragend; during dragover the browser shows only its type. */
+    draggedImageId: string | null = $state(null);
 
     catalogue = $derived(this.entries.map((e) => e.imageId));
     pageCount = $derived(countPages(this.catalogue.length, this.slots.length));

@@ -54,6 +54,16 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
         `Viewport ${position + 1}: ${shownTitle ? titleText(shownTitle) : emptyTitle}`,
     );
     let dropTarget = $state(false);
+    let zone: "show" | "overlay" = $state("show");
+    // "Overlay" only for a strip tile with pairs in this viewport's current registration.
+    const overlayable = $derived(
+        dropTarget &&
+            workspace.draggedImageId !== null &&
+            (workspace
+                .handleAt(position)
+                ?.layers?.blend.canOverlay(workspace.draggedImageId) ??
+                false),
+    );
     let titleOpen = $state(false);
 
     function onfocusin(e: FocusEvent) {
@@ -122,7 +132,10 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     }
 
     function ondrop(e: DragEvent) {
+        const overlay = overlayable && zone === "overlay";
         dropTarget = false;
+        zone = "show";
+        workspace.draggedImageId = null;
         const data = e.dataTransfer;
         if (!data) return;
         const from = data.getData(SLOT_MIME);
@@ -132,7 +145,9 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
             workspace.swap(Number(from), position);
         } else if (imageId) {
             e.preventDefault();
-            workspace.load(position, imageId);
+            const blend = workspace.handleAt(position)?.layers?.blend;
+            if (overlay && blend) blend.overlayWith(imageId);
+            else workspace.load(position, imageId);
             workspace.select(position);
         }
     }
@@ -160,6 +175,26 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     {ondrop}
 >
     <div class="body">
+        {#if overlayable}
+            <div class="zones" aria-hidden="true">
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                    class="zone"
+                    class:active={zone === "show"}
+                    ondragover={() => (zone = "show")}
+                >
+                    Show here
+                </div>
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                    class="zone"
+                    class:active={zone === "overlay"}
+                    ondragover={() => (zone = "overlay")}
+                >
+                    Overlay
+                </div>
+            </div>
+        {/if}
         {#if slot.imageId}
             {#key slot.imageId}
                 {@render viewer(slot.imageId)}
@@ -339,6 +374,26 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
         min-height: 0;
         /* The viewer never grows past its frame. */
         overflow: hidden;
+    }
+    /* While a registered tile is dragged over: drop left to show it here, right to overlay it. */
+    .zones {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        pointer-events: auto;
+    }
+    .zone {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgb(0 0 0 / 0.6);
+        color: var(--color-text-primary);
+        border: 2px dashed var(--color-border-subtle-01);
+    }
+    .zone.active {
+        border: 2px solid var(--color-focus);
     }
     .body > :global(*) {
         min-width: 0;
