@@ -121,7 +121,7 @@ Blend › Series: the eye's registered images oldest first, a Position slider th
                         .colour}
                 ></span>
                 <img
-                    src={getThumbUrl(image.instance, 48)}
+                    src={getThumbUrl(image.instance)}
                     alt=""
                     class="size-6 shrink-0 object-cover"
                 />

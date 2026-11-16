@@ -56,7 +56,7 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
                 id: candidate.image_id,
                 text: shortImageLabel(candidate.instance),
                 description: `${n} pair${n === 1 ? "" : "s"}`,
-                thumb: getThumbUrl(candidate.instance, 48),
+                thumb: getThumbUrl(candidate.instance),
             };
         }),
     );
@@ -69,7 +69,7 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
             value={blend.mode}
             onchange={(mode) => blend.setMode(mode as BlendMode)}
             items={MODES}
-            class="self-start"
+            class="max-w-full self-start"
         />
         {#if blend.error}
             <InlineNotification

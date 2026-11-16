@@ -5,6 +5,7 @@
 
     // Single-select toggle group (Carbon has none): one Tab stop on the selected option, arrow keys inside.
     // No item is selected when `value` matches none; pressing the selected item keeps it selected.
+    // In a narrow column a label with a tooltip truncates; one without keeps its full text.
     let {
         value,
         onchange,
@@ -61,7 +62,9 @@
         <ToggleGroupPrimitive.Item
             value={item.value}
             aria-label={item.label}
-            class="flex h-6 min-w-6 cursor-pointer items-center justify-center px-1 text-label-01 text-text-secondary hover:bg-content-switcher-background-hover hover:text-text-primary data-[state=on]:bg-content-switcher-selected data-[state=on]:text-text-primary data-[state=on]:shadow-content-switcher-selected"
+            class="{item.tooltip
+                ? ''
+                : 'shrink-0'} flex h-6 min-w-6 cursor-pointer items-center justify-center px-1 text-label-01 text-text-secondary hover:bg-content-switcher-background-hover hover:text-text-primary data-[state=on]:bg-content-switcher-selected data-[state=on]:text-text-primary data-[state=on]:shadow-content-switcher-selected"
         >
             {#snippet child({ props })}
                 {#if item.tooltip}
@@ -79,7 +82,9 @@
                                             ? 0
                                             : -1}
                                     >
-                                        {item.text}
+                                        <span class="min-w-0 truncate"
+                                            >{item.text}</span
+                                        >
                                     </button>
                                 {/snippet}
                             </Tooltip.Trigger>
@@ -92,7 +97,7 @@
                         tabindex={item.value === tabStop ? 0 : -1}
                         onfocus={() => (focused = item.value)}
                     >
-                        {item.text}
+                        <span class="min-w-0 truncate">{item.text}</span>
                     </button>
                 {/if}
             {/snippet}

@@ -116,6 +116,17 @@ describe("PointsetsSection", () => {
         ).toHaveAttribute("aria-pressed", "true");
     });
 
+    it("lists two same-day images of one modality as two lines", async () => {
+        reg(12, 9, { "inst-1": [pt], "inst-2": [pt], "inst-3": [pt] });
+        renderSection("inst-1", {
+            images: [fakeImage("inst-2"), fakeImage("inst-3")],
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Registration [12]" }),
+        );
+        expect(screen.getAllByText("FAF 2024-03-12")).toHaveLength(2);
+    });
+
     it("New creates on this image, makes it current and arms P; a failed New says so and arms nothing", async () => {
         vi.mocked(createFormAnnotation).mockImplementationOnce(async (body) => {
             return reg(

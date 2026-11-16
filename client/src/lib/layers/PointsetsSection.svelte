@@ -187,7 +187,7 @@ The name sets the eye's current registration for every viewport of that eye; P p
                                     />
                                     {#if lines}
                                         <ul aria-label="Points per image">
-                                            {#each lines as line (line.name)}
+                                            {#each lines as line, i (i)}
                                                 <li
                                                     class="flex gap-2 text-body-compact-01"
                                                 >
