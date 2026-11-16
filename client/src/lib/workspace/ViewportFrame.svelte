@@ -392,7 +392,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgb(0 0 0 / 0.6);
+        background: var(--color-overlay);
         color: var(--color-text-primary);
         border: 2px dashed var(--color-border-subtle-01);
     }

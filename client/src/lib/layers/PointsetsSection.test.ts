@@ -109,7 +109,7 @@ describe("PointsetsSection", () => {
         first.win.pointsets.sync.set(12, "error");
         expect(await screen.findByText("Couldn't save")).toBeInTheDocument();
         cleanup();
-        // Another viewport of the same eye, showing the FAF.
+        // Another viewport of the same eye.
         renderSection("inst-2", { images: [], win: first.win });
         expect(
             screen.getByRole("button", { name: "Registration [12]" }),
