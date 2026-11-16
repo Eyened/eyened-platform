@@ -192,12 +192,12 @@ export class ViewportBlend {
 
     setMode(mode: BlendMode): void {
         this.stopTimer();
+        this.playing = false;
         this.error = false;
         this.mode = mode;
         if (mode !== "flicker") return;
         this.showOther = false;
-        if (reducedMotion()) this.playing = false;
-        else this.play();
+        if (!reducedMotion()) this.play();
     }
 
     setWith(imageId: string): void {
