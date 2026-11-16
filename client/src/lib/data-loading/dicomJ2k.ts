@@ -1,89 +1,65 @@
 /**
- * JPEG 2000 frame decode via OpenJPEG WASM (same codec CWIL used).
+ * JPEG 2000 frame decode via OpenJPEG WASM.
+ * Browser: parallel worker pool. Node/Vitest: main-thread fallback.
  */
-import openJpegFactory from "@cornerstonejs/codec-openjpeg/decodewasmjs";
-import openjpegWasmUrl from "@cornerstonejs/codec-openjpeg/decodewasm?url";
+import { dicomDecodeConcurrency } from "./mapPool";
+import {
+    createJ2kDecoder,
+    decodeWithJ2kDecoder,
+    type J2KDecoder,
+} from "./dicomJ2kCodec";
+import { J2kWorkerPool } from "./dicomJ2kPool";
 
-type J2KDecoder = {
-    getEncodedBuffer: (length: number) => Uint8Array;
-    decode: () => void;
-    getFrameInfo: () => {
-        width: number;
-        height: number;
-        bitsPerSample: number;
-        componentCount: number;
-        isSigned: boolean;
-    };
-    getDecodedBuffer: () => Uint8Array;
-};
+let mainDecoder: Promise<J2KDecoder> | undefined;
+let pool: J2kWorkerPool | undefined;
+let poolFailed = false;
 
-type OpenJpegModule = {
-    J2KDecoder: new () => J2KDecoder;
-};
-
-let decoderPromise: Promise<J2KDecoder> | undefined;
-
-/**
- * Vite `?url` is root-relative (`/node_modules/...`). In the browser that is an
- * HTTP path; in Node/Vitest Emscripten opens it with fs, so prefix cwd.
- */
-function resolveWasmLocatePath(file: string): string {
-    if (!file.endsWith(".wasm")) {
-        return file;
+function useWorkers(): boolean {
+    if (poolFailed || typeof Worker === "undefined") {
+        return false;
     }
-    const url = openjpegWasmUrl;
-    if (url.startsWith("file:") || /^https?:/i.test(url)) {
-        return url;
+    // Vitest/jsdom: Worker exists but module workers + WASM are unreliable.
+    if (typeof process !== "undefined" && process.env?.VITEST) {
+        return false;
     }
-    const isNode =
-        typeof process !== "undefined" &&
-        Boolean(process.versions && process.versions.node);
-    if (isNode && url.startsWith("/")) {
-        return `${process.cwd()}${url}`;
-    }
-    return url;
+    return typeof window !== "undefined";
 }
 
-async function getDecoder(): Promise<J2KDecoder> {
-    if (!decoderPromise) {
-        decoderPromise = (async () => {
-            const factory = openJpegFactory as (opts: {
-                locateFile: (f: string) => string;
-            }) => Promise<OpenJpegModule>;
-            const instance = await factory({
-                locateFile: resolveWasmLocatePath,
-            });
-            return new instance.J2KDecoder();
-        })();
+function getPool(): J2kWorkerPool | undefined {
+    if (!useWorkers()) {
+        return undefined;
     }
-    return decoderPromise;
+    if (!pool) {
+        try {
+            pool = new J2kWorkerPool(dicomDecodeConcurrency());
+        } catch {
+            poolFailed = true;
+            return undefined;
+        }
+    }
+    return pool;
+}
+
+async function decodeOnMainThread(compressed: Uint8Array): Promise<Uint8Array> {
+    if (!mainDecoder) {
+        mainDecoder = createJ2kDecoder();
+    }
+    return decodeWithJ2kDecoder(await mainDecoder, compressed);
 }
 
 /** Decode one encapsulated J2K codestream to unsigned 8-bit samples. */
 export async function decodeJ2kFrame(
     compressed: Uint8Array,
 ): Promise<Uint8Array> {
-    const decoder = await getDecoder();
-    const encoded = decoder.getEncodedBuffer(compressed.length);
-    encoded.set(compressed);
-    decoder.decode();
-    const frameInfo = decoder.getFrameInfo();
-    const decoded = decoder.getDecodedBuffer();
-
-    if (frameInfo.bitsPerSample > 8) {
-        const src = frameInfo.isSigned
-            ? new Int16Array(
-                  decoded.buffer,
-                  decoded.byteOffset,
-                  decoded.byteLength / 2,
-              )
-            : new Uint16Array(
-                  decoded.buffer,
-                  decoded.byteOffset,
-                  decoded.byteLength / 2,
-              );
-        return Uint8Array.from(src as unknown as ArrayLike<number>);
+    const workerPool = getPool();
+    if (workerPool) {
+        try {
+            return await workerPool.decode(compressed);
+        } catch {
+            poolFailed = true;
+            pool?.terminate();
+            pool = undefined;
+        }
     }
-
-    return new Uint8Array(decoded);
+    return decodeOnMainThread(compressed);
 }

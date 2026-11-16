@@ -53,7 +53,11 @@ declare module "jpeg-lossless-decoder-js" {
 }
 
 declare module "@cornerstonejs/codec-openjpeg/decodewasmjs" {
-    const factory: (opts?: { locateFile?: (f: string) => string }) => Promise<{
+    const factory: (opts?: {
+        locateFile?: (f: string) => string;
+        print?: (s: string) => void;
+        printErr?: (s: string) => void;
+    }) => Promise<{
         J2KDecoder: new () => {
             getEncodedBuffer: (length: number) => Uint8Array;
             decode: () => void;
