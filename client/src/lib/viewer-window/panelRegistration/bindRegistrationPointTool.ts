@@ -7,6 +7,7 @@ import {
 import type { JSONSchema } from "$lib/forms/schemaType";
 import type { PointMarkerStyle } from "$lib/config/clientDefaults";
 import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
+import type { SyncState } from "$lib/webgl/segmentationState.svelte";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 
 const REGISTRATION_POINTS: JSONSchema = {
@@ -50,11 +51,22 @@ export function bindRegistrationPointTool(args: {
     schema: JSONSchema;
     canEdit: boolean;
     pointMarker: { style: PointMarkerStyle; radius: number; color: string };
+    onSync?: (sync: SyncState) => void;
 }): () => void {
     const analysis = registrationAnalysis(args.schema);
     if (!analysis) return () => {};
     const publicId = args.viewerContext.image.instance.id;
     const annotationId = args.annotationId;
+    // A failed save shows on the registration's row; the next move saves the whole set again.
+    const save = async (formData: unknown) => {
+        args.onSync?.("saving");
+        try {
+            await setFormAnnotationValue(annotationId, formData);
+            args.onSync?.("synced");
+        } catch {
+            args.onSync?.("error");
+        }
+    };
     const write = (
         points: ReturnType<typeof getPointsForImage>,
         persist: boolean,
@@ -68,7 +80,7 @@ export function bindRegistrationPointTool(args: {
             analysis,
         );
         formAnnotations.set(annotationId, { ...existing, form_data: next });
-        if (persist) setFormAnnotationValue(annotationId, next);
+        if (persist) void save(next);
     };
     const tool = new PointTool({
         canEdit: args.canEdit,

@@ -160,4 +160,31 @@ describe("bindRegistrationPointTool", () => {
         });
         expect(toolSpies.tools.at(-1)?.opts.canEdit).toBe(false);
     });
+
+    it("reports a failed save as an error, and the next save clears it", async () => {
+        vi.mocked(setFormAnnotationValue)
+            .mockRejectedValueOnce(new Error("offline"))
+            .mockResolvedValueOnce(undefined);
+        const onSync = vi.fn();
+        bindRegistrationPointTool({
+            viewerContext: {
+                image: { image_id: "img", instance: { id: "img" } },
+                addOverlay: () => () => {},
+            } as never,
+            annotationId: 21,
+            schema: schema as never,
+            canEdit: true,
+            pointMarker: { style: "cross", radius: 4, color: "red" },
+            onSync,
+        });
+        const tool = toolSpies.tools.at(-1)!;
+        tool.opts.onPersist([{ x: 3, y: 4 }]);
+        await vi.waitFor(() =>
+            expect(onSync).toHaveBeenLastCalledWith("error"),
+        );
+        tool.opts.onPersist([{ x: 5, y: 6 }]);
+        await vi.waitFor(() =>
+            expect(onSync).toHaveBeenLastCalledWith("synced"),
+        );
+    });
 });

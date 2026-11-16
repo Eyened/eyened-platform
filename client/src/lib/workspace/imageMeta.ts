@@ -12,7 +12,7 @@ export interface ViewportTitle {
     rest: string;
 }
 
-const MODALITY_LABELS: Partial<Record<string, string>> = {
+export const MODALITY_LABELS: Partial<Record<string, string>> = {
     ColorFundus: "CF",
     InfraredReflectance: "IR",
     Autofluorescence: "FAF",

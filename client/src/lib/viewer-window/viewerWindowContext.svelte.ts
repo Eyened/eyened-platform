@@ -9,6 +9,7 @@ import {
     loadPhotoLocators,
     type PhotoLocator,
 } from "$lib/registration/photoLocators";
+import { PointsetState } from "$lib/layers/pointsets";
 import type { Registration } from "$lib/registration/registration.svelte";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
@@ -53,6 +54,8 @@ export class ViewerWindowContext {
 
     photoLocators = new SvelteMap<string, PhotoLocator[]>();
     photoLocatorSets: PhotoLocator[][] = $state([]);
+    /** Each eye's current registration and point save states, for every viewport of the window. */
+    public readonly pointsets = new PointsetState();
 
     public readonly viewState: WorkspaceView;
 
