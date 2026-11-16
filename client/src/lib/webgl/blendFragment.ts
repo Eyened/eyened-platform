@@ -30,7 +30,7 @@ export function blendFragment(mappings: readonly string[]): string {
             (_, layer) => `    {
         vec2 uv = mapping_${layer}(v_uv);
         alphas[${layer}] = u_weight${layer} * blend_inside(uv);
-        colours[${layer}] = layer_colour(texture(u_layer${layer}, uv).rgb, u_wl${layer}, u_channel${layer}, u_tint${layer}, u_colour${layer});
+        colours[${layer}] = layer_colour(texture(u_layer${layer}, uv).rgb, u_wl${layer}, u_channel${layer}, u_invert${layer}, u_tint${layer}, u_colour${layer});
         coverage[${layer}] = mix(vec3(1.0), u_colour${layer}, u_tint${layer});
     }`,
         )
@@ -56,13 +56,14 @@ float blend_inside(vec2 uv) {
     return step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
 }
 
-vec3 layer_colour(vec3 rgb, vec2 wl, int channel, float tint, vec3 colour) {
+vec3 layer_colour(vec3 rgb, vec2 wl, int channel, float invert, float tint, vec3 colour) {
     vec3 c = clamp((255.0 * rgb - wl.x) / max(wl.y - wl.x, 1e-3), 0.0, 1.0);
     if (channel == -1) {
         c = vec3(dot(c, LUMA));
     } else if (channel >= 0) {
         c = vec3(c[channel]);
     }
+    c = mix(c, 1.0 - c, invert);
     return mix(c, dot(c, LUMA) * colour, tint);
 }
 
@@ -99,6 +100,7 @@ function layerDeclarations(mapping: string, layer: number): string {
 uniform float u_weight${layer};
 uniform vec2 u_wl${layer};
 uniform int u_channel${layer};
+uniform float u_invert${layer};
 uniform float u_tint${layer};
 uniform vec3 u_colour${layer};`;
     if (mapping === AFFINE_UNIFORM_LAYER) {
