@@ -9,6 +9,7 @@ import {
     loadPhotoLocators,
     type PhotoLocator,
 } from "$lib/registration/photoLocators";
+import { BlendStyles } from "$lib/layers/blendStyles";
 import { PointsetState } from "$lib/layers/pointsets";
 import type { Registration } from "$lib/registration/registration.svelte";
 import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -56,6 +57,8 @@ export class ViewerWindowContext {
     photoLocatorSets: PhotoLocator[][] = $state([]);
     /** Each eye's current registration and point save states, for every viewport of the window. */
     public readonly pointsets = new PointsetState();
+    /** Blend looks per image and role, kept for the page session. */
+    public readonly blendStyles = new BlendStyles();
 
     public readonly viewState: WorkspaceView;
 
