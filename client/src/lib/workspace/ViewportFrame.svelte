@@ -45,6 +45,10 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     // ASSUMPTION: the selected viewport's controls follow it in Tab order (plan decision 2).
     const tab = $derived(selected ? 0 : -1);
     const shownTitle = $derived(slot.imageId ? title : null);
+    // The viewport's own addition, e.g. "· blended with FAF 2024-03-12"; visual only.
+    const titleSuffix = $derived(
+        workspace.handleAt(position)?.titleSuffix ?? "",
+    );
     const emptyTitle = $derived(workspace.loaded ? "Empty" : "Loading…");
     const name = $derived(
         `Viewport ${position + 1}: ${shownTitle ? titleText(shownTitle) : emptyTitle}`,
@@ -190,7 +194,9 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                             {#if shownTitle}
                                 <span class="patient">{shownTitle.patient}</span
                                 >
-                                <span class="rest">{shownTitle.rest}</span>
+                                <span class="rest"
+                                    >{shownTitle.rest}{titleSuffix}</span
+                                >
                             {:else}
                                 <span class="rest">{emptyTitle}</span>
                             {/if}

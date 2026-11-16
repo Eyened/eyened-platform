@@ -45,6 +45,8 @@ function attach(ws: Workspace, position: number, instanceId: string) {
             measure: ctx.measure,
             projectionSources: [],
             localizer: new LocalizerLines(() => []),
+            pointTarget: null,
+            blend: {} as never,
         },
     });
     return ctx;

@@ -3,6 +3,7 @@ export type LayerSectionId =
     | "segmentations"
     | "etdrs"
     | "pointsets"
+    | "blend"
     | "distance"
     | "projection"
     | "localizer";
@@ -12,6 +13,7 @@ const HIDDEN_BY: Record<LayerSectionId, string | null> = {
     segmentations: "Segmentation",
     etdrs: "ETDRS",
     pointsets: "Registration",
+    blend: "Registration",
     distance: "Measure",
     // The projection shows segmentation content, so blinding segmentations hides it too.
     projection: "Segmentation",
@@ -22,6 +24,7 @@ const ORDER: readonly LayerSectionId[] = [
     "segmentations",
     "etdrs",
     "pointsets",
+    "blend",
     "distance",
     "projection",
     "localizer",
@@ -45,6 +48,7 @@ export function layerSections(input: LayerSectionsInput): LayerSectionId[] {
         segmentations: true,
         etdrs: input.is2D && input.hasEtdrsSchema,
         pointsets: input.is2D && input.hasRegistrationSchema,
+        blend: input.is2D && input.hasRegistrationSchema,
         distance: true,
         projection: input.projection,
         localizer: input.localizer,

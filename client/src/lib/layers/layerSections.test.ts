@@ -16,6 +16,7 @@ describe("layerSections", () => {
             "segmentations",
             "etdrs",
             "pointsets",
+            "blend",
             "distance",
         ]);
         expect(layerSections({ ...flat, is2D: false })).toEqual([
@@ -37,7 +38,7 @@ describe("layerSections", () => {
         ).toEqual(["etdrs", "distance"]);
         expect(
             layerSections({ ...flat, hide: ["ETDRS", "Measure", "Form"] }),
-        ).toEqual(["segmentations", "pointsets"]);
+        ).toEqual(["segmentations", "pointsets", "blend"]);
     });
 
     it("adds En-face projection after Distance lines; layout.hide Segmentation hides it too", () => {
@@ -45,6 +46,7 @@ describe("layerSections", () => {
             "segmentations",
             "etdrs",
             "pointsets",
+            "blend",
             "distance",
             "projection",
         ]);
@@ -54,7 +56,7 @@ describe("layerSections", () => {
                 projection: true,
                 hide: ["Segmentation"],
             }),
-        ).toEqual(["etdrs", "pointsets", "distance"]);
+        ).toEqual(["etdrs", "pointsets", "blend", "distance"]);
     });
 
     it("adds Localizer lines last, which no layout.hide name hides", () => {
@@ -65,5 +67,26 @@ describe("layerSections", () => {
                 hide: ["Segmentation", "ETDRS", "Registration", "Measure"],
             }),
         ).toEqual(["localizer"]);
+    });
+
+    it("puts Blend after Pointsets on 2D images with the registration schema, and hides both with Registration", () => {
+        const input = {
+            is2D: true,
+            hasEtdrsSchema: false,
+            hasRegistrationSchema: true,
+            projection: false,
+            localizer: false,
+            hide: [] as string[],
+        };
+        expect(layerSections(input)).toEqual([
+            "segmentations",
+            "pointsets",
+            "blend",
+            "distance",
+        ]);
+        expect(layerSections({ ...input, hide: ["Registration"] })).toEqual([
+            "segmentations",
+            "distance",
+        ]);
     });
 });

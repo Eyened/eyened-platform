@@ -24,6 +24,7 @@ import {
     type CatalogueEntry,
     type Slot,
 } from "./workspaceRules";
+import type { ViewportBlend } from "$lib/layers/viewportBlend.svelte";
 import type { LocalizerLines } from "$lib/layers/localizerLines.svelte";
 import type { WorkspaceUrlState } from "./workspaceUrl";
 import {
@@ -58,6 +59,8 @@ export interface LayersTarget {
     readonly localizer: LocalizerLines;
     /** The registration P works on in this viewport; null when there is none. */
     readonly pointTarget: { id: number; canEdit: boolean } | null;
+    /** This viewport's blend, kept while it is mounted. */
+    readonly blend: ViewportBlend;
 }
 
 /** What the palette and the options bar need from one viewport. */
@@ -68,6 +71,8 @@ export interface ViewportHandle {
     reset(): void;
     /** The viewport's layers; Layers lists them while it is selected. */
     readonly layers?: LayersTarget;
+    /** Added to the viewport title, e.g. while blending. */
+    readonly titleSuffix?: string;
 }
 
 /** The state of one viewer window: the catalogue, the slots and how they page. Positions are 0-based. */
@@ -307,6 +312,11 @@ export class Workspace {
             if (this.viewports.get(position) === handle)
                 this.viewports.delete(position);
         };
+    }
+
+    /** The handle of the viewport at a position; null while it is empty. */
+    handleAt(position: number): ViewportHandle | null {
+        return this.viewports.get(position) ?? null;
     }
 
     urlState(): WorkspaceUrlState {

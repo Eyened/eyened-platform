@@ -30,6 +30,7 @@
     import { eyeKey, pointBinding } from "$lib/layers/pointsets";
     import { bindRegistrationPointTool } from "./panelRegistration/bindRegistrationPointTool";
     import { GridLayers } from "$lib/layers/gridLayers.svelte";
+    import { ViewportBlend } from "$lib/layers/viewportBlend.svelte";
     import { LocalizerLines } from "$lib/layers/localizerLines.svelte";
     import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
     import type {
@@ -79,6 +80,17 @@
             ? (viewerWindowContext.photoLocators.get(image.image_id) ?? [])
             : [];
     });
+    const gl = image.webgl.gl;
+    // This viewport's blend: a swap keeps it; another image or a page turn remounts the viewer and resets it.
+    const blend = new ViewportBlend(
+        image,
+        viewerWindowContext,
+        () => workspace.catalogue,
+        gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) as number,
+        registrationHidden,
+    );
+    $effect(() => blend.apply(viewerContext));
+    onDestroy(() => blend.dispose(viewerContext));
     // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
     const layers: LayersTarget = {
         viewerContext,
@@ -92,6 +104,7 @@
         get pointTarget() {
             return pointTarget;
         },
+        blend,
     };
 
     // While mounted, this viewport is a source for its OCT's projection; the newest one wins.
@@ -271,6 +284,9 @@
             },
             reset: () => viewerContext.initTransform(),
             layers,
+            get titleSuffix() {
+                return blend.titleSuffix;
+            },
         });
     });
 
@@ -328,6 +344,11 @@
         class:has-bar={viewerContext.renderControls}
     >
         <Viewer />
+        {#if blend.viewportLine}
+            <p class="viewport-line text-helper-text-01">
+                {blend.viewportLine}
+            </p>
+        {/if}
         {#if image.is3D && image.depth > 1}
             <SliceScrollbar />
         {/if}
@@ -353,5 +374,16 @@
     /* The bar sits below the image, so it never covers part of the retina. */
     .viewer-section.has-bar {
         padding-bottom: 2rem;
+    }
+    /* Says why the blend shows only this image; never takes the pointer. */
+    .viewport-line {
+        position: absolute;
+        top: 0.5rem;
+        left: 0.5rem;
+        z-index: 1;
+        pointer-events: none;
+        padding: 0.25rem 0.5rem;
+        background: var(--color-background);
+        color: var(--color-text-primary);
     }
 </style>

@@ -159,6 +159,7 @@ export function readLayerSections(): Record<LayerSectionId, boolean> {
         segmentations: true,
         etdrs: false,
         pointsets: false,
+        blend: false,
         distance: false,
         projection: false,
         localizer: false,
@@ -171,6 +172,7 @@ export function readLayerSections(): Record<LayerSectionId, boolean> {
             "segmentations",
             "etdrs",
             "pointsets",
+            "blend",
             "projection",
             "localizer",
         ] as const)
