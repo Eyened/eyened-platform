@@ -127,8 +127,12 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     }
 
     function ondragleave(e: DragEvent) {
-        if (!(e.currentTarget as Node).contains(e.relatedTarget as Node | null))
+        if (
+            !(e.currentTarget as Node).contains(e.relatedTarget as Node | null)
+        ) {
             dropTarget = false;
+            zone = "show";
+        }
     }
 
     function ondrop(e: DragEvent) {
