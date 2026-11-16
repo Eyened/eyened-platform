@@ -143,7 +143,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Place",
         kind: "modal",
         icon: Location,
-        hint: "",
+        hint: "Click places the next missing point · drag moves one",
     },
     {
         id: "etdrs",

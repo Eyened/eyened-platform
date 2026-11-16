@@ -56,6 +56,8 @@ export interface LayersTarget {
     readonly projectionSources: EnfaceOverlaySourceResolved[];
     /** This viewport's localizer lines: the mode and the B-scan positions it draws. */
     readonly localizer: LocalizerLines;
+    /** The registration P works on in this viewport; null when there is none. */
+    readonly pointTarget: { id: number; canEdit: boolean } | null;
 }
 
 /** What the palette and the options bar need from one viewport. */

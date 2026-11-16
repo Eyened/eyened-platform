@@ -110,6 +110,13 @@ export class CrosshairTool implements Overlay {
     }
 }
 
+/** The "can't edit" cursor, for a viewer that cannot take the armed tool. */
+export class NoEditCursor implements Overlay {
+    repaint(viewerContext: ViewerContext) {
+        viewerContext.claimCursor("not-allowed", CursorPriority.Tool);
+    }
+}
+
 /** The overlay for an armed view tool; null for No tool and for tools built elsewhere. */
 export function createViewTool(id: ToolId | null): Overlay | null {
     switch (id) {

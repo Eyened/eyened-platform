@@ -23,7 +23,12 @@
     import { pointArming } from "$lib/forms/pointArming.svelte";
     import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
     import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
-    import { createViewTool } from "$lib/viewer/tools/viewTools";
+    import { createViewTool, NoEditCursor } from "$lib/viewer/tools/viewTools";
+    import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
+    import { formSchemasByName } from "$lib/data";
+    import type { JSONSchema } from "$lib/forms/schemaType";
+    import { eyeKey, pointBinding } from "$lib/layers/pointsets";
+    import { bindRegistrationPointTool } from "./panelRegistration/bindRegistrationPointTool";
     import { GridLayers } from "$lib/layers/gridLayers.svelte";
     import { LocalizerLines } from "$lib/layers/localizerLines.svelte";
     import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
@@ -46,10 +51,16 @@
     setContext("viewerContext", viewerContext);
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
-    viewerContext.renderControls = !mergeClientConfig(
+    const clientConfig = mergeClientConfig(
         CLIENT_DEFAULTS,
         taskContext?.task.task_definition.config,
-    ).layout.hide.includes("Rendering");
+    );
+    viewerContext.renderControls =
+        !clientConfig.layout.hide.includes("Rendering");
+    // `layout.hide: ["Registration"]` hides Pointsets and Blend, so P cannot place here.
+    const registrationHidden =
+        clientConfig.layout.hide.includes("Registration");
+    const workspace = getContext<Workspace>("workspace");
 
     const mainViewerContext = new MainViewerContext(
         viewerContext.instance.id,
@@ -77,6 +88,9 @@
         localizer,
         get projectionSources() {
             return projectionSources;
+        },
+        get pointTarget() {
+            return pointTarget;
         },
     };
 
@@ -127,8 +141,6 @@
     onDestroy(() => {
         topViewer.initTransform();
     });
-
-    const workspace = getContext<Workspace>("workspace");
 
     // The OCT projections this image shows: its own `_proj`, or linked by registration; in strip order.
     // resolveEnfaceOverlaySources reads registration.revision, so this re-runs when registrations import.
@@ -196,6 +208,50 @@
         const tool = createViewTool(workspace.armedTool);
         if (!tool) return;
         const remove = viewerContext.addOverlay(tool);
+        return () => {
+            remove();
+            viewerContext.resetCursor();
+        };
+    });
+
+    // The eye's current registration: its points show here, and P places them while armed.
+    const pointTarget = $derived(
+        pointBinding({
+            armed: workspace.armedTool === "point",
+            hidden: registrationHidden,
+            is2D: image.is2D,
+            current: viewerWindowContext.pointsets.current(
+                eyeKey(image.instance),
+            ),
+            canEdit: (annotation) => globalContext.canEdit(annotation),
+        }),
+    );
+    // Primitives: a drag rewrites the registration, which must not remount the tool mid-drag.
+    const pointId = $derived(pointTarget?.id);
+    const pointEditable = $derived(pointTarget?.canEdit ?? false);
+    $effect(() => {
+        const id = pointId;
+        const canEdit = pointEditable;
+        const schema = formSchemasByName.get(
+            BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
+        )?.schema;
+        if (id === undefined || !schema) return;
+        return untrack(() =>
+            bindRegistrationPointTool({
+                viewerContext,
+                annotationId: id,
+                schema: schema as JSONSchema,
+                canEdit,
+                pointMarker: clientConfig.point_marker,
+                onSync: (sync) =>
+                    viewerWindowContext.pointsets.sync.set(id, sync),
+            }),
+        );
+    });
+    // While P is armed, a viewport that cannot take points says so.
+    $effect(() => {
+        if (workspace.armedTool !== "point" || pointEditable) return;
+        const remove = viewerContext.addOverlay(new NoEditCursor());
         return () => {
             remove();
             viewerContext.resetCursor();
