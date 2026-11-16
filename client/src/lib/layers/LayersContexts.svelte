@@ -6,6 +6,7 @@ Provides the selected viewport's viewer and segmentation contexts to the section
     import type { LayersTarget } from "$lib/workspace/workspace.svelte";
     import { setContext, untrack } from "svelte";
     import type { LayerSectionId } from "./layerSections";
+    import BlendSection from "./BlendSection.svelte";
     import DistanceSection from "./DistanceSection.svelte";
     import EtdrsSection from "./EtdrsSection.svelte";
     import LocalizerSection from "./LocalizerSection.svelte";
@@ -52,6 +53,13 @@ Provides the selected viewport's viewer and segmentation contexts to the section
     <PointsetsSection
         open={open.pointsets}
         ontoggle={() => ontoggle("pointsets")}
+    />
+{/if}
+{#if sections.includes("blend")}
+    <BlendSection
+        blend={target.blend}
+        open={open.blend}
+        ontoggle={() => ontoggle("blend")}
     />
 {/if}
 {#if sections.includes("distance")}

@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { ToggleGroup as ToggleGroupPrimitive } from "bits-ui";
+    import { mergeProps, ToggleGroup as ToggleGroupPrimitive } from "bits-ui";
+    import * as Tooltip from "$lib/components/ui/tooltip/index.js";
     import { cn } from "$lib/utils.js";
 
     // Single-select toggle group (Carbon has none): one Tab stop on the selected option, arrow keys inside.
@@ -14,7 +15,12 @@
     }: {
         value: string;
         onchange: (value: string) => void;
-        items: { value: string; text: string; label: string }[];
+        items: {
+            value: string;
+            text: string;
+            label: string;
+            tooltip?: string;
+        }[];
         label: string;
         /** The id of the element that describes the group. */
         describedby?: string;
@@ -58,13 +64,37 @@
             class="flex h-6 min-w-6 cursor-pointer items-center justify-center px-1 text-label-01 text-text-secondary hover:bg-content-switcher-background-hover hover:text-text-primary data-[state=on]:bg-content-switcher-selected data-[state=on]:text-text-primary data-[state=on]:shadow-content-switcher-selected"
         >
             {#snippet child({ props })}
-                <button
-                    {...props}
-                    tabindex={item.value === tabStop ? 0 : -1}
-                    onfocus={() => (focused = item.value)}
-                >
-                    {item.text}
-                </button>
+                {#if item.tooltip}
+                    <!-- A short label carries its full name as a tooltip, on hover and on focus. -->
+                    <Tooltip.Provider delayDuration={100}>
+                        <Tooltip.Root>
+                            <Tooltip.Trigger>
+                                {#snippet child({ props: tip })}
+                                    <button
+                                        {...mergeProps(props, tip, {
+                                            onfocus: () =>
+                                                (focused = item.value),
+                                        })}
+                                        tabindex={item.value === tabStop
+                                            ? 0
+                                            : -1}
+                                    >
+                                        {item.text}
+                                    </button>
+                                {/snippet}
+                            </Tooltip.Trigger>
+                            <Tooltip.Content>{item.tooltip}</Tooltip.Content>
+                        </Tooltip.Root>
+                    </Tooltip.Provider>
+                {:else}
+                    <button
+                        {...props}
+                        tabindex={item.value === tabStop ? 0 : -1}
+                        onfocus={() => (focused = item.value)}
+                    >
+                        {item.text}
+                    </button>
+                {/if}
             {/snippet}
         </ToggleGroupPrimitive.Item>
     {/each}

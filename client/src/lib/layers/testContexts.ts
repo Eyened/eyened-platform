@@ -7,6 +7,7 @@ import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { fromStore, writable, type Writable } from "svelte/store";
 import { vi } from "vitest";
 import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
+import { BlendStyles } from "./blendStyles";
 import { GridLayers } from "./gridLayers.svelte";
 import { PointsetState } from "./pointsets";
 import type {
@@ -82,6 +83,7 @@ export function fakeImage(
 /** The window fake; two calls share one, as two viewports share their window. */
 export interface TestWindow {
     pointsets: PointsetState;
+    blendStyles: BlendStyles;
     images: SvelteMap<string, unknown>;
     registration: unknown;
     topViewers: Map<unknown, unknown>;
@@ -185,6 +187,7 @@ export function layersContexts(
     const others = over.images ?? [];
     const win: TestWindow = over.win ?? {
         pointsets: new PointsetState(),
+        blendStyles: new BlendStyles(),
         images: new SvelteMap<string, unknown>(),
         registration,
         topViewers: new Map(),
