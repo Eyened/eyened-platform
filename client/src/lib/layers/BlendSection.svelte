@@ -12,6 +12,7 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import BlendStyleFields from "./BlendStyleFields.svelte";
+    import SeriesBody from "./SeriesBody.svelte";
     import LayerSection from "./LayerSection.svelte";
     import { shortImageLabel } from "./pointsets";
     import type { BlendMode, ViewportBlend } from "./viewportBlend.svelte";
@@ -76,6 +77,9 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
                 role="status"
             />
         {/if}
+        {#if blend.mode === "series"}
+            <SeriesBody {blend} {styles} thisId={image.image_id} />
+        {/if}
         {#if blend.mode !== "off" && blend.mode !== "series"}
             {#if !blend.registration}
                 <p class="text-body-compact-01 text-text-secondary">
@@ -110,6 +114,8 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
                             max={512}
                             step={8}
                             labels={["Tile size"]}
+                            valueTexts={[`${blend.tile} px`]}
+                            tooltip
                             values={[blend.tile]}
                             onchange={([tile]) => (blend.tile = tile)}
                         />

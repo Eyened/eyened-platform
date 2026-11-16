@@ -92,6 +92,11 @@ One image's blend look, in the Blend section or a Series Style popover. Each fie
                 min={0}
                 max={255}
                 labels={["Window low", "Window high"]}
+                valueTexts={[
+                    String(Math.round(style.windowLevel.min)),
+                    String(Math.round(style.windowLevel.max)),
+                ]}
+                tooltip
                 values={[
                     Math.round(style.windowLevel.min),
                     Math.round(style.windowLevel.max),
@@ -108,6 +113,8 @@ One image's blend look, in the Blend section or a Series Style popover. Each fie
                 min={0}
                 max={100}
                 labels={["Tint"]}
+                valueTexts={[`${Math.round(style.tint * 100)}%`]}
+                tooltip
                 values={[Math.round(style.tint * 100)]}
                 onchange={([tint]) => set({ tint: tint / 100 })}
             />
@@ -154,6 +161,8 @@ One image's blend look, in the Blend section or a Series Style popover. Each fie
                 min={0}
                 max={100}
                 labels={["Opacity"]}
+                valueTexts={[`${Math.round(style.opacity * 100)}%`]}
+                tooltip
                 values={[Math.round(style.opacity * 100)]}
                 onchange={([opacity]) => set({ opacity: opacity / 100 })}
             />
