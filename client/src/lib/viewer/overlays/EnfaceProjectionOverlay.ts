@@ -4,6 +4,7 @@ import { compileShaderTemplate } from "$lib/webgl/shaderTemplate";
 import type { TextureShaderProgram } from "$lib/webgl/FragmentShaderProgram";
 import type { WebGL } from "$lib/webgl/webgl";
 import type { RenderTarget } from "$lib/webgl/types";
+import { colorsFlat } from "./colors";
 import fs_render_enface_projection from "./fs_render_enface_projection.frag";
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
@@ -19,8 +20,8 @@ type PreparedSource = {
 };
 
 /**
- * Programs are compiled once when the overlay is created. StripViewer rebuilds
- * this overlay when registration / modes change, so repaint only draws.
+ * Programs are compiled once when the overlay is created. MainViewer rebuilds
+ * this overlay when registration, modes or the source change, so repaint only draws.
  */
 export class EnfaceProjectionOverlay implements Overlay {
     private readonly prepared: PreparedSource[] = [];
@@ -62,31 +63,51 @@ export class EnfaceProjectionOverlay implements Overlay {
         const base = getBaseUniforms(viewerContext);
 
         for (const { source, program } of this.prepared) {
-            const projections = source.manager.getVisibleProjections();
-            if (!projections.length) {
-                continue;
-            }
-
             const renderAsHeatmap = source.mode === "heatmap";
-            // Nearest only for identity `_proj` binary — avoid LINEAR row bleed.
-            const nearestSample =
-                source.identityMapping && !renderAsHeatmap ? 1 : 0;
-            for (const { projection, color, layerAlpha } of projections) {
+            const common = {
+                ...base,
+                u_outline: false,
+                u_size_primary: source.sizePrimary,
+                u_size_secondary: source.sizeSecondary,
+                // The program needs every uniform it uses, so each pass starts from these and overrides its own.
+                u_color: [0, 0, 0],
+                u_min_thickness: 0,
+                u_max_thickness: 1,
+                u_colors: colorsFlat,
+                u_active_class: 0,
+                u_multi_active_alpha: 0,
+                u_multi_inactive_alpha: 0,
+            };
+            for (const layer of source.manager.getPaintLayers(source.mode)) {
+                if (layer.kind === "classMap") {
+                    // Class numbers: always nearest, linked or not; opacity per class in the shader.
+                    program.pass(renderTarget, {
+                        ...common,
+                        u_thickness: layer.texture,
+                        u_active_class: layer.active,
+                        u_multi_active_alpha: layer.activeAlpha,
+                        u_multi_inactive_alpha: layer.inactiveAlpha,
+                        u_alpha: source.mainViewerContext.alpha,
+                        u_mode: 2,
+                        u_nearest_sample: 1,
+                    });
+                    continue;
+                }
+                const { projection, color, layerAlpha } = layer;
                 const thicknessRange = renderAsHeatmap
                     ? projection.getThicknessRange()
                     : { min: 0, max: 1 };
                 program.pass(renderTarget, {
-                    ...base,
+                    ...common,
                     u_thickness: projection.textureData.texture,
                     u_color: color.map((c) => c / 255),
                     u_min_thickness: thicknessRange.min,
                     u_max_thickness: thicknessRange.max,
                     u_alpha: layerAlpha * source.mainViewerContext.alpha,
                     u_mode: renderAsHeatmap ? 1 : 0,
-                    u_nearest_sample: nearestSample,
-                    u_outline: false,
-                    u_size_primary: source.sizePrimary,
-                    u_size_secondary: source.sizeSecondary,
+                    // Nearest only for identity `_proj` binary — avoid LINEAR row bleed.
+                    u_nearest_sample:
+                        source.identityMapping && !renderAsHeatmap ? 1 : 0,
                 });
             }
         }

@@ -8,6 +8,8 @@ Provides the selected viewport's viewer and segmentation contexts to the section
     import type { LayerSectionId } from "./layerSections";
     import DistanceSection from "./DistanceSection.svelte";
     import EtdrsSection from "./EtdrsSection.svelte";
+    import LocalizerSection from "./LocalizerSection.svelte";
+    import ProjectionSection from "./ProjectionSection.svelte";
     import SegmentationsSection from "./SegmentationsSection.svelte";
 
     let {
@@ -52,5 +54,19 @@ Provides the selected viewport's viewer and segmentation contexts to the section
         open={open.distance}
         ontoggle={() => ontoggle("distance")}
         {shown}
+    />
+{/if}
+{#if sections.includes("projection")}
+    <ProjectionSection
+        sources={target.projectionSources}
+        open={open.projection}
+        ontoggle={() => ontoggle("projection")}
+    />
+{/if}
+{#if sections.includes("localizer")}
+    <LocalizerSection
+        localizer={target.localizer}
+        open={open.localizer}
+        ontoggle={() => ontoggle("localizer")}
     />
 {/if}

@@ -1,6 +1,7 @@
 <!--
 @component
-A volume's right edge: the slice scrollbar with ticks on slices that have segmentation data, and the readout line.
+A volume's right edge: the slice scrollbar with ticks on slices that have segmentation data, and the readout line,
+whose number is a field to go to a slice.
 Numbers are shown 1-based; the stored index stays 0-based.
 -->
 <script lang="ts">
@@ -57,6 +58,38 @@ Numbers are shown 1-based; the stored index stays 0-based.
         ),
     );
 
+    // The field is as wide as the largest number.
+    const fieldWidth = `calc(${String(depth).length}ch + 0.5rem)`;
+
+    /** Goes to the typed number, snapped to the ends; anything else puts the current number back. */
+    function go(field: HTMLInputElement) {
+        const text = field.value.trim();
+        if (/^\d+$/.test(text))
+            viewerContext.setIndex(
+                Math.max(1, Math.min(depth, Number(text))) - 1,
+            );
+        field.value = String(index + 1);
+    }
+
+    function onfieldkeydown(
+        e: KeyboardEvent & { currentTarget: HTMLInputElement },
+    ) {
+        const field = e.currentTarget;
+        if (e.key === "Enter") {
+            go(field);
+            field.select();
+        } else if (e.key === "Escape") {
+            field.value = String(index + 1);
+            viewerContext.canvas2D.parentElement?.focus();
+        } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            const step = e.key === "ArrowUp" ? -1 : 1;
+            viewerContext.setIndex(
+                Math.max(0, Math.min(depth - 1, index + step)),
+            );
+        }
+    }
+
     function onpointerdowncapture(e: PointerEvent) {
         if (e.button !== 0 || !track) return;
         const box = track.getBoundingClientRect();
@@ -97,44 +130,6 @@ Numbers are shown 1-based; the stored index stays 0-based.
 {/snippet}
 
 <div class="edge viewport-overlay">
-    <div class="line">
-        <div class="measure" aria-hidden="true">
-            <span data-part="numbers" bind:offsetWidth={numbersWidth}
-                >{@render numberLine(false)}</span
-            >
-            <span data-part="count" bind:offsetWidth={countWidth}
-                >{countText}</span
-            >
-            <span data-part="word" bind:offsetWidth={wordWidth}
-                >{word}&nbsp;</span
-            >
-            <span data-part="readout" bind:offsetWidth={readoutWidth}
-                >{index + 1} / {depth}</span
-            >
-        </div>
-        {#if showCount && parts.count}
-            <span class="dim">{countText}</span>
-        {/if}
-        {#if parts.numbers}
-            <span class="numbers">{@render numberLine(true)}</span>
-        {/if}
-        <span class="readout"
-            >{parts.word ? `${word} ` : ""}{index + 1} / {depth}</span
-        >
-        <IconButton
-            size="icon-xs"
-            label="Lock slice"
-            aria-pressed={locked}
-            class={locked ? "bg-background-selected" : undefined}
-            onclick={() =>
-                viewerContext.viewerWindowContext.viewState?.setLocked(
-                    viewerContext.image.image_id,
-                    !locked,
-                )}
-        >
-            {#if locked}<Locked />{:else}<Unlocked />{/if}
-        </IconButton>
-    </div>
     <div class="track" bind:this={track} {onpointerdowncapture}>
         <Slider
             orientation="vertical"
@@ -158,6 +153,58 @@ Numbers are shown 1-based; the stored index stays 0-based.
                 ></span>
             {/each}
         </div>
+    </div>
+    <!-- After the track: Carbon's slider number input follows the slider in Tab order. -->
+    <div class="line">
+        <div class="measure" aria-hidden="true">
+            <span data-part="numbers" bind:offsetWidth={numbersWidth}
+                >{@render numberLine(false)}</span
+            >
+            <span data-part="count" bind:offsetWidth={countWidth}
+                >{countText}</span
+            >
+            <span data-part="word" bind:offsetWidth={wordWidth}
+                >{word}&nbsp;</span
+            >
+            <span data-part="readout" bind:offsetWidth={readoutWidth}
+                ><span class="field-measure" style:width={fieldWidth}></span> / {depth}</span
+            >
+        </div>
+        {#if showCount && parts.count}
+            <span class="dim">{countText}</span>
+        {/if}
+        {#if parts.numbers}
+            <span class="numbers">{@render numberLine(true)}</span>
+        {/if}
+        <span class="readout"
+            >{parts.word ? `${word} ` : ""}<input
+                class="field"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                aria-label="Go to {word}, 1 to {depth}"
+                style:width={fieldWidth}
+                value={index + 1}
+                onfocus={(e) => e.currentTarget.select()}
+                onclick={(e) => e.currentTarget.select()}
+                onkeydown={onfieldkeydown}
+                onchange={(e) => go(e.currentTarget)}
+            />
+            / {depth}</span
+        >
+        <IconButton
+            size="icon-xs"
+            label="Lock slice"
+            aria-pressed={locked}
+            class={locked ? "bg-background-selected" : undefined}
+            onclick={() =>
+                viewerContext.viewerWindowContext.viewState?.setLocked(
+                    viewerContext.image.image_id,
+                    !locked,
+                )}
+        >
+            {#if locked}<Locked />{:else}<Unlocked />{/if}
+        </IconButton>
     </div>
 </div>
 
@@ -243,5 +290,27 @@ Numbers are shown 1-based; the stored index stays 0-based.
     }
     .readout {
         color: var(--color-text-primary);
+    }
+    .field-measure {
+        display: inline-block;
+    }
+    /* Carbon number input colours, 20 px high to fit the 24 px line. */
+    .field {
+        box-sizing: border-box;
+        height: 1.25rem;
+        padding-inline: 0.25rem;
+        border: 0;
+        border-bottom: 1px solid var(--color-border-strong-01);
+        background: var(--color-field-01);
+        color: var(--color-text-primary);
+        font: inherit;
+        text-align: right;
+    }
+    .field:hover {
+        background: var(--color-field-hover-01);
+    }
+    .field:focus {
+        outline: 2px solid var(--color-focus);
+        outline-offset: -2px;
     }
 </style>

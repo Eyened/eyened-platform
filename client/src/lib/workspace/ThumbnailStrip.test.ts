@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
     expectNoAxeViolations,
     workspaceContext,
@@ -13,6 +13,12 @@ const tile = createRawSnippet((imageId: () => string) => ({
 }));
 const titleFor = (imageId: string) => ({ patient: "P-000417", rest: imageId });
 
+/** The tiles' title buttons, which hold the strip's tab stop. */
+const titles = () => [
+    ...document.querySelectorAll<HTMLButtonElement>("[data-tile-index]"),
+];
+const copies = () => screen.getAllByRole("button", { name: "Copy public ID" });
+
 describe("ThumbnailStrip", () => {
     it("tiles follow the catalogue, carry their slot number, and a click loads into the selected viewport", async () => {
         const ws = workspaceWith(3, { layout: "2x1" });
@@ -20,9 +26,7 @@ describe("ThumbnailStrip", () => {
             props: { tile, titleFor },
             context: workspaceContext(ws),
         });
-        const names = screen
-            .getAllByRole("button")
-            .map((b) => b.textContent ?? "");
+        const names = titles().map((b) => b.textContent ?? "");
         expect(names.map((n) => n.match(/img\d+/)?.[0])).toEqual([
             "img01",
             "img02",
@@ -41,14 +45,29 @@ describe("ThumbnailStrip", () => {
             props: { tile, titleFor },
             context: workspaceContext(workspaceWith(3)),
         });
-        const tiles = screen.getAllByRole("button");
+        const tiles = titles();
         expect(tiles.map((b) => b.tabIndex)).toEqual([0, -1, -1]);
         await fireEvent.keyDown(tiles[0], { key: "ArrowRight" });
         await waitFor(() => expect(tiles[1]).toHaveFocus());
         expect(tiles.map((b) => b.tabIndex)).toEqual([-1, 0, -1]);
+        expect(copies().map((b) => b.tabIndex)).toEqual([-1, 0, -1]);
         await fireEvent.keyDown(tiles[1], { key: "End" });
         await waitFor(() => expect(tiles[2]).toHaveFocus());
         await fireEvent.keyDown(tiles[2], { key: "Home" });
         await waitFor(() => expect(tiles[0]).toHaveFocus());
+    });
+
+    it("copies the tile's public ID without loading the tile", async () => {
+        const writeText = vi.fn(() => Promise.resolve());
+        Object.assign(navigator, { clipboard: { writeText } });
+        const ws = workspaceWith(3, { layout: "2x1" });
+        render(ThumbnailStrip, {
+            props: { tile, titleFor },
+            context: workspaceContext(ws),
+        });
+        ws.select(1);
+        await fireEvent.click(copies()[2]);
+        expect(writeText).toHaveBeenCalledWith("img03");
+        expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img02"]);
     });
 });

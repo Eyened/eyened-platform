@@ -40,11 +40,22 @@ async function renderEdge(
 }
 
 const line = (c: Element) => c.querySelector(".line") as HTMLElement;
+// The B-scan field shows as its value.
 const visible = (c: Element) => {
     const copy = line(c).cloneNode(true) as HTMLElement;
     copy.querySelector(".measure")?.remove();
+    const field = line(c).querySelector("input");
+    copy.querySelector("input")?.replaceWith(field?.value ?? "");
     return copy.textContent?.replace(/\s+/g, " ").trim();
 };
+const field = () =>
+    screen.getByRole("textbox", {
+        name: "Go to B-scan, 1 to 128",
+    }) as HTMLInputElement;
+async function enter(text: string) {
+    field().value = text;
+    await fireEvent.keyDown(field(), { key: "Enter" });
+}
 
 describe("SliceScrollbar", () => {
     afterEach(() => vi.restoreAllMocks());
@@ -167,6 +178,54 @@ describe("SliceScrollbar", () => {
         await tick();
         expect(visible(container)).toBe("B-scan 65 / 128");
         expect(setIndex).not.toHaveBeenCalled();
+    });
+
+    it("goes to a typed B-scan on Enter and keeps the field for the next one", async () => {
+        const { viewerContext } = await renderEdge("bscan");
+        // Carbon's slider number input follows the slider in Tab order.
+        const slider = screen.getByRole("slider", { name: "Slice" });
+        expect(slider.compareDocumentPosition(field())).toBe(
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+        expect(field()).toHaveValue("65");
+        field().focus();
+        await enter("100");
+        expect(viewerContext.index).toBe(99);
+        expect(document.activeElement).toBe(field());
+    });
+
+    it("snaps a number out of range to the ends and puts back anything else", async () => {
+        const { viewerContext } = await renderEdge("bscan");
+        await enter("300");
+        expect(viewerContext.index).toBe(127);
+        await enter("0");
+        expect(viewerContext.index).toBe(0);
+        await enter("1x");
+        expect(viewerContext.index).toBe(0);
+        expect(field()).toHaveValue("1");
+    });
+
+    it("steps with the arrows in the field, goes on blur, and Esc goes back to the image", async () => {
+        const { viewerContext } = await renderEdge("bscan");
+        await fireEvent.keyDown(field(), { key: "ArrowDown" });
+        expect(viewerContext.index).toBe(65);
+        await fireEvent.keyDown(field(), { key: "ArrowUp" });
+        expect(viewerContext.index).toBe(64);
+        field().value = "90";
+        await fireEvent.change(field());
+        expect(viewerContext.index).toBe(89);
+
+        const image = document.createElement("div");
+        image.tabIndex = 0;
+        image.append(viewerContext.canvas2D);
+        document.body.append(image);
+        field().focus();
+        field().value = "10";
+        await fireEvent.keyDown(field(), { key: "Escape" });
+        expect(viewerContext.index).toBe(89);
+        expect(field()).toHaveValue("90");
+        expect(document.activeElement).toBe(image);
+        image.remove();
     });
 
     it("returns focus to the image after a mouse drag, not after a key", async () => {

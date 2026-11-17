@@ -26,7 +26,7 @@ import type {
     SeriesBlendSession,
 } from "./panelRegistration/registrationSession";
 
-/** What a ViewerContext reads from the workspace: the remembered slice, Lock, strip tracking and the armed tool. */
+/** What a ViewerContext reads from the workspace: the remembered slice, Lock, strip tracking, the armed tool and the selected viewport. */
 export type WorkspaceView = Pick<
     Workspace,
     | "peekIndex"
@@ -36,6 +36,7 @@ export type WorkspaceView = Pick<
     | "stripTracking"
     | "arm"
     | "armedTool"
+    | "selectedViewport"
 >;
 
 export class ViewerWindowContext {
@@ -280,9 +281,6 @@ export class ViewerWindowContext {
                         const viewerContext = new ViewerContext(image, this);
                         // Strip tiles show the middle slice; only the main viewer scrolls.
                         viewerContext.lockScroll = true;
-                        if (image.image_id.endsWith("_proj")) {
-                            viewerContext.enfaceProjectionMode = "binary";
-                        }
                         this.topViewers.set(image, viewerContext);
                         this.images.set(image.image_id, image);
                     }
@@ -308,7 +306,10 @@ export class ViewerWindowContext {
         return this.imagesIndex.get(instance.id)!;
     }
     importPhotoLocators(image: AbstractImage) {
-        const photoLocators = loadPhotoLocators(image);
+        // An OCT's `_proj` reads the same header as its volume, so its positions are added once, with the volume.
+        const photoLocators = image.image_id.endsWith("_proj")
+            ? []
+            : loadPhotoLocators(image);
         this.photoLocatorSets.push(photoLocators);
 
         for (const locator of photoLocators) {

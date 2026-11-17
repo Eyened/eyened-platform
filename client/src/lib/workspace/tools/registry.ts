@@ -173,7 +173,7 @@ export const BROWSE: readonly ToolId[] = [
 ];
 
 export const NO_TOOL_HINT =
-    "Shift+drag pans · wheel steps slices · Shift+wheel zooms · hold H hides overlays";
+    "Shift+drag pans · wheel steps slices · Shift+wheel zooms · hold H hides overlays · O localizer lines";
 
 export function toolById(id: ToolId): ToolDef {
     return TOOLS.find((t) => t.id === id)!;

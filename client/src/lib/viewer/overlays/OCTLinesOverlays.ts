@@ -6,9 +6,12 @@ import type { RenderTarget } from "$lib/webgl/types";
 import type { LocalizerMode } from "$lib/workspace/workspaceRules";
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
+import { cased } from "./casing";
 
 const FAINT = "rgba(0,255,0,0.2)";
-const CURRENT = "rgba(255,255,255,1)";
+// ASSUMPTION: the outline is 1 px like the current line; the design gives no width.
+const OUTLINE = "rgb(0,255,0)";
+const CURRENT = "rgb(255,255,255)";
 
 export class OCTLinesOverlay implements Overlay {
     constructor(
@@ -23,17 +26,35 @@ export class OCTLinesOverlay implements Overlay {
         const here = this.photolocators.filter(
             (locator) => locator.enfaceImageId == image.image_id,
         );
-        context2D.lineWidth = 0.5;
-        if (mode === "current") paintOutlines(context2D, viewerContext, here);
+        const volumes = lineVolumes(here);
+        paintOutlines(context2D, viewerContext, volumes);
+        const otherStyles = Object.fromEntries(
+            Object.entries(volumes).map(([id, volume]) => [
+                id,
+                otherLineStyle(screenGap(viewerContext, volume)),
+            ]),
+        );
         for (const locator of here) {
             const octPosition = viewerContext.registration.getPosition(
                 locator.octImageId,
             );
             const current = octPosition?.index == locator.index;
             if (mode === "current" && !current) continue;
-            context2D.strokeStyle = current ? CURRENT : FAINT;
             try {
-                locator.paint(context2D, viewerContext);
+                if (current) {
+                    context2D.lineWidth = 1;
+                    context2D.strokeStyle = CURRENT;
+                    cased(context2D, () =>
+                        locator.paint(context2D, viewerContext),
+                    );
+                } else {
+                    // Uncased, so up to 193 lines do not black out the macula.
+                    const style =
+                        otherStyles[locator.octImageId] ?? otherLineStyle(0);
+                    context2D.lineWidth = style.width;
+                    context2D.strokeStyle = style.colour;
+                    locator.paint(context2D, viewerContext);
+                }
             } catch (error) {
                 console.warn("PhotoLocator overlay paint failed", error);
             }
@@ -41,30 +62,64 @@ export class OCTLinesOverlay implements Overlay {
     }
 }
 
-/** Each volume's scanned area: its first and last B-scan lines joined at their ends. Circle scans get none. */
-function paintOutlines(
-    ctx: CanvasRenderingContext2D,
-    viewerContext: ViewerContext,
+/** Each volume's line B-scans in scan order; circle scans and single lines are left out. */
+function lineVolumes(
     locators: PhotoLocator[],
-) {
+): Record<string, LinePhotoLocator[]> {
     const byVolume: Record<string, LinePhotoLocator[]> = {};
     for (const locator of locators) {
         if (!(locator instanceof LinePhotoLocator)) continue;
         (byVolume[locator.octImageId] ??= []).push(locator);
     }
-    ctx.strokeStyle = FAINT;
-    for (const volume of Object.values(byVolume)) {
-        if (volume.length < 2) continue;
-        volume.sort((a, b) => a.index - b.index);
+    for (const [id, volume] of Object.entries(byVolume)) {
+        if (volume.length < 2) delete byVolume[id];
+        else volume.sort((a, b) => a.index - b.index);
+    }
+    return byVolume;
+}
+
+/** On-screen distance between neighbouring B-scans of one volume. */
+function screenGap(
+    viewerContext: ViewerContext,
+    volume: LinePhotoLocator[],
+): number {
+    const a = viewerContext.imageToViewerCoordinates(volume[0].start);
+    const b = viewerContext.imageToViewerCoordinates(
+        volume[volume.length - 1].start,
+    );
+    return Math.hypot(b.x - a.x, b.y - a.y) / (volume.length - 1);
+}
+
+/** Crowded lines (gap 2 px or less) stay faint hairlines; wider gaps get 1 px, rising to 60 % at 8 px. */
+function otherLineStyle(gap: number): { width: number; colour: string } {
+    if (!(gap > 2)) return { width: 0.5, colour: FAINT };
+    const alpha = Math.min(0.6, 0.2 + ((gap - 2) * 0.4) / 6);
+    return {
+        width: 1,
+        colour: `rgba(0,255,0,${Math.round(alpha * 100) / 100})`,
+    };
+}
+
+/** Each volume's scanned area: its first and last B-scan lines joined at their ends. */
+function paintOutlines(
+    ctx: CanvasRenderingContext2D,
+    viewerContext: ViewerContext,
+    volumes: Record<string, LinePhotoLocator[]>,
+) {
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = OUTLINE;
+    for (const volume of Object.values(volumes)) {
         const first = volume[0];
         const last = volume[volume.length - 1];
         const corners = [first.start, first.end, last.end, last.start].map(
             (p) => viewerContext.imageToViewerCoordinates(p),
         );
-        ctx.beginPath();
-        ctx.moveTo(corners[0].x, corners[0].y);
-        for (const c of corners.slice(1)) ctx.lineTo(c.x, c.y);
-        ctx.closePath();
-        ctx.stroke();
+        cased(ctx, () => {
+            ctx.beginPath();
+            ctx.moveTo(corners[0].x, corners[0].y);
+            for (const c of corners.slice(1)) ctx.lineTo(c.x, c.y);
+            ctx.closePath();
+            ctx.stroke();
+        });
     }
 }
