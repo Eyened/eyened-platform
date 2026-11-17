@@ -486,11 +486,8 @@ export class ImageLoader {
     }
 }
 
-/** Interim: non-primary storage with Format=angio_flow (future: Role column). */
 function angioFlowStorageId(instance: ImageGET): number | null {
-    const row = (instance.storages ?? []).find(
-        (s) => !s.is_primary && s.format === "angio_flow",
-    );
+    const row = (instance.storages ?? []).find((s) => s.role === "angio_flow");
     return row?.id ?? null;
 }
 

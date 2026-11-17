@@ -141,6 +141,9 @@ class ImageStorage(Base):
             "ix_ImageStorage_ImageInstanceID_IsPrimary", "ImageInstanceID", "IsPrimary"
         ),
         Index(
+            "ix_ImageStorage_ImageInstanceID_Role", "ImageInstanceID", "Role"
+        ),
+        Index(
             "ObjectKey_StorageBackendID_UNIQUE",
             "ObjectKey",
             "StorageBackendID",
@@ -168,15 +171,16 @@ class ImageStorage(Base):
         String(128), nullable=True, default=None
     )
 
-    # Decode hint: image/png, image/jpeg, dicom, png_series, binary, mhd.
-    # Interim: angio_flow = OCTA flow DICOM (same decode as dicom). Prefer a
-    # future Role column over overloading Format for semantic channel identity.
+    # How to read the bytes: image/png, image/jpeg, dicom, png_series, binary, mhd.
     Format: Mapped[str] = mapped_column(String(256))
 
     # Whether this is the primary storage location for the image
     # Each image instance can have multiple storage locations, but only one can be primary
     # This is currently not enforced in the database however
     IsPrimary: Mapped[bool] = mapped_column(default=True, server_default=text("1"))
+
+    # Channel of this file, such as angio_flow. Null when the file has no special channel.
+    Role: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
     # Datetimes - automatically filled
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
@@ -681,8 +685,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     def pixel_array(self) -> np.ndarray:
         array = None
         format = self.primary_storage.Format
-        # angio_flow is an interim Format for OCTA flow DICOMs (same decode as dicom)
-        if format in ("dicom", "angio_flow"):
+        if format == "dicom":
             array = self._load_dicom_array()
         elif format == "binary":
             array = self._load_binary_array()

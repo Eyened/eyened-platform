@@ -69,8 +69,8 @@ def resolve_image_data_ref(
     if fmt == "mhd":
         return StorageRef(key, obj if meta else f"{obj[:-4]}.raw")
 
-    # Whole-object formats: dicom, angio_flow (interim OCTA flow DICOM),
-    # image/png, image/jpeg — and any other Format that is a single file.
+    # Whole-object formats: dicom, image/png, image/jpeg, and any other
+    # Format that is a single file.
     return StorageRef(key, obj)
 
 

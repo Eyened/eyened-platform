@@ -237,6 +237,7 @@ class DTOConverter:
                 id=s.ImageStorageID,
                 format=s.Format,
                 is_primary=bool(s.IsPrimary),
+                role=s.Role,
             )
             for s in raw_storages
         ]

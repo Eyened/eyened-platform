@@ -32,17 +32,17 @@ def _instance(storages, primary=None):
 def test_default_uses_primary_storage():
     storages = [
         _storage(id=1, key="struct.dcm", fmt="dicom", primary=True),
-        _storage(id=2, key="flow.dcm", fmt="angio_flow", primary=False),
+        _storage(id=2, key="flow.dcm", fmt="dicom", primary=False),
     ]
     ref = resolve_image_data_ref(_instance(storages))
     assert ref.backend_key == "data"
     assert ref.relative_path == "struct.dcm"
 
 
-def test_storage_id_selects_angio_flow():
+def test_storage_id_selects_named_storage():
     storages = [
         _storage(id=1, key="struct.dcm", fmt="dicom", primary=True),
-        _storage(id=2, key="flow.dcm", fmt="angio_flow", primary=False),
+        _storage(id=2, key="flow.dcm", fmt="dicom", primary=False),
     ]
     ref = resolve_image_data_ref(_instance(storages), storage_id=2)
     assert ref.relative_path == "flow.dcm"
@@ -56,7 +56,7 @@ def test_unknown_storage_id_raises():
         resolve_image_data_ref(_instance(storages), storage_id=99)
 
 
-def test_angio_flow_is_whole_object_like_dicom():
-    storage = _storage(id=2, key="flow.dcm", fmt="angio_flow", primary=True)
+def test_dicom_is_a_whole_object():
+    storage = _storage(id=2, key="flow.dcm", fmt="dicom", primary=True)
     ref = resolve_image_data_ref(_instance([storage]), meta=True)
     assert ref.relative_path == "flow.dcm"

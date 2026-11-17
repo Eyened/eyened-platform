@@ -245,6 +245,9 @@ class ImportRow(InstancePOST):
     image_storage_is_primary: Optional[bool] = Field(
         None, description="If set, maps to ImageStorage.IsPrimary"
     )
+    image_storage_role: Optional[str] = Field(
+        None, description="If set, maps to ImageStorage.Role"
+    )
     image_storage_hash: Optional[bytes] = Field(
         None, description="SHA-256 digest (32 bytes); maps to ImageStorage.Hash"
     )

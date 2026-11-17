@@ -263,8 +263,8 @@ export interface paths {
          * Get Public Image Data
          * @description Redirect to the stored image data for an instance (by PublicID).
          *
-         *     Optional ``storage_id`` selects a non-primary ImageStorage row (e.g. OCTA
-         *     ``angio_flow``). When omitted, the primary storage is used.
+         *     Optional ``storage_id`` selects an ImageStorage row on this instance.
+         *     When omitted, the primary storage is used.
          */
         get: operations["get_public_image_data_images__image_id__data_get"];
         put?: never;
@@ -1760,6 +1760,11 @@ export interface components {
             format: string;
             /** Is Primary */
             is_primary: boolean;
+            /**
+             * Role
+             * @description Channel of this file, such as angio_flow
+             */
+            role?: string | null;
         };
         /**
          * ImportOptions
@@ -2046,6 +2051,11 @@ export interface components {
              * @description If set, maps to ImageStorage.IsPrimary
              */
             image_storage_is_primary?: boolean | null;
+            /**
+             * Image Storage Role
+             * @description If set, maps to ImageStorage.Role
+             */
+            image_storage_role?: string | null;
             /**
              * Image Storage Hash
              * @description SHA-256 digest (32 bytes); maps to ImageStorage.Hash

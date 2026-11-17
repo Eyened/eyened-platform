@@ -139,6 +139,9 @@ class ImageStorageGET(BaseModel):
     id: int
     format: str
     is_primary: bool
+    role: Optional[str] = Field(
+        None, description="Channel of this file, such as angio_flow"
+    )
 
 
 class ImageBase(BaseModel):

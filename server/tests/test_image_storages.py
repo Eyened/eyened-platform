@@ -28,7 +28,7 @@ def client_authed(client):
 
 @pytest.fixture()
 def octa_dual_image(session):
-    """One ImageInstance with primary dicom + secondary angio_flow storage."""
+    """One ImageInstance with a structural DICOM and an angio_flow DICOM."""
     backend = make_storage_backend(session, "octa-backend")
     device = make_device(session, "octa-dev")
     project = make_project(session, "octa")
@@ -43,8 +43,9 @@ def octa_dual_image(session):
         ImageInstanceID=image.ImageInstanceID,
         StorageBackendID=backend.StorageBackendID,
         ObjectKey="octa/flow.dcm",
-        Format="angio_flow",
+        Format="dicom",
         IsPrimary=False,
+        Role="angio_flow",
     )
     session.add(flow)
     session.commit()
@@ -69,9 +70,11 @@ def test_image_get_lists_storages_primary_first(client, octa_dual_image):
     assert storages[0]["id"] == octa_dual_image["primary_id"]
     assert storages[0]["is_primary"] is True
     assert storages[0]["format"] == "dicom"
+    assert storages[0]["role"] is None
     assert storages[1]["id"] == octa_dual_image["flow_id"]
     assert storages[1]["is_primary"] is False
-    assert storages[1]["format"] == "angio_flow"
+    assert storages[1]["format"] == "dicom"
+    assert storages[1]["role"] == "angio_flow"
 
 
 def test_data_default_redirects_primary(client_authed, octa_dual_image):

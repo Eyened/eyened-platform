@@ -217,6 +217,7 @@ IMAGE_STORAGE = Entity(
         "ObjectKey": "object_key",
         "Format": "image_storage_format",
         "IsPrimary": "image_storage_is_primary",
+        "Role": "image_storage_role",
         "Hash": "image_storage_hash",
         "Checksum": "image_storage_checksum",
     },

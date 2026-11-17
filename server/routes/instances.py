@@ -84,8 +84,8 @@ def get_public_image_data(
 ):
     """Redirect to the stored image data for an instance (by PublicID).
 
-    Optional ``storage_id`` selects a non-primary ImageStorage row (e.g. OCTA
-    ``angio_flow``). When omitted, the primary storage is used.
+    Optional ``storage_id`` selects an ImageStorage row on this instance.
+    When omitted, the primary storage is used.
     """
     item = service.get_for_storage(image_id)
     if index is not None and index < 0:

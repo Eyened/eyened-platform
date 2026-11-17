@@ -79,15 +79,16 @@ Backends are shared lookup rows — one per nginx mount or future object-store c
 | Column | Meaning |
 |--------|---------|
 | `ObjectKey` | Path to the file **within** the backend (unique per `StorageBackendID`) |
-| `Format` | How to read the bytes — `dicom`, `angio_flow` (interim OCTA flow DICOM), `image/png`, `image/jpeg`, `png_series`, `binary`, … |
+| `Format` | How to read the bytes — `dicom`, `image/png`, `image/jpeg`, `png_series`, `binary`, … |
 | `IsPrimary` | Whether this row is the default storage location for the instance |
+| `Role` | Channel of this file, such as `angio_flow`. Null when the file has no special channel |
 | `Hash` / `Checksum` | Optional integrity fields (SHA-256 digest or checksum string) |
 
 **Multiple files per instance:** import rows with the same `image_anonymous_identity` (and series) but different `object_key` values attach several `ImageStorage` rows to one `ImageInstance` — for example enface + OCT derived from the same source. See **[Import metadata fields](/eyened-platform/import_metadata_fields#storage)**.
 
-**OCTA structural + flow (interim):** keep **one** `ImageInstance` with two `ImageStorage` rows: primary `Format=dicom` (structural OCT) and secondary `Format=angio_flow` with `IsPrimary=false` (same volume, flow channel). `IsPrimary` only picks the default file; it does not name the channel. Overloading `Format` with `angio_flow` is for quick testing — a future `Role` column (`structural` / `angio_flow`) should replace that so both files stay `Format=dicom`.
+**OCTA structural + flow:** one `ImageInstance` holds two `ImageStorage` rows, both `Format=dicom`. The structural row is `IsPrimary`. The flow row has `Role=angio_flow` and `IsPrimary=false`.
 
-The API lists every storage on `ImageGET.storages` (`id`, `format`, `is_primary`). Bytes are still one nginx redirect per request: `GET /api/images/{public_id}/data` uses the primary; `?storage_id=` selects another row on the same instance. The viewer loads both for OCTA as **two mono R8 volumes** (structural remains the segmentation lattice; flow is a companion texture). The rendering panel can show structural OCT, angio flow alone, or structural with a red flow overlay (single-pass blend in the volume shader).
+The API lists every storage on `ImageGET.storages` (`id`, `format`, `is_primary`, `role`). Bytes are still one nginx redirect per request: `GET /api/images/{public_id}/data` uses the primary; `?storage_id=` selects another row on the same instance. The viewer loads both for OCTA as **two mono R8 volumes** (structural remains the segmentation lattice; flow is a companion texture). The rendering panel can show structural OCT, angio flow alone, or structural with a red flow overlay (single-pass blend in the volume shader).
 
 ### Resolving and reading files
 
