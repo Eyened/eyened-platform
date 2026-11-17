@@ -45,7 +45,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     // ASSUMPTION: the selected viewport's controls follow it in Tab order (plan decision 2).
     const tab = $derived(selected ? 0 : -1);
     const shownTitle = $derived(slot.imageId ? title : null);
-    // The viewport's own addition, e.g. "· blended with FAF 2024-03-12"; visual only.
+    // The viewport's own addition, e.g. "· blended with FAF · 2024-03-12"; visual only.
     const titleSuffix = $derived(
         workspace.handleAt(position)?.titleSuffix ?? "",
     );
@@ -233,9 +233,13 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                             {#if shownTitle}
                                 <span class="patient">{shownTitle.patient}</span
                                 >
-                                <span class="rest"
-                                    >{shownTitle.rest}{titleSuffix}</span
-                                >
+                                <span class="rest">{shownTitle.rest}</span>
+                                {#if shownTitle.twin}
+                                    <span class="twin">{shownTitle.twin}</span>
+                                {/if}
+                                {#if titleSuffix}
+                                    <span class="rest">{titleSuffix}</span>
+                                {/if}
                             {:else}
                                 <span class="rest">{emptyTitle}</span>
                             {/if}
@@ -349,10 +353,15 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
         color: var(--color-text-primary);
     }
     .rest {
-        flex: 1 1 0;
+        flex: 0 1 auto;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
+        color: var(--color-text-secondary);
+    }
+    /* Never shortens, so a retake's number always shows. */
+    .twin {
+        flex: none;
         color: var(--color-text-secondary);
     }
     .controls,

@@ -16,7 +16,7 @@ import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { Image3D } from "$lib/webgl/image3D";
 import type { WebGL } from "$lib/webgl/webgl";
-import { catalogueEntry } from "$lib/workspace/imageMeta";
+import { catalogueEntry, twinNumbers } from "$lib/workspace/imageMeta";
 import type { Workspace } from "$lib/workspace/workspace.svelte";
 import type { CatalogueEntry } from "$lib/workspace/workspaceRules";
 import type { WorkspaceUrlState } from "$lib/workspace/workspaceUrl";
@@ -59,6 +59,13 @@ export class ViewerWindowContext {
     public readonly pointsets = new PointsetState();
     /** Blend looks per image and role, kept for the page session. */
     public readonly blendStyles = new BlendStyles();
+    /** "#2", "#3"… by image id for same-titled images of another instance, in strip order; the strip, the viewports and Layers all read this one map. */
+    twins = $derived.by(() =>
+        twinNumbers(
+            this.workspace.catalogue,
+            (id) => this.images.get(id)?.instance,
+        ),
+    );
 
     public readonly viewState: WorkspaceView;
 

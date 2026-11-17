@@ -4,7 +4,9 @@ Layers › Localizer lines for the selected viewport: one Off / Current / All sw
 -->
 <script lang="ts">
     import { ToggleGroup } from "$lib/components/ui/toggle-group/index.js";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { LocalizerMode } from "$lib/workspace/workspaceRules";
+    import { getContext } from "svelte";
     import LayerSection from "./LayerSection.svelte";
     import type { LocalizerLines } from "./localizerLines.svelte";
     import { octLabel } from "./octLabel";
@@ -18,6 +20,8 @@ Layers › Localizer lines for the selected viewport: one Off / Current / All sw
         open: boolean;
         ontoggle: () => void;
     } = $props();
+
+    const win = getContext<ViewerContext>("viewerContext").viewerWindowContext;
 
     const MODES = [
         { value: "off", text: "Off", label: "Off" },
@@ -50,7 +54,7 @@ Layers › Localizer lines for the selected viewport: one Off / Current / All sw
         />
         <ul class="text-body-compact-01 text-text-primary">
             {#each octs as [octId, n] (octId)}
-                <li>{octLabel(octId, n)}</li>
+                <li>{octLabel(octId, n, win.twins.get(octId) ?? "")}</li>
             {/each}
         </ul>
     </div>

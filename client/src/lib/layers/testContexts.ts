@@ -10,6 +10,7 @@ import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
 import { BlendStyles } from "./blendStyles";
 import { GridLayers } from "./gridLayers.svelte";
 import { PointsetState } from "./pointsets";
+import { twinNumbers, type ImageMeta } from "$lib/workspace/imageMeta";
 import type {
     ModelSegmentationGET,
     SegmentationGET,
@@ -87,6 +88,7 @@ export interface TestWindow {
     images: SvelteMap<string, unknown>;
     registration: unknown;
     topViewers: Map<unknown, unknown>;
+    readonly twins: Map<string, string>;
 }
 
 /** The contexts a Layers section reads, with one save-state store per segmentation id. */
@@ -191,6 +193,15 @@ export function layersContexts(
         images: new SvelteMap<string, unknown>(),
         registration,
         topViewers: new Map(),
+        // As ViewerWindowContext: twin numbers over the window's images in strip order.
+        get twins() {
+            return twinNumbers(
+                workspace.catalogue,
+                (i) =>
+                    (win.images.get(i) as { instance: ImageMeta } | undefined)
+                        ?.instance,
+            );
+        },
     };
     for (const loaded of [image, ...others])
         win.images.set(loaded.image_id, loaded);
