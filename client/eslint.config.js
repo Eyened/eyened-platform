@@ -15,6 +15,8 @@ export default tseslint.config(
         // intentionally NOT ignored.
         ignores: [
             ".svelte-kit/",
+            ".svelte-kit-ci/",
+            ".svelte-kit-gate/",
             "build/",
             "coverage/",
             "dist/",

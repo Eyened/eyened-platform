@@ -59,4 +59,32 @@ describe("J2kWorkerPool", () => {
         expect(results.map((r) => r.length)).toEqual([1, 2, 3]);
         pool.terminate();
     });
+
+    it("uses the default worker url and reports worker failures", async () => {
+        class ScriptedWorker {
+            onmessage: ((ev: MessageEvent) => void) | null = null;
+            onerror: ((ev: ErrorEvent) => void) | null = null;
+            postMessage() {}
+            terminate() {}
+            emit(data: unknown) {
+                this.onmessage?.({ data } as MessageEvent);
+            }
+        }
+        const workers: ScriptedWorker[] = [];
+        vi.stubGlobal(
+            "Worker",
+            class extends ScriptedWorker {
+                constructor() {
+                    super();
+                    workers.push(this);
+                }
+            },
+        );
+        const pool = new J2kWorkerPool(1);
+        const pending = pool.decode(new Uint8Array([1, 2]));
+        await vi.waitFor(() => expect(workers).toHaveLength(1));
+        workers[0].onerror?.({ message: "boom" } as ErrorEvent);
+        await expect(pending).rejects.toThrow(/boom/);
+        pool.terminate();
+    });
 });

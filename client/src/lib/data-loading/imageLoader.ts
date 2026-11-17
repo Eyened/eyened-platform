@@ -341,9 +341,7 @@ export class ImageLoader {
             }
             volumeImage.attachFlow(flow.volume);
             progress?.onFlowReady?.(imageId);
-            console.info(
-                `[imageLoader] dicom ${imageId}: angio_flow attached`,
-            );
+            console.info(`[imageLoader] dicom ${imageId}: angio_flow attached`);
         } catch (err) {
             console.error(
                 `[imageLoader] dicom ${imageId}: angio_flow load failed`,

@@ -259,37 +259,44 @@ export class ViewerWindowContext {
         }
         const load = new ImageLoad<LoadedImages>(
             (progress) =>
-                this.imageLoader.load(instance, progress).then((loadedImages) => {
-                    for (const image of loadedImages) {
-                        this.importPhotoLocators(image);
-                    }
-
-                    this.bySOPInstanceUID.set(
-                        instance.sop_instance_uid,
-                        loadedImages,
-                    );
-
-                    for (const image of loadedImages) {
-                        const viewerContext = new ViewerContext(image, this);
-                        if (image.image_id.endsWith("_proj")) {
-                            viewerContext.enfaceProjectionMode = "binary";
+                this.imageLoader
+                    .load(instance, progress)
+                    .then((loadedImages) => {
+                        for (const image of loadedImages) {
+                            this.importPhotoLocators(image);
                         }
-                        this.topViewers.set(image, viewerContext);
-                    }
 
-                    const projImage = loadedImages.find((img) =>
-                        img.image_id.endsWith("_proj"),
-                    );
-                    const octImage = loadedImages.find((img) => img.is3D);
-                    if (projImage?.is2D && octImage?.is3D) {
-                        this.enfaceProjectionManagers.set(
-                            instance.id,
-                            new EnfaceProjectionManager(octImage as Image3D),
+                        this.bySOPInstanceUID.set(
+                            instance.sop_instance_uid,
+                            loadedImages,
                         );
-                    }
 
-                    return loadedImages;
-                }),
+                        for (const image of loadedImages) {
+                            const viewerContext = new ViewerContext(
+                                image,
+                                this,
+                            );
+                            if (image.image_id.endsWith("_proj")) {
+                                viewerContext.enfaceProjectionMode = "binary";
+                            }
+                            this.topViewers.set(image, viewerContext);
+                        }
+
+                        const projImage = loadedImages.find((img) =>
+                            img.image_id.endsWith("_proj"),
+                        );
+                        const octImage = loadedImages.find((img) => img.is3D);
+                        if (projImage?.is2D && octImage?.is3D) {
+                            this.enfaceProjectionManagers.set(
+                                instance.id,
+                                new EnfaceProjectionManager(
+                                    octImage as Image3D,
+                                ),
+                            );
+                        }
+
+                        return loadedImages;
+                    }),
             {
                 onFlowReady: (imageId) => {
                     this.octaFlowReady.set(imageId, true);

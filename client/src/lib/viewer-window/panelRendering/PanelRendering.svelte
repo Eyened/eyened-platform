@@ -12,8 +12,9 @@
 
     let { radio = true } = $props();
     const viewerContext = getContext<ViewerContext>("viewerContext");
-    const viewerWindowContext =
-        getContext<ViewerWindowContext>("viewerWindowContext");
+    const viewerWindowContext = getContext<ViewerWindowContext>(
+        "viewerWindowContext",
+    );
 
     // octaFlowReady bumps when flow attaches after structural was already shown
     let hasAngioFlow = $derived(

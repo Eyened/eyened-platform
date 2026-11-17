@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-    ANGIO_MODE_UNIFORM,
-    angioModeUniform,
-} from "./angioDisplayMode";
+import { ANGIO_MODE_UNIFORM, angioModeUniform } from "./angioDisplayMode";
 
 describe("angioModeUniform", () => {
     it("maps modes to shader ints", () => {

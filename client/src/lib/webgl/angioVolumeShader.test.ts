@@ -7,7 +7,9 @@ describe("angio-aware volume shaders", () => {
         expect(fs_renderImage3D).toContain("sampler3D u_image");
         expect(fs_renderImage3D).toContain("sampler3D u_flow");
         expect(fs_renderImage3D).toContain("u_angio_mode");
-        expect(fs_renderImage3D).toContain("mix(base, vec3(1.0f, 0.0f, 0.0f), f)");
+        expect(fs_renderImage3D).toContain(
+            "mix(base, vec3(1.0f, 0.0f, 0.0f), f)",
+        );
     });
 
     it("slice-array shader mirrors angio modes", () => {

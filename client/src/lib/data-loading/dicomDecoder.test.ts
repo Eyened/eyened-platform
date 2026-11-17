@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
     TRANSFER_SYNTAX,
     decodeDicomBuffer,
+    extractDimensions,
     type DecodeFrameFn,
 } from "./dicomDecoder";
 
@@ -111,6 +112,34 @@ describe("decodeDicomBuffer", () => {
         expect(decoded.volume.length).toBe(24);
         expect(decoded.volume[0]).toBe(55);
         expect(decoded.volume[12]).toBe(66);
+    });
+
+    it("rejects a frame whose decoded length does not match", async () => {
+        await expect(
+            decodeDicomBuffer(loadFixture("jpeg_baseline_2frames.dcm"), {
+                decodeJpegLossy: async () => new Uint8Array(1),
+            }),
+        ).rejects.toThrow(/length 1/);
+    });
+
+    it("reads shared functional group spacing and ignores a bad group", () => {
+        const shared = extractDimensions({
+            x00280011: 4,
+            x00280010: 3,
+            x00280008: 2,
+            x52009229: [
+                { x00289110: [{ x00280030: "0.1\\0.2", x00180050: "0.3" }] },
+            ],
+        });
+        expect(shared.width_mm).toBeCloseTo(0.8);
+        expect(shared.depth_mm).toBeCloseTo(0.6);
+        const broken = extractDimensions({
+            x00280011: 4,
+            x00280010: 3,
+            x00280008: 2,
+            x52009229: "nope",
+        });
+        expect(broken.depth_mm).toBe(-2);
     });
 
     it("decodes JPEG 2000 with the real OpenJPEG codec", async () => {

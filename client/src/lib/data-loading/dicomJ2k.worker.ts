@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { createJ2kDecoder, decodeWithJ2kDecoder } from "./dicomJ2kCodec";
 
-let decoderPromise = createJ2kDecoder();
+const decoderPromise = createJ2kDecoder();
 
 decoderPromise
     .then(() => postMessage({ type: "ready" }))

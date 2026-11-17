@@ -90,7 +90,9 @@ describe("PanelRendering", () => {
 
         const group = screen.getByRole("radiogroup", { name: "Angio display" });
         expect(group.querySelectorAll("input")).toHaveLength(3);
-        await fireEvent.click(screen.getByRole("radio", { name: "Angio flow" }));
+        await fireEvent.click(
+            screen.getByRole("radio", { name: "Angio flow" }),
+        );
         expect(context.angioDisplayMode).toBe("flow");
         await fireEvent.click(
             screen.getByRole("radio", { name: "Flow overlay (red)" }),
