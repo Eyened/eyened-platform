@@ -20,7 +20,6 @@ import ETDRS from "./ETDRS.svelte";
 import Layers from "./Layers.svelte";
 import Rendering from "./Rendering.svelte";
 import Close from "./Close.svelte";
-import Registration from "./Registration.svelte";
 import Draw from "./Draw.svelte";
 import Lines from "./Lines.svelte";
 import Intersection from "./Intersection.svelte";
@@ -46,7 +45,6 @@ export {
     ConnectedComponents,
     Close,
     Rendering,
-    Registration,
     Layers,
     ETDRS,
     Form,

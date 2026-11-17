@@ -73,6 +73,9 @@ Layers › En-face projection for the selected viewport: one Off / Mask / Thickn
             {@const label = octLabel(
                 source.octPublicId,
                 source.manager.octImage.depth,
+                viewerContext.viewerWindowContext.twins.get(
+                    source.octPublicId,
+                ) ?? "",
             )}
             <li class="flex flex-col gap-1 py-2 ps-8 pe-4">
                 <span class="text-body-compact-01 text-text-primary"

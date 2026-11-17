@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { entry, NO_URL, workspaceWith } from "./testUtils";
 import { Workspace } from "./workspace.svelte";
+import { pointArming } from "$lib/forms/pointArming.svelte";
 
 const ids = (ws: Workspace) => ws.slots.map((s) => s.imageId);
 
@@ -99,5 +100,15 @@ describe("Workspace tools", () => {
         expect(reset).toHaveBeenCalledOnce();
         expect(ws.armedTool).toBe("brush");
         expect(ws.lastPick.Draw).toBe("brush");
+    });
+});
+
+describe("Workspace.arm", () => {
+    it("arming P drops an armed form point field, so one click never places two points", () => {
+        const persist = vi.fn();
+        pointArming.arm({ key: "form-point", persist } as never);
+        workspaceWith(1).arm("point");
+        expect(pointArming.session).toBeNull();
+        expect(persist).toHaveBeenCalled();
     });
 });

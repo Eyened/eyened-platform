@@ -83,6 +83,7 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
         if (!e.dataTransfer) return;
         e.dataTransfer.setData(IMAGE_MIME, imageId);
         e.dataTransfer.effectAllowed = "copy";
+        workspace.draggedImageId = imageId;
     }
 
     // Enter and Space are the button's own click, which the tile handles.
@@ -120,6 +121,7 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
                 onfocus={() => (focusId = imageId)}
                 onkeydown={(e) => onkeydown(e, i)}
                 ondragstart={(e) => ondragstart(e, imageId)}
+                ondragend={() => (workspace.draggedImageId = null)}
             >
                 {#if slots}
                     <span class="slot"
@@ -128,7 +130,17 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
                         )}</span
                     >
                 {/if}
-                <span class="title">{title ? titleText(title) : imageId}</span>
+                <span class="title"
+                    >{title
+                        ? titleText({
+                              patient: title.patient,
+                              rest: title.rest,
+                          })
+                        : imageId}</span
+                >
+                {#if title?.twin}
+                    <span class="twin">{title.twin}</span>
+                {/if}
             </button>
             <div class="tile-body">
                 {@render tile(imageId)}
@@ -193,6 +205,11 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
+        color: var(--color-text-secondary);
+    }
+    /* Outside the ellipsis, so a retake's number always shows. */
+    .twin {
+        flex: none;
         color: var(--color-text-secondary);
     }
     .tile-body {

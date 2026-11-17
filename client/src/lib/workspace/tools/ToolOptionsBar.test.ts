@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/svelte";
+import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import {
     expectNoAxeViolations,
@@ -26,5 +26,28 @@ describe("ToolOptionsBar", () => {
         await fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
         expect(zoomBy).toHaveBeenLastCalledWith(0.8);
         await expectNoAxeViolations(container);
+    });
+
+    it("names the registration P places into, read-only for a colleague's, or asks for one", () => {
+        const show = (pointTarget: { id: number; canEdit: boolean } | null) => {
+            const ws = workspaceWith(1);
+            ws.attachViewport(0, {
+                zoomPercent: 100,
+                zoomBy: vi.fn(),
+                reset: vi.fn(),
+                layers: { pointTarget } as never,
+            });
+            ws.arm("point");
+            return render(ToolOptionsBar, { context: workspaceContext(ws) });
+        };
+        show(null);
+        expect(
+            screen.getByText("Make a registration current in Pointsets."),
+        ).toBeInTheDocument();
+        cleanup();
+        show({ id: 640, canEdit: false });
+        expect(
+            screen.getByText("Registration [640] · read-only"),
+        ).toBeInTheDocument();
     });
 });

@@ -23,8 +23,14 @@
     import { pointArming } from "$lib/forms/pointArming.svelte";
     import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
     import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
-    import { createViewTool } from "$lib/viewer/tools/viewTools";
+    import { createViewTool, NoEditCursor } from "$lib/viewer/tools/viewTools";
+    import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
+    import { formAnnotations, formSchemasByName } from "$lib/data";
+    import type { JSONSchema } from "$lib/forms/schemaType";
+    import { eyeKey, pointBinding } from "$lib/layers/pointsets";
+    import { bindRegistrationPointTool } from "./panelRegistration/bindRegistrationPointTool";
     import { GridLayers } from "$lib/layers/gridLayers.svelte";
+    import { ViewportBlend } from "$lib/layers/viewportBlend.svelte";
     import { LocalizerLines } from "$lib/layers/localizerLines.svelte";
     import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
     import type {
@@ -46,10 +52,16 @@
     setContext("viewerContext", viewerContext);
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
-    viewerContext.renderControls = !mergeClientConfig(
+    const clientConfig = mergeClientConfig(
         CLIENT_DEFAULTS,
         taskContext?.task.task_definition.config,
-    ).layout.hide.includes("Rendering");
+    );
+    viewerContext.renderControls =
+        !clientConfig.layout.hide.includes("Rendering");
+    // `layout.hide: ["Registration"]` hides Pointsets and Blend, so P cannot place here.
+    const registrationHidden =
+        clientConfig.layout.hide.includes("Registration");
+    const workspace = getContext<Workspace>("workspace");
 
     const mainViewerContext = new MainViewerContext(
         viewerContext.instance.id,
@@ -68,6 +80,17 @@
             ? (viewerWindowContext.photoLocators.get(image.image_id) ?? [])
             : [];
     });
+    const gl = image.webgl.gl;
+    // This viewport's blend: a swap keeps it; another image or a page turn remounts the viewer and resets it.
+    const blend = new ViewportBlend(
+        image,
+        viewerWindowContext,
+        () => workspace.catalogue,
+        gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) as number,
+        registrationHidden,
+    );
+    $effect(() => blend.apply(viewerContext));
+    onDestroy(() => blend.dispose(viewerContext));
     // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
     const layers: LayersTarget = {
         viewerContext,
@@ -78,6 +101,10 @@
         get projectionSources() {
             return projectionSources;
         },
+        get pointTarget() {
+            return pointTarget;
+        },
+        blend,
     };
 
     // While mounted, this viewport is a source for its OCT's projection; the newest one wins.
@@ -127,8 +154,6 @@
     onDestroy(() => {
         topViewer.initTransform();
     });
-
-    const workspace = getContext<Workspace>("workspace");
 
     // The OCT projections this image shows: its own `_proj`, or linked by registration; in strip order.
     // resolveEnfaceOverlaySources reads registration.revision, so this re-runs when registrations import.
@@ -202,6 +227,66 @@
         };
     });
 
+    // The eye's current registration: its points show here, and P places them while armed.
+    // An armed form point field takes the clicks, so the registration stays read-only then.
+    const pointTarget = $derived(
+        pointBinding({
+            armed: workspace.armedTool === "point" && !pointArming.session,
+            hidden: registrationHidden,
+            is2D: image.is2D,
+            current: viewerWindowContext.pointsets.current(
+                eyeKey(image.instance),
+            ),
+            canEdit: (annotation) => globalContext.canEdit(annotation),
+        }),
+    );
+    // Primitives: a drag rewrites the registration, which must not remount the tool mid-drag.
+    const pointId = $derived(pointTarget?.id);
+    const pointEditable = $derived(pointTarget?.canEdit ?? false);
+    let pointTool = $state.raw<ReturnType<typeof bindRegistrationPointTool>>();
+    $effect(() => {
+        const id = pointId;
+        const canEdit = pointEditable;
+        const schema = formSchemasByName.get(
+            BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
+        )?.schema;
+        if (id === undefined || !schema) return;
+        const binding = untrack(() =>
+            bindRegistrationPointTool({
+                viewerContext,
+                annotationId: id,
+                schema: schema as JSONSchema,
+                canEdit,
+                pointMarker: clientConfig.point_marker,
+                onSync: (sync) =>
+                    viewerWindowContext.pointsets.sync.set(id, sync),
+            }),
+        );
+        pointTool = binding;
+        return () => {
+            binding.dispose();
+            if (pointTool === binding) pointTool = undefined;
+        };
+    });
+    // Another viewport's edit of this registration reaches this viewport's tool.
+    $effect(() => {
+        const formData =
+            pointId === undefined
+                ? undefined
+                : formAnnotations.get(pointId)?.form_data;
+        const binding = pointTool;
+        if (binding) untrack(() => binding.sync(formData));
+    });
+    // While P is armed, a viewport that cannot take points says so.
+    $effect(() => {
+        if (workspace.armedTool !== "point" || pointEditable) return;
+        const remove = viewerContext.addOverlay(new NoEditCursor());
+        return () => {
+            remove();
+            viewerContext.resetCursor();
+        };
+    });
+
     // Reset view and the options bar act on the selected viewport through this handle.
     $effect(() => {
         if (!position) return;
@@ -215,6 +300,9 @@
             },
             reset: () => viewerContext.initTransform(),
             layers,
+            get titleSuffix() {
+                return blend.titleSuffix;
+            },
         });
     });
 
@@ -272,6 +360,11 @@
         class:has-bar={viewerContext.renderControls}
     >
         <Viewer />
+        {#if blend.viewportLine}
+            <p class="viewport-line text-helper-text-01">
+                {blend.viewportLine}
+            </p>
+        {/if}
         {#if image.is3D && image.depth > 1}
             <SliceScrollbar />
         {/if}
@@ -297,5 +390,16 @@
     /* The bar sits below the image, so it never covers part of the retina. */
     .viewer-section.has-bar {
         padding-bottom: 2rem;
+    }
+    /* Says why the blend shows only this image; never takes the pointer. */
+    .viewport-line {
+        position: absolute;
+        top: 0.5rem;
+        left: 0.5rem;
+        z-index: 1;
+        pointer-events: none;
+        padding: 0.25rem 0.5rem;
+        background: var(--color-background);
+        color: var(--color-text-primary);
     }
 </style>

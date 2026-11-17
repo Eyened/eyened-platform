@@ -63,7 +63,12 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 
     function titleFor(imageId: string) {
         const image = viewerWindowContext.images.get(imageId);
-        return image ? viewportTitle(image.instance) : null;
+        return image
+            ? {
+                  ...viewportTitle(image.instance),
+                  twin: viewerWindowContext.twins.get(imageId) ?? "",
+              }
+            : null;
     }
 </script>
 

@@ -25,7 +25,7 @@ vi.mock("./FragmentShaderProgram", () => ({
 }));
 
 vi.mock("./imageRenderer", () => ({
-    getBaseUniforms: () => ({ u_base: 1 }),
+    getBaseUniforms: () => ({ u_base: 1, u_window_level: [40, 200] }),
 }));
 
 const { BlendRenderer } = await import("./blendRenderer");
@@ -49,6 +49,7 @@ function style(overrides: Partial<BlendLayerStyle> = {}): BlendLayerStyle {
         tint: 0,
         colour: "#ffffff",
         opacity: 1,
+        invert: false,
         ...overrides,
     };
 }
@@ -141,6 +142,28 @@ describe("BlendRenderer", () => {
         expect(shader.pass).toHaveBeenLastCalledWith(
             target,
             expect.objectContaining({ u_weight1: 1 }),
+        );
+    });
+
+    it("passes each layer's Invert and leaves the composite unstretched, so the viewport's W/L applies once", () => {
+        const renderer = new BlendRenderer();
+        renderer.setLayers([
+            { image: image("a"), mapping: "map-a", style: style(), weight: 1 },
+            {
+                image: image("b"),
+                mapping: "map-b",
+                style: style({ invert: true }),
+                weight: 1,
+            },
+        ]);
+        renderer.renderImage(viewer, target);
+        expect(shader.pass).toHaveBeenLastCalledWith(
+            target,
+            expect.objectContaining({
+                u_invert0: 0,
+                u_invert1: 1,
+                u_window_level: [0, 255],
+            }),
         );
     });
 

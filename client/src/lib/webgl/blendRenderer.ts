@@ -24,6 +24,8 @@ export type BlendComposite = "overlay" | "checkerboard";
 export type BlendLayerStyle = {
     renderMode: RenderMode;
     windowLevel: WindowLevel;
+    /** Inverts the layer after its W/L, before the tint. */
+    invert: boolean;
     tint: number;
     colour: string;
     opacity: number;
@@ -95,6 +97,8 @@ export class BlendRenderer implements ImageRenderer {
         if (!shader || layers.length === 0) return;
         const anchor = layers[0]!.image;
         const uniforms = getBaseUniforms(viewerContext);
+        // Each layer applies its own W/L; the viewport's reaches layer 0 through its style, so the result is not stretched again.
+        uniforms.u_window_level = [0, 255];
         uniforms.u_size_anchor = [anchor.width, anchor.height];
         uniforms.u_composite =
             this.composite === "checkerboard"
@@ -123,6 +127,7 @@ export class BlendRenderer implements ImageRenderer {
                 style.windowLevel.max,
             ];
             uniforms[`u_channel${layer}`] = CHANNELS[renderMode] ?? -2;
+            uniforms[`u_invert${layer}`] = style.invert ? 1 : 0;
             uniforms[`u_tint${layer}`] = style.tint;
             uniforms[`u_colour${layer}`] = [...parseHexColour(style.colour)];
         });

@@ -16,8 +16,20 @@ The tool options bar: the armed tool's name, its options, then a one-line hint f
     const tool = $derived(
         workspace.armedTool ? toolById(workspace.armedTool) : null,
     );
-    const hint = $derived(tool ? tool.hint : NO_TOOL_HINT);
     const viewport = $derived(workspace.selectedViewport);
+    // P names its registration; without one, the hint says what to do first.
+    const point = $derived(
+        tool?.id === "point" ? (viewport?.layers?.pointTarget ?? null) : null,
+    );
+    const hint = $derived.by(() => {
+        if (!tool) return NO_TOOL_HINT;
+        if (tool.id !== "point") return tool.hint;
+        if (!point) return "Make a registration current in Pointsets.";
+        // ASSUMPTION: the spec says only "read-only" for a colleague's registration.
+        return point.canEdit
+            ? tool.hint
+            : "Another grader's points can't be moved";
+    });
 
     let bar: HTMLElement | undefined = $state();
     let hintElement: HTMLElement | undefined = $state();
@@ -70,6 +82,13 @@ The tool options bar: the armed tool's name, its options, then a one-line hint f
                 <ZoomIn />
             </IconButton>
         </div>
+    {/if}
+    {#if point}
+        <span class="text-body-compact-01 text-text-primary"
+            >Registration [{point.id}]{point.canEdit
+                ? ""
+                : " · read-only"}</span
+        >
     {/if}
     <span
         bind:this={hintElement}

@@ -1,4 +1,5 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import { pointArming } from "$lib/forms/pointArming.svelte";
 import type { GridLayers } from "$lib/layers/gridLayers.svelte";
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
@@ -24,7 +25,9 @@ import {
     type CatalogueEntry,
     type Slot,
 } from "./workspaceRules";
+import type { ViewportBlend } from "$lib/layers/viewportBlend.svelte";
 import type { LocalizerLines } from "$lib/layers/localizerLines.svelte";
+import type { TitleSuffix } from "./imageMeta";
 import type { WorkspaceUrlState } from "./workspaceUrl";
 import {
     toolById,
@@ -56,6 +59,10 @@ export interface LayersTarget {
     readonly projectionSources: EnfaceOverlaySourceResolved[];
     /** This viewport's localizer lines: the mode and the B-scan positions it draws. */
     readonly localizer: LocalizerLines;
+    /** The registration P works on in this viewport; null when there is none. */
+    readonly pointTarget: { id: number; canEdit: boolean } | null;
+    /** This viewport's blend, kept while it is mounted. */
+    readonly blend: ViewportBlend;
 }
 
 /** What the palette and the options bar need from one viewport. */
@@ -66,6 +73,8 @@ export interface ViewportHandle {
     reset(): void;
     /** The viewport's layers; Layers lists them while it is selected. */
     readonly layers?: LayersTarget;
+    /** Added to the viewport title, e.g. while blending. */
+    readonly titleSuffix?: TitleSuffix | null;
 }
 
 /** The state of one viewer window: the catalogue, the slots and how they page. Positions are 0-based. */
@@ -98,6 +107,8 @@ export class Workspace {
         Place: "point",
     });
     toolMode: ToolMode = $state("all");
+    /** The image a strip tile drag carries, from dragstart to dragend; during dragover the browser shows only its type. */
+    draggedImageId: string | null = $state(null);
 
     catalogue = $derived(this.entries.map((e) => e.imageId));
     pageCount = $derived(countPages(this.catalogue.length, this.slots.length));
@@ -288,6 +299,8 @@ export class Workspace {
             this.selectedViewport?.reset();
             return;
         }
+        // One point tool at a time: P drops an armed form point field.
+        if (id === "point") pointArming.disarm();
         this.armedTool = id;
         this.lastPick = { ...this.lastPick, [tool.group]: id };
     }
@@ -305,6 +318,11 @@ export class Workspace {
             if (this.viewports.get(position) === handle)
                 this.viewports.delete(position);
         };
+    }
+
+    /** The handle of the viewport at a position; null while it is empty. */
+    handleAt(position: number): ViewportHandle | null {
+        return this.viewports.get(position) ?? null;
     }
 
     urlState(): WorkspaceUrlState {

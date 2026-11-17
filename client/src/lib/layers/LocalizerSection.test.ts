@@ -4,6 +4,7 @@ import type { PhotoLocator } from "$lib/registration/photoLocators";
 import { expectNoAxeViolations } from "$lib/workspace/testUtils";
 import LocalizerSection from "./LocalizerSection.svelte";
 import { LocalizerLines } from "./localizerLines.svelte";
+import { layersContexts } from "./testContexts";
 
 afterEach(() => {
     cleanup();
@@ -24,6 +25,7 @@ describe("LocalizerSection", () => {
                 open: true,
                 ontoggle: vi.fn(),
             },
+            context: layersContexts().context,
         });
         expect(
             screen.getAllByRole("listitem").map((li) => li.textContent),

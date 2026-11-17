@@ -1,7 +1,10 @@
 import { Matrix } from "$lib/matrix";
 import type { Position2D } from "$lib/types";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import { BaseImageRenderer } from "$lib/webgl/imageRenderer";
+import {
+    BaseImageRenderer,
+    type ImageRenderer,
+} from "$lib/webgl/imageRenderer";
 import type { Shaders } from "$lib/webgl/shaders";
 import type { RenderBounds } from "$lib/webgl/types";
 import { SvelteSet } from "svelte/reactivity";
@@ -148,7 +151,7 @@ export class ViewerContext {
     canvas2D: HTMLCanvasElement;
     context2D: CanvasRenderingContext2D;
 
-    imageRenderer: BaseImageRenderer;
+    imageRenderer: ImageRenderer;
 
     registration: Registration;
 

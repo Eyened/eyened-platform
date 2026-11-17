@@ -6,19 +6,14 @@ import {
 } from "./taskConfigLayout";
 
 vi.mock("./panelInfo/panelInfo.svelte", () => ({ default: {} }));
-vi.mock("./panelRegistration/PanelRegistration.svelte", () => ({
-    default: {},
-}));
 vi.mock("./panelForm/PanelForm.svelte", () => ({ default: {} }));
 vi.mock("./panelQuickForm/PanelQuickForm.svelte", () => ({ default: {} }));
 vi.mock("./icons/icons", () => ({
     Info: {},
     Rendering: {},
-    Registration: {},
     Form: {},
 }));
 vi.mock("./panelHelp/InfoPanelHelp.svelte", () => ({ default: {} }));
-vi.mock("./panelHelp/RegistrationPanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/FormPanelHelp.svelte", () => ({ default: {} }));
 
 const { resolvePanels } = await import("./resolvePanels");
@@ -26,7 +21,6 @@ const { resolvePanels } = await import("./resolvePanels");
 const baseInput = {
     is2D: true,
     etdrsSchema: undefined,
-    registrationSchema: undefined,
 };
 
 describe("resolvePanels", () => {
@@ -70,19 +64,6 @@ describe("resolvePanels", () => {
         const { panels, expandedPanelNames } = resolvePanels(baseInput);
         expect(panels.map((p) => p.name)).toEqual(["Info", "Form"]);
         expect(expandedPanelNames).toEqual([]);
-    });
-
-    it("includes Registration when its 2D schema is present", () => {
-        const { panels } = resolvePanels({
-            is2D: true,
-            etdrsSchema: { id: 1, name: "etdrs" } as never,
-            registrationSchema: { id: 2, name: "reg" } as never,
-        });
-        expect(panels.map((p) => p.name)).toEqual([
-            "Info",
-            "Registration",
-            "Form",
-        ]);
     });
 
     it("skips unknown prepend types with a console warning", () => {

@@ -67,6 +67,7 @@ Click loads into the selected viewport; drag loads onto any viewport.
             <h4 class="px-2 text-label-01 text-text-secondary">{visit.date}</h4>
             <ul class="flex flex-col">
                 {#each visit.images as imageId (imageId)}
+                    {@const title = titleFor(imageId)}
                     <li>
                         <button
                             type="button"
@@ -75,9 +76,14 @@ Click loads into the selected viewport; drag loads onto any viewport.
                             onclick={() => load(imageId)}
                             ondragstart={(e) => ondragstart(e, imageId)}
                         >
-                            <span class="min-w-0 truncate"
-                                >{titleFor(imageId)?.rest ?? imageId}</span
-                            >
+                            <span class="flex min-w-0 gap-1">
+                                <span class="min-w-0 truncate"
+                                    >{title?.rest ?? imageId}</span
+                                >
+                                {#if title?.twin}
+                                    <span class="flex-none">{title.twin}</span>
+                                {/if}
+                            </span>
                             {#if inView.includes(imageId)}
                                 <span
                                     class="flex-none text-label-01 text-text-secondary"

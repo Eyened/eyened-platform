@@ -78,7 +78,7 @@ describe("bindRegistrationPointTool", () => {
 
     it("loads points and persists edits", () => {
         const addOverlay = vi.fn(() => vi.fn());
-        const dispose = bindRegistrationPointTool({
+        const { dispose } = bindRegistrationPointTool({
             viewerContext: {
                 image: { image_id: "img", instance: { id: "img" } },
                 addOverlay,
@@ -126,6 +126,33 @@ describe("bindRegistrationPointTool", () => {
         expect(written).not.toHaveProperty("img_proj");
     });
 
+    it("takes another viewport's edit of the same image before its own next edit", () => {
+        const bind = () =>
+            bindRegistrationPointTool({
+                viewerContext: {
+                    image: { image_id: "img", instance: { id: "img" } },
+                    addOverlay: () => () => {},
+                } as never,
+                annotationId: 21,
+                schema: schema as never,
+                canEdit: true,
+                pointMarker: { style: "cross", radius: 4, color: "red" },
+            });
+        bind();
+        const b = bind();
+        const [toolA, toolB] = toolSpies.tools;
+        toolA!.opts.onPersist([...toolA!.points, { x: 2, y: 2 }]);
+        b.sync(formAnnotations.get(21)?.form_data);
+        toolB!.opts.onPersist([...toolB!.points, { x: 3, y: 3 }]);
+        expect(formAnnotations.get(21)?.form_data).toEqual({
+            img: [
+                { x: 1, y: 2 },
+                { x: 2, y: 2 },
+                { x: 3, y: 3 },
+            ],
+        });
+    });
+
     it("treats a schema with no index as an OCT registration", () => {
         bindRegistrationPointTool({
             viewerContext: {
@@ -159,5 +186,32 @@ describe("bindRegistrationPointTool", () => {
             pointMarker: { style: "cross", radius: 4, color: "red" },
         });
         expect(toolSpies.tools.at(-1)?.opts.canEdit).toBe(false);
+    });
+
+    it("reports a failed save as an error, and the next save clears it", async () => {
+        vi.mocked(setFormAnnotationValue)
+            .mockRejectedValueOnce(new Error("offline"))
+            .mockResolvedValueOnce(undefined);
+        const onSync = vi.fn();
+        bindRegistrationPointTool({
+            viewerContext: {
+                image: { image_id: "img", instance: { id: "img" } },
+                addOverlay: () => () => {},
+            } as never,
+            annotationId: 21,
+            schema: schema as never,
+            canEdit: true,
+            pointMarker: { style: "cross", radius: 4, color: "red" },
+            onSync,
+        });
+        const tool = toolSpies.tools.at(-1)!;
+        tool.opts.onPersist([{ x: 3, y: 4 }]);
+        await vi.waitFor(() =>
+            expect(onSync).toHaveBeenLastCalledWith("error"),
+        );
+        tool.opts.onPersist([{ x: 5, y: 6 }]);
+        await vi.waitFor(() =>
+            expect(onSync).toHaveBeenLastCalledWith("synced"),
+        );
     });
 });

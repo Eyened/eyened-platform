@@ -45,11 +45,32 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     // ASSUMPTION: the selected viewport's controls follow it in Tab order (plan decision 2).
     const tab = $derived(selected ? 0 : -1);
     const shownTitle = $derived(slot.imageId ? title : null);
+    // The viewport's own addition, e.g. "· blended with FAF · 2024-03-12"; shown in the title and its tooltip, not in the viewport's name.
+    const titleSuffix = $derived(
+        workspace.handleAt(position)?.titleSuffix ?? null,
+    );
+    const tooltipText = $derived(
+        [
+            shownTitle ? titleText(shownTitle) : "",
+            titleSuffix?.rest ?? "",
+            titleSuffix?.twin ? ` ${titleSuffix.twin}` : "",
+        ].join(""),
+    );
     const emptyTitle = $derived(workspace.loaded ? "Empty" : "Loading…");
     const name = $derived(
         `Viewport ${position + 1}: ${shownTitle ? titleText(shownTitle) : emptyTitle}`,
     );
     let dropTarget = $state(false);
+    let zone: "show" | "overlay" = $state("show");
+    // "Overlay" only for a strip tile with pairs in this viewport's current registration.
+    const overlayable = $derived(
+        dropTarget &&
+            workspace.draggedImageId !== null &&
+            (workspace
+                .handleAt(position)
+                ?.layers?.blend.canOverlay(workspace.draggedImageId) ??
+                false),
+    );
     let titleOpen = $state(false);
 
     function onfocusin(e: FocusEvent) {
@@ -113,12 +134,19 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     }
 
     function ondragleave(e: DragEvent) {
-        if (!(e.currentTarget as Node).contains(e.relatedTarget as Node | null))
+        if (
+            !(e.currentTarget as Node).contains(e.relatedTarget as Node | null)
+        ) {
             dropTarget = false;
+            zone = "show";
+        }
     }
 
     function ondrop(e: DragEvent) {
+        const overlay = overlayable && zone === "overlay";
         dropTarget = false;
+        zone = "show";
+        workspace.draggedImageId = null;
         const data = e.dataTransfer;
         if (!data) return;
         const from = data.getData(SLOT_MIME);
@@ -128,7 +156,9 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
             workspace.swap(Number(from), position);
         } else if (imageId) {
             e.preventDefault();
-            workspace.load(position, imageId);
+            const blend = workspace.handleAt(position)?.layers?.blend;
+            if (overlay && blend) blend.overlayWith(imageId);
+            else workspace.load(position, imageId);
             workspace.select(position);
         }
     }
@@ -156,6 +186,26 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     {ondrop}
 >
     <div class="body">
+        {#if overlayable}
+            <div class="zones" aria-hidden="true">
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                    class="zone"
+                    class:active={zone === "show"}
+                    ondragover={() => (zone = "show")}
+                >
+                    Show here
+                </div>
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                    class="zone"
+                    class:active={zone === "overlay"}
+                    ondragover={() => (zone = "overlay")}
+                >
+                    Overlay
+                </div>
+            </div>
+        {/if}
         {#if slot.imageId}
             {#key slot.imageId}
                 {@render viewer(slot.imageId)}
@@ -191,6 +241,17 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                                 <span class="patient">{shownTitle.patient}</span
                                 >
                                 <span class="rest">{shownTitle.rest}</span>
+                                {#if shownTitle.twin}
+                                    <span class="twin">{shownTitle.twin}</span>
+                                {/if}
+                                {#if titleSuffix}
+                                    <span class="rest">{titleSuffix.rest}</span>
+                                    {#if titleSuffix.twin}
+                                        <span class="twin"
+                                            >{titleSuffix.twin}</span
+                                        >
+                                    {/if}
+                                {/if}
                             {:else}
                                 <span class="rest">{emptyTitle}</span>
                             {/if}
@@ -198,7 +259,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                     {/snippet}
                 </Tooltip.Trigger>
                 {#if shownTitle}
-                    <Tooltip.Content>{titleText(shownTitle)}</Tooltip.Content>
+                    <Tooltip.Content>{tooltipText}</Tooltip.Content>
                 {/if}
             </Tooltip.Root>
         </Tooltip.Provider>
@@ -304,10 +365,15 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
         color: var(--color-text-primary);
     }
     .rest {
-        flex: 1 1 0;
+        flex: 0 1 auto;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
+        color: var(--color-text-secondary);
+    }
+    /* Never shortens, so a retake's number always shows. */
+    .twin {
+        flex: none;
         color: var(--color-text-secondary);
     }
     .controls,
@@ -333,6 +399,26 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
         min-height: 0;
         /* The viewer never grows past its frame. */
         overflow: hidden;
+    }
+    /* While a registered tile is dragged over: drop left to show it here, right to overlay it. */
+    .zones {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        pointer-events: auto;
+    }
+    .zone {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--color-overlay);
+        color: var(--color-text-primary);
+        border: 2px dashed var(--color-border-subtle-01);
+    }
+    .zone.active {
+        border: 2px solid var(--color-focus);
     }
     .body > :global(*) {
         min-width: 0;

@@ -75,12 +75,6 @@
             ],
         },
         {
-            title: "Registration",
-            shortcuts: [
-                { action: "Zoom to registration point", keys: "0 – 9" },
-            ],
-        },
-        {
             title: "ETDRS grid",
             shortcuts: [
                 {

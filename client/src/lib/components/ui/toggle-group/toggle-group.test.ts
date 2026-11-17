@@ -39,4 +39,18 @@ describe("ToggleGroup", () => {
         await rerender({ value: "none" });
         expect(tabIndexes()).toEqual([0, -1, -1]);
     });
+
+    it("keeps the selected state on an item that has a tooltip", () => {
+        render(ToggleGroup, {
+            props: {
+                value: "current",
+                onchange: vi.fn(),
+                items: items.map((item) => ({ ...item, tooltip: item.label })),
+                label: "Localizer lines",
+            },
+        });
+        expect(
+            screen.getByRole("radio", { name: "Current slice" }),
+        ).toHaveAttribute("data-state", "on");
+    });
 });

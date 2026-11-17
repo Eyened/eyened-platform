@@ -1,10 +1,14 @@
 <script lang="ts">
     import { cn } from "$lib/utils.js";
+    import type { Snippet } from "svelte";
 
     // Carbon radio button over a native input: 20 px circle, 8 px dot, 8 px to the label. Radios sharing a name are one tab stop.
+    // A `children` snippet replaces `labelText` and fills the rest of the row, so a click anywhere on it selects; `labelledBy` then names the radio.
     const uid = $props.id();
     let {
         labelText,
+        children,
+        labelledBy,
         hideLabel = false,
         name,
         value,
@@ -14,7 +18,11 @@
         primaryFocus = false,
         class: className,
     }: {
-        labelText: string;
+        labelText?: string;
+        /** A richer label that replaces `labelText`. */
+        children?: Snippet;
+        /** Ids of the parts of `children` that name the radio. */
+        labelledBy?: string;
         hideLabel?: boolean;
         name: string;
         value: string;
@@ -34,6 +42,7 @@
         type="radio"
         data-slot="radio-button"
         data-modal-primary-focus={primaryFocus || undefined}
+        aria-labelledby={labelledBy}
         aria-describedby={describedBy}
         {name}
         {value}
@@ -49,7 +58,9 @@
         for={uid}
         class={cn(
             "cursor-pointer pt-0.5 text-body-compact-01 text-text-primary",
+            children && "min-w-0 flex-1",
             hideLabel && "sr-only",
-        )}>{labelText}</label
+        )}
+        >{#if children}{@render children()}{:else}{labelText}{/if}</label
     >
 </span>
