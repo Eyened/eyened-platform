@@ -1,3 +1,4 @@
+import { ImageLoad } from "$lib/data-loading/imageLoad.svelte";
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
 import {
     fetchInstance,
@@ -31,7 +32,6 @@ export type MainPanelType = {
 };
 
 export class ViewerWindowContext {
-    private imagesIndex = new Map<string, Promise<LoadedImages>>();
     private bySOPInstanceUID = new Map<string, LoadedImages>();
 
     private viewers = new Set<ViewerContext>();
@@ -53,6 +53,10 @@ export class ViewerWindowContext {
     >();
     /** Instance ids whose angio_flow volume finished attaching after structural. */
     public readonly octaFlowReady = new SvelteMap<string, boolean>();
+    public readonly imageLoads = new SvelteMap<
+        string,
+        ImageLoad<LoadedImages>
+    >();
 
     photoLocators = new SvelteMap<string, PhotoLocator[]>();
     photoLocatorSets: PhotoLocator[][] = $state([]);
@@ -177,6 +181,15 @@ export class ViewerWindowContext {
             // Data is automatically ingested into global stores by fetchInstance
         }
 
+        const loadPromises: Promise<LoadedImages>[] = [];
+        for (const id of ids) {
+            const instance = instances.get(id);
+            if (instance) {
+                loadPromises.push(this.ensureImageLoad(instance).promise);
+            } else {
+                console.warn(`Instance with id ${id} not found after fetch`);
+            }
+        }
         this.instanceIds = ids;
 
         // Fetch all form annotations for the involved patient(s)
@@ -187,28 +200,20 @@ export class ViewerWindowContext {
                     .filter((pid): pid is number => typeof pid === "number"),
             ),
         );
-        if (patientIds.length) {
-            await Promise.all(
-                patientIds
-                    .filter((pid) => !this.loadedPatientIds.has(pid))
-                    .map(async (pid) => {
-                        await fetchFormAnnotations({ patient_id: pid });
-                        await fetchPatient(pid, {
-                            include_attributes: true,
-                        });
-                        this.loadedPatientIds.add(pid);
-                    }),
-            );
-        }
+        const patientPromises =
+            patientIds.length === 0
+                ? []
+                : patientIds
+                      .filter((pid) => !this.loadedPatientIds.has(pid))
+                      .map(async (pid) => {
+                          await fetchFormAnnotations({ patient_id: pid });
+                          await fetchPatient(pid, {
+                              include_attributes: true,
+                          });
+                          this.loadedPatientIds.add(pid);
+                      });
 
-        // Load images for all instances
-        const loadPromises: Promise<unknown>[] = [];
-        for (const id of ids) {
-            const instance = instances.get(id);
-            if (instance) loadPromises.push(this.loadImage(instance));
-            else console.warn(`Instance with id ${id} not found after fetch`);
-        }
-        await Promise.all(loadPromises);
+        await Promise.all([...patientPromises, ...loadPromises]);
     }
 
     destroy() {
@@ -233,7 +238,8 @@ export class ViewerWindowContext {
         this.topViewers.clear();
         this.viewers.clear();
         this.foregroundViewers.clear();
-        this.imagesIndex.clear();
+        this.imageLoads.clear();
+        this.octaFlowReady.clear();
         this.bySOPInstanceUID.clear();
         this.photoLocators.clear();
         this.photoLocatorSets = [];
@@ -245,18 +251,15 @@ export class ViewerWindowContext {
         this.enfaceProjectionManagers.clear();
     }
 
-    async loadImage(instance: ImageGET): Promise<LoadedImages> {
-        // Start loading if not already in progress
-        if (!this.imagesIndex.has(instance.id)) {
-            const loadPromise = this.imageLoader
-                .load(instance, {
-                    // Async-only: never mutate reactive state synchronously from
-                    // the {#await getImages()} template expression.
-                    onFlowReady: (imageId) => {
-                        this.octaFlowReady.set(imageId, true);
-                    },
-                })
-                .then((loadedImages) => {
+    /** Start or reuse the load for an instance. */
+    ensureImageLoad(instance: ImageGET): ImageLoad<LoadedImages> {
+        const existing = this.imageLoads.get(instance.id);
+        if (existing) {
+            return existing;
+        }
+        const load = new ImageLoad<LoadedImages>(
+            (progress) =>
+                this.imageLoader.load(instance, progress).then((loadedImages) => {
                     for (const image of loadedImages) {
                         this.importPhotoLocators(image);
                     }
@@ -286,13 +289,17 @@ export class ViewerWindowContext {
                     }
 
                     return loadedImages;
-                });
-
-            this.imagesIndex.set(instance.id, loadPromise);
-        }
-
-        return this.imagesIndex.get(instance.id)!;
+                }),
+            {
+                onFlowReady: (imageId) => {
+                    this.octaFlowReady.set(imageId, true);
+                },
+            },
+        );
+        this.imageLoads.set(instance.id, load);
+        return load;
     }
+
     importPhotoLocators(image: AbstractImage) {
         const photoLocators = loadPhotoLocators(image);
         this.photoLocatorSets.push(photoLocators);
@@ -424,10 +431,14 @@ export class ViewerWindowContext {
     }
 
     getImages(instanceID: string): Promise<LoadedImages> {
+        const existing = this.imageLoads.get(instanceID);
+        if (existing) {
+            return existing.promise;
+        }
         const instance = instances.get(instanceID);
         if (instance === undefined) {
             throw new Error(`Instance with id ${instanceID} not found`);
         }
-        return this.loadImage(instance);
+        return this.ensureImageLoad(instance).promise;
     }
 }

@@ -8,6 +8,7 @@ import type { ImageGET } from "../../types/openapi_types";
 import { decodeDicomBuffer } from "./dicomDecoder";
 import { buildImageDataUrl } from "./imageDataUrl";
 import type { ImageLoadProgress } from "./loadProgress";
+import { setLoadMessage } from "./loadProgress";
 import { loadMhdRawFromEndpoints } from "./mhdLoader";
 
 export type LoadedImages =
@@ -56,7 +57,7 @@ export class ImageLoader {
                     progress,
                 );
             }
-            return this.loadDicom(instance, img_id, imageId);
+            return this.loadDicom(instance, img_id, imageId, progress);
         } else if (dataFormat === "png_series") {
             const meta = await this.loadPngSeriesMeta(imageId);
             return this.loadPngSeries(instance, meta, img_id, imageId);
@@ -265,6 +266,7 @@ export class ImageLoader {
         const structural = await this.decodeDicomVolume(
             this.buildDataUrl(imageId),
             img_id,
+            progress,
         );
         const { width, height, depth } = structural.dimensions;
         const expected = width * height * depth;
@@ -356,12 +358,14 @@ export class ImageLoader {
     async decodeDicomVolume(
         url: string,
         logId: string,
+        progress?: ImageLoadProgress,
     ): Promise<{
         volume: Uint8Array;
         dimensions: Dimensions;
         meta: Record<string, unknown>;
         photometricInterpretation?: string;
     }> {
+        setLoadMessage(progress, "Downloading…");
         const response = await fetch(url, {
             headers: { Accept: "application/dicom" },
         });
@@ -371,6 +375,7 @@ export class ImageLoader {
             );
         }
         const buffer = await response.arrayBuffer();
+        setLoadMessage(progress, "Decoding…");
         return decodeDicomBuffer(buffer, { logId });
     }
 
@@ -378,9 +383,10 @@ export class ImageLoader {
         instance: ImageGET,
         img_id: string,
         imageId: string,
+        progress?: ImageLoadProgress,
     ): Promise<LoadedImages> {
         const url = this.buildDataUrl(imageId);
-        const decoded = await this.decodeDicomVolume(url, img_id);
+        const decoded = await this.decodeDicomVolume(url, img_id, progress);
         const { volume, dimensions, meta, photometricInterpretation } = decoded;
         const { width, height, depth } = dimensions;
 

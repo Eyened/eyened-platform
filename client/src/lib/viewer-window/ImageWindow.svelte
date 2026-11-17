@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { ImageLoad } from "$lib/data-loading/imageLoad.svelte";
     import { ImageLoader } from "$lib/data-loading/imageLoader";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { Registration } from "$lib/registration/registration.svelte";
@@ -27,12 +28,14 @@
     );
     setContext("viewerWindowContext", viewerWindowContext);
 
-    const loading = imageLoader.load(instance);
+    const load = new ImageLoad((progress) =>
+        imageLoader.load(instance, progress),
+    );
 </script>
 
 <div id="main">
-    {#await loading}
-        <div class="itemLoading">Loading {instance.id}</div>
+    {#await load.promise}
+        <div class="itemLoading">{load.message} {instance.id}</div>
     {:then images}
         {#each images as image}
             <div class="item">
