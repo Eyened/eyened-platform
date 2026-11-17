@@ -30,6 +30,12 @@ import type { LocalizerLines } from "$lib/layers/localizerLines.svelte";
 import type { TitleSuffix } from "./imageMeta";
 import type { WorkspaceUrlState } from "./workspaceUrl";
 import {
+    MAGNIFIER_DEFAULTS,
+    type MagnifierPrefs,
+    type MagnifierSource,
+} from "./magnifier";
+import { writeMagnifier } from "./workspacePrefs";
+import {
     toolById,
     type ToolGroup,
     type ToolId,
@@ -43,6 +49,8 @@ export interface WorkspaceOptions {
     strip?: boolean;
     /** Whether strip tiles start following the crosshair; on when missing. */
     stripTracking?: boolean;
+    /** The Magnifier's stored settings; the defaults when missing. */
+    magnifier?: MagnifierPrefs;
     /** The palette's mode; All tools when missing. */
     toolMode?: ToolMode;
 }
@@ -83,8 +91,12 @@ export class Workspace {
     entries: CatalogueEntry[] = $state.raw([]);
     /** Whether the thumbnail strip shows above the grid. */
     strip = $state(true);
-    /** Whether strip tiles follow the crosshair: tile cursor, twin zoom and OCT tile slice. */
+    /** Whether strip tiles follow the crosshair: tile cursor and OCT tile slice. */
     stripTracking = $state(true);
+    /** The Magnifier's settings, stored per browser. */
+    magnifier: MagnifierPrefs = $state.raw({ ...MAGNIFIER_DEFAULTS });
+    /** The viewport the pointer was last over; the Magnifier shows it. */
+    magnifierSource: MagnifierSource | null = $state.raw(null);
     arrange: ArrangeOrder = $state("opened");
     preset: Preset = $state.raw(getPreset(DEFAULT_PRESET_ID)!);
     page = $state(1);
@@ -140,6 +152,7 @@ export class Workspace {
         this.writeUrl = options.writeUrl;
         this.strip = options.strip ?? true;
         this.stripTracking = options.stripTracking ?? true;
+        this.magnifier = options.magnifier ?? { ...MAGNIFIER_DEFAULTS };
         this.toolMode = options.toolMode ?? "all";
     }
 
@@ -309,6 +322,12 @@ export class Workspace {
     toggleTool(id: ToolId): void {
         if (this.armedTool === id) this.armedTool = null;
         else this.arm(id);
+    }
+
+    /** Changes the Magnifier's settings and stores them; never touches the armed tool. */
+    setMagnifier(change: Partial<MagnifierPrefs>): void {
+        this.magnifier = { ...this.magnifier, ...change };
+        writeMagnifier(this.magnifier);
     }
 
     /** A viewport's viewer registers its handle; the returned function removes it. */

@@ -6,11 +6,17 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import OverflowMenuHorizontal from "carbon-icons-svelte/lib/OverflowMenuHorizontal.svelte";
+    import WatsonHealthMagnify from "carbon-icons-svelte/lib/WatsonHealthMagnify.svelte";
     import { getContext } from "svelte";
     import OverflowMenu from "../OverflowMenu.svelte";
     import { rovingIndex } from "../rovingIndex";
     import type { Workspace } from "../workspace.svelte";
-    import { paletteLayout, paletteSections } from "./paletteLayout";
+    import {
+        GAP_PX,
+        paletteLayout,
+        paletteSections,
+        SLOT_PX,
+    } from "./paletteLayout";
     import {
         GROUPS,
         offered,
@@ -32,9 +38,10 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
 
     const workspace = getContext<Workspace>("workspace");
     const sections = $derived(paletteSections(workspace.toolMode));
+    // The Magnifier toggle keeps its own slot, so the tools get the rest.
     const flat = $derived(
         orientation === "horizontal" ||
-            paletteLayout(available, sections) === "flat",
+            paletteLayout(available - SLOT_PX - GAP_PX, sections) === "flat",
     );
     const leftOut = $derived(
         TOOLS.filter((t) => !offered(t.id, workspace.toolMode)),
@@ -56,8 +63,8 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     }
 
     /** One Tab stop; arrow keys move between slots in markup order. */
-    const stops = $derived(
-        sections.flatMap((s) => {
+    const stops = $derived([
+        ...sections.flatMap((s) => {
             if (s.group === "More") return ["more"];
             const m = modal(s.tools);
             const slots =
@@ -66,7 +73,8 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
                     : m.map((t) => t.id);
             return [...slots, ...actions(s.tools).map((t) => t.id)];
         }),
-    );
+        "magnifier",
+    ]);
     let current = $state("");
     const active = $derived(stops.includes(current) ? current : stops[0]);
     let toolbar: HTMLElement | undefined = $state();
@@ -221,6 +229,19 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
             {/if}
         </div>
     {/each}
+    <!-- Not a tool: it shows a panel and leaves the armed tool alone. -->
+    <IconButton
+        label="Magnifier"
+        shortcut="M"
+        aria-keyshortcuts="M"
+        aria-pressed={workspace.magnifier.on}
+        class="aria-pressed:bg-button-primary aria-pressed:text-text-on-color aria-pressed:hover:bg-button-primary-hover"
+        data-stop="magnifier"
+        tabindex={tab("magnifier")}
+        onclick={() => workspace.setMagnifier({ on: !workspace.magnifier.on })}
+    >
+        <WatsonHealthMagnify />
+    </IconButton>
 </div>
 
 <style>

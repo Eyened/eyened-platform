@@ -1,6 +1,13 @@
 /** Per-user viewer panel state; each read and write survives private mode and quota errors. */
 
 import { MediaQuery } from "svelte/reactivity";
+import {
+    MAGNIFIER_DEFAULTS,
+    MAGNIFIER_SIZES,
+    MAGNIFIER_ZOOMS,
+    type MagnifierPrefs,
+    type MagnifierSize,
+} from "./magnifier";
 import type { LocalizerMode } from "./workspaceRules";
 import type { ToolMode } from "./tools/registry";
 import type { LayerSectionId } from "$lib/layers/layerSections";
@@ -13,6 +20,7 @@ const LOCALIZER_KEY = "eyened:viewer:localizer";
 const TOOL_MODE_KEY = "eyened:viewer:toolMode";
 const LAYER_AREA_KEY = "eyened:viewer:layerArea";
 const LAYER_SECTIONS_KEY = "eyened:viewer:layerSections";
+const MAGNIFIER_KEY = "eyened:viewer:magnifier";
 
 export type LeftPanel = "images" | "info" | "help";
 const PANELS: readonly string[] = ["images", "info", "help"];
@@ -191,6 +199,42 @@ export function writeLayerSections(
             (id) => open[id as LayerSectionId],
         );
         localStorage.setItem(LAYER_SECTIONS_KEY, JSON.stringify(ids));
+    } catch {
+        // Private mode or quota: the choice lasts this session only.
+    }
+}
+
+/** The Magnifier's last settings; a missing or unknown field takes its default. */
+export function readMagnifier(): MagnifierPrefs {
+    try {
+        const raw = localStorage.getItem(MAGNIFIER_KEY);
+        const stored: unknown = raw === null ? null : JSON.parse(raw);
+        if (typeof stored !== "object" || stored === null)
+            return { ...MAGNIFIER_DEFAULTS };
+        const s = stored as Record<string, unknown>;
+        const place = (v: unknown) =>
+            typeof v === "number" && Number.isFinite(v) ? v : null;
+        return {
+            on: s.on === true,
+            zoom:
+                MAGNIFIER_ZOOMS.find((z) => z === s.zoom) ??
+                MAGNIFIER_DEFAULTS.zoom,
+            size:
+                typeof s.size === "string" &&
+                Object.hasOwn(MAGNIFIER_SIZES, s.size)
+                    ? (s.size as MagnifierSize)
+                    : MAGNIFIER_DEFAULTS.size,
+            x: place(s.x),
+            y: place(s.y),
+        };
+    } catch {
+        return { ...MAGNIFIER_DEFAULTS };
+    }
+}
+
+export function writeMagnifier(m: MagnifierPrefs): void {
+    try {
+        localStorage.setItem(MAGNIFIER_KEY, JSON.stringify(m));
     } catch {
         // Private mode or quota: the choice lasts this session only.
     }

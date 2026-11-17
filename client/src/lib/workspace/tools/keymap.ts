@@ -15,6 +15,7 @@ export const RENDER_MODE_DIGITS: Record<string, RenderMode> =
 
 const HIDE_OVERLAYS = "h";
 const LOCALIZER = "o";
+const MAGNIFIER = "m";
 
 /** A viewport's keys. The viewer forwards only keys pressed while it has focus. */
 export class Keymap implements ViewerEventListener {
@@ -47,6 +48,11 @@ export class Keymap implements ViewerEventListener {
         if (key === LOCALIZER) {
             if (!viewerContext.isStripTile)
                 viewerContext.viewerWindowContext.viewState?.selectedViewport?.layers?.localizer.toggle();
+            return;
+        }
+        if (key === MAGNIFIER) {
+            const view = viewerContext.viewerWindowContext.viewState;
+            view?.setMagnifier({ on: !view.magnifier.on });
             return;
         }
         const tool = toolForKey(key);

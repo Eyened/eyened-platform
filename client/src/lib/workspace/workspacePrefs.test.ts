@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { MAGNIFIER_DEFAULTS } from "./magnifier";
 import { mockWidth } from "./testUtils";
+import { Workspace } from "./workspace.svelte";
 import {
+    readMagnifier,
     readLayerArea,
     readLayerSections,
     readToolMode,
@@ -81,5 +84,35 @@ describe("Layers sections", () => {
         });
         localStorage.setItem("eyened:viewer:layerSections", "{");
         expect(readLayerSections().segmentations).toBe(true);
+    });
+});
+
+describe("magnifier", () => {
+    it("round-trips what the grader set", () => {
+        new Workspace().setMagnifier({
+            on: true,
+            zoom: 6,
+            size: "large",
+            x: 40,
+            y: 120,
+        });
+        expect(readMagnifier()).toEqual({
+            on: true,
+            zoom: 6,
+            size: "large",
+            x: 40,
+            y: 120,
+        });
+    });
+
+    it("gives the defaults (off, 3×, Medium, top-right) for a missing or bad value", () => {
+        expect(readMagnifier()).toEqual(MAGNIFIER_DEFAULTS);
+        localStorage.setItem("eyened:viewer:magnifier", "{not json");
+        expect(readMagnifier()).toEqual(MAGNIFIER_DEFAULTS);
+        localStorage.setItem(
+            "eyened:viewer:magnifier",
+            JSON.stringify({ on: "yes", zoom: 5, size: "toString", x: "1" }),
+        );
+        expect(readMagnifier()).toEqual(MAGNIFIER_DEFAULTS);
     });
 });

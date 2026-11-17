@@ -114,4 +114,17 @@ describe("Keymap", () => {
         press(viewer, { key: "Escape", code: "Escape" });
         expect(viewer.transform).toEqual(viewer.getInitTransform());
     });
+
+    it("M shows and hides the Magnifier and keeps the armed tool; Esc leaves it on", () => {
+        const workspace = new Workspace();
+        const viewer = viewerOf("colour", { workspace });
+        workspace.arm("brush");
+        press(viewer, { key: "m", code: "KeyM" });
+        expect(workspace.magnifier.on).toBe(true);
+        expect(workspace.armedTool).toBe("brush");
+        press(viewer, { key: "Escape", code: "Escape" });
+        expect(workspace.magnifier.on).toBe(true);
+        press(viewer, { key: "M", code: "KeyM" });
+        expect(workspace.magnifier.on).toBe(false);
+    });
 });
