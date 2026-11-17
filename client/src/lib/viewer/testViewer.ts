@@ -8,10 +8,10 @@ import { ViewerContext } from "./viewerContext.svelte";
 export type ImageKind = "colour" | "grey" | "bscan" | "enface";
 
 /** A synthetic 128-slice volume or 2D image; only what ViewerContext and the controls read. */
-function fakeImage(kind: ImageKind): AbstractImage {
+function fakeImage(kind: ImageKind, imageId = `img-${kind}`): AbstractImage {
     const volume = kind === "bscan" || kind === "enface";
     return {
-        image_id: `img-${kind}`,
+        image_id: imageId,
         instance: { id: 1, device: { model: "Synthetic" } },
         width: 512,
         height: 512,
@@ -32,11 +32,12 @@ export function viewerOf(
     {
         workspace = new Workspace(),
         tile = false,
-    }: { workspace?: Workspace; tile?: boolean } = {},
+        imageId,
+    }: { workspace?: Workspace; tile?: boolean; imageId?: string } = {},
 ): ViewerContext {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     const registration = { getPosition: vi.fn(), setPosition: vi.fn() };
-    const image = fakeImage(kind);
+    const image = fakeImage(kind, imageId);
     const topViewers = new Map<AbstractImage, ViewerContext>();
     const viewer = new ViewerContext(image, {
         registration,

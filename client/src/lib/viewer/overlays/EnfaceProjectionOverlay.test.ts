@@ -28,8 +28,9 @@ function source(
     return {
         octPublicId: mappingGlsl,
         manager: {
-            getVisibleProjections: () => [
+            getPaintLayers: () => [
                 {
+                    kind: "projection",
                     projection: {
                         textureData: { texture: `${mappingGlsl}-texture` },
                         getThicknessRange: () => ({ min: 2, max: 8 }),
@@ -147,6 +148,68 @@ describe("EnfaceProjectionOverlay", () => {
                 u_nearest_sample: 0,
             }),
         );
+    });
+
+    it("paints a class map nearest-sampled on a linked image, at the viewer's opacity only", () => {
+        const pass = vi.fn();
+        compileShaderTemplate.mockReturnValueOnce({ pass });
+        const linked = source("binary", "linked");
+        linked.manager = {
+            getPaintLayers: () => [
+                {
+                    kind: "classMap",
+                    texture: "map",
+                    active: 2,
+                    activeAlpha: 1,
+                    inactiveAlpha: 0.2,
+                },
+            ],
+        } as unknown as EnfaceProjectionManager;
+        new EnfaceProjectionOverlay([linked], webgl).repaint(
+            { image: { webgl } } as unknown as ViewerContext,
+            {} as RenderTarget,
+        );
+        expect(pass).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                u_thickness: "map",
+                u_mode: 2,
+                u_nearest_sample: 1,
+                u_alpha: 0.5,
+                u_active_class: 2,
+            }),
+        );
+    });
+
+    it("gives the projection and class map passes the same uniform names, as the program needs every uniform it uses", () => {
+        const pass = vi.fn();
+        compileShaderTemplate.mockReturnValueOnce({ pass });
+        const both = source("binary", "linked");
+        both.manager = {
+            getPaintLayers: () => [
+                {
+                    kind: "projection",
+                    projection: { textureData: { texture: "t" } },
+                    color: [255, 0, 0],
+                    layerAlpha: 1,
+                },
+                {
+                    kind: "classMap",
+                    texture: "map",
+                    active: 2,
+                    activeAlpha: 1,
+                    inactiveAlpha: 0.2,
+                },
+            ],
+        } as unknown as EnfaceProjectionManager;
+        new EnfaceProjectionOverlay([both], webgl).repaint(
+            { image: { webgl } } as unknown as ViewerContext,
+            {} as RenderTarget,
+        );
+        const [projection, classMap] = pass.mock.calls.map(([, u]) =>
+            Object.keys(u).sort(),
+        );
+        expect(classMap).toEqual(projection);
     });
 
     it("skips a source whose mapped shader fails to compile", () => {

@@ -11,6 +11,10 @@
     import Viewer from "$lib/viewer/Viewer.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import { instances } from "$lib/data/stores.svelte";
+    import { resolveEnfaceOverlaySources } from "$lib/registration/resolveEnfaceOverlaySources";
+    import { EnfaceProjectionOverlay } from "$lib/viewer/overlays/EnfaceProjectionOverlay";
+    import { instanceIdFromImageId } from "./viewerViewState";
     import { getContext, onDestroy, setContext, untrack } from "svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
@@ -21,6 +25,8 @@
     import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
     import { createViewTool } from "$lib/viewer/tools/viewTools";
     import { GridLayers } from "$lib/layers/gridLayers.svelte";
+    import { LocalizerLines } from "$lib/layers/localizerLines.svelte";
+    import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
     import type {
         LayersTarget,
         Workspace,
@@ -53,19 +59,40 @@
     );
     setContext("mainViewerContext", mainViewerContext);
     onDestroy(viewerContext.addOverlay(mainViewerContext));
+    // This viewport's localizer lines: the B-scan positions of loaded OCTs on this 2D image.
+    // The live array, as the strip passed it: a later OCT's positions are pushed into it.
+    const localizer = new LocalizerLines(() => {
+        // That push notifies nothing, so read the tracked list of loaded sets to see it.
+        void viewerWindowContext.photoLocatorSets.length;
+        return image.is2D
+            ? (viewerWindowContext.photoLocators.get(image.image_id) ?? [])
+            : [];
+    });
     // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
     const layers: LayersTarget = {
         viewerContext,
         mainViewerContext,
         grids: new GridLayers(viewerContext, viewerWindowContext.registration),
         measure: new MeasureTool(viewerContext.image),
+        localizer,
+        get projectionSources() {
+            return projectionSources;
+        },
     };
 
+    // While mounted, this viewport is a source for its OCT's projection; the newest one wins.
+    const position = getContext<(() => number) | undefined>("viewportPosition");
     if (image.is3D) {
         const enfaceManager = viewerWindowContext.enfaceProjectionManagers.get(
             image.instance.id,
         );
-        enfaceManager?.registerMainViewerContext(mainViewerContext);
+        if (enfaceManager)
+            onDestroy(
+                enfaceManager.register({
+                    mainViewerContext,
+                    position: () => position?.() ?? 0,
+                }),
+            );
     }
 
     onDestroy(
@@ -103,6 +130,67 @@
 
     const workspace = getContext<Workspace>("workspace");
 
+    // The OCT projections this image shows: its own `_proj`, or linked by registration; in strip order.
+    // resolveEnfaceOverlaySources reads registration.revision, so this re-runs when registrations import.
+    const projectionSources = $derived.by(() => {
+        if (!image.is2D) return [];
+        const sources = resolveEnfaceOverlaySources({
+            imageId: image.image_id,
+            imageWidth: image.width,
+            imageHeight: image.height,
+            registration: viewerWindowContext.registration,
+            managers: viewerWindowContext.enfaceProjectionManagers,
+            getImageSize: (id) => {
+                for (const [img] of viewerWindowContext.topViewers) {
+                    if (img.image_id === id) return [img.width, img.height];
+                }
+                if (id.endsWith("_proj")) {
+                    const mgr =
+                        viewerWindowContext.enfaceProjectionManagers.get(
+                            id.slice(0, -"_proj".length),
+                        );
+                    if (mgr) return [mgr.octImage.width, mgr.octImage.depth];
+                }
+                const meta = instances.get(id);
+                return meta ? [meta.columns, meta.rows] : undefined;
+            },
+            projMode: viewerContext.enfaceProjectionMode,
+            linkedModes: viewerContext.enfaceProjectionModesByOct,
+        });
+        const order = (oct: string) =>
+            workspace.catalogue.findIndex(
+                (id) => instanceIdFromImageId(id) === oct,
+            );
+        return sources.sort(
+            (a, b) => order(a.octPublicId) - order(b.octPublicId),
+        );
+    });
+
+    // Paints each projection that is on, from its OCT's newest viewport.
+    $effect(() => {
+        const sources = projectionSources.flatMap((source) => {
+            const from = source.manager.mainViewerContext;
+            return source.mode !== "off" && from
+                ? [{ ...source, mainViewerContext: from }]
+                : [];
+        });
+        if (!sources.length) return;
+        const overlay = new EnfaceProjectionOverlay(sources, image.webgl);
+        const remove = viewerContext.addOverlay(overlay);
+        return () => {
+            remove();
+            overlay.destroy();
+        };
+    });
+
+    $effect(() => {
+        const locators = localizer.locators();
+        if (!locators.length) return;
+        return viewerContext.addOverlay(
+            new OCTLinesOverlay(locators, () => localizer.mode),
+        );
+    });
+
     // The armed view tool acts in every viewport; strip tiles never take it.
     $effect(() => {
         const tool = createViewTool(workspace.armedTool);
@@ -115,7 +203,6 @@
     });
 
     // Reset view and the options bar act on the selected viewport through this handle.
-    const position = getContext<(() => number) | undefined>("viewportPosition");
     $effect(() => {
         if (!position) return;
         return workspace.attachViewport(position(), {

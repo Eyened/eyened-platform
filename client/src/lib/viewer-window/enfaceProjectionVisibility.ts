@@ -191,3 +191,29 @@ export function enumerateVisibleEnfaceLayers(
 
     return result;
 }
+
+/** The class each en-face pixel paints, as the B-scan: the active class where present, else the lowest visible class present; 0 for none. */
+export function classWinners(
+    classes: readonly { index: number; values: ArrayLike<number> }[],
+    active: number | undefined,
+    visible: ReadonlySet<number>,
+): Uint8Array {
+    const shown = classes
+        .filter((c) => visible.has(c.index))
+        .sort((a, b) => a.index - b.index);
+    const first = shown.find((c) => c.index === active);
+    const winners = new Uint8Array(classes[0]?.values.length ?? 0);
+    for (let p = 0; p < winners.length; p++) {
+        if (first && first.values[p] > 0) {
+            winners[p] = first.index;
+            continue;
+        }
+        for (const c of shown) {
+            if (c.values[p] > 0) {
+                winners[p] = c.index;
+                break;
+            }
+        }
+    }
+    return winners;
+}

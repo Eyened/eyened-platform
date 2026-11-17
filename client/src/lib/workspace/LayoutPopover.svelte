@@ -8,22 +8,13 @@ Arrow keys move focus only; Enter, Space or a click applies.
     import * as Popover from "$lib/components/ui/popover/index.js";
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
     import { Toggle } from "$lib/components/ui/toggle/index.js";
-    import { ToggleGroup } from "$lib/components/ui/toggle-group/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
     import { getContext, tick, untrack } from "svelte";
     import { PRESET_ROWS, smallestRowFor } from "./presets";
     import { rovingIndex } from "./rovingIndex";
     import type { Workspace } from "./workspace.svelte";
-    import {
-        ARRANGE_ORDERS,
-        type ArrangeOrder,
-        type LocalizerMode,
-    } from "./workspaceRules";
-    import {
-        writeStripLocalizer,
-        writeStripOn,
-        writeStripTracking,
-    } from "./workspacePrefs";
+    import { ARRANGE_ORDERS, type ArrangeOrder } from "./workspaceRules";
+    import { writeStripOn, writeStripTracking } from "./workspacePrefs";
 
     let {
         stripToggle = false,
@@ -44,11 +35,6 @@ Arrow keys move focus only; Enter, Space or a click applies.
         eye: "By eye",
         modality: "By modality",
     };
-    const LOCALIZER_ITEMS = [
-        { value: "off", text: "Off", label: "Off" },
-        { value: "current", text: "Current", label: "Current slice" },
-        { value: "all", text: "All", label: "All slices" },
-    ];
     const flat = PRESET_ROWS.flatMap((row, r) =>
         row.presets.map((preset, c) => ({ preset, r, c })),
     );
@@ -131,11 +117,6 @@ Arrow keys move focus only; Enter, Space or a click applies.
     function setTracking(on: boolean) {
         workspace.stripTracking = on;
         writeStripTracking(on);
-    }
-
-    function setLocalizer(mode: LocalizerMode) {
-        workspace.stripLocalizer = mode;
-        writeStripLocalizer(mode);
     }
 
     // Carbon Popover: Tab out of the last control closes it.
@@ -299,20 +280,6 @@ Arrow keys move focus only; Enter, Space or a click applies.
                         Crosshair tracking
                     </Field.Label>
                 </Field.Field>
-                {#if workspace.hasLocalizers}
-                    <div class="flex min-h-6 items-center gap-2">
-                        <span
-                            class="text-body-compact-01 text-text-primary"
-                            aria-hidden="true">Localizer lines</span
-                        >
-                        <ToggleGroup
-                            label="Localizer lines"
-                            value={workspace.stripLocalizer}
-                            onchange={(v) => setLocalizer(v as LocalizerMode)}
-                            items={LOCALIZER_ITEMS}
-                        />
-                    </div>
-                {/if}
             </div>
         {/if}
     </Popover.Content>

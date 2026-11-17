@@ -12,11 +12,7 @@ import {
     workspaceContext,
     workspaceWith,
 } from "./testUtils";
-import {
-    readStripLocalizer,
-    readStripOn,
-    readStripTracking,
-} from "./workspacePrefs";
+import { readStripOn, readStripTracking } from "./workspacePrefs";
 
 async function open(ws = workspaceWith(20)) {
     const result = render(LayoutPopover, { context: workspaceContext(ws) });
@@ -100,9 +96,6 @@ describe("LayoutPopover strip settings", () => {
         expect(
             screen.getByRole("switch", { name: "Crosshair tracking" }),
         ).toBeInTheDocument();
-        expect(
-            screen.queryByRole("group", { name: "Localizer lines" }),
-        ).toBeNull();
         await fireEvent.click(strip);
         expect(ws.strip).toBe(false);
         expect(readStripOn()).toBe(false);
@@ -114,7 +107,6 @@ describe("LayoutPopover strip settings", () => {
     it("in a task, shows the settings under a plain Thumbnail strip label and remembers them", async () => {
         localStorage.clear();
         const ws = workspaceWith(3);
-        ws.hasLocalizers = true;
         const { container } = render(LayoutPopover, {
             context: workspaceContext(ws),
         });
@@ -130,11 +122,6 @@ describe("LayoutPopover strip settings", () => {
         );
         expect(ws.stripTracking).toBe(false);
         expect(readStripTracking()).toBe(false);
-        await fireEvent.click(
-            within(group).getByRole("radio", { name: "Current slice" }),
-        );
-        expect(ws.stripLocalizer).toBe("current");
-        expect(readStripLocalizer()).toBe("current");
         await expectNoAxeViolations(container);
     });
 });

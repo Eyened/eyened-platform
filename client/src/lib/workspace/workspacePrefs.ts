@@ -9,7 +9,7 @@ const LEFT_KEY = "eyened:viewer:leftPanel";
 const RIGHT_KEY = "eyened:viewer:rightOpen";
 const STRIP_KEY = "eyened:viewer:strip";
 const TRACKING_KEY = "eyened:viewer:stripTracking";
-const LOCALIZER_KEY = "eyened:viewer:stripLocalizer";
+const LOCALIZER_KEY = "eyened:viewer:localizer";
 const TOOL_MODE_KEY = "eyened:viewer:toolMode";
 const LAYER_AREA_KEY = "eyened:viewer:layerArea";
 const LAYER_SECTIONS_KEY = "eyened:viewer:layerSections";
@@ -101,17 +101,17 @@ export function writeStripTracking(on: boolean): void {
     }
 }
 
-/** Which localizer lines strip tiles draw; All unless the user chose another. */
-export function readStripLocalizer(): LocalizerMode {
+/** The localizer lines mode a viewport starts on: the browser's last choice, Off when none. */
+export function readLocalizer(): LocalizerMode {
     try {
         const raw = localStorage.getItem(LOCALIZER_KEY);
-        return raw === "off" || raw === "current" ? raw : "all";
+        return raw === "current" || raw === "all" ? raw : "off";
     } catch {
-        return "all";
+        return "off";
     }
 }
 
-export function writeStripLocalizer(mode: LocalizerMode): void {
+export function writeLocalizer(mode: LocalizerMode): void {
     try {
         localStorage.setItem(LOCALIZER_KEY, mode);
     } catch {
@@ -160,12 +160,20 @@ export function readLayerSections(): Record<LayerSectionId, boolean> {
         etdrs: false,
         pointsets: false,
         distance: false,
+        projection: false,
+        localizer: false,
     };
     try {
         const raw = localStorage.getItem(LAYER_SECTIONS_KEY);
         const stored: unknown = raw === null ? null : JSON.parse(raw);
         if (!Array.isArray(stored)) return open;
-        for (const id of ["segmentations", "etdrs", "pointsets"] as const)
+        for (const id of [
+            "segmentations",
+            "etdrs",
+            "pointsets",
+            "projection",
+            "localizer",
+        ] as const)
             open[id] = stored.includes(id);
         return open;
     } catch {

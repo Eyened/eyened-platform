@@ -1,5 +1,6 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { GridLayers } from "$lib/layers/gridLayers.svelte";
+import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 import type { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -21,9 +22,9 @@ import {
     type ArrangeOrder,
     type Axis,
     type CatalogueEntry,
-    type LocalizerMode,
     type Slot,
 } from "./workspaceRules";
+import type { LocalizerLines } from "$lib/layers/localizerLines.svelte";
 import type { WorkspaceUrlState } from "./workspaceUrl";
 import {
     toolById,
@@ -39,8 +40,6 @@ export interface WorkspaceOptions {
     strip?: boolean;
     /** Whether strip tiles start following the crosshair; on when missing. */
     stripTracking?: boolean;
-    /** Which localizer lines strip tiles start with; All when missing. */
-    stripLocalizer?: LocalizerMode;
     /** The palette's mode; All tools when missing. */
     toolMode?: ToolMode;
 }
@@ -53,6 +52,10 @@ export interface LayersTarget {
     readonly grids: GridLayers;
     /** Today's Measure tool with this viewport's lines, until the Distance tool replaces it. */
     readonly measure: MeasureTool;
+    /** The OCT projections this viewport's image shows, in strip order, with this viewport's modes. */
+    readonly projectionSources: EnfaceOverlaySourceResolved[];
+    /** This viewport's localizer lines: the mode and the B-scan positions it draws. */
+    readonly localizer: LocalizerLines;
 }
 
 /** What the palette and the options bar need from one viewport. */
@@ -73,10 +76,6 @@ export class Workspace {
     strip = $state(true);
     /** Whether strip tiles follow the crosshair: tile cursor, twin zoom and OCT tile slice. */
     stripTracking = $state(true);
-    /** Which localizer lines strip tiles draw. */
-    stripLocalizer: LocalizerMode = $state("all");
-    /** True while an open image has B-scan positions to draw; the viewer window sets it. */
-    hasLocalizers = $state(false);
     arrange: ArrangeOrder = $state("opened");
     preset: Preset = $state.raw(getPreset(DEFAULT_PRESET_ID)!);
     page = $state(1);
@@ -130,7 +129,6 @@ export class Workspace {
         this.writeUrl = options.writeUrl;
         this.strip = options.strip ?? true;
         this.stripTracking = options.stripTracking ?? true;
-        this.stripLocalizer = options.stripLocalizer ?? "all";
         this.toolMode = options.toolMode ?? "all";
     }
 

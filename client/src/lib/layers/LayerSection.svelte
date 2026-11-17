@@ -1,6 +1,6 @@
 <!--
 @component
-A Layers section (level 3) or a group inside one (level 4): a disclosure button with a count, an optional action on the trailing edge, and the body while open.
+A Layers section (level 3) or a group inside one (level 4): a disclosure button with a count (left out for settings sections), an optional action on the trailing edge, and the body while open.
 A closed body is not rendered, so its controls leave the Tab order.
 -->
 <script lang="ts">
@@ -17,7 +17,7 @@ A closed body is not rendered, so its controls leave the Tab order.
         children,
     }: {
         title: string;
-        count: number;
+        count?: number;
         open: boolean;
         ontoggle: () => void;
         level?: 3 | 4;
@@ -45,7 +45,9 @@ A closed body is not rendered, so its controls leave the Tab order.
                 aria-hidden="true"
             />
             <span class="min-w-0 flex-1 truncate">{title}</span>
-            <span class="pe-2 text-text-secondary">{count}</span>
+            {#if count !== undefined}
+                <span class="pe-2 text-text-secondary">{count}</span>
+            {/if}
         </button>
     </svelte:element>
     {@render action?.()}
