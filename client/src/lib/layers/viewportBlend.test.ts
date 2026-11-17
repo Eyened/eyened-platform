@@ -1,3 +1,4 @@
+import { twinNumbers } from "$lib/workspace/imageMeta";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { formAnnotations } from "$lib/data/stores.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
@@ -67,6 +68,10 @@ function setup(images = [A, B, C], { cap = 16, hidden = false } = {}) {
         images: new Map(images.map((i) => [i.image_id, i])),
         registration: { revision: 0 },
         topViewers: new Map(),
+        twins: twinNumbers(
+            images.map((i) => i.image_id),
+            (id) => images.find((i) => i.image_id === id)?.instance as never,
+        ),
     };
     const blend = new ViewportBlend(
         images[0]!,
@@ -97,6 +102,15 @@ afterEach(() => {
 });
 
 describe("ViewportBlend", () => {
+    it("titles a pair blend with the other image's name line, #2 for a retake", () => {
+        const B2 = img("b2", "Autofluorescence", "2024-03-12");
+        registration(12, { a: tri, b2: tri });
+        const { win, blend } = setup([A, B, B2]);
+        win.pointsets.setCurrent(EYE, 12);
+        blend.setMode("overlay");
+        expect(blend.titleSuffix).toBe(" · blended with FAF · 2024-03-12 #2");
+    });
+
     it("swaps in a BlendRenderer with the viewport's W/L on this image, and Off puts the viewer's renderer back", () => {
         registration(12, { a: tri, b: tri });
         const { win, blend } = setup();
@@ -227,7 +241,7 @@ describe("ViewportBlend", () => {
         expect(layers[0]!.style.windowLevel).toEqual({ min: 30, max: 220 });
         blend.step(-1);
         expect(blend.layers(viewer())!.map((l) => l.weight)).toEqual([0, 1]);
-        expect(blend.titleSuffix).toBe(" · series · showing 2020-06-03");
+        expect(blend.titleSuffix).toBe(" · series · showing CF · 2020-06-03");
     });
 
     it("offers the Overlay drop only for an image with pairs in the current registration, and never when Registration is hidden", () => {

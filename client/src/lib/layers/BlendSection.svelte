@@ -14,7 +14,6 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
     import BlendStyleFields from "./BlendStyleFields.svelte";
     import SeriesBody from "./SeriesBody.svelte";
     import LayerSection from "./LayerSection.svelte";
-    import { shortImageLabel } from "./pointsets";
     import type { BlendMode, ViewportBlend } from "./viewportBlend.svelte";
 
     let {
@@ -54,7 +53,7 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
             const n = blend.pairs(candidate);
             return {
                 id: candidate.image_id,
-                text: shortImageLabel(candidate.instance),
+                text: blend.nameOf(candidate).name,
                 description: `${n} pair${n === 1 ? "" : "s"}`,
                 thumb: getThumbUrl(candidate.instance),
             };
@@ -152,7 +151,7 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
                     image={blend.other}
                     role="other"
                     {styles}
-                    label={shortImageLabel(blend.other.instance)}
+                    label={blend.nameOf(blend.other).name}
                     fields={tinted
                         ? ["mode", "wl", "tint", "colour", "opacity", "reset"]
                         : ["mode", "wl", "reset"]}

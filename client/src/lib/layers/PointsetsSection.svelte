@@ -25,13 +25,9 @@ The name sets the eye's current registration for every viewport of that eye; P p
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
     import { getContext } from "svelte";
     import type { FormAnnotationGET } from "../../types/openapi_types";
+    import { imageName } from "$lib/workspace/imageMeta";
     import LayerSection from "./LayerSection.svelte";
-    import {
-        eyeKey,
-        imageLines,
-        registrationRows,
-        shortImageLabel,
-    } from "./pointsets";
+    import { eyeKey, imageLines, registrationRows } from "./pointsets";
     import RegistrationDeleteModal from "./RegistrationDeleteModal.svelte";
     import SyncStatus from "./SyncStatus.svelte";
 
@@ -75,7 +71,7 @@ The name sets the eye's current registration for every viewport of that eye; P p
                 ? [
                       {
                           id: image.instance.id,
-                          label: shortImageLabel(image.instance),
+                          ...imageName(image.instance, win.twins.get(id) ?? ""),
                       },
                   ]
                 : [];
@@ -192,9 +188,19 @@ The name sets the eye's current registration for every viewport of that eye; P p
                                                     class="flex gap-2 text-body-compact-01"
                                                 >
                                                     <span
-                                                        class="min-w-0 flex-1 [overflow-wrap:anywhere] text-text-primary"
-                                                        >{line.name}</span
+                                                        class="min-w-0 flex-1 [overflow-wrap:anywhere]"
                                                     >
+                                                        <span
+                                                            class="block text-text-primary"
+                                                            >{line.name}</span
+                                                        >
+                                                        {#if line.device}
+                                                            <span
+                                                                class="block text-label-01 text-text-secondary"
+                                                                >{line.device}</span
+                                                            >
+                                                        {/if}
+                                                    </span>
                                                     <span
                                                         class="tabular-nums {line.gap
                                                             ? 'text-text-error'

@@ -61,7 +61,12 @@ export function modelSegmentation(
 /** A synthetic loaded 2D image of patient 1. */
 export function fakeImage(
     id: string,
-    over: { modality?: string; date?: string; laterality?: string } = {},
+    over: {
+        modality?: string;
+        date?: string;
+        laterality?: string;
+        device?: { manufacturer: string; model: string };
+    } = {},
 ) {
     return {
         image_id: id,
@@ -76,7 +81,10 @@ export function fakeImage(
             study: { id: 2, date: over.date ?? "2024-03-12" },
             laterality: over.laterality ?? "R",
             modality: over.modality ?? "Autofluorescence",
-            device: { manufacturer: "Heidelberg", model: "Spectralis" },
+            device: over.device ?? {
+                manufacturer: "Heidelberg",
+                model: "Spectralis",
+            },
         },
     };
 }

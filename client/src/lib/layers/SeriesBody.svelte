@@ -8,14 +8,11 @@ Blend › Series: the eye's registered images oldest first, a Position slider th
     import * as Popover from "$lib/components/ui/popover/index.js";
     import { Slider } from "$lib/components/ui/slider/index.js";
     import { getThumbUrl } from "$lib/data-loading/utils";
-    import { MODALITY_LABELS } from "$lib/workspace/imageMeta";
     import ChevronLeft from "carbon-icons-svelte/lib/ChevronLeft.svelte";
     import ChevronRight from "carbon-icons-svelte/lib/ChevronRight.svelte";
     import Settings from "carbon-icons-svelte/lib/Settings.svelte";
-    import type { ImageGET } from "../../types/openapi_types";
     import BlendStyleFields from "./BlendStyleFields.svelte";
     import type { BlendStyles } from "./blendStyles";
-    import { shortImageLabel } from "./pointsets";
     import type { ViewportBlend } from "./viewportBlend.svelte";
 
     let {
@@ -30,16 +27,6 @@ Blend › Series: the eye's registered images oldest first, a Position slider th
     const full = $derived(ticked.size >= blend.cap);
     const walkable = $derived(blend.shown.length > 1);
     const showingId = $derived(walkable ? blend.showing?.image_id : undefined);
-
-    /** "CF · Topcon". */
-    function description(instance: ImageGET): string {
-        const modality = instance.modality
-            ? (MODALITY_LABELS[instance.modality] ?? instance.modality)
-            : "";
-        return [modality, instance.device.manufacturer]
-            .filter(Boolean)
-            .join(" · ");
-    }
 
     // Page Up / Down on the slider jump between images; caught before the handle's own keys.
     function pageKeys(e: KeyboardEvent) {
@@ -72,7 +59,7 @@ Blend › Series: the eye's registered images oldest first, a Position slider th
             max={Math.max(blend.shown.length - 1, 1)}
             step={0.01}
             labels={["Position"]}
-            valueTexts={[blend.showing?.instance.study.date ?? ""]}
+            valueTexts={[blend.showing ? blend.nameOf(blend.showing).name : ""]}
             tooltip
             values={[blend.seriesPosition]}
             onchange={([position]) => blend.setPosition(position)}
@@ -99,7 +86,7 @@ Blend › Series: the eye's registered images oldest first, a Position slider th
         {#each blend.seriesItems as { image } (image.image_id)}
             {@const isThis = image.image_id === thisId}
             {@const on = ticked.has(image.image_id)}
-            {@const label = shortImageLabel(image.instance)}
+            {@const label = blend.nameOf(image)}
             <li
                 class="flex items-start gap-2 border-s-3 py-1 ps-2 {image.image_id ===
                 showingId
@@ -128,16 +115,19 @@ Blend › Series: the eye's registered images oldest first, a Position slider th
                 <label for="{uid}-{image.image_id}" class="min-w-0 flex-1">
                     <span
                         class="block text-body-compact-01 [overflow-wrap:anywhere] text-text-primary"
-                        >{image.instance.study.date}{isThis
-                            ? " · this image"
-                            : ""}</span
+                        >{label.name}{isThis ? " · this image" : ""}</span
                     >
-                    <span class="block text-helper-text-01 text-text-secondary"
-                        >{description(image.instance)}{image.image_id ===
-                        showingId
-                            ? " · showing"
-                            : ""}</span
-                    >
+                    {#if label.device || image.image_id === showingId}
+                        <span
+                            class="block text-helper-text-01 text-text-secondary"
+                            >{[
+                                label.device,
+                                image.image_id === showingId ? "showing" : "",
+                            ]
+                                .filter(Boolean)
+                                .join(" · ")}</span
+                        >
+                    {/if}
                 </label>
                 <Popover.Root>
                     <Popover.Trigger>
@@ -145,14 +135,15 @@ Blend › Series: the eye's registered images oldest first, a Position slider th
                             <IconButton
                                 {...props}
                                 size="icon-xs"
-                                label="Style, {label}"><Settings /></IconButton
+                                label="Style, {label.name}"
+                                ><Settings /></IconButton
                             >
                         {/snippet}
                     </Popover.Trigger>
                     <Popover.Content
                         data-slot="filter-popover"
                         role="dialog"
-                        aria-label="Style, {label}"
+                        aria-label="Style, {label.name}"
                         side="left"
                         align="start"
                         class="flex w-60 flex-col gap-3 shadow-popover"
@@ -161,7 +152,7 @@ Blend › Series: the eye's registered images oldest first, a Position slider th
                             {image}
                             role="series"
                             {styles}
-                            {label}
+                            label={label.name}
                             fields={isThis
                                 ? ["tint", "opacity"]
                                 : [

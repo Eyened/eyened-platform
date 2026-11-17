@@ -73,7 +73,7 @@ describe("BlendSection, pair modes", () => {
         win.pointsets.setCurrent(EYE, 12);
         blend.setMode("overlay");
         const field = await screen.findByRole("button", { name: /With/ });
-        expect(field).toHaveTextContent("FAF 2024-03-12");
+        expect(field).toHaveTextContent("FAF · 2024-03-12");
         await expectNoAxeViolations(container);
     });
 
@@ -164,7 +164,7 @@ describe("BlendSection, Series", () => {
             screen.getByText("Series · 2 registered images"),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("button", { name: "Style, CF 2022-05-10" }),
+            screen.getByRole("button", { name: "Style, CF · 2022-05-10" }),
         ).toBeEnabled();
         expect(screen.queryByText(/2023-01-01/)).toBeNull();
         await expectNoAxeViolations(container);
@@ -174,7 +174,7 @@ describe("BlendSection, Series", () => {
         const { blend } = series();
         await fireEvent.click((await screen.findAllByRole("checkbox"))[2]!); // tick the FAF
         const slider = screen.getByRole("slider", { name: "Position" });
-        expect(slider).toHaveAttribute("aria-valuetext", "2022-05-10");
+        expect(slider).toHaveAttribute("aria-valuetext", "CF · 2022-05-10");
         await fireEvent.keyDown(slider, { key: "PageUp" });
         expect(blend.showing?.image_id).toBe("inst-2");
         await fireEvent.click(
@@ -218,7 +218,7 @@ describe("BlendSection, Series", () => {
         const { win } = series();
         await fireEvent.click(
             await screen.findByRole("button", {
-                name: "Style, FAF 2024-03-12",
+                name: "Style, FAF · 2024-03-12",
             }),
         );
         await fireEvent.click(

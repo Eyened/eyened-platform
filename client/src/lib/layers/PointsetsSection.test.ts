@@ -104,7 +104,7 @@ describe("PointsetsSection", () => {
         expect(
             screen.getByRole("button", { name: "Registration [12]" }),
         ).toHaveAttribute("aria-pressed", "true");
-        expect(screen.getByText("This CF 2022-05-10")).toBeInTheDocument();
+        expect(screen.getByText("This CF · 2022-05-10")).toBeInTheDocument();
         expect(screen.getByText("2 · no 3")).toBeInTheDocument();
         first.win.pointsets.sync.set(12, "error");
         expect(await screen.findByText("Couldn't save")).toBeInTheDocument();
@@ -116,15 +116,23 @@ describe("PointsetsSection", () => {
         ).toHaveAttribute("aria-pressed", "true");
     });
 
-    it("lists two same-day images of one modality as two lines", async () => {
-        reg(12, 9, { "inst-1": [pt], "inst-2": [pt], "inst-3": [pt] });
+    it("numbers a retake of this image by the window's strip order: this image is the first, the other line reads #2", async () => {
+        reg(12, 9, { "inst-1": [pt], "inst-2": [pt] });
         renderSection("inst-1", {
-            images: [fakeImage("inst-2"), fakeImage("inst-3")],
+            images: [
+                fakeImage("inst-2", {
+                    modality: "ColorFundus",
+                    date: "2022-05-10",
+                    device: { manufacturer: "Topcon", model: "Maestro2" },
+                }),
+            ],
         });
         await fireEvent.click(
             screen.getByRole("button", { name: "Registration [12]" }),
         );
-        expect(screen.getAllByText("FAF 2024-03-12")).toHaveLength(2);
+        expect(screen.getByText("This CF · 2022-05-10")).toBeInTheDocument();
+        expect(screen.getByText("CF · 2022-05-10 #2")).toBeInTheDocument();
+        expect(screen.getAllByText("Topcon Maestro2")).toHaveLength(2);
     });
 
     it("New creates on this image, makes it current and arms P; a failed New says so and arms nothing", async () => {

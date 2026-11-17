@@ -10,8 +10,9 @@ import {
     type BlendLayerStyle,
 } from "$lib/webgl/blendRenderer";
 import type { ImageRenderer } from "$lib/webgl/imageRenderer";
+import { imageName, type ImageName } from "$lib/workspace/imageMeta";
 import { registeredImageSize } from "./blendStyles";
-import { eyeKey, pairCount, shortImageLabel } from "./pointsets";
+import { eyeKey, pairCount } from "./pointsets";
 import { defaultTicks, nextStop, seriesLayerWeights } from "./seriesBlend";
 
 export type BlendMode = "off" | "overlay" | "checker" | "flicker" | "series";
@@ -26,7 +27,12 @@ export type SeriesItem = { image: AbstractImage; mapping: string };
 /** What a viewport's blend reads from its window. */
 export type BlendWindow = Pick<
     ViewerWindowContext,
-    "pointsets" | "blendStyles" | "images" | "registration" | "topViewers"
+    | "pointsets"
+    | "blendStyles"
+    | "images"
+    | "registration"
+    | "topViewers"
+    | "twins"
 >;
 
 function reducedMotion(): boolean {
@@ -161,10 +167,10 @@ export class ViewportBlend {
     titleSuffix = $derived.by((): string => {
         if (this.mode === "series")
             return this.showing && this.shown.length > 1
-                ? ` · series · showing ${dateOf(this.showing)}`
+                ? ` · series · showing ${this.nameOf(this.showing).name}`
                 : "";
         if (this.mode === "off" || !this.registration || !this.other) return "";
-        const label = shortImageLabel(this.other.instance);
+        const label = this.nameOf(this.other).name;
         return this.mode === "flicker"
             ? ` · flicker with ${label}`
             : ` · blended with ${label}`;
@@ -187,6 +193,14 @@ export class ViewportBlend {
             this.registration?.form_data,
             this.image.instance.id,
             image.instance.id,
+        );
+    }
+
+    /** How Layers names an image here: its name line with the twin number, over its device line. */
+    nameOf(image: AbstractImage): ImageName {
+        return imageName(
+            image.instance,
+            this.win.twins.get(image.image_id) ?? "",
         );
     }
 

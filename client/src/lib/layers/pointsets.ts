@@ -5,7 +5,7 @@ import {
     type EyeLaterality,
 } from "$lib/viewer-window/panelRegistration/groupOpenImages";
 import type { SyncState } from "$lib/webgl/segmentationState.svelte";
-import { MODALITY_LABELS } from "$lib/workspace/imageMeta";
+import type { ImageName } from "$lib/workspace/imageMeta";
 import { SvelteMap } from "svelte/reactivity";
 import type { FormAnnotationGET } from "../../types/openapi_types";
 
@@ -18,17 +18,6 @@ export function eyeKey(instance: {
         instance.patient.id,
         (instance.laterality ?? null) as EyeLaterality,
     );
-}
-
-/** "CF 2024-03-12". */
-export function shortImageLabel(instance: {
-    modality?: string | null;
-    study: { date?: string | null };
-}): string {
-    const modality = instance.modality
-        ? (MODALITY_LABELS[instance.modality] ?? instance.modality)
-        : "";
-    return [modality, instance.study.date].filter(Boolean).join(" ");
 }
 
 /** The point lists in a registration's form data, keyed by public ID. */
@@ -89,7 +78,12 @@ export function registrationRows(
     return rows.sort((x, y) => x.id - y.id);
 }
 
-export type ImageLine = { name: string; points: string; gap: boolean };
+export type ImageLine = {
+    name: string;
+    device: string;
+    points: string;
+    gap: boolean;
+};
 
 /**
  * The current registration's details: this image first, then loaded images in strip order, then the rest by public ID.
@@ -98,22 +92,28 @@ export type ImageLine = { name: string; points: string; gap: boolean };
 export function imageLines(
     formData: unknown,
     thisId: string,
-    loaded: readonly { id: string; label: string }[],
+    loaded: readonly ({ id: string } & ImageName)[],
 ): ImageLine[] | null {
     const lists = pointLists(formData);
     if (!lists.some(([, list]) => list.some((p) => p != null))) return null;
     const data = Object.fromEntries(lists);
     const length = Math.max(...lists.map(([, list]) => list.length));
-    const labels = new Map(loaded.map((image) => [image.id, image.label]));
+    const names = new Map(loaded.map((image) => [image.id, image]));
 
     const line = (id: string): ImageLine => {
-        const label = labels.get(id);
-        if (id !== thisId && label === undefined)
-            return { name: `${id} (not loaded)`, points: "", gap: false };
-        const name = id === thisId ? `This ${label ?? id}` : label!;
+        const image = names.get(id);
+        if (id !== thisId && image === undefined)
+            return {
+                name: `${id} (not loaded)`,
+                device: "",
+                points: "",
+                gap: false,
+            };
+        const name = id === thisId ? `This ${image?.name ?? id}` : image!.name;
+        const device = image?.device ?? "";
         const list = data[id] ?? [];
         const n = list.filter((p) => p != null).length;
-        if (n === 0) return { name, points: "no points", gap: false };
+        if (n === 0) return { name, device, points: "no points", gap: false };
         const missing: number[] = [];
         for (let i = 0; i < length; i++) {
             const elsewhere = lists.some(
@@ -122,15 +122,25 @@ export function imageLines(
             if (!placed(list, i) && elsewhere) missing.push(i + 1);
         }
         return missing.length
-            ? { name, points: `${n} · no ${missing.join(", ")}`, gap: true }
-            : { name, points: `${n} point${n === 1 ? "" : "s"}`, gap: false };
+            ? {
+                  name,
+                  device,
+                  points: `${n} · no ${missing.join(", ")}`,
+                  gap: true,
+              }
+            : {
+                  name,
+                  device,
+                  points: `${n} point${n === 1 ? "" : "s"}`,
+                  gap: false,
+              };
     };
 
     const loadedHere = loaded
         .map((image) => image.id)
         .filter((id) => id !== thisId && id in data);
     const unloaded = Object.keys(data)
-        .filter((id) => id !== thisId && !labels.has(id))
+        .filter((id) => id !== thisId && !names.has(id))
         .sort();
     return [thisId, ...loadedHere, ...unloaded].map(line);
 }

@@ -47,29 +47,38 @@ describe("registrationRows", () => {
 });
 
 describe("imageLines", () => {
+    const loaded = [
+        { id: "inst-1", name: "CF · 2022-05-10", device: "Topcon Maestro2" },
+        { id: "inst-2", name: "FAF · 2024-03-12", device: "" },
+    ];
+
     it("puts this image first, reads a gap as '2 · no 3' and names unloaded images by public ID", () => {
         const lines = imageLines(
             { gone: [pt], "inst-2": [pt, pt, null], "inst-1": [pt, pt, pt] },
             "inst-1",
-            [
-                { id: "inst-1", label: "CF 2022-05-10" },
-                { id: "inst-2", label: "FAF 2024-03-12" },
-            ],
+            loaded,
         );
         expect(lines).toEqual([
-            { name: "This CF 2022-05-10", points: "3 points", gap: false },
-            { name: "FAF 2024-03-12", points: "2 · no 3", gap: true },
-            { name: "gone (not loaded)", points: "", gap: false },
+            {
+                name: "This CF · 2022-05-10",
+                device: "Topcon Maestro2",
+                points: "3 points",
+                gap: false,
+            },
+            {
+                name: "FAF · 2024-03-12",
+                device: "",
+                points: "2 · no 3",
+                gap: true,
+            },
+            { name: "gone (not loaded)", device: "", points: "", gap: false },
         ]);
     });
 
     it("says this image has no points when it is not in the registration yet, and gives nothing for an empty registration", () => {
-        const loaded = [
-            { id: "inst-1", label: "CF 2022-05-10" },
-            { id: "inst-2", label: "FAF 2024-03-12" },
-        ];
         expect(imageLines({ "inst-2": [pt] }, "inst-1", loaded)?.[0]).toEqual({
-            name: "This CF 2022-05-10",
+            name: "This CF · 2022-05-10",
+            device: "Topcon Maestro2",
             points: "no points",
             gap: false,
         });
