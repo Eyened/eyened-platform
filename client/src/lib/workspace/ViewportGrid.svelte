@@ -7,6 +7,7 @@ While the thumbnail strip is on, maximise hides the other viewports instead.
 <script lang="ts">
     import { getContext, setContext, type Snippet } from "svelte";
     import type { ViewportTitle } from "./imageMeta";
+    import { STRIP_PX } from "./magnifier";
     import Splitter from "./Splitter.svelte";
     import ViewportFrame from "./ViewportFrame.svelte";
     import type { Workspace } from "./workspace.svelte";
@@ -33,7 +34,6 @@ While the thumbnail strip is on, maximise hides the other viewports instead.
     const uid = $props.id();
     const STRIP_TILE_WIDTH = 132;
     const STRIP_TILE_HEIGHT = 92;
-    const STRIP_HEIGHT = 104;
     const STRIP_STEP = STRIP_TILE_WIDTH + GRID_GAP;
 
     let grid: HTMLDivElement | undefined = $state();
@@ -75,7 +75,7 @@ While the thumbnail strip is on, maximise hides the other viewports instead.
                 ? "position: absolute; inset: 0;"
                 : "display: none;";
         if (position === maximised)
-            return `position: absolute; inset: ${STRIP_HEIGHT}px 0 0 0;`;
+            return `position: absolute; inset: ${STRIP_PX}px 0 0 0;`;
         const tile = position < maximised ? position : position - 1;
         return `position: absolute; top: 0; width: ${STRIP_TILE_WIDTH}px; height: ${STRIP_TILE_HEIGHT}px; left: ${tile * STRIP_STEP - stripX}px;`;
     }
@@ -252,7 +252,7 @@ While the thumbnail strip is on, maximise hides the other viewports instead.
         <div
             bind:this={scroller}
             class="strip-scroll"
-            style="top: {STRIP_TILE_HEIGHT}px; height: {STRIP_HEIGHT -
+            style="top: {STRIP_TILE_HEIGHT}px; height: {STRIP_PX -
                 STRIP_TILE_HEIGHT}px;"
             onscroll={() => (stripX = scroller?.scrollLeft ?? 0)}
         >
