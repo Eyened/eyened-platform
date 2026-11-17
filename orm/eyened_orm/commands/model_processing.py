@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable
 
 import click
 
-from eyened_orm import Modality
 from eyened_orm.inference.etdrs_summary import run_etdrs_model
+from eyened_orm.inference.outputs import UnsupportedMode
+from eyened_orm.inference.registry import MODEL_SLUGS
 
 from .shared import get_database
 from .targets import (
-    PIPELINE_IMAGE_CHUNK_SIZE,
-    filter_image_ids_by_modalities,
     image_target_options,
-    iter_image_id_chunks,
     patient_target_options,
     resolve_exclude_ids,
     resolve_image_target,
@@ -21,227 +19,82 @@ from .targets import (
 )
 
 
-def _get_device(device: str | None):
-    """Get torch device from string or auto-detect."""
-    try:
-        import torch
-    except ImportError as exc:
-        raise RuntimeError(
-            "This model needs PyTorch, which is not installed. "
-            "See the inference documentation for how to run models that need it: "
-            "https://eyened.github.io/eyened-platform/orm/inference/#workers-and-images"
-        ) from exc
-    from eyened_orm.inference.utils import auto_device
-
-    if device is None:
-        return auto_device()
-    return torch.device(device)
+def _mode(overwrite: bool, upgrade: bool, failed: bool) -> str:
+    chosen = [
+        name
+        for name, flag in (("overwrite", overwrite), ("upgrade", upgrade), ("failed", failed))
+        if flag
+    ]
+    if len(chosen) > 1:
+        raise click.UsageError(f"Choose at most one of --{', --'.join(chosen)}")
+    return chosen[0] if chosen else "default"
 
 
-CFI_ATTRIBUTE_MODEL_SLUGS: tuple[str, ...] = (
-    "cfi-roi",
-    "cfi-keypoints",
-    "cfi-odfd",
-    "cfi-quality",
-)
-
-# cfi-roi is fundusprep/OpenCV; the other CFI attribute slugs import torch.
-CFI_TORCH_ATTRIBUTE_SLUGS: frozenset[str] = frozenset(
-    slug for slug in CFI_ATTRIBUTE_MODEL_SLUGS if slug != "cfi-roi"
-)
-
-
-def _device_for_cfi_slug(model_slug: str, device: str | None):
-    """Resolve a torch device only for CFI pipelines that need one."""
-    if model_slug not in CFI_TORCH_ATTRIBUTE_SLUGS:
-        return None
-    return _get_device(device)
-
-
-CFI_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("cfi-amd",)
-
-OCT_SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = ("layer-segmentation",)
-
-SEGMENTATION_MODEL_SLUGS: tuple[str, ...] = (
-    *CFI_SEGMENTATION_MODEL_SLUGS,
-    *OCT_SEGMENTATION_MODEL_SLUGS,
-)
-
-SEGMENTATION_SLUG_MODALITIES: dict[str, tuple[Modality, ...]] = {
-    "cfi-amd": (Modality.ColorFundus,),
-    "layer-segmentation": (Modality.OCT,),
-}
-
-
-def _cfi_pipeline_class(model_name: str):
-
-    if model_name == "cfi-roi":
-        from eyened_orm.inference.cfi_roi import CFI_ROI
-
-        return CFI_ROI
-    if model_name == "cfi-keypoints":
-        from eyened_orm.inference.cfi_keypoints import CFIKeypoints
-
-        return CFIKeypoints
-    if model_name == "cfi-odfd":
-        from eyened_orm.inference.cfi_odfd import CFI_ODFD
-
-        return CFI_ODFD
-    if model_name == "cfi-quality":
-        from eyened_orm.inference.cfi_quality import CFI_Quality
-
-        return CFI_Quality
-    raise ValueError(f"Unknown CFI model: {model_name!r}")
-
-
-def _filter_supported_modalities(
-    session, image_ids: Iterable[int], modalities: tuple[Modality, ...]
-) -> set[int]:
-    """Keep only images whose modality is in ``modalities`` (SQL, chunked)."""
-    if not modalities:
-        return set(image_ids)
-    return filter_image_ids_by_modalities(
-        session,
-        image_ids,
-        modalities,
-        chunk_size=PIPELINE_IMAGE_CHUNK_SIZE,
-    )
-
-
-def run_cfi_attribute_pipeline(
-    session,
-    image_ids: Iterable[int],
-    model_slug: str,
-    *,
-    device=None,
-    batch_size: int = 8,
-    n_workers: int = 16,
-    overwrite: bool = False,
-    upgrade: bool = False,
-    failed: bool = False,
-    commit_interval: int = 100,
-) -> None:
-    """Run a single CFI attribute pipeline (one slug). RQ jobs call this once per job."""
-    model_class = _cfi_pipeline_class(model_slug)
-    image_ids = _filter_supported_modalities(
-        session, image_ids, model_class.supported_modalities
-    )
-    if not image_ids:
-        print(f"No images with supported modalities for {model_slug}")
-        return
-
-    if failed:
-        scope = "failed"
-    elif upgrade:
-        scope = "upgrade"
-    elif overwrite:
-        scope = "overwrite"
-    else:
-        scope = "default"
-
-    n_candidates = len(image_ids)
-    pipeline = model_class(
-        session,
-        device=device,
-        n_workers=n_workers,
-        batch_size=batch_size,
-    )
-
-    # Exclude existing outcomes once up-front (ID-only SQL), then chunk only
-    # the remaining work. Required-input checks stay per-chunk below.
-    outcome_ids = set(image_ids)
-    if failed:
-        outcome_ids = pipeline.failed_image_ids_in_scope(outcome_ids)
-        print(
-            f"{model_slug}: {len(outcome_ids)} failed rows in scope "
-            f"(of {n_candidates} candidates)"
+def run_model_options(f: Callable) -> Callable:
+    for option in reversed(
+        (
+            click.option(
+                "-m",
+                "--model",
+                "models",
+                multiple=True,
+                type=click.Choice(list(MODEL_SLUGS), case_sensitive=False),
+                help="Model to run; repeatable. Default: every model, in registry order.",
+            ),
+            image_target_options(),
+            click.option(
+                "-d",
+                "--device",
+                default=None,
+                help="Torch device (e.g. 'cuda:0', 'cpu'). Auto-detected if not provided.",
+            ),
+            click.option(
+                "-b", "--batch-size", type=int, default=None, help="Default: per model."
+            ),
+            click.option(
+                "-w",
+                "--n-workers",
+                type=int,
+                default=None,
+                help="Preprocessing worker processes (0 = in-process). Default: per model.",
+            ),
+            click.option(
+                "--overwrite",
+                is_flag=True,
+                help="Reprocess images that already have output for the current version.",
+            ),
+            click.option(
+                "--upgrade",
+                is_flag=True,
+                help=(
+                    "Attribute models: run the current version on images that only have "
+                    "output from older versions (stored alongside; reads prefer the newest)."
+                ),
+            ),
+            click.option(
+                "--failed",
+                is_flag=True,
+                help="Attribute models: retry only images whose last attempts failed.",
+            ),
+            click.option(
+                "--upscale/--no-upscale",
+                default=False,
+                help=(
+                    "CFI segmentations: store masks in original image space (legacy). "
+                    "Default stores native model output with a projection matrix."
+                ),
+            ),
+            click.option(
+                "--commit-interval", type=int, default=None, help="Default: per output type."
+            ),
         )
-    pending = pipeline.select_pending_by_outcomes(
-        outcome_ids, upgrade=upgrade, failed=failed, overwrite=overwrite
-    )
-    outcome_stats = pipeline.last_filter_stats
-    assert outcome_stats is not None
-
-    skip_parts = []
-    if outcome_stats.skipped_existing:
-        skip_parts.append(f"{outcome_stats.skipped_existing} existing")
-    if outcome_stats.skipped_successful:
-        skip_parts.append(f"{outcome_stats.skipped_successful} already succeeded")
-    if failed and n_candidates > len(outcome_ids):
-        skip_parts.append(f"{n_candidates - len(outcome_ids)} not failed")
-    skip_summary = ", ".join(skip_parts) if skip_parts else "none"
-
-    chunks = list(iter_image_id_chunks(pending))
-    print(
-        f"Running {model_slug} ({n_candidates} candidates → {len(pending)} pending "
-        f"after outcome filter [{skip_summary}]; "
-        f"{len(chunks)} chunks of ≤{PIPELINE_IMAGE_CHUNK_SIZE}, mode={scope})"
-    )
-
-    if not pending:
-        if failed:
-            print(f"{model_slug}: no failed images to process")
-        else:
-            print(f"{model_slug}: nothing to process")
-        return
-
-    total_processed = 0
-    total_skipped_missing_inputs = 0
-
-    for chunk_idx, chunk in enumerate(chunks, start=1):
-        chunk_size = len(chunk)
-        if pipeline.required_inputs:
-            # Outcome filtering already done; only resolve/skip missing inputs.
-            filtered = pipeline.filter_image_ids(chunk, overwrite=True)
-            skipped_missing = (
-                pipeline.last_filter_stats.skipped_missing_inputs
-                if pipeline.last_filter_stats
-                else 0
-            )
-        else:
-            filtered = chunk
-            skipped_missing = 0
-
-        total_skipped_missing_inputs += skipped_missing
-        if skipped_missing:
-            print(
-                f"{model_slug} chunk {chunk_idx}/{len(chunks)}: "
-                f"{len(filtered)} to process of {chunk_size} "
-                f"(skipped {skipped_missing} missing inputs); "
-                f"so far {total_processed} processed, "
-                f"{total_skipped_missing_inputs} missing inputs"
-            )
-        else:
-            print(
-                f"{model_slug} chunk {chunk_idx}/{len(chunks)}: "
-                f"processing {len(filtered)} images; "
-                f"so far {total_processed} processed"
-            )
-
-        if not filtered:
-            continue
-        pipeline.run(filtered, commit_interval=commit_interval)
-        session.commit()
-        total_processed += len(filtered)
-
-    if total_processed == 0:
-        print(
-            f"{model_slug}: nothing processed "
-            f"({total_skipped_missing_inputs} missing inputs "
-            f"of {len(pending)} pending after outcome filter)"
-        )
-        return
-    print(
-        f"Completed {model_slug}: processed {total_processed}; "
-        f"skipped {outcome_stats.skipped_existing} existing, "
-        f"{outcome_stats.skipped_successful} already succeeded, "
-        f"{total_skipped_missing_inputs} missing inputs "
-        f"(of {n_candidates} candidates)"
-    )
+    ):
+        f = option(f)
+    return f
 
 
-def _run_cfi_models_impl(
-    model,
+def _run_models(
+    models,
     path,
     image_ids,
     project,
@@ -255,13 +108,12 @@ def _run_cfi_models_impl(
     overwrite,
     upgrade,
     failed,
+    upscale,
     commit_interval,
-):
-    # CFI attribute models only support ColorFundus; default the target filter
-    # so "all images" does not pull every modality into Python first.
-    if modality is None:
-        modality = Modality.ColorFundus.name
+) -> None:
+    from eyened_orm.inference.runner import run_model
 
+    mode = _mode(overwrite, upgrade, failed)
     spec = target_spec_from_cli(
         path=path,
         image_ids=image_ids,
@@ -271,354 +123,52 @@ def _run_cfi_models_impl(
         modality=modality,
         include_inactive=include_inactive,
     )
-
-    database = get_database()
-
-    with database.get_session() as session:
+    slugs = list(models) or list(MODEL_SLUGS)
+    errors: list[str] = []
+    with get_database().get_session() as session:
         target = resolve_image_target(session, spec, allow_default=True)
         print(f"Target: {target.summary}")
+        for slug in slugs:
+            try:
+                run_model(
+                    session,
+                    slug,
+                    target.image_ids,
+                    device=device,
+                    mode=mode,
+                    upscale=upscale,
+                    batch_size=batch_size,
+                    n_workers=n_workers,
+                    commit_interval=commit_interval,
+                )
+            except UnsupportedMode as exc:
+                if models:
+                    raise click.UsageError(f"{slug}: {exc}") from exc
+                print(f"Skipping {slug}: {exc}")
+            except RuntimeError as exc:
+                errors.append(str(exc))
+    if errors:
+        raise click.ClickException("\n".join(errors))
 
-        for slug in [model] if model is not None else CFI_ATTRIBUTE_MODEL_SLUGS:
-            # cfi-roi runs first so dependent models can reuse stored CFI_ROI attributes
-            run_cfi_attribute_pipeline(
-                session,
-                target.image_ids,
-                slug,
-                device=_device_for_cfi_slug(slug, device),
-                batch_size=batch_size,
-                n_workers=n_workers,
-                overwrite=overwrite,
-                upgrade=upgrade,
-                failed=failed,
-                commit_interval=commit_interval,
-            )
 
+@click.command(name="run-model")
+@run_model_options
+def run_model_command(**kwargs):
+    """Run registered inference models on images and store their output.
 
-@click.command(name="run-cfi-models")
-@click.option(
-    "-m",
-    "--model",
-    type=click.Choice(list(CFI_ATTRIBUTE_MODEL_SLUGS), case_sensitive=False),
-    required=False,
-    help="Model to run (if not specified, runs all models)",
-)
-@image_target_options()
-@click.option(
-    "-d",
-    "--device",
-    type=str,
-    default=None,
-    help="Device to use (e.g., 'cuda:0', 'cpu'). Auto-detected if not provided.",
-)
-@click.option(
-    "-b",
-    "--batch-size",
-    type=int,
-    default=8,
-    help="Batch size for processing (not used for cfi-roi)",
-)
-@click.option(
-    "-w",
-    "--n-workers",
-    type=int,
-    default=16,
-    help="Number of preprocessing worker processes",
-)
-@click.option(
-    "--overwrite",
-    is_flag=True,
-    default=False,
-    help="Overwrite existing attribute values for the current model version",
-)
-@click.option(
-    "--upgrade",
-    is_flag=True,
-    default=False,
-    help=(
-        "Run the current model version on images that lack its output, even when "
-        "older versions already have AttributeValue rows (stored alongside; reads "
-        "prefer the newer version). Default: skip when any version has output."
-    ),
-)
-@click.option(
-    "--failed",
-    is_flag=True,
-    default=False,
-    help=(
-        "Retry only images with a failed AttributeValue for this model (null value "
-        "columns), within the selected target (project, patient, path, etc.)"
-    ),
-)
-@click.option(
-    "--commit-interval",
-    type=int,
-    default=100,
-    help="Commit interval for processing",
-)
-def run_cfi_models(
-    model,
-    path,
-    image_ids,
-    project,
-    patient,
-    exclude,
-    modality,
-    include_inactive,
-    device,
-    batch_size,
-    n_workers,
-    overwrite,
-    upgrade,
-    failed,
-    commit_interval,
-):
-    """Run CFI attribute inference models on images.
-
-    With no targeting flags, processes all active ColorFundus images.
-    Narrow scope with --path, --image-ids, --project, and/or --patient.
-    Override the default modality with --modality if needed.
-
-    Supported models:
-    - cfi-roi: CFI ROI detection (no device/batch-size needed)
-    - cfi-keypoints: CFI keypoints detection (fovea and disc edge)
-    - cfi-odfd: Optic Disc to Fovea Distance estimation
-    - cfi-quality: Image quality assessment
+    With no targeting flags, processes all active images; each model only sees
+    images of its modalities. With no -m, models run in registry order, so
+    producers (cfi-roi) run before the models that consume their output.
     """
-    _run_cfi_models_impl(
-        model,
-        path,
-        image_ids,
-        project,
-        patient,
-        exclude,
-        modality,
-        include_inactive,
-        device,
-        batch_size,
-        n_workers,
-        overwrite,
-        upgrade,
-        failed,
-        commit_interval,
-    )
+    _run_models(**kwargs)
 
 
 @click.command(name="run-models", hidden=True)
-@click.option(
-    "-m",
-    "--model",
-    type=click.Choice(list(CFI_ATTRIBUTE_MODEL_SLUGS), case_sensitive=False),
-    required=False,
-    help="Model to run (if not specified, runs all models)",
-)
-@image_target_options()
-@click.option(
-    "-d",
-    "--device",
-    type=str,
-    default=None,
-    help="Device to use (e.g., 'cuda:0', 'cpu'). Auto-detected if not provided.",
-)
-@click.option(
-    "-b",
-    "--batch-size",
-    type=int,
-    default=8,
-    help="Batch size for processing (not used for cfi-roi)",
-)
-@click.option(
-    "-w",
-    "--n-workers",
-    type=int,
-    default=16,
-    help="Number of preprocessing worker processes",
-)
-@click.option(
-    "--overwrite",
-    is_flag=True,
-    default=False,
-    help="Overwrite existing attribute values for the current model version",
-)
-@click.option(
-    "--upgrade",
-    is_flag=True,
-    default=False,
-    help="See run-cfi-models --upgrade",
-)
-@click.option(
-    "--failed",
-    is_flag=True,
-    default=False,
-    help="See run-cfi-models --failed",
-)
-@click.option(
-    "--commit-interval",
-    type=int,
-    default=100,
-    help="Commit interval for processing",
-)
-def run_models(
-    model,
-    path,
-    image_ids,
-    project,
-    patient,
-    exclude,
-    modality,
-    include_inactive,
-    device,
-    batch_size,
-    n_workers,
-    overwrite,
-    upgrade,
-    failed,
-    commit_interval,
-):
-    """Deprecated alias for run-cfi-models."""
-    click.echo(
-        "Warning: 'run-models' is deprecated; use 'run-cfi-models' instead.",
-        err=True,
-    )
-    _run_cfi_models_impl(
-        model,
-        path,
-        image_ids,
-        project,
-        patient,
-        exclude,
-        modality,
-        include_inactive,
-        device,
-        batch_size,
-        n_workers,
-        overwrite,
-        upgrade,
-        failed,
-        commit_interval,
-    )
-
-
-@click.command(name="run-segmentation")
-@click.option(
-    "-m",
-    "--model",
-    type=click.Choice(list(SEGMENTATION_MODEL_SLUGS), case_sensitive=False),
-    required=False,
-    help="Segmentation model to run (if not specified, runs all models)",
-)
-@image_target_options()
-@click.option(
-    "-d",
-    "--device",
-    type=str,
-    default=None,
-    help="Device to use (e.g., 'cuda:0', 'cpu'). Auto-detected if not provided.",
-)
-@click.option(
-    "-b",
-    "--batch-size",
-    type=int,
-    default=8,
-    help="Batch size for processing",
-)
-@click.option(
-    "-w",
-    "--n-workers",
-    type=int,
-    default=12,
-    help="Number of preprocessing worker processes",
-)
-@click.option(
-    "--skip-existing",
-    is_flag=True,
-    default=True,
-    help="Skip existing segmentations (filters out complete images)",
-)
-@click.option(
-    "--upscale/--no-upscale",
-    default=False,
-    help=(
-        "Upscale segmentation to original image size (legacy). "
-        "Default stores native model output with image_projection_matrix."
-    ),
-)
-def run_segmentation(
-    model,
-    path,
-    image_ids,
-    project,
-    patient,
-    exclude,
-    modality,
-    include_inactive,
-    device,
-    batch_size,
-    n_workers,
-    skip_existing,
-    upscale,
-):
-    """Run segmentation inference models on a set of images.
-
-    Supported models:
-    - cfi-amd: CFI AMD segmentation (ColorFundus)
-    - layer-segmentation: OCT retinal layer segmentation (nnU-Net)
-    """
-    spec = target_spec_from_cli(
-        path=path,
-        image_ids=image_ids,
-        project=project,
-        patient=patient,
-        exclude=exclude,
-        modality=modality,
-        include_inactive=include_inactive,
-    )
-
-    database = get_database()
-    device_obj = _get_device(device)
-
-    with database.get_session() as session:
-        target = resolve_image_target(session, spec)
-        print(f"Target: {target.summary}")
-
-        slugs = [model] if model is not None else SEGMENTATION_MODEL_SLUGS
-        for slug in slugs:
-            modalities = SEGMENTATION_SLUG_MODALITIES[slug]
-            slug_ids = _filter_supported_modalities(
-                session, target.image_ids, modalities
-            )
-            if not slug_ids:
-                print(
-                    f"No images with supported modalities for {slug} "
-                    f"({', '.join(m.name for m in modalities)})"
-                )
-                continue
-            print(
-                f"Running {slug} on {len(slug_ids)} "
-                f"{'/'.join(m.name for m in modalities)} images"
-            )
-            if slug == "cfi-amd":
-                from eyened_orm.inference.cfi_amd_segmentation import run_for_image_ids
-
-                run_for_image_ids(
-                    session,
-                    slug_ids,
-                    device=device_obj,
-                    batch_size=batch_size,
-                    n_workers=n_workers,
-                    overwrite=not skip_existing,
-                    upscale=upscale,
-                )
-            elif slug == "layer-segmentation":
-                from eyened_orm.inference.layer_segmentation import run_for_image_ids
-
-                run_for_image_ids(
-                    session,
-                    slug_ids,
-                    device=device_obj,
-                    overwrite=not skip_existing,
-                )
-            else:
-                raise ValueError(f"Unknown segmentation model: {slug!r}")
+@run_model_options
+def run_models(**kwargs):
+    """Deprecated alias for run-model."""
+    click.echo("Warning: 'run-models' is deprecated; use 'run-model' instead.", err=True)
+    _run_models(**kwargs)
 
 
 @click.command(name="run-registration")
@@ -679,9 +229,8 @@ def run_registration(path, image_ids, project, patient, exclude, replace):
 
 
 model_commands = [
-    run_cfi_models,
+    run_model_command,
     run_models,
     run_etdrs_model,
-    run_segmentation,
     run_registration,
 ]

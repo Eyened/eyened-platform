@@ -79,7 +79,7 @@ flowchart LR
 
 | Storage | Column / table | JSON shape | Written by |
 |---------|----------------|------------|------------|
-| AI keypoints | `CFI_Keypoints` (`AttributeValue`), or legacy `ImageInstance.CFKeypoints` | `{ "fovea_xy": [x,y], "disc_edge_xy": [x,y], … }` | `eorm run-cfi-models` / CFI import |
+| AI keypoints | `CFI_Keypoints` (`AttributeValue`), or legacy `ImageInstance.CFKeypoints` | `{ "fovea_xy": [x,y], "disc_edge_xy": [x,y], … }` | `eorm run-model` / CFI import |
 | Manual ETDRS grid | `FormAnnotation.FormData` | `{ "fovea": {x,y}, "disc_edge": {x,y} }` | ETDRS edit tool → `PUT /form-annotations/{id}/value` |
 
 Both use **full-resolution image pixel coordinates**. See **[ETDRS Grid Panel](/eyened-platform/client/panels/etdrs)** for the viewer workflow.

@@ -81,83 +81,38 @@ class APIClient:
 
         return response
 
-    def enqueue_run_cfi_models(
+    def enqueue_run_model(
         self,
         image_ids: list[int],
         *,
-        model: Optional[str] = None,
-        overwrite: bool = False,
-        commit_interval: int = 100,
-        batch_size: int = 8,
-        n_workers: int = 16,
+        models: Optional[list[str]] = None,
+        mode: str = "default",
+        upscale: bool = False,
+        batch_size: Optional[int] = None,
+        n_workers: Optional[int] = None,
+        commit_interval: Optional[int] = None,
         timeout: Optional[float] = 30,
     ) -> dict[str, Any]:
-        """
-        Queue CFI attribute inference on the API worker (``POST /api/import/run_cfi_models``).
+        """Queue model inference on the API workers (``POST /api/import/run_model``).
 
-        Returns the JSON body (``success``, ``message``, ``task_id``, ``task_ids``, etc.).
-        When ``model`` is omitted, one job per model is queued; ``task_ids`` lists every job id.
+        One job per model (all registered models when ``models`` is omitted);
+        ``task_ids`` in the returned JSON lists every job id.
         """
         resp = self.post(
-            "/api/import/run_cfi_models",
+            "/api/import/run_model",
             json={
                 "image_ids": image_ids,
-                "model": model,
-                "overwrite": overwrite,
+                "models": models,
+                "mode": mode,
+                "upscale": upscale,
+                "batch_size": batch_size,
+                "n_workers": n_workers,
                 "commit_interval": commit_interval,
-                "batch_size": batch_size,
-                "n_workers": n_workers,
             },
             timeout=timeout,
         )
         resp.raise_for_status()
         return resp.json()
-
-    def _enqueue_image_ids_job(
-        self,
-        path: str,
-        payload: dict[str, Any],
-        *,
-        timeout: Optional[float] = 30,
-    ) -> dict[str, Any]:
-        resp = self.post(path, json=payload, timeout=timeout)
-        resp.raise_for_status()
-        return resp.json()
-
-    def enqueue_run_cfi_amd(
-        self,
-        image_ids: list[int],
-        *,
-        overwrite: bool = False,
-        batch_size: int = 8,
-        n_workers: int = 12,
-        timeout: Optional[float] = 30,
-    ) -> dict[str, Any]:
-        """``POST /api/import/run_cfi_amd``."""
-        return self._enqueue_image_ids_job(
-            "/api/import/run_cfi_amd",
-            {
-                "image_ids": image_ids,
-                "overwrite": overwrite,
-                "batch_size": batch_size,
-                "n_workers": n_workers,
-            },
-            timeout=timeout,
-        )
-
-    def enqueue_run_layer_segmentation(
-        self,
-        image_ids: list[int],
-        *,
-        overwrite: bool = False,
-        timeout: Optional[float] = 30,
-    ) -> dict[str, Any]:
-        """``POST /api/import/run_layer_segmentation``."""
-        return self._enqueue_image_ids_job(
-            "/api/import/run_layer_segmentation",
-            {"image_ids": image_ids, "overwrite": overwrite},
-            timeout=timeout,
-        )
 
     def enqueue_update_thumbnails(
         self,

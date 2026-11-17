@@ -165,6 +165,31 @@ database.
   built from it (e.g. CLI stdout) would report.
 - **`eorm create-user` writes an audit row.** It previously wrote none.
 
+**Model inference**
+
+- **One entrypoint per surface for every model.** `eorm run-model -m <slug>` replaces
+  `run-cfi-models` and `run-segmentation`; `POST /api/import/run_model` replaces
+  `run_cfi_models`, `run_cfi_amd` and `run_layer_segmentation`; the `run_model_job` RQ
+  task replaces the three per-type tasks; and `ApiClient.enqueue_run_model` replaces
+  `enqueue_run_cfi_models`, `enqueue_run_cfi_amd` and `enqueue_run_layer_segmentation`.
+  Scripts calling the old names must switch. `run-models` stays as a deprecated alias.
+- **The route takes `models` (a list) and `mode`** (`default`, `upgrade`, `failed`,
+  `overwrite`) instead of `model` and an `overwrite` flag. Omitting `models` queues
+  every model, including the segmentation models, one job per model on the queue named
+  after it. `cfi-drusen` jobs wait until a worker listens on the `cfi-drusen` queue.
+- **The mode flags are shared by all models.** Segmentation models treat the default and
+  `--upgrade` alike (an image is processed when the current model version lacks any of
+  its features), and reject `--failed` because they record no failure rows; a run of all
+  models skips them in `--failed` mode.
+- **A segmentation run that fails on some images now fails the command and the RQ job**
+  after saving the rest. Layer segmentation already did this; `cfi-amd` only printed the
+  errors.
+- **Native `cfi-amd` takes its projection matrix from the `CFI_ROI` input**, so images
+  without a ROI are skipped (run `cfi-roi` first, or run all models). `--upscale` needs
+  no ROI.
+- **Adding a model** is one `Pipeline` subclass and one `ModelSpec` line; see
+  [Adding a model](/eyened-platform/orm/inference#adding-a-model).
+
 ## v2026.09.0
 
 Per-project access control is now enforced, tasks declare the projects they span, and the
