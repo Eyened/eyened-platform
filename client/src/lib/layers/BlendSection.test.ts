@@ -52,6 +52,51 @@ function renderBlend({
 }
 
 describe("BlendSection, pair modes", () => {
+    /** Two same-day FAFs from one device in the current registration: inst-3 is "#2" and has 2 pairs. */
+    function withTwins() {
+        formAnnotations.set(12, {
+            id: 12,
+            form_data: {
+                "inst-1": tri,
+                "inst-2": tri,
+                "inst-3": [tri[0], tri[1], null],
+            },
+        } as never);
+        const view = renderBlend({
+            images: [fakeImage("inst-2"), fakeImage("inst-3")],
+        });
+        view.win.pointsets.setCurrent(EYE, 12);
+        view.blend.setMode("overlay");
+        return view;
+    }
+
+    it("lists With as radio rows named by the name and device lines, described by the pair count, the first checked", async () => {
+        withTwins();
+        const first = await screen.findByRole("radio", {
+            name: "FAF · 2024-03-12 Heidelberg Spectralis",
+        });
+        const retake = screen.getByRole("radio", {
+            name: "FAF · 2024-03-12 #2 Heidelberg Spectralis",
+        });
+        expect(first).toBeChecked();
+        expect(first).toHaveAccessibleDescription("3 pairs");
+        expect(retake).toHaveAccessibleDescription("2 pairs");
+    });
+
+    it("a click on a row's thumbnail picks it, also under 3 pairs, and the viewport asks for the missing pair", async () => {
+        const { blend } = withTwins();
+        const retake = await screen.findByRole("radio", { name: /#2/ });
+        const thumb = (retake as HTMLInputElement).labels![0]!.querySelector(
+            "img",
+        )!;
+        await fireEvent.click(thumb);
+        expect(retake).toBeChecked();
+        expect(blend.other?.image_id).toBe("inst-3");
+        expect(blend.viewportLine).toBe(
+            "Place 1 more pair to line up the images",
+        );
+    });
+
     it("asks for a current registration only in pair modes, then offers With on the registration's first image; passes axe", async () => {
         formAnnotations.set(12, {
             id: 12,
@@ -72,8 +117,11 @@ describe("BlendSection, pair modes", () => {
         );
         win.pointsets.setCurrent(EYE, 12);
         blend.setMode("overlay");
-        const field = await screen.findByRole("button", { name: /With/ });
-        expect(field).toHaveTextContent("FAF · 2024-03-12");
+        expect(
+            await screen.findByRole("radio", {
+                name: "FAF · 2024-03-12 Heidelberg Spectralis",
+            }),
+        ).toBeChecked();
         await expectNoAxeViolations(container);
     });
 

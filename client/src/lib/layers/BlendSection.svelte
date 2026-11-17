@@ -4,7 +4,7 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
-    import { Dropdown } from "$lib/components/ui/dropdown/index.js";
+    import { RadioButton } from "$lib/components/ui/radio-button/index.js";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { Slider } from "$lib/components/ui/slider/index.js";
     import { ToggleGroup } from "$lib/components/ui/toggle-group/index.js";
@@ -25,6 +25,7 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const { image } = viewerContext;
     const styles = viewerContext.viewerWindowContext.blendStyles;
+    const uid = $props.id();
 
     const MODES = [
         { value: "off", text: "Off", label: "Off" },
@@ -48,13 +49,13 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
     const tinted = $derived(
         blend.mode === "overlay" || blend.mode === "checker",
     );
-    const withItems = $derived(
+    const withRows = $derived(
         blend.candidates.map((candidate) => {
             const n = blend.pairs(candidate);
             return {
                 id: candidate.image_id,
-                text: blend.nameOf(candidate).name,
-                description: `${n} pair${n === 1 ? "" : "s"}`,
+                ...blend.nameOf(candidate),
+                pairs: `${n} pair${n === 1 ? "" : "s"}`,
                 thumb: getThumbUrl(candidate.instance),
             };
         }),
@@ -91,17 +92,52 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
                         .registration.id}].
                 </p>
             {:else}
-                <p class="text-label-01 text-text-secondary" aria-hidden="true">
-                    With · Registration [{blend.registration.id}]
-                </p>
-                <Dropdown
-                    labelText="With"
-                    hideLabel
-                    size="md"
-                    items={withItems}
-                    selectedId={blend.other.image_id}
-                    onselect={(id) => blend.setWith(id)}
-                />
+                <fieldset class="flex min-w-0 flex-col">
+                    <legend class="mb-2 text-label-01 text-text-secondary">
+                        With · Registration [{blend.registration.id}]
+                    </legend>
+                    {#each withRows as row, i (row.id)}
+                        <!-- Two images can share the name line and differ only by device, so both lines name the radio. -->
+                        <RadioButton
+                            name="{uid}-with"
+                            value={row.id}
+                            checked={row.id === blend.other.image_id}
+                            onchange={() => blend.setWith(row.id)}
+                            labelledBy={row.device
+                                ? `${uid}-name-${i} ${uid}-device-${i}`
+                                : `${uid}-name-${i}`}
+                            describedBy="{uid}-pairs-{i}"
+                            class="flex py-1"
+                        >
+                            <span class="flex items-start gap-2">
+                                <img
+                                    src={row.thumb}
+                                    alt=""
+                                    class="size-6 shrink-0 object-cover"
+                                />
+                                <span
+                                    class="min-w-0 flex-1 [overflow-wrap:anywhere]"
+                                >
+                                    <span id="{uid}-name-{i}" class="block"
+                                        >{row.name}</span
+                                    >
+                                    {#if row.device}
+                                        <span
+                                            id="{uid}-device-{i}"
+                                            class="block text-label-01 text-text-secondary"
+                                            >{row.device}</span
+                                        >
+                                    {/if}
+                                </span>
+                                <span
+                                    id="{uid}-pairs-{i}"
+                                    class="shrink-0 text-label-01 text-text-secondary tabular-nums"
+                                    >{row.pairs}</span
+                                >
+                            </span>
+                        </RadioButton>
+                    {/each}
+                </fieldset>
                 {#if blend.mode === "checker"}
                     <div class="flex items-center gap-2">
                         <span class="text-label-01 text-text-secondary"

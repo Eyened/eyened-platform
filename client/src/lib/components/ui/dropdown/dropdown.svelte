@@ -5,7 +5,6 @@
     // Carbon Dropdown (carbon-components-svelte prop names) over ui/select, size lg (48 px), md (40 px) or sm (32 px);
     // menu items match the field height and the menu shows 5.5 items (@carbon/styles 1.117.0 list-box).
     // An item's optional `hint` (a shortcut key) follows its text in the menu.
-    // An item's optional `thumb` (an image URL) shows as a 24 px square before its text, also in the closed field; `description` follows the text in the menu.
     // `onselect` fires only when the user picks a different item; the optional `onclose` fires whenever the menu closes.
     const uid = $props.id(); // $props.id() is not allowed as a destructuring default
     let {
@@ -20,13 +19,7 @@
         onselect,
         onclose,
     }: {
-        items: {
-            id: string;
-            text: string;
-            hint?: string;
-            thumb?: string;
-            description?: string;
-        }[];
+        items: { id: string; text: string; hint?: string }[];
         selectedId?: string;
         labelText: string;
         type?: "default" | "inline";
@@ -39,8 +32,9 @@
     } = $props();
 
     const heights = { sm: "h-8", md: "h-10", lg: undefined };
-    const selected = $derived(items.find((i) => i.id === selectedId));
-    const selectedText = $derived(selected?.text ?? "");
+    const selectedText = $derived(
+        items.find((i) => i.id === selectedId)?.text ?? "",
+    );
 </script>
 
 <div
@@ -81,13 +75,6 @@
             variant={type}
             class={heights[size]}
         >
-            {#if selected?.thumb}
-                <img
-                    src={selected.thumb}
-                    alt=""
-                    class="size-6 shrink-0 object-cover"
-                />
-            {/if}
             {selectedText}
         </Select.Trigger>
         <Select.Content
@@ -105,14 +92,7 @@
                     label={item.text}
                     class={heights[size]}
                 >
-                    <!-- No whitespace before the text, so the option's text starts with it. -->
-                    <!-- prettier-ignore -->
-                    {#if item.thumb}<img src={item.thumb} alt="" class="me-2 size-6 shrink-0 object-cover" />{/if}{item.text}
-                    {#if item.description}
-                        <span class="ms-2 text-text-secondary"
-                            >{item.description}</span
-                        >
-                    {/if}
+                    {item.text}
                     {#if item.hint}
                         <span class="ms-2 text-text-secondary">{item.hint}</span
                         >
