@@ -8,8 +8,8 @@ import {
 import type { Workspace } from "../workspace.svelte";
 import ToolPalette from "./ToolPalette.svelte";
 
-// All tools: 12 slots and 3 gaps between the 4 jobs.
-const ALL_TOOLS_FLAT = 12 * 40 + 3 * 12;
+// All tools: 12 slots and 3 gaps between the 4 jobs, plus the Magnifier slot and its gap.
+const ALL_TOOLS_FLAT = 13 * 40 + 4 * 12;
 
 function renderPalette(ws: Workspace, available: number) {
     return render(ToolPalette, {
@@ -19,6 +19,20 @@ function renderPalette(ws: Workspace, available: number) {
 }
 
 describe("ToolPalette", () => {
+    it("the Magnifier toggle shows its state and never arms or disarms a tool", async () => {
+        const ws = workspaceWith(1);
+        ws.arm("brush");
+        renderPalette(ws, ALL_TOOLS_FLAT - 1);
+        const magnifier = screen.getByRole("button", { name: "Magnifier" });
+        expect(magnifier).toHaveAttribute("aria-pressed", "false");
+        await fireEvent.click(magnifier);
+        expect(ws.magnifier.on).toBe(true);
+        expect(magnifier).toHaveAttribute("aria-pressed", "true");
+        expect(ws.armedTool).toBe("brush");
+        await fireEvent.click(magnifier);
+        expect(ws.magnifier.on).toBe(false);
+    });
+
     it("is flat while every slot fits; a pixel short, each job is a split slot", async () => {
         const ws = workspaceWith(1);
         const flat = renderPalette(ws, ALL_TOOLS_FLAT);

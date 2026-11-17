@@ -24,7 +24,7 @@ import { SvelteMap } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
 import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
 
-/** What a ViewerContext reads from the workspace: the remembered slice, Lock, strip tracking, the armed tool and the selected viewport. */
+/** What a ViewerContext reads from the workspace: the remembered slice, Lock, strip tracking, the armed tool, the selected viewport and the Magnifier. */
 export type WorkspaceView = Pick<
     Workspace,
     | "peekIndex"
@@ -35,6 +35,8 @@ export type WorkspaceView = Pick<
     | "arm"
     | "armedTool"
     | "selectedViewport"
+    | "magnifier"
+    | "setMagnifier"
 >;
 
 export class ViewerWindowContext {
