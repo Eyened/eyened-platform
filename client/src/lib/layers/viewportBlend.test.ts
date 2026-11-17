@@ -30,7 +30,12 @@ vi.mock("$lib/registration/glslPathBetween", () => ({
 const { ViewportBlend } = await import("./viewportBlend.svelte");
 
 /** A synthetic loaded 2D image of patient 1's right eye. */
-function img(id: string, modality = "ColorFundus", date = "2022-05-10") {
+function img(
+    id: string,
+    modality = "ColorFundus",
+    date = "2022-05-10",
+    device = {},
+) {
     return {
         image_id: id,
         is2D: true,
@@ -42,7 +47,7 @@ function img(id: string, modality = "ColorFundus", date = "2022-05-10") {
             laterality: "R",
             modality,
             study: { date },
-            device: {},
+            device,
         },
     } as unknown as AbstractImage;
 }
@@ -108,7 +113,29 @@ describe("ViewportBlend", () => {
         const { win, blend } = setup([A, B, B2]);
         win.pointsets.setCurrent(EYE, 12);
         blend.setMode("overlay");
-        expect(blend.titleSuffix).toBe(" · blended with FAF · 2024-03-12 #2");
+        expect(blend.titleSuffix).toEqual({
+            rest: " · blended with FAF · 2024-03-12",
+            twin: "#2",
+        });
+    });
+
+    it("adds the other image's device to the title only when its name line matches this image's", () => {
+        const topcon = { manufacturer: "Topcon", model: "TRC-NW8" };
+        const sameDay = img("a2", "ColorFundus", "2022-05-10", topcon);
+        const faf = img("b3", "Autofluorescence", "2024-03-12", topcon);
+        registration(12, { a: tri, a2: tri, b3: tri });
+        const { win, blend } = setup([A, sameDay, faf]);
+        win.pointsets.setCurrent(EYE, 12);
+        blend.setMode("overlay");
+        expect(blend.titleSuffix).toEqual({
+            rest: " · blended with CF · 2022-05-10 · Topcon TRC-NW8",
+            twin: "",
+        });
+        blend.setWith("b3");
+        expect(blend.titleSuffix).toEqual({
+            rest: " · blended with FAF · 2024-03-12",
+            twin: "",
+        });
     });
 
     it("swaps in a BlendRenderer with the viewport's W/L on this image, and Off puts the viewer's renderer back", () => {
@@ -241,7 +268,10 @@ describe("ViewportBlend", () => {
         expect(layers[0]!.style.windowLevel).toEqual({ min: 30, max: 220 });
         blend.step(-1);
         expect(blend.layers(viewer())!.map((l) => l.weight)).toEqual([0, 1]);
-        expect(blend.titleSuffix).toBe(" · series · showing CF · 2020-06-03");
+        expect(blend.titleSuffix).toEqual({
+            rest: " · series · showing CF · 2020-06-03",
+            twin: "",
+        });
     });
 
     it("offers the Overlay drop only for an image with pairs in the current registration, and never when Registration is hidden", () => {

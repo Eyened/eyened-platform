@@ -47,7 +47,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     const shownTitle = $derived(slot.imageId ? title : null);
     // The viewport's own addition, e.g. "· blended with FAF · 2024-03-12"; visual only.
     const titleSuffix = $derived(
-        workspace.handleAt(position)?.titleSuffix ?? "",
+        workspace.handleAt(position)?.titleSuffix ?? null,
     );
     const emptyTitle = $derived(workspace.loaded ? "Empty" : "Loading…");
     const name = $derived(
@@ -238,7 +238,12 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                                     <span class="twin">{shownTitle.twin}</span>
                                 {/if}
                                 {#if titleSuffix}
-                                    <span class="rest">{titleSuffix}</span>
+                                    <span class="rest">{titleSuffix.rest}</span>
+                                    {#if titleSuffix.twin}
+                                        <span class="twin"
+                                            >{titleSuffix.twin}</span
+                                        >
+                                    {/if}
                                 {/if}
                             {:else}
                                 <span class="rest">{emptyTitle}</span>

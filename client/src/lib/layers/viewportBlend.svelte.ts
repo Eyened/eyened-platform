@@ -10,7 +10,11 @@ import {
     type BlendLayerStyle,
 } from "$lib/webgl/blendRenderer";
 import type { ImageRenderer } from "$lib/webgl/imageRenderer";
-import { imageName, type ImageName } from "$lib/workspace/imageMeta";
+import {
+    imageName,
+    type ImageName,
+    type TitleSuffix,
+} from "$lib/workspace/imageMeta";
 import { registeredImageSize } from "./blendStyles";
 import { eyeKey, pairCount } from "./pointsets";
 import { defaultTicks, nextStop, seriesLayerWeights } from "./seriesBlend";
@@ -164,16 +168,17 @@ export class ViewportBlend {
     );
 
     /** Added to the viewport title while blending. */
-    titleSuffix = $derived.by((): string => {
+    titleSuffix = $derived.by((): TitleSuffix | null => {
         if (this.mode === "series")
             return this.showing && this.shown.length > 1
-                ? ` · series · showing ${this.nameOf(this.showing).name}`
-                : "";
-        if (this.mode === "off" || !this.registration || !this.other) return "";
-        const label = this.nameOf(this.other).name;
-        return this.mode === "flicker"
-            ? ` · flicker with ${label}`
-            : ` · blended with ${label}`;
+                ? this.suffix(" · series · showing", this.showing)
+                : null;
+        if (this.mode === "off" || !this.registration || !this.other)
+            return null;
+        return this.suffix(
+            this.mode === "flicker" ? " · flicker with" : " · blended with",
+            this.other,
+        );
     });
 
     /** One line over the viewport when a pair mode cannot draw the other image. */
@@ -202,6 +207,24 @@ export class ViewportBlend {
             image.instance,
             this.win.twins.get(image.image_id) ?? "",
         );
+    }
+
+    /** True when another image's name line reads the same as this image's, so only its device tells them apart. */
+    sameName(image: AbstractImage): boolean {
+        return (
+            image !== this.image &&
+            this.nameOf(image).name === this.nameOf(this.image).name
+        );
+    }
+
+    private suffix(lead: string, image: AbstractImage): TitleSuffix {
+        const { name, device } = imageName(image.instance, "");
+        const shown =
+            this.sameName(image) && device ? `${name} · ${device}` : name;
+        return {
+            rest: `${lead} ${shown}`,
+            twin: this.win.twins.get(image.image_id) ?? "",
+        };
     }
 
     setMode(mode: BlendMode): void {

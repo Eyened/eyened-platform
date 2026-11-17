@@ -27,6 +27,7 @@ import {
 } from "./workspaceRules";
 import type { ViewportBlend } from "$lib/layers/viewportBlend.svelte";
 import type { LocalizerLines } from "$lib/layers/localizerLines.svelte";
+import type { TitleSuffix } from "./imageMeta";
 import type { WorkspaceUrlState } from "./workspaceUrl";
 import {
     toolById,
@@ -73,7 +74,7 @@ export interface ViewportHandle {
     /** The viewport's layers; Layers lists them while it is selected. */
     readonly layers?: LayersTarget;
     /** Added to the viewport title, e.g. while blending. */
-    readonly titleSuffix?: string;
+    readonly titleSuffix?: TitleSuffix | null;
 }
 
 /** The state of one viewer window: the catalogue, the slots and how they page. Positions are 0-based. */

@@ -100,17 +100,13 @@ Blend › Series: the eye's registered images oldest first, a Position slider th
                     disabled={isThis || (!on && full)}
                     onCheckedChange={() => blend.toggleTick(image.image_id)}
                 />
-                <!-- The image's Series tint at a glance; changed in its Style popover. -->
-                <span
-                    aria-hidden="true"
-                    class="mt-1.5 size-3 shrink-0 border border-border-strong-01"
-                    style:background-color={styles.get(image.image_id, "series")
-                        .colour}
-                ></span>
+                <!-- The frame shows the image's Series tint at a glance; changed in its Style popover. -->
                 <img
                     src={getThumbUrl(image.instance)}
                     alt=""
-                    class="size-6 shrink-0 object-cover"
+                    class="size-6 shrink-0 object-cover outline-2 -outline-offset-2"
+                    style:outline-color={styles.get(image.image_id, "series")
+                        .colour}
                 />
                 <label for="{uid}-{image.image_id}" class="min-w-0 flex-1">
                     <span

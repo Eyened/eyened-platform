@@ -128,12 +128,12 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
                                             >{row.device}</span
                                         >
                                     {/if}
+                                    <span
+                                        id="{uid}-pairs-{i}"
+                                        class="block text-label-01 text-text-secondary tabular-nums"
+                                        >{row.pairs}</span
+                                    >
                                 </span>
-                                <span
-                                    id="{uid}-pairs-{i}"
-                                    class="shrink-0 text-label-01 text-text-secondary tabular-nums"
-                                    >{row.pairs}</span
-                                >
                             </span>
                         </RadioButton>
                     {/each}
@@ -188,6 +188,9 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
                     role="other"
                     {styles}
                     label={blend.nameOf(blend.other).name}
+                    device={blend.sameName(blend.other)
+                        ? blend.nameOf(blend.other).device
+                        : ""}
                     fields={tinted
                         ? ["mode", "wl", "tint", "colour", "opacity", "reset"]
                         : ["mode", "wl", "reset"]}

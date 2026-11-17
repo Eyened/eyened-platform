@@ -22,12 +22,15 @@ One image's blend look, in the Blend section or a Series Style popover. Each fie
         role,
         styles,
         label,
+        device = "",
         fields,
     }: {
         image: AbstractImage;
         role: BlendRole;
         styles: BlendStyles;
         label: string;
+        /** Shown under the label when only the device tells the image apart. */
+        device?: string;
         fields: readonly Field[];
     } = $props();
 
@@ -74,7 +77,9 @@ One image's blend look, in the Blend section or a Series Style popover. Each fie
 </script>
 
 <div role="group" aria-labelledby="{uid}-name" class="flex flex-col gap-2">
-    <p id="{uid}-name" class="text-label-01 text-text-secondary">{label}</p>
+    <p id="{uid}-name" class="text-label-01 text-text-secondary">
+        {label}{#if device}<span class="block">{device}</span>{/if}
+    </p>
     {#if fields.includes("mode")}
         <Dropdown
             size="md"

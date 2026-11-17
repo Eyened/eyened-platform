@@ -20,6 +20,12 @@ export interface ViewportTitle {
     twin?: string;
 }
 
+/** A viewport's addition to its title, e.g. "· blended with CF F2 · 2017-04-18" and the other image's "#3", kept apart so it never shortens. */
+export interface TitleSuffix {
+    rest: string;
+    twin: string;
+}
+
 /** How Layers names an image: a name line over a device line. */
 export interface ImageName {
     name: string;
