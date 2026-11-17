@@ -113,6 +113,13 @@ It moves only when the grader drags its gripper or clicks it for the next corner
         live = null;
     }
 
+    // A cancelled drag (pen or touch) never gets a pointerup: drop the move and keep the stored place.
+    function onpointercancel() {
+        press = null;
+        dragged = false;
+        live = null;
+    }
+
     // A click or Enter goes to the next corner; the click that ends a drag does not.
     function onclick() {
         if (dragged) {
@@ -137,10 +144,11 @@ It moves only when the grader drags its gripper or clicks it for the next corner
                 label="Move magnifier to next corner"
                 tooltip="Drag to move, click for next corner"
                 size="icon-xs"
-                class="cursor-grab"
+                class="cursor-grab touch-none"
                 {onpointerdown}
                 {onpointermove}
                 {onpointerup}
+                {onpointercancel}
                 {onclick}
             >
                 <Draggable />

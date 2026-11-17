@@ -50,7 +50,7 @@ Mount it keyed on the source viewport.
             ),
         ),
     );
-    // Last, so it goes under everything drawn above.
+    // After the source's repaint, which draws the segmentation masks into the shared WebGL canvas, so the copy includes them.
     onDestroy(view.addOverlay(new MagnifierCopy()));
 
     $effect(() => {

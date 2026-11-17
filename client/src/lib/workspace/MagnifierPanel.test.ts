@@ -73,6 +73,25 @@ describe("MagnifierPanel", () => {
         expect(region()).toHaveStyle({ left: "924px", top: "630px" });
     });
 
+    it("a cancelled drag drops the move: the panel stays at its stored place", async () => {
+        const ws = workspaceWith(1);
+        ws.setMagnifier({ on: true, x: 924, y: 630 });
+        renderPanel(ws);
+        const gripper = screen.getByRole("button", {
+            name: "Move magnifier to next corner",
+        });
+        await fireEvent.pointerDown(gripper, {
+            button: 0,
+            clientX: 500,
+            clientY: 500,
+        });
+        await fireEvent.pointerMove(gripper, { clientX: 440, clientY: 470 });
+        await fireEvent.pointerCancel(gripper);
+        await fireEvent.pointerMove(gripper, { clientX: 300, clientY: 300 });
+        expect(region()).toHaveStyle({ left: "924px", top: "630px" });
+        expect(readMagnifier()).toMatchObject({ x: 924, y: 630 });
+    });
+
     it("shows a stored place clamped inside a smaller workspace and keeps it stored", () => {
         const ws = workspaceWith(1);
         ws.setMagnifier({ on: true, x: 900, y: 600 });
