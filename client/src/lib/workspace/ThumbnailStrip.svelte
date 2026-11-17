@@ -19,6 +19,7 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
     import Copy from "carbon-icons-svelte/lib/Copy.svelte";
     import { IMAGE_MIME } from "./dragTypes";
     import { titleText, type ViewportTitle } from "./imageMeta";
+    import { STRIP_PX } from "./magnifier";
     import { rovingIndex } from "./rovingIndex";
     import type { Workspace } from "./workspace.svelte";
 
@@ -102,7 +103,12 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
     }
 </script>
 
-<ul bind:this={strip} class="strip" aria-label="Thumbnails">
+<ul
+    bind:this={strip}
+    class="strip"
+    style="height: {STRIP_PX}px;"
+    aria-label="Thumbnails"
+>
     {#each workspace.catalogue as imageId, i (imageId)}
         {@const title = titleFor(imageId)}
         {@const slots = slotNumbers[imageId]}
@@ -171,7 +177,6 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
         display: flex;
         flex: none;
         gap: 2px;
-        height: 104px;
         overflow-x: auto;
         overflow-y: hidden;
     }

@@ -81,6 +81,7 @@ It moves only when the grader drags its gripper or clicks it for the next corner
     const area = $derived({ width, height });
     const panel = $derived({ width: panelWidth, height: panelHeight });
     // Below the strip and the top-right viewport's titlebar, above the bottom viewport's view bar.
+    // ASSUMPTION: the spec names only the toast insets; these are their canvas equivalents with the titlebar and strip added.
     const places = $derived(
         corners(area, panel, {
             top: (workspace.strip ? STRIP_PX : 0) + 32,
