@@ -24,7 +24,7 @@ import { cased, casedText } from "../overlays/casing";
 const defaultStroke = "rgba(0, 255, 0, 1)";
 const fillStyle = "rgba(255, 255, 255, 0.6)";
 /** Viewer-pixel movement before a press on a point becomes a drag. */
-const CLICK_DRAG_THRESHOLD_PX = 4;
+export const CLICK_DRAG_THRESHOLD_PX = 4;
 
 export type PointToolOptions = {
     canEdit?: boolean;

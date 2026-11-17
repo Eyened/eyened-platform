@@ -17,6 +17,14 @@ import type { Workspace } from "./workspace.svelte";
 import WorkspaceFrame from "./WorkspaceFrame.svelte";
 import type { TaskHeader } from "./WorkspaceHeader.svelte";
 
+// The Magnifier's viewer reaches cornerstone's WADO loader, which throws on import under jsdom.
+vi.mock("cornerstone-wado-image-loader", () => ({
+    external: {},
+    configure: vi.fn(),
+}));
+vi.mock("cornerstone-core", () => ({}));
+vi.mock("dicom-parser", () => ({}));
+
 const viewer = createRawSnippet((imageId: () => string) => ({
     render: () => `<div data-testid="viewer-${imageId()}"></div>`,
 }));

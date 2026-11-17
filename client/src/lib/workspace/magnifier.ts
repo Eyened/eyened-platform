@@ -69,3 +69,48 @@ export function magnifierFeed(
         },
     };
 }
+
+/** The thumbnail strip's height, in px. */
+export const STRIP_PX = 104;
+
+export interface Box {
+    width: number;
+    height: number;
+}
+
+export interface Insets {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+}
+
+/** The four corner places, in the order a gripper click visits them. */
+export function corners(area: Box, panel: Box, inset: Insets): Point[] {
+    const right = area.width - panel.width - inset.right;
+    const bottom = area.height - panel.height - inset.bottom;
+    return [
+        { x: right, y: inset.top },
+        { x: right, y: bottom },
+        { x: inset.left, y: bottom },
+        { x: inset.left, y: inset.top },
+    ];
+}
+
+/** Where a place shows inside the area; the stored place is left as it is. */
+export function clampInto(p: Point, area: Box, panel: Box): Point {
+    const clamp = (v: number, max: number) =>
+        Math.min(Math.max(v, 0), Math.max(max, 0));
+    return {
+        x: clamp(p.x, area.width - panel.width),
+        y: clamp(p.y, area.height - panel.height),
+    };
+}
+
+/** The corner after the one the panel is at; top-right from anywhere else. */
+export function nextCorner(current: Point, places: Point[]): Point {
+    const i = places.findIndex(
+        (c) => Math.abs(c.x - current.x) < 1 && Math.abs(c.y - current.y) < 1,
+    );
+    return places[(i + 1) % places.length];
+}

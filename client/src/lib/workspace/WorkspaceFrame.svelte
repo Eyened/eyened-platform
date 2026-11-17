@@ -21,6 +21,7 @@ Below md there are no icon columns: a menu button opens the left column's conten
     import { titleText, type ViewportTitle } from "./imageMeta";
     import ImagesListShell from "./ImagesListShell.svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
+    import MagnifierPanel from "./MagnifierPanel.svelte";
     import Pager from "./Pager.svelte";
     import { GAP_PX } from "./tools/paletteLayout";
     import ToolOptionsBar from "./tools/ToolOptionsBar.svelte";
@@ -104,6 +105,9 @@ Below md there are no icon columns: a menu button opens the left column's conten
     let railHeight = $state(0);
     let bottomHeight = $state(0);
     const paletteSpace = $derived(railHeight - bottomHeight - GAP_PX);
+    // The Magnifier is placed and clamped inside the canvas.
+    let canvasWidth = $state(0);
+    let canvasHeight = $state(0);
 
     const LEFT_PANELS = [
         { id: "images", label: "Images", Icon: Image },
@@ -431,7 +435,12 @@ Below md there are no icon columns: a menu button opens the left column's conten
         {/each}
     </div>
     <div class="tool-options" inert={overlayOpen}><ToolOptionsBar /></div>
-    <main class="canvas" inert={overlayOpen}>
+    <main
+        class="canvas"
+        inert={overlayOpen}
+        bind:clientWidth={canvasWidth}
+        bind:clientHeight={canvasHeight}
+    >
         {#if emptyMessage}
             <p class="m-8 text-body-compact-01 text-text-primary">
                 {emptyMessage}
@@ -441,6 +450,11 @@ Below md there are no icon columns: a menu button opens the left column's conten
                 <ThumbnailStrip {tile} {titleFor} />
             {/if}
             <ViewportGrid {viewer} {titleFor} onchooseimage={chooseImage} />
+            <MagnifierPanel
+                width={canvasWidth}
+                height={canvasHeight}
+                {titleFor}
+            />
         {/if}
     </main>
     <div class="pager" inert={overlayOpen}><Pager /></div>

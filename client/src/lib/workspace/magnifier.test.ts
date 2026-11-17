@@ -3,7 +3,7 @@ import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.s
 import { viewerOf } from "$lib/viewer/testViewer";
 import type { ViewerEvent } from "$lib/viewer/viewer-utils";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-import { magnifierFeed } from "./magnifier";
+import { clampInto, corners, magnifierFeed, nextCorner } from "./magnifier";
 import { Workspace } from "./workspace.svelte";
 
 vi.mock("$lib/webgl/imageRenderer", () => ({ BaseImageRenderer: class {} }));
@@ -43,5 +43,42 @@ describe("magnifierFeed", () => {
             viewerContext: a,
             inside: false,
         });
+    });
+});
+
+describe("magnifier place", () => {
+    const area = { width: 1000, height: 700 };
+    const panel = { width: 280, height: 360 };
+    const inset = { top: 32, right: 16, bottom: 40, left: 16 };
+
+    it("a gripper click visits top-right, bottom-right, bottom-left, top-left and round again; from a dragged place it goes to top-right", () => {
+        const places = corners(area, panel, inset);
+        expect(places).toEqual([
+            { x: 704, y: 32 },
+            { x: 704, y: 300 },
+            { x: 16, y: 300 },
+            { x: 16, y: 32 },
+        ]);
+        const seen = [];
+        let p = places[0];
+        for (let i = 0; i < 4; i++) {
+            p = nextCorner(p, places);
+            seen.push(p);
+        }
+        expect(seen).toEqual([places[1], places[2], places[3], places[0]]);
+        expect(nextCorner({ x: 300, y: 200 }, places)).toEqual(places[0]);
+    });
+
+    it("shows a stored place inside a smaller workspace", () => {
+        expect(
+            clampInto({ x: 900, y: 600 }, { width: 600, height: 400 }, panel),
+        ).toEqual({ x: 320, y: 40 });
+        expect(clampInto({ x: -20, y: 10 }, area, panel)).toEqual({
+            x: 0,
+            y: 10,
+        });
+        expect(
+            clampInto({ x: 50, y: 50 }, { width: 200, height: 200 }, panel),
+        ).toEqual({ x: 0, y: 0 });
     });
 });
