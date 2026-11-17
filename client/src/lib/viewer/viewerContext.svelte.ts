@@ -382,16 +382,13 @@ export class ViewerContext {
         this.transform = transform;
     }
 
-    /** Centre an image point at a multiple of the fit scale. */
-    focusFromFit(x: number, y: number, factor: number) {
-        this.initTransform();
+    /** Centre an image point at a multiple of another viewer's scale; both show this image with the same stretch. */
+    focusFrom(source: ViewerContext, x: number, y: number, factor: number) {
         const { width: w, height: h } = this.viewerSize;
-        this.transform = this.transform
-            .pan(this.imageToViewerCoordinates({ x, y }), {
-                x: w / 2,
-                y: h / 2,
-            })
-            .zoom(w / 2, h / 2, factor);
+        const centre = { x: w / 2, y: h / 2 };
+        this.transform = source.transform
+            .pan(source.imageToViewerCoordinates({ x, y }), centre)
+            .zoom(centre.x, centre.y, factor);
     }
 
     get aspectRatio() {

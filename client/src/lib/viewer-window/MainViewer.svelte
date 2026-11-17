@@ -7,7 +7,6 @@
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import SliceScrollbar from "$lib/viewer/SliceScrollbar.svelte";
     import ViewControls from "$lib/viewer/ViewControls.svelte";
-    import type { ViewerEvent } from "$lib/viewer/viewer-utils";
     import Viewer from "$lib/viewer/Viewer.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
@@ -18,6 +17,7 @@
     import { getContext, onDestroy, setContext, untrack } from "svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
+    import { magnifierFeed } from "$lib/workspace/magnifier";
     import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import { FeaturePipetteOverlay } from "./panelSegmentation/FeaturePipetteOverlay";
     import { pointArming } from "$lib/forms/pointArming.svelte";
@@ -109,6 +109,21 @@
 
     // While mounted, this viewport is a source for its OCT's projection; the newest one wins.
     const position = getContext<(() => number) | undefined>("viewportPosition");
+
+    onDestroy(
+        viewerContext.addOverlay(
+            magnifierFeed(
+                workspace,
+                mainViewerContext,
+                () => position?.() ?? null,
+            ),
+        ),
+    );
+    // The Magnifier never paints from a viewer that is gone.
+    onDestroy(() => {
+        if (workspace.magnifierSource?.viewerContext === viewerContext)
+            workspace.magnifierSource = null;
+    });
     if (image.is3D) {
         const enfaceManager = viewerWindowContext.enfaceProjectionManagers.get(
             image.instance.id,
@@ -127,33 +142,6 @@
             new FeaturePipetteOverlay(mainViewerContext, globalContext.user.id),
         ),
     );
-
-    const topViewer = viewerWindowContext.topViewers.get(image)!;
-
-    // The tile's zoom on hover, as a multiple of its own fit.
-    const TWIN_ZOOM = 3;
-
-    const followCursor = {
-        pointermove(e: ViewerEvent<PointerEvent>) {
-            if (!viewerWindowContext.viewState.stripTracking) return;
-            const p = e.viewerContext.viewerToImageCoordinates(e.cursor);
-            topViewer.focusFromFit(p.x, p.y, TWIN_ZOOM);
-        },
-        pointerleave() {
-            topViewer.initTransform();
-        },
-    };
-
-    onDestroy(viewerContext.addOverlay(followCursor));
-
-    // Switching Crosshair tracking off returns the tile to its fit.
-    $effect(() => {
-        if (!viewerWindowContext.viewState.stripTracking)
-            untrack(() => topViewer.initTransform());
-    });
-    onDestroy(() => {
-        topViewer.initTransform();
-    });
 
     // The OCT projections this image shows: its own `_proj`, or linked by registration; in strip order.
     // resolveEnfaceOverlaySources reads registration.revision, so this re-runs when registrations import.

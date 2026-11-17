@@ -1,5 +1,7 @@
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
+import type { ViewerEventListener } from "$lib/viewer/viewer-utils";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+import type { Workspace } from "./workspace.svelte";
 
 export const MAGNIFIER_ZOOMS = [2, 3, 4, 6] as const;
 export type MagnifierZoom = (typeof MAGNIFIER_ZOOMS)[number];
@@ -40,4 +42,30 @@ export interface MagnifierSource {
     y: number;
     /** False once the pointer has left that viewport. */
     inside: boolean;
+}
+
+/** A main viewer's pointer overlay: moves set the Magnifier's source, also during a stroke; a leave keeps the last view, dimmed. */
+export function magnifierFeed(
+    workspace: Pick<Workspace, "magnifierSource">,
+    mainViewerContext: MainViewerContext,
+    position: () => number | null,
+): ViewerEventListener {
+    return {
+        pointermove({ viewerContext, cursor }) {
+            const p = viewerContext.viewerToImageCoordinates(cursor);
+            workspace.magnifierSource = {
+                viewerContext,
+                mainViewerContext,
+                position: position(),
+                x: p.x,
+                y: p.y,
+                inside: true,
+            };
+        },
+        pointerleave({ viewerContext }) {
+            const source = workspace.magnifierSource;
+            if (source?.viewerContext === viewerContext)
+                workspace.magnifierSource = { ...source, inside: false };
+        },
+    };
 }

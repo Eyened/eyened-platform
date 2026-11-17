@@ -5,20 +5,26 @@ import type { ViewerContext } from "./viewerContext.svelte";
 
 vi.mock("$lib/webgl/imageRenderer", () => ({ BaseImageRenderer: class {} }));
 
-describe("focusFromFit", () => {
-    it("centres the point at a multiple of the fit scale, whatever the current zoom", () => {
-        const viewer = viewerOf("bscan");
-        viewer.viewerSize = { width: 132, height: 80 };
-        viewer.initTransform();
-        const fit = viewer.transform.a;
-        viewer.zoom(10, 10, 7);
+describe("focusFrom", () => {
+    it("centres an image point at a multiple of the source viewer's on-screen scale", () => {
+        const source = viewerOf("bscan");
+        source.viewerSize = { width: 400, height: 300 };
+        source.initTransform();
+        source.zoom(10, 10, 1.7);
+        const panel = viewerOf("bscan");
+        panel.viewerSize = { width: 260, height: 260 };
 
-        viewer.focusFromFit(100, 200, 3);
+        panel.focusFrom(source, 100, 200, 3);
 
-        expect(viewer.transform.a).toBeCloseTo(3 * fit);
-        const centre = viewer.imageToViewerCoordinates({ x: 100, y: 200 });
-        expect(centre.x).toBeCloseTo(66);
-        expect(centre.y).toBeCloseTo(40);
+        expect(panel.imageViewerTransform.a).toBeCloseTo(
+            3 * source.imageViewerTransform.a,
+        );
+        expect(panel.imageViewerTransform.e).toBeCloseTo(
+            3 * source.imageViewerTransform.e,
+        );
+        const centre = panel.imageToViewerCoordinates({ x: 100, y: 200 });
+        expect(centre.x).toBeCloseTo(130);
+        expect(centre.y).toBeCloseTo(130);
     });
 });
 
