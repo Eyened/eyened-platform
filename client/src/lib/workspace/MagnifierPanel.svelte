@@ -7,6 +7,7 @@ It moves only when the grader drags its gripper or clicks it for the next corner
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { ToggleGroup } from "$lib/components/ui/toggle-group/index.js";
     import { CLICK_DRAG_THRESHOLD_PX } from "$lib/viewer/tools/PointTool.svelte";
+    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import Close from "carbon-icons-svelte/lib/Close.svelte";
     import Draggable from "carbon-icons-svelte/lib/Draggable.svelte";
     import { getContext } from "svelte";
@@ -63,6 +64,17 @@ It moves only when the grader drags its gripper or clicks it for the next corner
             .filter(Boolean)
             .join(" · ");
     });
+
+    // One view per source viewport: a new view compiles its own shaders, and nothing deletes them.
+    const views = new WeakMap<ViewerContext, ViewerContext>();
+    function viewFor(from: ViewerContext): ViewerContext {
+        let view = views.get(from);
+        if (!view) {
+            view = new ViewerContext(from.image, from.viewerWindowContext);
+            views.set(from, view);
+        }
+        return view;
+    }
 
     let panelWidth = $state(0);
     let panelHeight = $state(0);
@@ -181,7 +193,10 @@ It moves only when the grader drags its gripper or clicks it for the next corner
         >
             {#if source}
                 {#key source.viewerContext}
-                    <MagnifierView {source} />
+                    <MagnifierView
+                        {source}
+                        view={viewFor(source.viewerContext)}
+                    />
                 {/key}
             {/if}
         </div>

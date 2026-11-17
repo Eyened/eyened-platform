@@ -3,12 +3,21 @@ import { tick } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 import { viewerOf } from "$lib/viewer/testViewer";
+import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import MagnifierPanel from "./MagnifierPanel.svelte";
 import { expectNoAxeViolations, workspaceWith } from "./testUtils";
 import type { Workspace } from "./workspace.svelte";
 import { readMagnifier } from "./workspacePrefs";
 
-vi.mock("$lib/webgl/imageRenderer", () => ({ BaseImageRenderer: class {} }));
+// Counts image renderers: each one compiles four shader programs.
+const renderers = vi.hoisted(() => ({ built: 0 }));
+vi.mock("$lib/webgl/imageRenderer", () => ({
+    BaseImageRenderer: class {
+        constructor() {
+            renderers.built++;
+        }
+    },
+}));
 vi.mock("cornerstone-wado-image-loader", () => ({
     external: {},
     configure: vi.fn(),
@@ -129,5 +138,31 @@ describe("MagnifierPanel", () => {
         expect(container.querySelector(".viewer")).not.toBeNull();
         expect(container.querySelector(".view")).toHaveClass("dimmed");
         expect(region()).toHaveTextContent("Viewport 1");
+    });
+
+    it("builds one view per source viewport: going back to a viewport builds no new renderer", async () => {
+        const ws = workspaceWith(2);
+        ws.setMagnifier({ on: true });
+        renderPanel(ws);
+        const a = viewerOf("colour", { workspace: ws, imageId: "a" });
+        const b = viewerOf("grey", { workspace: ws, imageId: "b" });
+        const over = (viewerContext: ViewerContext) => {
+            ws.magnifierSource = {
+                viewerContext,
+                mainViewerContext: {
+                    repaint() {},
+                } as unknown as MainViewerContext,
+                position: 0,
+                x: 10,
+                y: 10,
+                inside: true,
+            };
+            return tick();
+        };
+        const before = renderers.built;
+        await over(a);
+        await over(b);
+        await over(a);
+        expect(renderers.built - before).toBe(2);
     });
 });

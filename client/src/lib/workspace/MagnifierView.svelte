@@ -1,7 +1,7 @@
 <!--
 @component
 The Magnifier's view of one source viewport: its own viewer on the same image, centred on the pointer.
-Mount it keyed on the source viewport.
+Mount it keyed on the source viewport, with that viewport's view; each mount adds its overlays and removes them on destroy.
 -->
 <script lang="ts">
     import {
@@ -10,17 +10,20 @@ Mount it keyed on the source viewport.
     } from "$lib/viewer/overlays/magnifierOverlays";
     import type { Overlay } from "$lib/viewer/viewer-utils";
     import Viewer from "$lib/viewer/Viewer.svelte";
-    import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext, onDestroy, setContext, untrack } from "svelte";
     import type { MagnifierSource } from "./magnifier";
     import type { Workspace } from "./workspace.svelte";
 
-    let { source }: { source: MagnifierSource } = $props();
+    let {
+        source,
+        view: given,
+    }: { source: MagnifierSource; view: ViewerContext } = $props();
 
     const workspace = getContext<Workspace>("workspace");
     // Keyed on the source viewport, so it never changes while mounted.
     const from = untrack(() => source.viewerContext);
-    const view = new ViewerContext(from.image, from.viewerWindowContext);
+    const view = untrack(() => given);
     // The pointer is over the source, so the shared crosshair stays out of the panel; the mark shows the centre.
     view.active = true;
     setContext("viewerContext", view);
