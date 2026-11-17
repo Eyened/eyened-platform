@@ -60,7 +60,7 @@ export class ViewerWindowContext {
     /** Blend looks per image and role, kept for the page session. */
     public readonly blendStyles = new BlendStyles();
     /** "#2", "#3"… by image id for same-titled images of another instance, in strip order; the strip, the viewports and Layers all read this one map. */
-    twins = $derived.by(() =>
+    public readonly twins = $derived.by(() =>
         twinNumbers(
             this.workspace.catalogue,
             (id) => this.images.get(id)?.instance,
