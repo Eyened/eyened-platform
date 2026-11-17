@@ -14,6 +14,7 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
     } from "$lib/config/clientDefaults";
     import { Workspace } from "$lib/workspace/workspace.svelte";
     import {
+        readMagnifier,
         readStripTracking,
         readToolMode,
         startStripOn,
@@ -75,6 +76,7 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
         writeUrl: urlWriter.write,
         strip,
         stripTracking: readStripTracking(),
+        magnifier: readMagnifier(),
         // A task always offers every tool (no switcher); /view starts in the stored mode.
         toolMode: taskContext ? "all" : readToolMode(),
     });
