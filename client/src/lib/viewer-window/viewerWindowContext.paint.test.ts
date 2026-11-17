@@ -137,6 +137,13 @@ describe("ViewerWindowContext registration editor paint", () => {
         ctx.syncMainPanelsToViewState();
         expect(setOpenViewers).toHaveBeenCalledWith([{ id: "vol", index: 7 }]);
     });
+
+    it("returns an image load that is already in flight", () => {
+        ctx = createContext();
+        const pending = Promise.resolve([]);
+        ctx.imageLoads.set("inst-1", { promise: pending } as never);
+        expect(ctx.getImages("inst-1")).toBe(pending);
+    });
 });
 
 vi.mock("@cornerstonejs/codec-openjpeg/decodewasmjs", () => ({

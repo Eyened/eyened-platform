@@ -47,10 +47,9 @@ export function createVolumeImage(
     }
 
     if (fitsTexture3D(dimensions, limits)) {
+        const flowLabel = flowData ? " +flow" : "";
         console.info(
-            `[volume] image ${img_id}: ${width}x${height}x${depth}` +
-                (flowData ? " +flow" : "") +
-                ` → Image3D`,
+            `[volume] image ${img_id}: ${width}x${height}x${depth}${flowLabel} → Image3D`,
         );
         return new Image3D(
             instance,
@@ -64,10 +63,9 @@ export function createVolumeImage(
     }
 
     assertSliceStackFits(dimensions, limits);
+    const flowLabel = flowData ? " +flow" : "";
     console.info(
-        `[volume] image ${img_id}: ${width}x${height}x${depth}` +
-            (flowData ? " +flow" : "") +
-            ` → ImageSliceStack`,
+        `[volume] image ${img_id}: ${width}x${height}x${depth}${flowLabel} → ImageSliceStack`,
     );
     return new ImageSliceStack(
         instance,
