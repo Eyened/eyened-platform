@@ -103,6 +103,16 @@ describe("decodeDicomBuffer", () => {
         expect(decoded.volume[12]).toBe(66);
     });
 
+    it("decodes JPEG Lossless when the basic offset table is empty", async () => {
+        const decoded = await decodeDicomBuffer(
+            loadFixture("jpeg_lossless_2frames_empty_bot.dcm"),
+        );
+        expect(decoded.transferSyntax).toBe(TRANSFER_SYNTAX.JPEGLossless);
+        expect(decoded.volume.length).toBe(24);
+        expect(decoded.volume[0]).toBe(55);
+        expect(decoded.volume[12]).toBe(66);
+    });
+
     it("decodes JPEG 2000 with the real OpenJPEG codec", async () => {
         const decoded = await decodeDicomBuffer(loadFixture("j2k_2frames.dcm"));
         expect(decoded.volume.length).toBe(24);

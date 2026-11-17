@@ -209,12 +209,13 @@ async function decodeEncapsulatedFrames(
     const indices = Array.from({ length: depth }, (_, i) => i);
     const limit = concurrency ?? dicomDecodeConcurrency();
     await mapPool(indices, limit, async (frameIndex) => {
-        const compressed = dicomParser.readEncapsulatedImageFrame(
+        const compressed = readEncapsulatedFrame(
             dataSet,
             pixelElement,
             frameIndex,
+            depth,
         );
-        const frame = await decodeFrame(toUint8(compressed));
+        const frame = await decodeFrame(compressed);
         if (frame.length !== frameSize) {
             throw new Error(
                 `Frame ${frameIndex} length ${frame.length} != ${frameSize}`,
@@ -223,6 +224,53 @@ async function decodeEncapsulatedFrames(
         volume.set(frame, frameIndex * frameSize);
     });
     return volume;
+}
+
+/**
+ * Encapsulated Pixel Data may omit the Basic Offset Table (DICOM PS3.5 A.4).
+ * Heidelberg Spectralis does this; dicom-parser's readEncapsulatedImageFrame
+ * then throws. Same fallbacks as Cornerstone WADO Image Loader.
+ */
+function readEncapsulatedFrame(
+    dataSet: dicomParser.DataSet,
+    pixelElement: dicomParser.Element,
+    frameIndex: number,
+    depth: number,
+): Uint8Array {
+    const bot = pixelElement.basicOffsetTable;
+    if (bot && bot.length > 0) {
+        return toUint8(
+            dicomParser.readEncapsulatedImageFrame(
+                dataSet,
+                pixelElement,
+                frameIndex,
+            ),
+        );
+    }
+
+    const fragments = pixelElement.fragments ?? [];
+    if (fragments.length !== depth) {
+        const reconstructed = dicomParser.createJPEGBasicOffsetTable(
+            dataSet,
+            pixelElement,
+        );
+        return toUint8(
+            dicomParser.readEncapsulatedImageFrame(
+                dataSet,
+                pixelElement,
+                frameIndex,
+                reconstructed,
+            ),
+        );
+    }
+
+    return toUint8(
+        dicomParser.readEncapsulatedPixelDataFromFragments(
+            dataSet,
+            pixelElement,
+            frameIndex,
+        ),
+    );
 }
 
 function bytesPerSample(bitsAllocated: number): number {

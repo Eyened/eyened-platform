@@ -38,6 +38,18 @@ declare module "dicom-parser" {
         basicOffsetTable?: number[],
         fragments?: Fragment[],
     ): ByteArray;
+    export function readEncapsulatedPixelDataFromFragments(
+        dataSet: DataSet,
+        pixelDataElement: Element,
+        startFragmentIndex: number,
+        numFragments?: number,
+        fragments?: Fragment[],
+    ): ByteArray;
+    export function createJPEGBasicOffsetTable(
+        dataSet: DataSet,
+        pixelDataElement: Element,
+        fragments?: Fragment[],
+    ): number[];
 }
 
 declare module "jpeg-lossless-decoder-js" {
