@@ -45,9 +45,16 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     // ASSUMPTION: the selected viewport's controls follow it in Tab order (plan decision 2).
     const tab = $derived(selected ? 0 : -1);
     const shownTitle = $derived(slot.imageId ? title : null);
-    // The viewport's own addition, e.g. "· blended with FAF · 2024-03-12"; visual only.
+    // The viewport's own addition, e.g. "· blended with FAF · 2024-03-12"; shown in the title and its tooltip, not in the viewport's name.
     const titleSuffix = $derived(
         workspace.handleAt(position)?.titleSuffix ?? null,
+    );
+    const tooltipText = $derived(
+        [
+            shownTitle ? titleText(shownTitle) : "",
+            titleSuffix?.rest ?? "",
+            titleSuffix?.twin ? ` ${titleSuffix.twin}` : "",
+        ].join(""),
     );
     const emptyTitle = $derived(workspace.loaded ? "Empty" : "Loading…");
     const name = $derived(
@@ -252,7 +259,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                     {/snippet}
                 </Tooltip.Trigger>
                 {#if shownTitle}
-                    <Tooltip.Content>{titleText(shownTitle)}</Tooltip.Content>
+                    <Tooltip.Content>{tooltipText}</Tooltip.Content>
                 {/if}
             </Tooltip.Root>
         </Tooltip.Provider>
