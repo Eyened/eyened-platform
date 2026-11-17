@@ -25,12 +25,10 @@
 </script>
 
 <Button
-    variant="outline"
+    variant="ghost"
     size="sm"
+    class="tabular-nums"
     onclick={() => measureTool.setResolution(val)}
-    class="flex-1 justify-center"
 >
-    From {name}
-    <br />
-    {val.toFixed(2)} μm/pix
+    From {name}: {val.toFixed(2)} µm/px
 </Button>

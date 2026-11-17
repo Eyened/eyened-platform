@@ -6,25 +6,19 @@ import {
 } from "./taskConfigLayout";
 
 vi.mock("./panelInfo/panelInfo.svelte", () => ({ default: {} }));
-vi.mock("./panelETRDS/PanelETDRS.svelte", () => ({ default: {} }));
 vi.mock("./panelRegistration/PanelRegistration.svelte", () => ({
     default: {},
 }));
-vi.mock("./panelMeasure/PanelMeasure.svelte", () => ({ default: {} }));
 vi.mock("./panelForm/PanelForm.svelte", () => ({ default: {} }));
 vi.mock("./panelQuickForm/PanelQuickForm.svelte", () => ({ default: {} }));
 vi.mock("./icons/icons", () => ({
     Info: {},
     Rendering: {},
-    ETDRS: {},
     Registration: {},
     Form: {},
 }));
-vi.mock("./icons/Measure.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/InfoPanelHelp.svelte", () => ({ default: {} }));
-vi.mock("./panelHelp/EtdrsPanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/RegistrationPanelHelp.svelte", () => ({ default: {} }));
-vi.mock("./panelHelp/MeasurePanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/FormPanelHelp.svelte", () => ({ default: {} }));
 
 const { resolvePanels } = await import("./resolvePanels");
@@ -41,7 +35,7 @@ describe("resolvePanels", () => {
             baseInput,
             CLIENT_DEFAULTS,
         );
-        expect(panels.map((p) => p.name)).toEqual(["Info", "Measure", "Form"]);
+        expect(panels.map((p) => p.name)).toEqual(["Info", "Form"]);
         expect(expandedPanelNames).toEqual([]);
     });
 
@@ -74,11 +68,11 @@ describe("resolvePanels", () => {
 
     it("returns defaults immediately when taskConfig has no layout object", () => {
         const { panels, expandedPanelNames } = resolvePanels(baseInput);
-        expect(panels.map((p) => p.name)).toEqual(["Info", "Measure", "Form"]);
+        expect(panels.map((p) => p.name)).toEqual(["Info", "Form"]);
         expect(expandedPanelNames).toEqual([]);
     });
 
-    it("includes ETDRS and Registration when 2D schemas are present", () => {
+    it("includes Registration when its 2D schema is present", () => {
         const { panels } = resolvePanels({
             is2D: true,
             etdrsSchema: { id: 1, name: "etdrs" } as never,
@@ -86,9 +80,7 @@ describe("resolvePanels", () => {
         });
         expect(panels.map((p) => p.name)).toEqual([
             "Info",
-            "ETDRS",
             "Registration",
-            "Measure",
             "Form",
         ]);
     });

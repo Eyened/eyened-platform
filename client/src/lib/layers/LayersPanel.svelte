@@ -13,6 +13,10 @@ The Layers panel body: the selected viewport's name, then the sections that appl
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import { getContext } from "svelte";
     import LayersContexts from "./LayersContexts.svelte";
+    import {
+        readLayerSections,
+        writeLayerSections,
+    } from "$lib/workspace/workspacePrefs";
     import { layerSections, type LayerSectionId } from "./layerSections";
 
     let {
@@ -55,13 +59,12 @@ The Layers panel body: the selected viewport's name, then the sections that appl
             : workspace.loaded && !workspace.slots[workspace.selected]?.imageId,
     );
 
-    // Kept here, not per viewport, so a section stays open when the selection moves.
-    let open: Record<LayerSectionId, boolean> = $state({
-        segmentations: true,
-        etdrs: false,
-        pointsets: false,
-        distance: false,
-    });
+    // Kept here, not per viewport, so a section stays open when the selection moves; saved for the next visit.
+    let open: Record<LayerSectionId, boolean> = $state(readLayerSections());
+    function toggle(id: LayerSectionId) {
+        open = { ...open, [id]: !open[id] };
+        writeLayerSections(open);
+    }
 </script>
 
 <p class="px-4 pb-2 text-helper-text-01 text-text-secondary">{subtitle}</p>
@@ -69,12 +72,6 @@ The Layers panel body: the selected viewport's name, then the sections that appl
     <p class="px-4 text-body-compact-01 text-text-secondary">No layers</p>
 {:else if target && sections.length > 0}
     {#key target}
-        <LayersContexts
-            {target}
-            {sections}
-            {shown}
-            {open}
-            ontoggle={(id) => (open = { ...open, [id]: !open[id] })}
-        />
+        <LayersContexts {target} {sections} {shown} {open} ontoggle={toggle} />
     {/key}
 {/if}
