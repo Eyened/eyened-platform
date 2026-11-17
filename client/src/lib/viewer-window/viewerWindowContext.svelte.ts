@@ -17,7 +17,6 @@ import type { Image3D } from "$lib/webgl/image3D";
 import type { WebGL } from "$lib/webgl/webgl";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
-import MainViewer from "./MainViewer.svelte";
 import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
 import type { ViewerViewStateController } from "./viewerViewState";
 import { instanceIdFromImageId } from "./viewerViewState";
@@ -25,6 +24,9 @@ import type {
     RegistrationEditorSession,
     SeriesBlendSession,
 } from "./panelRegistration/registrationSession";
+
+const loadMainViewer = () =>
+    import("./MainViewer.svelte").then((m) => m.default);
 
 export type MainPanelType = {
     component: any;
@@ -76,6 +78,7 @@ export class ViewerWindowContext {
     ) {
         this.imageLoader = new ImageLoader(webgl);
         this.viewState = viewState;
+        void loadMainViewer();
 
         // start rendering loop
         const loop = () => {
@@ -325,13 +328,17 @@ export class ViewerWindowContext {
     }
 
     addImagePanel(image: AbstractImage) {
-        this.mainPanels.push({ component: MainViewer, props: { image } });
-        this.syncMainPanelsToViewState();
+        void loadMainViewer().then((component) => {
+            this.mainPanels.push({ component, props: { image } });
+            this.syncMainPanelsToViewState();
+        });
     }
 
     setImagePanel(image: AbstractImage) {
-        this.mainPanels = [{ component: MainViewer, props: { image } }];
-        this.syncMainPanelsToViewState();
+        void loadMainViewer().then((component) => {
+            this.mainPanels = [{ component, props: { image } }];
+            this.syncMainPanelsToViewState();
+        });
     }
 
     /** Open the first image shown in the top row (first slice of the first instance). */
@@ -370,6 +377,7 @@ export class ViewerWindowContext {
      * (task grade does not preload the instances store the way /view does).
      */
     async restoreMainViewersFromViewState() {
+        const mainViewer = await loadMainViewer();
         const pending = this.viewState?.getViewers() ?? [];
         if (pending.length) {
             const results = await Promise.allSettled(
@@ -386,7 +394,7 @@ export class ViewerWindowContext {
                 result.status === "fulfilled" && result.value
                     ? [
                           {
-                              component: MainViewer,
+                              component: mainViewer,
                               props: { image: result.value },
                           },
                       ]
@@ -406,7 +414,7 @@ export class ViewerWindowContext {
         if (!this.instanceIds.length) return;
         const loaded = await this.getImages(this.instanceIds[0]);
         this.setPanel({
-            component: MainViewer,
+            component: mainViewer,
             props: { image: loaded[loaded.length - 1] },
         });
     }

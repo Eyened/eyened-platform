@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ImageGET } from "../../types/openapi_types";
 
-const attachFlow = vi.fn();
+const { attachFlow, volumeKind } = vi.hoisted(() => ({
+    attachFlow: vi.fn(),
+    volumeKind: { current: "3d" as "3d" | "2d" },
+}));
 
 vi.mock("$lib/webgl/image3D", () => ({
     Image3D: class Image3D {
@@ -24,8 +27,10 @@ vi.mock("$lib/webgl/imageSliceStack", () => ({
 
 vi.mock("$lib/webgl/createVolumeImage", async () => {
     const { Image3D } = await import("$lib/webgl/image3D");
+    const { Image2D } = await import("$lib/webgl/image2D");
     return {
-        createVolumeImage: () => new Image3D(),
+        createVolumeImage: () =>
+            volumeKind.current === "2d" ? new Image2D() : new Image3D(),
     };
 });
 
@@ -61,6 +66,7 @@ describe("ImageLoader OCTA", () => {
     beforeEach(() => {
         attachFlow.mockReset();
         decodeDicomBuffer.mockReset();
+        volumeKind.current = "3d";
         vi.stubGlobal(
             "fetch",
             vi.fn(async () => ({
@@ -93,6 +99,30 @@ describe("ImageLoader OCTA", () => {
             instance("angio_flow"),
         );
         expect(loaded).toHaveLength(1);
+        expect(attachFlow).not.toHaveBeenCalled();
+    });
+
+    it("does not fetch flow when structural is not a volume", async () => {
+        volumeKind.current = "2d";
+        decodeDicomBuffer.mockResolvedValueOnce(volume(8));
+        const { ImageLoader } = await import("./imageLoader");
+        const loaded = await new ImageLoader({} as never).load(
+            instance("angio_flow"),
+        );
+        expect(loaded).toHaveLength(1);
+        expect(decodeDicomBuffer).toHaveBeenCalledOnce();
+        expect(attachFlow).not.toHaveBeenCalled();
+    });
+
+    it("keeps structural when flow length does not match", async () => {
+        decodeDicomBuffer
+            .mockResolvedValueOnce(volume(8))
+            .mockResolvedValueOnce(volume(4));
+        const { ImageLoader } = await import("./imageLoader");
+        await new ImageLoader({} as never).load(instance("angio_flow"));
+        await vi.waitFor(() =>
+            expect(decodeDicomBuffer).toHaveBeenCalledTimes(2),
+        );
         expect(attachFlow).not.toHaveBeenCalled();
     });
 
