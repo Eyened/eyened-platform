@@ -68,6 +68,31 @@ def test_a_non_protocol_object_fails_load(tmp_path: Path):
         load_extensions(tmp_path)
 
 
+def test_a_class_object_fails_load(tmp_path: Path):
+    _write(
+        tmp_path,
+        "cls.py",
+        "class Registry:\n    name = 'Registry'\n"
+        "    def applies(self, ctx): return True\n"
+        "    def fetch(self, ctx): return None\n"
+        "extensions = [Registry]\n",
+    )
+    with pytest.raises(ExtensionLoadError, match="cls.py"):
+        load_extensions(tmp_path)
+
+
+def test_imported_module_is_registered_before_exec(tmp_path: Path):
+    _write(
+        tmp_path,
+        "reg.py",
+        VALID_MODULE
+        + "import sys\n"
+        + "assert __name__ in sys.modules\n",
+    )
+    loaded = load_extensions(tmp_path)
+    assert [e.name for e in loaded] == ["Registry"]
+
+
 def test_empty_name_fails_load(tmp_path: Path):
     _write(
         tmp_path,

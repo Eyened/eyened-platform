@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OPEN_EXTENSIONS_STORAGE_KEY } from "./openExtensionPrefs";
 
@@ -42,6 +42,17 @@ describe("AdditionalDataSources", () => {
         expect(fetchApi).toHaveBeenCalledWith(
             "/studies/7/data-sources/Registry",
         );
+        expect(localStorage.getItem(OPEN_EXTENSIONS_STORAGE_KEY)).toBe(
+            JSON.stringify(["Registry", "Folded"]),
+        );
+
+        await fireEvent.click(screen.getByRole("button", { name: "Registry" }));
+
+        await vi.waitFor(() => {
+            expect(localStorage.getItem(OPEN_EXTENSIONS_STORAGE_KEY)).toBe(
+                JSON.stringify(["Folded"]),
+            );
+        });
     });
 
     it("restores the open set from localStorage", async () => {

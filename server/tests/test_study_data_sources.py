@@ -153,9 +153,36 @@ def test_invalid_envelope_is_502(client, sources, registry, studies):
 
 def test_a_slow_fetch_is_502(client, sources, registry, studies, monkeypatch):
     monkeypatch.setattr(study_service, "FETCH_TIMEOUT", 0.05)
-    registry.sleep_s = 0.3
+    registry.sleep_s = 0.4
 
+    started = time.perf_counter()
     response = client.get(f"/studies/{studies['Alpha']['study']}/data-sources/Registry")
+    elapsed = time.perf_counter() - started
 
     assert response.status_code == 502
+    assert elapsed < 0.25
     assert "a/b c" not in response.text
+
+
+def test_one_broken_applies_still_lists_the_other(client, monkeypatch, studies, caplog):
+    @dataclass
+    class Boom:
+        name: str = "Boom"
+
+        def applies(self, ctx: ExtensionContext) -> bool:
+            raise RuntimeError(ctx.patient_identifier)
+
+        def fetch(self, ctx: ExtensionContext) -> TablesContribution | None:
+            return None
+
+    good = Registry()
+    monkeypatch.setattr(study_service, "get_extensions", lambda: (Boom(), good))
+
+    with caplog.at_level("WARNING"):
+        response = client.get(f"/studies/{studies['Alpha']['study']}/data-sources")
+
+    assert response.status_code == 200
+    assert response.json() == [{"name": "Registry"}]
+    assert "Boom" in caplog.text
+    assert "RuntimeError" in caplog.text
+    assert "a/b c" not in caplog.text

@@ -39,7 +39,15 @@ export function loadDataSource(
 export function isTablesContribution(
     data: unknown,
 ): data is TablesContribution {
-    if (typeof data !== "object" || data === null) return false;
+    if (typeof data !== "object" || data === null || Array.isArray(data)) {
+        return false;
+    }
     const record = data as { kind?: unknown; groups?: unknown };
-    return record.kind === "tables" && typeof record.groups === "object";
+    const groups = record.groups;
+    return (
+        record.kind === "tables" &&
+        typeof groups === "object" &&
+        groups !== null &&
+        !Array.isArray(groups)
+    );
 }

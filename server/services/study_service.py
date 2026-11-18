@@ -246,7 +246,20 @@ class StudyService:
 
     def _extensions_for(self, study: Study) -> list[StudyExtension]:
         ctx = self._context(study)
-        return [e for e in get_extensions() if e.applies(ctx)]
+        matched: list[StudyExtension] = []
+        for extension in get_extensions():
+            try:
+                applies = extension.applies(ctx)
+            except Exception as exc:
+                logger.warning(
+                    "Data source %s applies failed: %s",
+                    extension.name,
+                    type(exc).__name__,
+                )
+                continue
+            if applies:
+                matched.append(extension)
+        return matched
 
     def list_data_sources(self, study_id: int) -> list[StudyExtension]:
         """The extensions that apply to a study the actor can see.
@@ -272,15 +285,19 @@ class StudyService:
         )
         if extension is None:
             raise NotFoundError(f"Data source {name} not found")
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                result = pool.submit(extension.fetch, ctx).result(timeout=FETCH_TIMEOUT)
-        except concurrent.futures.TimeoutError:
-            logger.warning("Data source %s timed out", name)
-            raise UpstreamError(f"Data source {name} unavailable") from None
-        except Exception as exc:
-            logger.warning("Data source %s failed: %s", name, type(exc).__name__)
-            raise UpstreamError(f"Data source {name} unavailable") from None
+            future = pool.submit(extension.fetch, ctx)
+            try:
+                result = future.result(timeout=FETCH_TIMEOUT)
+            except concurrent.futures.TimeoutError:
+                logger.warning("Data source %s timed out", name)
+                raise UpstreamError(f"Data source {name} unavailable") from None
+            except Exception as exc:
+                logger.warning("Data source %s failed: %s", name, type(exc).__name__)
+                raise UpstreamError(f"Data source {name} unavailable") from None
+        finally:
+            pool.shutdown(wait=False)
         if result is None:
             raise NotFoundError(f"Data source {name} has no data for this study")
         try:

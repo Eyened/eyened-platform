@@ -6,6 +6,7 @@ This module must not live in that directory: a bind mount replaces it.
 from __future__ import annotations
 
 import importlib.util
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -60,7 +61,8 @@ class StudyExtension(Protocol):
 
 def _is_extension(obj: object) -> bool:
     return (
-        isinstance(obj, StudyExtension)
+        not isinstance(obj, type)
+        and isinstance(obj, StudyExtension)
         and isinstance(getattr(obj, "name", None), str)
         and bool(obj.name.strip())
     )
@@ -72,6 +74,7 @@ def _import_file(path: Path):
     if spec is None or spec.loader is None:
         raise ExtensionLoadError(f"Cannot import {path.name}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
