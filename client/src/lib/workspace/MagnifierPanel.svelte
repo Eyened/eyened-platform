@@ -44,11 +44,12 @@ It moves only when the grader drags its gripper or clicks it for the next corner
         value: String(z),
         text: `${z}×`,
         label: `${z}×`,
+        tooltip: `Zoom ${z}×`,
     }));
     const SIZES = [
-        { value: "small", text: "S", label: "Small" },
-        { value: "medium", text: "M", label: "Medium" },
-        { value: "large", text: "L", label: "Large" },
+        { value: "small", text: "S", label: "Small", tooltip: "Small" },
+        { value: "medium", text: "M", label: "Medium", tooltip: "Medium" },
+        { value: "large", text: "L", label: "Large", tooltip: "Large" },
     ];
 
     const m = $derived(workspace.magnifier);
@@ -209,10 +210,8 @@ It moves only when the grader drags its gripper or clicks it for the next corner
                 {/key}
             {/if}
         </div>
-        <footer
-            class="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-label-01 text-text-secondary"
-        >
-            <span>Zoom</span>
+        <!-- No visible words: at Small the two groups only fit on one row without them. -->
+        <footer class="flex flex-wrap items-center gap-x-2 gap-y-1 px-2 py-2">
             <ToggleGroup
                 label="Zoom"
                 value={String(m.zoom)}
@@ -222,9 +221,9 @@ It moves only when the grader drags its gripper or clicks it for the next corner
                     })}
                 items={ZOOMS}
             />
-            <span class="ms-auto">Size</span>
             <ToggleGroup
                 label="Size"
+                class="ms-auto"
                 value={m.size}
                 onchange={(v) =>
                     workspace.setMagnifier({ size: v as MagnifierSize })}
