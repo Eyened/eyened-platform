@@ -15,10 +15,10 @@ It moves only when the grader drags its gripper or clicks it for the next corner
     import {
         clampInto,
         corners,
+        MAGNIFIER_CORNERS,
         MAGNIFIER_SIZES,
         MAGNIFIER_ZOOMS,
         STRIP_PX,
-        type MagnifierCorner,
         type MagnifierSize,
         type MagnifierZoom,
         type Point,
@@ -143,12 +143,10 @@ It moves only when the grader drags its gripper or clicks it for the next corner
             return;
         }
         // From a dragged place the next corner is the start.
-        const corner = placed ? 0 : (m.corner + 1) % places.length;
-        workspace.setMagnifier({
-            corner: corner as MagnifierCorner,
-            x: null,
-            y: null,
-        });
+        const corner = placed
+            ? 0
+            : MAGNIFIER_CORNERS[(m.corner + 1) % MAGNIFIER_CORNERS.length];
+        workspace.setMagnifier({ corner, x: null, y: null });
     }
 </script>
 
