@@ -1,17 +1,12 @@
-# External data sources (study panels fed by another service). Copy to
-# compose.data-sources.yaml (gitignored), append :compose.data-sources.yaml to
-# COMPOSE_FILE, and write deploy/data_sources.yaml (gitignored) in the format
-# documented in server/data_sources.yaml, for example:
+# Study panel extensions. Copy to compose.data-sources.yaml (gitignored),
+# append :compose.data-sources.yaml to COMPOSE_FILE, and put Python modules in
+# deploy/extensions/ (gitignored). Each module exports `extensions`, a sequence
+# of objects with name, applies(ctx), and fetch(ctx). See
+# docs/design/browser-extensions/spec.md.
 #
-#   sources:
-#     - name: Registry
-#       url: http://registry.internal/api/project/{project}/patient/{patient}/study/{date}
-#       projects: [Project A, Project B]
-#
-# The server fetches these URLs; the browser never does, and only users who can
-# see a study get its data. Restart the server after editing the file.
+# Restart the server after adding a module.
 
 services:
   server:
     volumes:
-      - ./data_sources.yaml:/app/server/data_sources.yaml:ro
+      - ./extensions:/app/server/extensions:ro

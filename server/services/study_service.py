@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import concurrent.futures
 import logging
-from urllib.parse import quote
 
-import httpxyz
 from fastapi import Depends
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from eyened_orm import Study, StudyTagLink
@@ -14,8 +14,13 @@ from eyened_orm.authz.ownership import require_owner, require_owner_or_project_a
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 
-from ..config import DataSource, get_data_sources
 from ..db import get_db
+from ..study_extension import (
+    StudyExtension,
+    TablesContribution,
+    extension_context,
+    get_extensions,
+)
 from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
@@ -23,7 +28,7 @@ from .exceptions import BadRequestError, NotFoundError, UpstreamError
 
 logger = logging.getLogger(__name__)
 
-DATA_SOURCE_TIMEOUT = 10
+FETCH_TIMEOUT = 10
 
 
 class StudyService:
@@ -231,54 +236,60 @@ class StudyService:
             raise NotFoundError(f"Study {study_id} not found")
         return study
 
-    @staticmethod
-    def _sources_for(study: Study) -> list[DataSource]:
-        project = study.Patient.Project.ProjectName
-        return [s for s in get_data_sources() if project in s.projects]
+    def _context(self, study: Study):
+        return extension_context(
+            study,
+            actor_id=self._actor.id,
+            actor_username=self._actor.username,
+            session=self.repository.session,
+        )
 
-    def list_data_sources(self, study_id: int) -> list[DataSource]:
-        """The configured data sources that apply to a study the actor can see.
+    def _extensions_for(self, study: Study) -> list[StudyExtension]:
+        ctx = self._context(study)
+        return [e for e in get_extensions() if e.applies(ctx)]
+
+    def list_data_sources(self, study_id: int) -> list[StudyExtension]:
+        """The extensions that apply to a study the actor can see.
 
         Raises:
             NotFoundError: If the study does not exist or is out of scope.
         """
-        return self._sources_for(self._visible_study(study_id))
+        return self._extensions_for(self._visible_study(study_id))
 
-    def fetch_data_source(self, study_id: int, name: str) -> bytes:
-        """Fetch a study's data from the named source; return the upstream body.
-
-        The upstream URL is built from the study's own fields, never from the
-        request, so access to the study is access to its data.
+    def fetch_data_source(self, study_id: int, name: str) -> TablesContribution:
+        """Run the named extension's fetch for a visible study.
 
         Raises:
-            NotFoundError: If the study is missing or out of scope, the source
-                does not apply to it, or the upstream has no data (404).
-            UpstreamError: If the upstream fails or times out.
+            NotFoundError: If the study is missing or out of scope, the
+                extension does not apply, or fetch returns None.
+            UpstreamError: If fetch raises, times out, or returns a bad envelope.
         """
         study = self._visible_study(study_id)
-        source = next((s for s in self._sources_for(study) if s.name == name), None)
-        if source is None:
-            raise NotFoundError(f"Data source {name} not found")
-        url = source.url.format(
-            project=quote(study.Patient.Project.ProjectName, safe=""),
-            patient=quote(study.Patient.PatientIdentifier, safe=""),
-            date=quote(study.StudyDate.isoformat(), safe=""),
+        ctx = self._context(study)
+        extension = next(
+            (e for e in get_extensions() if e.name == name and e.applies(ctx)),
+            None,
         )
-        # The URL is not logged: it holds a patient identifier.
+        if extension is None:
+            raise NotFoundError(f"Data source {name} not found")
         try:
-            with httpxyz.Client(timeout=DATA_SOURCE_TIMEOUT) as client:
-                response = client.get(url)
-        except httpxyz.HTTPError as exc:
-            logger.warning("Data source %s unreachable: %s", name, type(exc).__name__)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                result = pool.submit(extension.fetch, ctx).result(timeout=FETCH_TIMEOUT)
+        except concurrent.futures.TimeoutError:
+            logger.warning("Data source %s timed out", name)
             raise UpstreamError(f"Data source {name} unavailable") from None
-        if response.status_code == 404:
+        except Exception as exc:
+            logger.warning("Data source %s failed: %s", name, type(exc).__name__)
+            raise UpstreamError(f"Data source {name} unavailable") from None
+        if result is None:
             raise NotFoundError(f"Data source {name} has no data for this study")
-        if not response.is_success:
-            logger.warning(
-                "Data source %s returned HTTP %s", name, response.status_code
-            )
-            raise UpstreamError(f"Data source {name} unavailable")
-        return response.content
+        try:
+            if isinstance(result, TablesContribution):
+                return result
+            return TablesContribution.model_validate(result)
+        except ValidationError:
+            logger.warning("Data source %s returned an invalid envelope", name)
+            raise UpstreamError(f"Data source {name} unavailable") from None
 
 
 def get_study_service(

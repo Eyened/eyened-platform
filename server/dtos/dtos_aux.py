@@ -32,7 +32,6 @@ class ObjectTagPATCH(BaseModel):
 
 class DataSourceGET(BaseModel):
     name: str
-    collapse: bool
 
 
 # Utility DTOs

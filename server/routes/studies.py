@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Response
 
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import DataSourceGET, ObjectTagPATCH, ObjectTagPOST, TagMeta
+from ..study_extension import TablesContribution
 from ..services.study_service import StudyService, get_study_service
 from .auth import CurrentUser, get_current_user
 
@@ -62,21 +63,19 @@ def list_study_data_sources(
     service: StudyService = Depends(get_study_service),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> list[DataSourceGET]:
-    """External data sources configured for this study's project."""
-    return [
-        DataSourceGET(name=s.name, collapse=s.collapse)
-        for s in service.list_data_sources(study_id)
-    ]
+    """Study panel extensions that apply to this study."""
+    return [DataSourceGET(name=s.name) for s in service.list_data_sources(study_id)]
 
 
-@router.get("/studies/{study_id}/data-sources/{name}")
+@router.get(
+    "/studies/{study_id}/data-sources/{name}",
+    response_model=TablesContribution,
+)
 def get_study_data_source(
     study_id: int,
     name: str,
     service: StudyService = Depends(get_study_service),
     current_user: CurrentUser = Depends(get_current_user),
-) -> Response:
-    """This study's data from an external source, proxied unchanged."""
-    return Response(
-        service.fetch_data_source(study_id, name), media_type="application/json"
-    )
+) -> TablesContribution:
+    """This study's contribution from a named extension."""
+    return service.fetch_data_source(study_id, name)

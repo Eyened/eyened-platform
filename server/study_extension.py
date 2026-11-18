@@ -16,6 +16,7 @@ from typing import Literal, Protocol, runtime_checkable
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from eyened_orm import Study
 from eyened_orm.patient import SexEnum
 
 EXTENSIONS_DIR = Path(__file__).parent / "extensions"
@@ -108,3 +109,29 @@ def load_extensions(path: Path | None = None) -> tuple[StudyExtension, ...]:
 @lru_cache
 def get_extensions() -> tuple[StudyExtension, ...]:
     return load_extensions(EXTENSIONS_DIR)
+
+
+def extension_context(
+    study: Study,
+    *,
+    actor_id: int,
+    actor_username: str,
+    session: Session,
+) -> ExtensionContext:
+    patient = study.Patient
+    project = patient.Project
+    return ExtensionContext(
+        study_id=study.StudyID,
+        study_date=study.StudyDate,
+        study_round=study.StudyRound,
+        study_description=study.StudyDescription,
+        patient_id=patient.PatientID,
+        patient_identifier=patient.PatientIdentifier,
+        patient_birth_date=patient.BirthDate,
+        patient_sex=patient.Sex,
+        project_id=project.ProjectID,
+        project_name=project.ProjectName,
+        actor_id=actor_id,
+        actor_username=actor_username,
+        session=session,
+    )

@@ -42,12 +42,15 @@ deploy/.env.*
 !deploy/.env.example
 deploy/compose.storage.yaml
 deploy/compose.data-sources.yaml
-deploy/data_sources.yaml
+deploy/extensions/
 deploy/backups
 deploy/snapshots/
 
 # Agent / superpowers working docs (local only)
 .agents/
+
+server/extensions/*
+!server/extensions/.gitkeep
 
 .coverage
 coverage.xml
