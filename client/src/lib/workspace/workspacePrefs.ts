@@ -2,6 +2,7 @@
 
 import { MediaQuery } from "svelte/reactivity";
 import {
+    MAGNIFIER_CORNERS,
     MAGNIFIER_DEFAULTS,
     MAGNIFIER_SIZES,
     MAGNIFIER_ZOOMS,
@@ -224,6 +225,9 @@ export function readMagnifier(): MagnifierPrefs {
                 Object.hasOwn(MAGNIFIER_SIZES, s.size)
                     ? (s.size as MagnifierSize)
                     : MAGNIFIER_DEFAULTS.size,
+            corner:
+                MAGNIFIER_CORNERS.find((c) => c === s.corner) ??
+                MAGNIFIER_DEFAULTS.corner,
             x: place(s.x),
             y: place(s.y),
         };

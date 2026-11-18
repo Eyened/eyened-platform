@@ -40,7 +40,7 @@ function renderPanel(ws: Workspace, width = 1000, height = 700) {
 const region = () => screen.queryByRole("region", { name: "Magnifier" });
 
 // jsdom lays out nothing, so the panel measures 0 × 0 and the corners sit on the insets.
-// The strip is on: top-right is 16 px from the right, 104 + 32 px from the top.
+// The strip is on: bottom-left is 16 px from the left, 40 px from the bottom; the top corners are 104 + 32 px from the top.
 describe("MagnifierPanel", () => {
     it("shows only while on, with no view until the pointer has been over a viewport; ✕ turns it off", async () => {
         const ws = workspaceWith(1);
@@ -59,27 +59,44 @@ describe("MagnifierPanel", () => {
         expect(region()).toBeNull();
     });
 
-    it("starts top-right; a gripper click goes to the next corner; a drag places it and is stored", async () => {
+    it("starts bottom-left; a gripper click stores the next corner; after a drag a click goes back to the start", async () => {
         const ws = workspaceWith(1);
         ws.setMagnifier({ on: true });
         renderPanel(ws);
-        expect(region()).toHaveStyle({ left: "984px", top: "136px" });
+        expect(region()).toHaveStyle({ left: "16px", top: "660px" });
         const gripper = screen.getByRole("button", {
             name: "Move magnifier to next corner",
         });
         await fireEvent.click(gripper);
-        expect(readMagnifier()).toMatchObject({ x: 984, y: 660 });
+        expect(readMagnifier()).toMatchObject({ corner: 1, x: null, y: null });
+        expect(region()).toHaveStyle({ left: "16px", top: "136px" });
 
         await fireEvent.pointerDown(gripper, {
             button: 0,
             clientX: 500,
             clientY: 500,
         });
-        await fireEvent.pointerMove(gripper, { clientX: 440, clientY: 470 });
+        await fireEvent.pointerMove(gripper, { clientX: 560, clientY: 470 });
         await fireEvent.pointerUp(gripper);
         await fireEvent.click(gripper);
-        expect(readMagnifier()).toMatchObject({ x: 924, y: 630 });
-        expect(region()).toHaveStyle({ left: "924px", top: "630px" });
+        expect(readMagnifier()).toMatchObject({ x: 76, y: 106 });
+
+        await fireEvent.click(gripper);
+        expect(readMagnifier()).toMatchObject({ corner: 0, x: null, y: null });
+        expect(region()).toHaveStyle({ left: "16px", top: "660px" });
+    });
+
+    it("a corner stays a corner, with its inset, in a smaller workspace", async () => {
+        const ws = workspaceWith(1);
+        ws.setMagnifier({ on: true });
+        const { rerender } = renderPanel(ws);
+        const gripper = screen.getByRole("button", {
+            name: "Move magnifier to next corner",
+        });
+        for (let i = 0; i < 3; i++) await fireEvent.click(gripper);
+        expect(region()).toHaveStyle({ left: "984px", top: "660px" });
+        await rerender({ width: 400, height: 300 });
+        expect(region()).toHaveStyle({ left: "384px", top: "260px" });
     });
 
     it("a cancelled drag drops the move: the panel stays at its stored place", async () => {

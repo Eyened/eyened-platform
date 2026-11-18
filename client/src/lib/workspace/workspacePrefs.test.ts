@@ -93,6 +93,7 @@ describe("magnifier", () => {
             on: true,
             zoom: 6,
             size: "large",
+            corner: 2,
             x: 40,
             y: 120,
         });
@@ -100,18 +101,25 @@ describe("magnifier", () => {
             on: true,
             zoom: 6,
             size: "large",
+            corner: 2,
             x: 40,
             y: 120,
         });
     });
 
-    it("gives the defaults (off, 3×, Medium, top-right) for a missing or bad value", () => {
+    it("gives the defaults (off, 3×, Medium, start corner) for a missing or bad value", () => {
         expect(readMagnifier()).toEqual(MAGNIFIER_DEFAULTS);
         localStorage.setItem("eyened:viewer:magnifier", "{not json");
         expect(readMagnifier()).toEqual(MAGNIFIER_DEFAULTS);
         localStorage.setItem(
             "eyened:viewer:magnifier",
-            JSON.stringify({ on: "yes", zoom: 5, size: "toString", x: "1" }),
+            JSON.stringify({
+                on: "yes",
+                zoom: 5,
+                size: "toString",
+                corner: 7,
+                x: "1",
+            }),
         );
         expect(readMagnifier()).toEqual(MAGNIFIER_DEFAULTS);
     });

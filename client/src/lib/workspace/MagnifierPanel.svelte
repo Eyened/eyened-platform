@@ -17,8 +17,8 @@ It moves only when the grader drags its gripper or clicks it for the next corner
         corners,
         MAGNIFIER_SIZES,
         MAGNIFIER_ZOOMS,
-        nextCorner,
         STRIP_PX,
+        type MagnifierCorner,
         type MagnifierSize,
         type MagnifierZoom,
         type Point,
@@ -80,7 +80,7 @@ It moves only when the grader drags its gripper or clicks it for the next corner
     let panelHeight = $state(0);
     const area = $derived({ width, height });
     const panel = $derived({ width: panelWidth, height: panelHeight });
-    // Below the strip and the top-right viewport's titlebar, above the bottom viewport's view bar.
+    // Below the strip and the top viewports' titlebars, above the bottom viewports' view bars.
     // ASSUMPTION: the spec names only the toast insets; these are their canvas equivalents with the titlebar and strip added.
     const places = $derived(
         corners(area, panel, {
@@ -90,9 +90,11 @@ It moves only when the grader drags its gripper or clicks it for the next corner
             left: 16,
         }),
     );
-    const stored = $derived(
-        m.x === null || m.y === null ? places[0] : { x: m.x, y: m.y },
+    // A dragged place wins; otherwise the stored corner, worked out from the current sizes.
+    const placed = $derived(
+        m.x !== null && m.y !== null ? { x: m.x, y: m.y } : null,
     );
+    const stored = $derived(placed ?? places[m.corner]);
     let live: Point | null = $state(null);
     const shown = $derived(live ?? clampInto(stored, area, panel));
 
@@ -139,7 +141,13 @@ It moves only when the grader drags its gripper or clicks it for the next corner
             dragged = false;
             return;
         }
-        workspace.setMagnifier(nextCorner(shown, places));
+        // From a dragged place the next corner is the start.
+        const corner = placed ? 0 : (m.corner + 1) % places.length;
+        workspace.setMagnifier({
+            corner: corner as MagnifierCorner,
+            x: null,
+            y: null,
+        });
     }
 </script>
 
