@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OPEN_EXTENSIONS_STORAGE_KEY } from "./openExtensionPrefs";
 
 const fetchApi = vi.hoisted(() => vi.fn());
 vi.mock("$lib/api/client", () => ({ fetchApi }));
@@ -13,23 +14,21 @@ function json(body: unknown, status = 200) {
 describe("AdditionalDataSources", () => {
     beforeEach(() => {
         fetchApi.mockReset();
+        localStorage.clear();
     });
 
     it("lists the server's sources for the study and loads each one", async () => {
         fetchApi.mockImplementation(async (path: string) =>
             path === "/studies/7/data-sources"
-                ? json([
-                      { name: "Registry", collapse: false },
-                      { name: "Folded", collapse: true },
-                  ])
-                : json({ "Table A": [["x", 1]] }),
+                ? json([{ name: "Registry" }, { name: "Folded" }])
+                : json({ kind: "tables", groups: { "Table A": [["x", 1]] } }),
         );
 
         render(AdditionalDataSources, { props: { studyId: 7 } });
 
         expect(
-            await screen.findByRole("button", { name: "Table A" }),
-        ).toBeTruthy();
+            await screen.findAllByRole("button", { name: "Table A" }),
+        ).toHaveLength(2);
         expect(
             screen
                 .getByRole("button", { name: "Registry" })
@@ -39,10 +38,36 @@ describe("AdditionalDataSources", () => {
             screen
                 .getByRole("button", { name: "Folded" })
                 .getAttribute("aria-expanded"),
-        ).toBe("false");
+        ).toBe("true");
         expect(fetchApi).toHaveBeenCalledWith(
             "/studies/7/data-sources/Registry",
         );
+    });
+
+    it("restores the open set from localStorage", async () => {
+        localStorage.setItem(
+            OPEN_EXTENSIONS_STORAGE_KEY,
+            JSON.stringify(["Folded"]),
+        );
+        fetchApi.mockImplementation(async (path: string) =>
+            path === "/studies/7/data-sources"
+                ? json([{ name: "Registry" }, { name: "Folded" }])
+                : json({ kind: "tables", groups: { "Table A": [["x", 1]] } }),
+        );
+
+        render(AdditionalDataSources, { props: { studyId: 7 } });
+
+        await screen.findByRole("button", { name: "Table A" });
+        expect(
+            screen
+                .getByRole("button", { name: "Registry" })
+                .getAttribute("aria-expanded"),
+        ).toBe("false");
+        expect(
+            screen
+                .getByRole("button", { name: "Folded" })
+                .getAttribute("aria-expanded"),
+        ).toBe("true");
     });
 
     it("shows nothing when no source applies", async () => {
@@ -59,7 +84,7 @@ describe("AdditionalDataSources", () => {
     it("keeps the page up when one source fails", async () => {
         fetchApi.mockImplementation(async (path: string) =>
             path === "/studies/9/data-sources"
-                ? json([{ name: "Broken", collapse: false }])
+                ? json([{ name: "Broken" }])
                 : json({ detail: "x" }, 502),
         );
 
@@ -67,6 +92,20 @@ describe("AdditionalDataSources", () => {
 
         expect(
             await screen.findByText("Broken could not be loaded"),
+        ).toBeTruthy();
+    });
+
+    it("keeps the page up when kind is not tables", async () => {
+        fetchApi.mockImplementation(async (path: string) =>
+            path === "/studies/10/data-sources"
+                ? json([{ name: "Weird" }])
+                : json({ kind: "markdown", body: "# hi" }),
+        );
+
+        render(AdditionalDataSources, { props: { studyId: 10 } });
+
+        expect(
+            await screen.findByText("Weird could not be loaded"),
         ).toBeTruthy();
     });
 });

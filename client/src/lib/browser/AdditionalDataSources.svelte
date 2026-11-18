@@ -1,5 +1,13 @@
 <script lang="ts">
-    import { listDataSources, loadDataSource } from "$lib/browser/dataSources";
+    import {
+        isTablesContribution,
+        listDataSources,
+        loadDataSource,
+    } from "$lib/browser/dataSources";
+    import {
+        readOpenExtensionNames,
+        writeOpenExtensionNames,
+    } from "$lib/browser/openExtensionPrefs";
     import * as Accordion from "$lib/components/ui/accordion/index.js";
     import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
@@ -9,7 +17,6 @@
     let { studyId }: { studyId: number } = $props();
 
     let sources = $state<DataSourceGET[]>([]);
-    // One accordion item per source; the server's `collapse` sets whether it starts closed.
     let open = $state<string[]>([]);
 
     $effect(() => {
@@ -18,7 +25,7 @@
             .then((result) => {
                 if (cancelled) return;
                 sources = result;
-                open = result.filter((s) => !s.collapse).map((s) => s.name);
+                open = readOpenExtensionNames(result.map((s) => s.name));
             })
             .catch(() => {
                 if (!cancelled) sources = [];
@@ -26,6 +33,10 @@
         return () => {
             cancelled = true;
         };
+    });
+
+    $effect(() => {
+        if (sources.length > 0) writeOpenExtensionNames(open);
     });
 </script>
 
@@ -39,7 +50,14 @@
                     {#await loadDataSource(studyId, source.name)}
                         <InlineLoading status="active" description="Loading…" />
                     {:then data}
-                        <ExternalData {data} />
+                        {#if isTablesContribution(data)}
+                            <ExternalData groups={data.groups} />
+                        {:else}
+                            <InlineNotification
+                                title="{source.name} could not be loaded"
+                                subtitle="Try again later."
+                            />
+                        {/if}
                     {:catch}
                         <InlineNotification
                             title="{source.name} could not be loaded"

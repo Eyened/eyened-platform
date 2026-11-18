@@ -1203,7 +1203,7 @@ export interface paths {
         };
         /**
          * List Study Data Sources
-         * @description External data sources configured for this study's project.
+         * @description Study panel extensions that apply to this study.
          */
         get: operations["list_study_data_sources_studies__study_id__data_sources_get"];
         put?: never;
@@ -1223,7 +1223,7 @@ export interface paths {
         };
         /**
          * Get Study Data Source
-         * @description This study's data from an external source, proxied unchanged.
+         * @description This study's contribution from a named extension.
          */
         get: operations["get_study_data_source_studies__study_id__data_sources__name__get"];
         put?: never;
@@ -1499,8 +1499,6 @@ export interface components {
         DataSourceGET: {
             /** Name */
             name: string;
-            /** Collapse */
-            collapse: boolean;
         };
         /**
          * Datatype
@@ -2682,6 +2680,19 @@ export interface components {
             page: number;
             /** Count */
             count: number;
+        };
+        /** TablesContribution */
+        TablesContribution: {
+            /**
+             * Kind
+             * @default tables
+             * @constant
+             */
+            kind: "tables";
+            /** Groups */
+            groups: {
+                [key: string]: (string | number | null)[][];
+            };
         };
         /** TagGET */
         TagGET: {
@@ -5947,7 +5958,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TablesContribution"];
                 };
             };
             /** @description Validation Error */

@@ -12,10 +12,15 @@ vi.mock("./patientStudies", () => ({
 }));
 
 vi.mock("$lib/browser/dataSources", () => ({
-    listDataSources: vi.fn(async () => [
-        { name: "External grades", collapse: false },
-    ]),
-    loadDataSource: vi.fn(async () => ({ Scores: [] })),
+    listDataSources: vi.fn(async () => [{ name: "External grades" }]),
+    loadDataSource: vi.fn(async () => ({
+        kind: "tables",
+        groups: { Scores: [] },
+    })),
+    isTablesContribution: (data: unknown) =>
+        typeof data === "object" &&
+        data !== null &&
+        (data as { kind?: unknown }).kind === "tables",
 }));
 
 const { default: PanelVisits } = await import("./PanelVisits.svelte");

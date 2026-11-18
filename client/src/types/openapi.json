@@ -5508,7 +5508,7 @@
     "/studies/{study_id}/data-sources": {
       "get": {
         "summary": "List Study Data Sources",
-        "description": "External data sources configured for this study's project.",
+        "description": "Study panel extensions that apply to this study.",
         "operationId": "list_study_data_sources_studies__study_id__data_sources_get",
         "parameters": [
           {
@@ -5579,7 +5579,7 @@
     "/studies/{study_id}/data-sources/{name}": {
       "get": {
         "summary": "Get Study Data Source",
-        "description": "This study's data from an external source, proxied unchanged.",
+        "description": "This study's contribution from a named extension.",
         "operationId": "get_study_data_source_studies__study_id__data_sources__name__get",
         "parameters": [
           {
@@ -5633,7 +5633,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TablesContribution"
+                }
               }
             }
           },
@@ -6645,16 +6647,11 @@
           "name": {
             "type": "string",
             "title": "Name"
-          },
-          "collapse": {
-            "type": "boolean",
-            "title": "Collapse"
           }
         },
         "type": "object",
         "required": [
-          "name",
-          "collapse"
+          "name"
         ],
         "title": "DataSourceGET"
       },
@@ -10303,6 +10300,49 @@
         ],
         "title": "SubTasksWithImagesResponse",
         "description": "Response envelope for paginated SubTasks with images."
+      },
+      "TablesContribution": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "tables",
+            "title": "Kind",
+            "default": "tables"
+          },
+          "groups": {
+            "additionalProperties": {
+              "items": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "minProperties": 0,
+            "title": "Groups"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "groups"
+        ],
+        "title": "TablesContribution"
       },
       "TagGET": {
         "properties": {
