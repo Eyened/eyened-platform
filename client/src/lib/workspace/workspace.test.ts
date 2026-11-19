@@ -125,6 +125,16 @@ describe("Draw toggles", () => {
         ws.arm("zoom");
         expect([ws.questionable, ws.dilateErode]).toEqual([false, false]);
     });
+
+    it("turn off when the armed Draw tool is toggled back to No tool", () => {
+        const ws = new Workspace();
+        ws.arm("brush");
+        ws.questionable = true;
+        ws.dilateErode = true;
+        ws.toggleTool("brush");
+        expect(ws.armedTool).toBeNull();
+        expect([ws.questionable, ws.dilateErode]).toEqual([false, false]);
+    });
 });
 
 describe("Layers sections", () => {

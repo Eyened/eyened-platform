@@ -346,8 +346,10 @@ export class Workspace {
 
     /** A palette click: the armed tool again returns to No tool. */
     toggleTool(id: ToolId): void {
-        if (this.armedTool === id) this.armedTool = null;
-        else this.arm(id);
+        if (this.armedTool === id) {
+            this.armedTool = null;
+            this.resetDrawToggles();
+        } else this.arm(id);
     }
 
     /** Changes the Magnifier's settings and stores them; never touches the armed tool. */
