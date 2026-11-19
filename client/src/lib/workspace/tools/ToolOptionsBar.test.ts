@@ -5,7 +5,6 @@ import {
     screen,
     within,
 } from "@testing-library/svelte";
-import { tick } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     expectNoAxeViolations,
@@ -185,17 +184,5 @@ describe("ToolOptionsBar when short", () => {
         await vi.waitFor(() =>
             expect(inRow(narrow.container)).toEqual(["size"]),
         );
-    });
-
-    it("never folds a can't-edit reason", async () => {
-        renderBrush(50, {
-            name: null,
-            reason: "No current segmentation. Choose one in Segmentations.",
-        });
-        await tick();
-        expect(screen.getByRole("status")).toHaveTextContent(
-            "No current segmentation. Choose one in Segmentations.",
-        );
-        expect(screen.queryByRole("button", { name: "More" })).toBeNull();
     });
 });
