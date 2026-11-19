@@ -2,12 +2,11 @@ import type { Position2D } from "$lib/types";
 import { sizeKey } from "$lib/workspace/paint";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
-import type { PaintView } from "./segmentation";
+import { casedStroke, type PaintView } from "./segmentation";
 
 /** Alt+wheel and Alt+drag change the brush size; draws the brush outline in place of the system cursor. */
 export class SetBrushRadiusTool implements Overlay {
     wheelFactor = 1.05;
-    lineWidth = 1;
 
     private positionStart: Position2D | undefined;
     private radiusStart: number | undefined;
@@ -56,11 +55,7 @@ export class SetBrushRadiusTool implements Overlay {
 
     repaint(viewerContext: ViewerContext) {
         const ctx = viewerContext.context2D;
-        ctx.lineWidth = this.lineWidth;
-        ctx.strokeStyle = "white";
-
         const radius = this.radius;
-
         const center = this.lastPosition;
         const c = viewerContext.imageToViewerCoordinates(center);
         const crx = viewerContext.imageToViewerCoordinates({
@@ -73,14 +68,27 @@ export class SetBrushRadiusTool implements Overlay {
         });
         const radiusX = crx.x - c.x;
         const radiusY = (cry.y - c.y) * this.viewerContext.aspectRatio;
-        const { x, y } = c;
 
-        const path = new Path2D();
-        path.ellipse(x, y, radiusX, radiusY, 0, 0, 2 * Math.PI);
-        ctx.stroke(path);
+        // The outline at the real size; a 5 px cross keeps a tiny brush findable.
+        const outline = new Path2D();
+        outline.ellipse(
+            c.x,
+            c.y,
+            Math.abs(radiusX),
+            Math.abs(radiusY),
+            0,
+            0,
+            2 * Math.PI,
+        );
+        casedStroke(ctx, outline, "white", this.dashed() ? [4, 3] : []);
+        const cross = new Path2D();
+        cross.moveTo(c.x - 2.5, c.y);
+        cross.lineTo(c.x + 2.5, c.y);
+        cross.moveTo(c.x, c.y - 2.5);
+        cross.lineTo(c.x, c.y + 2.5);
+        casedStroke(ctx, cross, "white");
 
         if (this.positionStart && this.radiusStart) {
-            ctx.strokeStyle = "green";
             const path = new Path2D();
             const d = 5;
             path.moveTo(c.x, c.y);
@@ -92,8 +100,7 @@ export class SetBrushRadiusTool implements Overlay {
             path.lineTo(crx.x - d, c.y + d);
             path.moveTo(crx.x, c.y);
             path.lineTo(crx.x - d, c.y - d);
-
-            ctx.stroke(path);
+            casedStroke(ctx, path, "green");
         }
 
         viewerContext.claimCursor("none", CursorPriority.Hide);

@@ -210,3 +210,24 @@ export abstract class SegmentationTool implements Overlay {
         }
     }
 }
+
+/** A dark casing under overlay lines keeps them at 3:1 against light and dark retina. */
+const CASING = "rgba(0, 0, 0, 0.75)";
+
+/** Strokes `path` 1 px in `color` over a 3 px dark casing. */
+export function casedStroke(
+    ctx: CanvasRenderingContext2D,
+    path: Path2D,
+    color: string,
+    dash: number[] = [],
+): void {
+    ctx.save();
+    ctx.setLineDash(dash);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = CASING;
+    ctx.stroke(path);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = color;
+    ctx.stroke(path);
+    ctx.restore();
+}
