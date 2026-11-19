@@ -44,6 +44,7 @@ describe("strip tiles", () => {
         new ScrollOCT().wheel({
             viewerContext: tile,
             wheel: { primaryDeltaPx: 100 },
+            modifiers: { alt: false },
         } as unknown as ViewerEvent<WheelEvent>);
 
         expect(tile.setIndex).not.toHaveBeenCalled();

@@ -14,6 +14,17 @@ describe("ScrollOCT", () => {
         new ScrollOCT().wheel({
             viewerContext: viewer,
             wheel: { zoomIntent: false, primaryDeltaPx: 100 },
+            modifiers: { alt: false },
+        } as unknown as ViewerEvent<WheelEvent>);
+        expect(viewer.index).toBe(64);
+    });
+
+    it("leaves Alt+wheel to the brush size", () => {
+        const viewer = viewerOf("bscan");
+        new ScrollOCT().wheel({
+            viewerContext: viewer,
+            wheel: { zoomIntent: false, primaryDeltaPx: 100 },
+            modifiers: { alt: true },
         } as unknown as ViewerEvent<WheelEvent>);
         expect(viewer.index).toBe(64);
     });

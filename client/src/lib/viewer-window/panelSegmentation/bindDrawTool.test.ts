@@ -173,6 +173,9 @@ describe("bindDrawTool", () => {
             expect(item.undo).toHaveBeenCalledWith(viewerContext.index),
         );
         expect(item.draw).toHaveBeenCalledTimes(1);
+        expect(item.draw.mock.invocationCallOrder[0]).toBeLessThan(
+            item.undo.mock.invocationCallOrder[0],
+        );
     });
 
     it("holding Space paints only while the pointer is over the viewport", () => {

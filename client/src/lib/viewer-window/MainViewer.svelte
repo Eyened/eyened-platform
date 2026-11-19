@@ -238,7 +238,8 @@
     // Built whatever tool is armed, so the options bar names the target as soon as a Draw tool is picked.
     const drawTarget = $derived(
         drawBinding({
-            segmentation: segmentationContext.segmentationItem?.segmentation ?? null,
+            segmentation:
+                segmentationContext.segmentationItem?.segmentation ?? null,
             activeIndices: segmentationContext.activeIndices,
             toolId: workspace.armedTool,
             canEdit: (segmentation) => globalContext.canEdit(segmentation),
