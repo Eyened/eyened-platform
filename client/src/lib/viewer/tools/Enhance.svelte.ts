@@ -16,13 +16,16 @@ export class EnhanceTool extends BrushTool {
     }
 
     startDraw(viewerContext: ViewerContext) {
-        const mask =
+        const state =
             this.segmentationContext.segmentationItem?.getSegmentationState(
                 viewerContext.index,
                 true,
-            )?.mask;
+            );
+        const mask = state?.mask;
         // The options bar already says why when the target is not a probability segmentation.
         if (!(mask instanceof ProbabilityMask)) return;
+        // The stroke changes the mask while held, so take the undo target first.
+        state?.ensureInitialCheckpoint();
         this.stroke = { mode: this.nextMode(), size: this.size };
         this.setDrawing(true);
         this.drawInterval = setInterval(() => {

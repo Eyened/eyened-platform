@@ -7,11 +7,30 @@ vi.mock("cornerstone-wado-image-loader", () => ({
 }));
 vi.mock("cornerstone-core", () => ({}));
 vi.mock("dicom-parser", () => ({}));
+vi.mock("$lib/data/helpers", () => ({
+    getSegmentationData: vi.fn().mockResolvedValue(null),
+    getModelSegmentationData: vi.fn().mockResolvedValue(null),
+    updateSegmentationData: vi.fn(),
+}));
+vi.mock("$lib/webgl/imageEncoder", () => ({
+    Base64Serializer: class {
+        serialize(data: Uint8Array) {
+            return JSON.stringify(Array.from(data));
+        }
+        async deserialize(text: string) {
+            return Uint8Array.from(JSON.parse(text));
+        }
+    },
+}));
 
 import { viewerOf, type ImageKind } from "$lib/viewer/testViewer";
 import type { EventName } from "$lib/viewer/viewer-utils";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { ProbabilityMask } from "$lib/webgl/mask.svelte";
+import {
+    constructors,
+    SegmentationState,
+} from "$lib/webgl/segmentationState.svelte";
 import { Workspace } from "$lib/workspace/workspace.svelte";
 import { bindDrawTool } from "./bindDrawTool";
 import { SegmentationContext } from "./segmentationContext.svelte";
@@ -162,7 +181,10 @@ describe("bindDrawTool", () => {
         });
         const item = {
             segmentation: { image_projection_matrix: null },
-            getSegmentationState: () => ({ mask }),
+            getSegmentationState: () => ({
+                mask,
+                ensureInitialCheckpoint: vi.fn(),
+            }),
             draw: vi.fn().mockResolvedValue(undefined),
             undo: vi.fn().mockResolvedValue(undefined),
         };
@@ -176,6 +198,64 @@ describe("bindDrawTool", () => {
         expect(item.draw.mock.invocationCallOrder[0]).toBeLessThan(
             item.undo.mock.invocationCallOrder[0],
         );
+    });
+
+    it("Esc on the first Enhance stroke of a slice restores the pre-stroke pixels", async () => {
+        const realProbability = constructors.Probability;
+        vi.useFakeTimers();
+        try {
+            const { viewerContext, segmentationContext } = setup("enhance");
+            const mask = Object.assign(
+                Object.create(ProbabilityMask.prototype),
+                {
+                    planeWidth: 2,
+                    planeHeight: 2,
+                    data: new Uint8Array([1, 2, 3, 4]),
+                    exportData() {
+                        return this.data.slice();
+                    },
+                    importData(data: Uint8Array) {
+                        this.data = data.slice();
+                    },
+                    drawEnhance() {
+                        this.data = this.data.map((v: number) => v + 10);
+                    },
+                    draw() {},
+                },
+            );
+            constructors.Probability = function () {
+                return mask;
+            } as never;
+            const state = new SegmentationState(
+                { width: 2, height: 2, depth: 1 } as never,
+                {
+                    id: 1,
+                    annotation_type: "segmentation",
+                    data_representation: "Probability",
+                    data_type: "R8",
+                    width: 2,
+                    height: 2,
+                } as never,
+                0,
+                new Uint8Array([1, 2, 3, 4]),
+            );
+            segmentationContext.segmentationItem = {
+                segmentation: { image_projection_matrix: null },
+                getSegmentationState: () => state,
+                draw: () => state.draw(null as never, {} as never),
+                undo: () => state.undo(),
+            } as never;
+            send(viewerContext, "pointermove");
+            send(viewerContext, "pointerdown");
+            await vi.advanceTimersByTimeAsync(100);
+            expect(Array.from(mask.data)).not.toEqual([1, 2, 3, 4]);
+            send(viewerContext, "keydown", ESC);
+            await vi.advanceTimersByTimeAsync(100);
+            expect(Array.from(mask.data)).toEqual([1, 2, 3, 4]);
+        } finally {
+            constructors.Probability = realProbability;
+            vi.useRealTimers();
+        }
     });
 
     it("holding Space paints only while the pointer is over the viewport", () => {
