@@ -23,6 +23,7 @@ vi.mock("$lib/webgl/imageEncoder", () => ({
     },
 }));
 
+import { getSegmentationData } from "$lib/data/helpers";
 import { viewerOf, type ImageKind } from "$lib/viewer/testViewer";
 import type { EventName } from "$lib/viewer/viewer-utils";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -183,6 +184,7 @@ describe("bindDrawTool", () => {
             segmentation: { image_projection_matrix: null },
             getSegmentationState: () => ({
                 mask,
+                loaded: Promise.resolve(),
                 ensureInitialCheckpoint: vi.fn(),
             }),
             draw: vi.fn().mockResolvedValue(undefined),
@@ -252,6 +254,70 @@ describe("bindDrawTool", () => {
             send(viewerContext, "keydown", ESC);
             await vi.advanceTimersByTimeAsync(100);
             expect(Array.from(mask.data)).toEqual([1, 2, 3, 4]);
+        } finally {
+            constructors.Probability = realProbability;
+            vi.useRealTimers();
+        }
+    });
+
+    it("Esc on an Enhance stroke begun while the slice loads restores the loaded pixels", async () => {
+        const realProbability = constructors.Probability;
+        vi.useFakeTimers();
+        try {
+            const { viewerContext, segmentationContext } = setup("enhance");
+            const mask = Object.assign(
+                Object.create(ProbabilityMask.prototype),
+                {
+                    planeWidth: 2,
+                    planeHeight: 2,
+                    data: new Uint8Array([0, 0, 0, 0]),
+                    exportData() {
+                        return this.data.slice();
+                    },
+                    importData(data: Uint8Array) {
+                        this.data = data.slice();
+                    },
+                    drawEnhance() {
+                        this.data = this.data.map((v: number) => v + 10);
+                    },
+                    draw() {},
+                },
+            );
+            constructors.Probability = function () {
+                return mask;
+            } as never;
+            let release!: (value: unknown) => void;
+            vi.mocked(getSegmentationData).mockReturnValueOnce(
+                new Promise((resolve) => {
+                    release = resolve;
+                }) as never,
+            );
+            const state = new SegmentationState(
+                { width: 2, height: 2, depth: 1 } as never,
+                {
+                    id: 1,
+                    annotation_type: "segmentation",
+                    data_representation: "Probability",
+                    data_type: "R8",
+                    width: 2,
+                    height: 2,
+                } as never,
+                0,
+            );
+            segmentationContext.segmentationItem = {
+                segmentation: { image_projection_matrix: null },
+                getSegmentationState: () => state,
+                draw: () => state.draw(null as never, {} as never),
+                undo: () => state.undo(),
+            } as never;
+            send(viewerContext, "pointermove");
+            send(viewerContext, "pointerdown");
+            release({ data: new Uint8Array([5, 6, 7, 8]) });
+            await vi.advanceTimersByTimeAsync(100);
+            expect(Array.from(mask.data)).not.toEqual([5, 6, 7, 8]);
+            send(viewerContext, "keydown", ESC);
+            await vi.advanceTimersByTimeAsync(100);
+            expect(Array.from(mask.data)).toEqual([5, 6, 7, 8]);
         } finally {
             constructors.Probability = realProbability;
             vi.useRealTimers();

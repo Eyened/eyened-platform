@@ -24,8 +24,11 @@ export class EnhanceTool extends BrushTool {
         const mask = state?.mask;
         // The options bar already says why when the target is not a probability segmentation.
         if (!(mask instanceof ProbabilityMask)) return;
-        // The stroke changes the mask while held, so take the undo target first.
-        state?.ensureInitialCheckpoint();
+        // The undo target must be the loaded slice, so wait for the load; a failed load just skips it.
+        void state?.loaded.then(
+            () => state.ensureInitialCheckpoint(),
+            () => {},
+        );
         this.stroke = { mode: this.nextMode(), size: this.size };
         this.setDrawing(true);
         this.drawInterval = setInterval(() => {
