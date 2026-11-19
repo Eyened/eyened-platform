@@ -13,6 +13,7 @@ Mount it keyed on the source viewport, with that viewport's view; each mount add
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext, onDestroy, setContext, untrack } from "svelte";
     import type { MagnifierSource } from "./magnifier";
+    import { sizeKey } from "./paint";
     import type { Workspace } from "./workspace.svelte";
 
     let {
@@ -44,9 +45,13 @@ Mount it keyed on the source viewport, with that viewport's view; each mount add
                 new MagnifierMark(() =>
                     BRUSHES.includes(workspace.armedTool ?? "")
                         ? {
-                              radius: source.mainViewerContext
-                                  .segmentationContext.brushRadius,
-                              dashed: workspace.armedTool === "eraser",
+                              radius: workspace.paint[
+                                  sizeKey(source.viewerContext.image)
+                              ],
+                              dashed:
+                                  workspace.armedTool === "eraser" ||
+                                  (workspace.armedTool === "enhance" &&
+                                      workspace.remove),
                           }
                         : null,
                 ),

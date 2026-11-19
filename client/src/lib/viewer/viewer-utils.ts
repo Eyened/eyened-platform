@@ -77,7 +77,9 @@ export type EventName =
     | "wheel"
     | "keydown"
     | "keyup"
-    | "dblclick";
+    | "dblclick"
+    | "pointercancel"
+    | "blur";
 
 export type ViewerModifiers = {
     shift: boolean;
@@ -94,7 +96,12 @@ export type ViewerWheelData = {
 };
 
 export interface ViewerEvent<
-    T extends PointerEvent | KeyboardEvent | WheelEvent | MouseEvent,
+    T extends
+        | PointerEvent
+        | KeyboardEvent
+        | WheelEvent
+        | MouseEvent
+        | FocusEvent,
 > {
     event: T;
     viewerContext: ViewerContext;
@@ -114,6 +121,8 @@ export interface ViewerEventListener {
     keydown?: (arg0: ViewerEvent<KeyboardEvent>) => any;
     keyup?: (arg0: ViewerEvent<KeyboardEvent>) => any;
     dblclick?: (arg0: ViewerEvent<MouseEvent>) => any;
+    pointercancel?: (arg0: ViewerEvent<PointerEvent>) => any;
+    blur?: (arg0: ViewerEvent<FocusEvent>) => any;
 }
 
 export interface Overlay extends ViewerEventListener {

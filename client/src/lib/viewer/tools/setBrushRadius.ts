@@ -1,8 +1,10 @@
 import type { Position2D } from "$lib/types";
+import { sizeKey } from "$lib/workspace/paint";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
-import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
+import type { PaintView } from "./segmentation";
 
+/** Alt+wheel and Alt+drag change the brush size; draws the brush outline in place of the system cursor. */
 export class SetBrushRadiusTool implements Overlay {
     wheelFactor = 1.05;
     lineWidth = 1;
@@ -13,35 +15,37 @@ export class SetBrushRadiusTool implements Overlay {
 
     constructor(
         private readonly viewerContext: ViewerContext,
-        private readonly segmentationContext: SegmentationContext,
+        private readonly view: PaintView,
+        /** True draws the outline dashed: Eraser, Enhance Decrease. */
+        private readonly dashed: () => boolean,
     ) {}
 
+    private get radius(): number {
+        return this.view.paint[sizeKey(this.viewerContext.image)];
+    }
+
+    private set radius(size: number) {
+        this.view.setSize(this.viewerContext.image, size);
+    }
+
     wheel(e: ViewerEvent<WheelEvent>) {
-        if (e.event.altKey) {
-            if (e.event.deltaY > 0) {
-                this.segmentationContext.brushRadius *= this.wheelFactor;
-            } else {
-                this.segmentationContext.brushRadius /= this.wheelFactor;
-            }
-        }
+        if (!e.event.altKey) return;
+        this.radius =
+            e.event.deltaY > 0
+                ? this.radius * this.wheelFactor
+                : this.radius / this.wheelFactor;
     }
 
     pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
         const { event, position } = pointerEvent;
         this.lastPosition = position;
         if (event.altKey) {
-            // update brush radius
             if (this.positionStart && this.radiusStart) {
-                const x_start = this.positionStart.x + this.radiusStart;
-                const x_current = position.x + this.radiusStart;
-                const dx = x_start - x_current;
-
-                this.segmentationContext.brushRadius = Math.abs(
-                    this.radiusStart - dx,
-                );
+                const dx = this.positionStart.x - position.x;
+                this.radius = Math.abs(this.radiusStart - dx);
             } else {
                 this.positionStart = position;
-                this.radiusStart = this.segmentationContext.brushRadius;
+                this.radiusStart = this.radius;
             }
         } else {
             // Reset the starting position when Alt key is released
@@ -50,35 +54,12 @@ export class SetBrushRadiusTool implements Overlay {
         }
     }
 
-    keydown(keyEvent: ViewerEvent<KeyboardEvent>) {
-        const {
-            event: { repeat, key },
-        } = keyEvent;
-        if (repeat) return;
-        if (key >= "1" && key <= "9") {
-            this.segmentationContext.brushRadius = Math.log(parseInt(key));
-        }
-    }
-
-    keyup(keyEvent: ViewerEvent<KeyboardEvent>) {
-        const {
-            event: { key },
-        } = keyEvent;
-
-        if (key === "=" || key === "+") {
-            this.segmentationContext.brushRadius *= this.wheelFactor;
-        }
-        if (key === "-") {
-            this.segmentationContext.brushRadius /= this.wheelFactor;
-        }
-    }
-
     repaint(viewerContext: ViewerContext) {
         const ctx = viewerContext.context2D;
         ctx.lineWidth = this.lineWidth;
         ctx.strokeStyle = "white";
 
-        const radius = this.segmentationContext.brushRadius;
+        const radius = this.radius;
 
         const center = this.lastPosition;
         const c = viewerContext.imageToViewerCoordinates(center);

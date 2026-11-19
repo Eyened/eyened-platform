@@ -14,9 +14,6 @@ import type { Workspace } from "$lib/workspace/workspace.svelte";
 import { LocalizerLines } from "./localizerLines.svelte";
 import { graderSegmentation, layersContexts, ME } from "./testContexts";
 
-vi.mock("$lib/viewer-window/panelSegmentation/DrawingTools.svelte", () => ({
-    default: () => {},
-}));
 vi.mock(
     "$lib/viewer-window/panelSegmentation/NewSegmentationRegion.svelte",
     () => ({ default: () => {} }),

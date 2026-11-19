@@ -1,6 +1,6 @@
 <!--
 @component
-Layers › Segmentations for the selected viewport: opacity and Area, the old drawing tools until 3b replaces them, and rows grouped AI, Mine, then other graders.
+Layers › Segmentations for the selected viewport: opacity and Area, and rows grouped AI, Mine, then other graders.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
@@ -11,7 +11,6 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import DrawingTools from "$lib/viewer-window/panelSegmentation/DrawingTools.svelte";
     import NewSegmentation from "$lib/viewer-window/panelSegmentation/NewSegmentation.svelte";
     import NewSegmentationRegion from "$lib/viewer-window/panelSegmentation/NewSegmentationRegion.svelte";
     import SegmentationItem from "$lib/viewer-window/panelSegmentation/SegmentationItem.svelte";
@@ -81,7 +80,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
     }
     const percent = $derived(Math.round(mainViewerContext.alpha * 100));
 
-    // The old drawing tools and the pipette act only while this section is on screen.
+    // The pipette acts only while this section is on screen.
     $effect(() => {
         if (!shown || !open) return;
         viewerContext.activePanels.add("Segmentation");
@@ -132,8 +131,6 @@ Layers › Segmentations for the selected viewport: opacity and Area, the old dr
                     >
                 </Field.Field>
             </div>
-            <!-- The old tools' hidden tooltips stick out past the panel edge and make it scroll sideways. -->
-            <div class="overflow-x-clip"><DrawingTools /></div>
             {#each groups as group (group.key)}
                 <LayerSection
                     level={4}

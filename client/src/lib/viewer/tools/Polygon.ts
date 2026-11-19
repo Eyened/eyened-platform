@@ -1,47 +1,33 @@
-import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
-import { SegmentationTool, type DrawingExecutor } from "./segmentation";
+import { SegmentationTool, type DrawingMode } from "./segmentation";
 
 const lineWidth = 2;
 
+/** Drag round an area to fill it, or with X, to erase it. */
 export class PolygonTool extends SegmentationTool {
-    constructor(
-        drawingExecutor: DrawingExecutor,
-        viewerContext: ViewerContext,
-        segmentationContext: SegmentationContext,
-    ) {
-        super(drawingExecutor, viewerContext, segmentationContext);
+    protected nextMode(): DrawingMode {
+        return this.view.remove ? "erase" : "paint";
     }
 
     pointerdown(e: ViewerEvent<PointerEvent>) {
         const { event } = e;
         this.lastPosition = this.eventToSegmentation(e);
-
-        if (event.altKey || event.shiftKey) return;
-
-        if (event.button === 0) this.drawingState = "paint";
-        else if (event.button === 2) this.drawingState = "erase";
-
+        if (event.button !== 0 || event.altKey || event.shiftKey) return;
+        if (this.stroke) return;
         this.startDraw(e.viewerContext);
     }
 
     pointerup(e: ViewerEvent<PointerEvent>) {
-        const { viewerContext } = e;
-        this.endDraw(viewerContext);
+        this.endDraw(e.viewerContext);
     }
 
     pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
         const { event } = pointerEvent;
-        if (event.altKey || event.shiftKey) {
-            return;
-        }
+        if (event.altKey || event.shiftKey) return;
         this.lastPosition = this.eventToSegmentation(pointerEvent);
-
-        if (this.drawingState && this.currentPoints) {
-            this.currentPoints.push(this.eventToSegmentation(pointerEvent));
-        }
+        if (this.currentPoints) this.currentPoints.push(this.lastPosition);
     }
 
     executeDraw(
@@ -49,7 +35,6 @@ export class PolygonTool extends SegmentationTool {
         _viewerContext: ViewerContext,
     ): void {
         ctx.fillStyle = "white";
-
         ctx.beginPath();
         const p = this.currentPoints![0];
         ctx.moveTo(p.x, p.y);
@@ -62,23 +47,11 @@ export class PolygonTool extends SegmentationTool {
 
     repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
         super.repaint(viewerContext, renderTarget);
-        const flipDrawErase = this.flipDrawErase;
-        if (
-            !this.drawingState ||
-            !this.currentPoints ||
-            this.currentPoints.length == 0
-        )
-            return;
+        if (!this.currentPoints || this.currentPoints.length == 0) return;
 
         const ctx = viewerContext.context2D;
-
         ctx.lineWidth = lineWidth;
-
-        if ((this.drawingState === "paint") !== flipDrawErase) {
-            ctx.strokeStyle = this.paintColor;
-        } else {
-            ctx.strokeStyle = this.eraseColor;
-        }
+        ctx.strokeStyle = this.drawingColor;
         ctx.fillStyle = this.fillColor;
         ctx.setLineDash([]);
 

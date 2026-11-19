@@ -5,6 +5,7 @@ import {
     type ViewerEvent,
     type ViewerEventListener,
 } from "$lib/viewer/viewer-utils";
+import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { toolForKey } from "./registry";
 
 /** Digits by physical key, so AZERTY works: 1 Original … 0 Blue. */
@@ -17,10 +18,25 @@ const HIDE_OVERLAYS = "h";
 const LOCALIZER = "o";
 const MAGNIFIER = "m";
 
+/** The selected viewport's segmentation state and slice; keys reach the focused viewport, and focus selects it. */
+function selectedSegmentation(viewerContext: ViewerContext) {
+    const layers =
+        viewerContext.viewerWindowContext.viewState?.selectedViewport?.layers;
+    return layers
+        ? {
+              segmentationContext: layers.mainViewerContext.segmentationContext,
+              index: layers.viewerContext.index,
+          }
+        : null;
+}
+
 /** A viewport's keys. The viewer forwards only keys pressed while it has focus. */
 export class Keymap implements ViewerEventListener {
     keydown(e: ViewerEvent<KeyboardEvent>) {
         const { event, viewerContext } = e;
+        // No key acts while a stroke is drawn; Esc is the tool's, which drops the stroke.
+        if (selectedSegmentation(viewerContext)?.segmentationContext.isDrawing)
+            return;
         if (event.ctrlKey || event.metaKey || event.altKey) return;
         if (event.key === "Escape") {
             viewerContext.initTransform();

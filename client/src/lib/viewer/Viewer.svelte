@@ -199,6 +199,13 @@
         forwardEvent("pointerup", e);
     }
 
+    // A pen leaving the screen mid-stroke ends the press as a release would.
+    function onpointercancel(e: PointerEvent) {
+        pointerDown = false;
+        dismissing = false;
+        forwardEvent("pointercancel", e);
+    }
+
     function onkeydown(e: KeyboardEvent) {
         updateModifierState(e, true);
         forwardEvent("keydown", e);
@@ -229,10 +236,11 @@
         e.preventDefault();
     }
 
-    function onblur() {
+    function onblur(e: FocusEvent) {
         resetModifierState();
         // The H keyup never arrives once focus has left, so end the hold here.
         viewerContext.hideOverlays = false;
+        forwardEvent("blur", e);
     }
 </script>
 
@@ -245,6 +253,7 @@
         bind:this={viewerElement}
         {onpointerdown}
         {onpointerup}
+        {onpointercancel}
         {onpointermove}
         {onpointerenter}
         {onpointerleave}

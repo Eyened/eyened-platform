@@ -52,10 +52,6 @@ export class SegmentationContext {
         ),
     );
 
-    public flipDrawErase = $state(false);
-    public erodeDilateActive = $state(false);
-    public questionableActive = $state(false);
-    public brushRadius = $state(4);
     /** Multi-class overlay opacity for the selected class vs other visible classes. */
     public multiClassActiveAlpha = $state(1);
     public multiClassInactiveAlpha = $state(0.2);
@@ -153,8 +149,6 @@ export class SegmentationContext {
         } else {
             this.activeIndices = [];
         }
-        this.questionableActive = false;
-        this.erodeDilateActive = false;
         this.viewerWindowContext.viewState?.resetDrawToggles();
     }
 
@@ -182,8 +176,6 @@ export class SegmentationContext {
         } else {
             this.activeIndices = [];
         }
-        this.questionableActive = false;
-        this.erodeDilateActive = false;
         this.viewerWindowContext.viewState?.resetDrawToggles();
     }
 
@@ -192,8 +184,6 @@ export class SegmentationContext {
         if (this.activeSegmentationKey() === key) {
             this.segmentationItem = undefined;
             this.activeIndices = [];
-            this.questionableActive = false;
-            this.erodeDilateActive = false;
             this.viewerWindowContext.viewState?.resetDrawToggles();
             return;
         }
