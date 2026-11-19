@@ -1,6 +1,6 @@
 <!--
 @component
-A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab order. Esc or an item closes it and returns focus to the button. The palette's ⋯ More tools passes the armed tool's icon when one of its tools is armed.
+A ⋯ disclosure: the button shows or hides a list that can hold buttons, sliders and toggle groups, in Tab order. Esc closes it and returns focus to the button; focus moving outside it closes it too. The palette's ⋯ More tools passes the armed tool's icon when one of its tools is armed.
 -->
 <script lang="ts">
     import { IconButton } from "$lib/components/ui/icon-button/index.js";

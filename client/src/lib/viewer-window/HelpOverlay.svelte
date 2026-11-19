@@ -43,20 +43,21 @@
         {
             title: "Render modes (color images)",
             shortcuts: [
-                { action: "Original", keys: "R" },
-                { action: "Luminance", keys: "L" },
-                { action: "Contrast enhanced", keys: "E" },
-                { action: "Color balanced", keys: "B" },
-                { action: "CLAHE", keys: "H" },
-                { action: "Sharpened", keys: "S" },
-                { action: "Histogram matched", keys: "M" },
+                { action: "Original", keys: "1" },
+                { action: "Contrast enhanced", keys: "2" },
+                { action: "Color balanced", keys: "3" },
+                { action: "CLAHE", keys: "4" },
+                { action: "Sharpened", keys: "5" },
+                { action: "Histogram matched", keys: "6" },
+                { action: "Luminance", keys: "7" },
+                { action: "Red / green / blue channel", keys: "8 / 9 / 0" },
             ],
         },
         {
             title: "Render modes (grayscale / OCT)",
             shortcuts: [
-                { action: "Original", keys: "R" },
-                { action: "CLAHE", keys: "H" },
+                { action: "Original", keys: "1" },
+                { action: "CLAHE", keys: "4" },
             ],
         },
         {
@@ -80,8 +81,8 @@
             title: "ETDRS grid",
             shortcuts: [
                 {
-                    action: "Cycle central / inner / outer circles",
-                    keys: "C / I / O",
+                    action: "Cycle central / inner circles",
+                    keys: "C / I",
                 },
             ],
         },
