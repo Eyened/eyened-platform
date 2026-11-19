@@ -124,6 +124,8 @@ export function shouldHandleFeaturePipetteKey(
 ): boolean {
     if (event.code !== FEATURE_PIPETTE_KEY || event.repeat) return false;
     if (isTypingTarget(event)) return false;
+    // A stroke writes to the current segmentation, so it must not change mid-stroke.
+    if (mainViewerContext.segmentationContext.isDrawing) return false;
     // I acts at the pointer, so only in the focused viewport while the pointer is over it.
     return (
         viewerContext.active && viewerContext.activePanels.has("Segmentation")
