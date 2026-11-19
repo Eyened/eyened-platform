@@ -525,7 +525,7 @@ Below md there are no icon columns: a menu button opens the left column's conten
         grid-template-columns: var(--rail) var(--left) minmax(0, 1fr) var(
                 --right
             );
-        grid-template-rows: 48px 32px minmax(0, 1fr) auto;
+        grid-template-rows: 48px minmax(32px, auto) minmax(0, 1fr) auto;
         grid-template-areas:
             "header header header header"
             "rail left tools right"

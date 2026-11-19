@@ -3,21 +3,22 @@ import type { Position2D } from "$lib/types";
 import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { segToImageMatrix } from "$lib/webgl/segmentationProjection";
 import type { RenderTarget } from "$lib/webgl/types";
+import { sizeKey } from "$lib/workspace/paint";
+import type { Workspace } from "$lib/workspace/workspace.svelte";
 import type { Overlay, ViewerEvent } from "../viewer-utils";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
 
-const paintKey = "Q";
-const eraseKey = "W";
-
 export type DrawingMode = "erase" | "paint";
 
-export interface DrawingExecutor {
-    getCtx(): CanvasRenderingContext2D;
-    draw(ctx: CanvasRenderingContext2D, mode: "paint" | "erase"): Promise<void>;
-    undo(): void;
-    redo(): void;
-    canUndo(): boolean;
-    canRedo(): boolean;
+/** What a Draw tool reads from the workspace. */
+export type PaintView = Pick<Workspace, "paint" | "remove" | "setSize">;
+
+export interface DrawToolDeps {
+    viewerContext: ViewerContext;
+    segmentationContext: SegmentationContext;
+    view: PaintView;
+    /** Tells the grader a stroke could not be saved. */
+    report: (message: string) => void;
 }
 
 export abstract class SegmentationTool implements Overlay {
@@ -25,21 +26,61 @@ export abstract class SegmentationTool implements Overlay {
     eraseColor = "rgba(255, 200, 200, 0.5)";
     fillColor = "rgba(255, 255, 255, 0.4)";
 
-    drawingState: DrawingMode = "paint";
     currentPoints: Position2D[] | undefined;
     lastPosition: Position2D | undefined;
     syncing: boolean = false;
+    /** Fixed when a stroke starts, so its preview and its write agree. */
+    protected stroke: { mode: DrawingMode; size: number } | undefined;
+    /** `lockScroll` before the stroke, put back when it ends. */
+    private scrollBefore: boolean | undefined;
 
-    constructor(
-        protected readonly drawingExecutor: DrawingExecutor,
-        protected readonly viewerContext: ViewerContext,
-        protected readonly segmentationContext: SegmentationContext,
-    ) {}
+    protected readonly viewerContext: ViewerContext;
+    protected readonly segmentationContext: SegmentationContext;
+    protected readonly view: PaintView;
+    protected readonly report: (message: string) => void;
+
+    constructor(deps: DrawToolDeps) {
+        this.viewerContext = deps.viewerContext;
+        this.segmentationContext = deps.segmentationContext;
+        this.view = deps.view;
+        this.report = deps.report;
+    }
+
+    /** The mode a stroke started now would have. */
+    protected abstract nextMode(): DrawingMode;
 
     abstract executeDraw(
         ctx: CanvasRenderingContext2D,
         viewerContext: ViewerContext,
     ): void;
+
+    get mode(): DrawingMode {
+        return this.stroke?.mode ?? this.nextMode();
+    }
+
+    /** The brush size in image pixels for this viewer's image kind. */
+    get size(): number {
+        return (
+            this.stroke?.size ??
+            this.view.paint[sizeKey(this.viewerContext.image)]
+        );
+    }
+
+    get drawingColor(): string {
+        return this.mode === "paint" ? this.paintColor : this.eraseColor;
+    }
+
+    /** A stroke is written to the slice shown when it ends, so the wheel and arrows don't step slices during one. */
+    protected setDrawing(on: boolean): void {
+        this.segmentationContext.isDrawing = on;
+        if (on && this.scrollBefore === undefined) {
+            this.scrollBefore = this.viewerContext.lockScroll;
+            this.viewerContext.lockScroll = true;
+        } else if (!on && this.scrollBefore !== undefined) {
+            this.viewerContext.lockScroll = this.scrollBefore;
+            this.scrollBefore = undefined;
+        }
+    }
 
     protected segToImageMatrix(): Matrix {
         const segmentation =
@@ -78,7 +119,7 @@ export abstract class SegmentationTool implements Overlay {
         const segToImage = this.segToImageMatrix();
         const imageToSeg = segToImage.inverse;
         const imageCenter = segToImage.apply(centerSeg);
-        const r = this.segmentationContext.brushRadius;
+        const r = this.size;
         const aspect = this.viewerContext.aspectRatio;
         const px = imageToSeg.apply({ x: imageCenter.x + r, y: imageCenter.y });
         const py = imageToSeg.apply({
@@ -91,79 +132,76 @@ export abstract class SegmentationTool implements Overlay {
         };
     }
 
-    get mode() {
-        return (this.drawingState === "paint") !== this.flipDrawErase
-            ? "paint"
-            : "erase";
-    }
-    get flipDrawErase(): boolean {
-        return this.segmentationContext.flipDrawErase;
-    }
-
-    get drawingColor(): string {
-        if (this.mode === "paint") {
-            return this.flipDrawErase ? this.eraseColor : this.paintColor;
-        } else if (this.mode === "erase") {
-            return this.flipDrawErase ? this.paintColor : this.eraseColor;
-        }
-        throw new Error(`Invalid drawing mode: ${this.mode}`);
-    }
-
     keydown(e: ViewerEvent<KeyboardEvent>) {
-        const {
-            event: { repeat, key, ctrlKey, shiftKey },
-            viewerContext,
-        } = e;
-        if (repeat) return;
-
-        if (ctrlKey) {
-            const k = key.toLowerCase();
-            if (k === "z" && !shiftKey && this.drawingExecutor.canUndo()) {
-                this.drawingExecutor.undo();
-                e.event.preventDefault();
-                return;
-            }
-            if (k === "y" && this.drawingExecutor.canRedo()) {
-                this.drawingExecutor.redo();
-                e.event.preventDefault();
-                return;
-            }
+        const { event, viewerContext } = e;
+        if (event.key === "Escape") {
+            if (this.stroke) this.cancel(viewerContext);
+            return;
         }
-
-        const k = key.toUpperCase();
-        if (k == paintKey) this.drawingState = "paint";
-        if (k == eraseKey) this.drawingState = "erase";
-
-        if (k == paintKey || k == eraseKey) {
-            this.startDraw(viewerContext);
-        }
+        if (
+            event.code !== "Space" ||
+            event.ctrlKey ||
+            event.metaKey ||
+            event.altKey
+        )
+            return;
+        event.preventDefault();
+        // Hold Space acts at the pointer, so only in the viewport the pointer is over.
+        if (
+            event.repeat ||
+            this.stroke ||
+            !viewerContext.active ||
+            !this.lastPosition
+        )
+            return;
+        this.startDraw(viewerContext);
     }
 
     keyup(e: ViewerEvent<KeyboardEvent>) {
-        const { event, viewerContext } = e;
-        const k = event.key.toUpperCase();
-        if (k == paintKey || k == eraseKey) {
-            this.endDraw(viewerContext);
-        }
+        if (e.event.code === "Space") this.endDraw(e.viewerContext);
+    }
+
+    /** A pen leaving the screen keeps what was drawn; undo takes it back. */
+    pointercancel(e: ViewerEvent<PointerEvent>) {
+        this.endDraw(e.viewerContext);
+    }
+
+    /** Losing focus keeps what was drawn; undo takes it back. */
+    blur(e: ViewerEvent<FocusEvent>) {
+        this.endDraw(e.viewerContext);
     }
 
     startDraw(_viewerContext: ViewerContext) {
+        this.stroke = { mode: this.nextMode(), size: this.size };
         this.currentPoints = [this.lastPosition!];
-        this.segmentationContext.isDrawing = true;
+        this.setDrawing(true);
+    }
+
+    /** Esc: the stroke is dropped and nothing is written. */
+    cancel(_viewerContext: ViewerContext) {
+        this.currentPoints = undefined;
+        this.stroke = undefined;
+        this.setDrawing(false);
     }
 
     endDraw(viewerContext: ViewerContext) {
-        this.segmentationContext.isDrawing = false;
+        this.setDrawing(false);
         if (this.currentPoints) {
             this.syncing = true;
-
-            const ctx = this.drawingExecutor.getCtx();
+            const ctx = this.segmentationContext.getCtx();
             this.executeDraw(ctx, viewerContext);
-            this.drawingExecutor
-                .draw(ctx, this.mode)
-                .then(() => (this.syncing = false));
+            this.segmentationContext
+                .draw(ctx, this.mode, viewerContext.index)
+                .catch((error) => {
+                    console.error(error);
+                    this.report(
+                        "Error drawing on segmentation. Check console for details.",
+                    );
+                })
+                .finally(() => (this.syncing = false));
             this.currentPoints = undefined;
         }
+        this.stroke = undefined;
     }
 
     repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
@@ -171,4 +209,25 @@ export abstract class SegmentationTool implements Overlay {
             viewerContext.claimCursor("wait", CursorPriority.Busy);
         }
     }
+}
+
+/** A dark casing under overlay lines keeps them at 3:1 against light and dark retina. */
+const CASING = "rgba(0, 0, 0, 0.75)";
+
+/** Strokes `path` 1 px in `color` over a 3 px dark casing. */
+export function casedStroke(
+    ctx: CanvasRenderingContext2D,
+    path: Path2D,
+    color: string,
+    dash: number[] = [],
+): void {
+    ctx.save();
+    ctx.setLineDash(dash);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = CASING;
+    ctx.stroke(path);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = color;
+    ctx.stroke(path);
+    ctx.restore();
 }

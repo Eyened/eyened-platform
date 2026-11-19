@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { entry, NO_URL, workspaceWith } from "./testUtils";
 import { Workspace } from "./workspace.svelte";
 import { pointArming } from "$lib/forms/pointArming.svelte";
+import { readLayerSections } from "./workspacePrefs";
 
 const ids = (ws: Workspace) => ws.slots.map((s) => s.imageId);
 
@@ -110,5 +111,44 @@ describe("Workspace.arm", () => {
         workspaceWith(1).arm("point");
         expect(pointArming.session).toBeNull();
         expect(persist).toHaveBeenCalled();
+    });
+});
+
+describe("Draw toggles", () => {
+    it("stay on between Draw tools and turn off when a tool outside Draw is armed", () => {
+        const ws = new Workspace();
+        ws.arm("brush");
+        ws.questionable = true;
+        ws.dilateErode = true;
+        ws.arm("polygon");
+        expect([ws.questionable, ws.dilateErode]).toEqual([true, true]);
+        ws.arm("zoom");
+        expect([ws.questionable, ws.dilateErode]).toEqual([false, false]);
+    });
+
+    it("turn off when the armed Draw tool is toggled back to No tool", () => {
+        const ws = new Workspace();
+        ws.arm("brush");
+        ws.questionable = true;
+        ws.dilateErode = true;
+        ws.toggleTool("brush");
+        expect(ws.armedTool).toBeNull();
+        expect([ws.questionable, ws.dilateErode]).toEqual([false, false]);
+    });
+});
+
+describe("Layers sections", () => {
+    it("arming a Draw tool opens a closed Segmentations section and stores it; no tool closes it", () => {
+        localStorage.clear();
+        const ws = new Workspace();
+        ws.setLayerSection("segmentations", false);
+        ws.arm("zoom");
+        expect(ws.layerSections.segmentations).toBe(false);
+        ws.arm("polygon");
+        expect(ws.layerSections.segmentations).toBe(true);
+        expect(readLayerSections().segmentations).toBe(true);
+        ws.arm("zoom");
+        expect(ws.layerSections.segmentations).toBe(true);
+        localStorage.clear();
     });
 });

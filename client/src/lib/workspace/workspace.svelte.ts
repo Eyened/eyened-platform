@@ -1,5 +1,6 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { pointArming } from "$lib/forms/pointArming.svelte";
+import type { DrawTarget } from "$lib/layers/drawBinding";
 import type { GridLayers } from "$lib/layers/gridLayers.svelte";
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
@@ -34,7 +35,14 @@ import {
     type MagnifierPrefs,
     type MagnifierSource,
 } from "./magnifier";
-import { writeMagnifier } from "./workspacePrefs";
+import { clampSize, PAINT_DEFAULTS, sizeKey, type PaintPrefs } from "./paint";
+import type { LayerSectionId } from "$lib/layers/layerSections";
+import {
+    readLayerSections,
+    writeLayerSections,
+    writeMagnifier,
+    writePaint,
+} from "./workspacePrefs";
 import {
     toolById,
     type ToolGroup,
@@ -51,6 +59,8 @@ export interface WorkspaceOptions {
     stripTracking?: boolean;
     /** The Magnifier's stored settings; the defaults when missing. */
     magnifier?: MagnifierPrefs;
+    /** Brush, Eraser and Enhance settings; the defaults when missing. */
+    paint?: PaintPrefs;
     /** The palette's mode; All tools when missing. */
     toolMode?: ToolMode;
 }
@@ -69,6 +79,8 @@ export interface LayersTarget {
     readonly localizer: LocalizerLines;
     /** The registration P works on in this viewport; null when there is none. */
     readonly pointTarget: { id: number; canEdit: boolean } | null;
+    /** The current segmentation a Draw tool writes into here, or why it can't. */
+    readonly drawTarget: DrawTarget;
     /** This viewport's blend, kept while it is mounted. */
     readonly blend: ViewportBlend;
 }
@@ -97,6 +109,16 @@ export class Workspace {
     magnifier: MagnifierPrefs = $state.raw({ ...MAGNIFIER_DEFAULTS });
     /** The viewport the pointer was last over; the Magnifier shows it. */
     magnifierSource: MagnifierSource | null = $state.raw(null);
+    /** Brush, Eraser and Enhance settings, stored per browser. */
+    paint: PaintPrefs = $state.raw({ ...PAINT_DEFAULTS });
+    /** X for Polygon and Enhance: Erase and Decrease instead of Fill and Increase. This session only. */
+    remove = $state(false);
+    /** Questionable and Dilate / Erode: off again when the target changes or a tool outside Draw is armed. */
+    questionable = $state(false);
+    dilateErode = $state(false);
+    /** The open Layers sections, kept here so arming a Draw tool can open Segmentations; stored per browser. */
+    layerSections: Record<LayerSectionId, boolean> =
+        $state.raw(readLayerSections());
     arrange: ArrangeOrder = $state("opened");
     preset: Preset = $state.raw(getPreset(DEFAULT_PRESET_ID)!);
     page = $state(1);
@@ -153,6 +175,7 @@ export class Workspace {
         this.strip = options.strip ?? true;
         this.stripTracking = options.stripTracking ?? true;
         this.magnifier = options.magnifier ?? { ...MAGNIFIER_DEFAULTS };
+        this.paint = options.paint ?? { ...PAINT_DEFAULTS };
         this.toolMode = options.toolMode ?? "all";
     }
 
@@ -314,20 +337,47 @@ export class Workspace {
         }
         // One point tool at a time: P drops an armed form point field.
         if (id === "point") pointArming.disarm();
+        // A Draw tool opens Segmentations, as if by hand; it never closes it.
+        if (tool.group === "Draw") this.setLayerSection("segmentations", true);
+        else this.resetDrawToggles();
         this.armedTool = id;
         this.lastPick = { ...this.lastPick, [tool.group]: id };
     }
 
     /** A palette click: the armed tool again returns to No tool. */
     toggleTool(id: ToolId): void {
-        if (this.armedTool === id) this.armedTool = null;
-        else this.arm(id);
+        if (this.armedTool === id) {
+            this.armedTool = null;
+            this.resetDrawToggles();
+        } else this.arm(id);
     }
 
     /** Changes the Magnifier's settings and stores them; never touches the armed tool. */
     setMagnifier(change: Partial<MagnifierPrefs>): void {
         this.magnifier = { ...this.magnifier, ...change };
         writeMagnifier(this.magnifier);
+    }
+
+    /** Changes the paint settings and stores them. */
+    setPaint(change: Partial<PaintPrefs>): void {
+        this.paint = { ...this.paint, ...change };
+        writePaint(this.paint);
+    }
+
+    /** Sets the brush size for this image's kind, within the size limits, and stores it. */
+    setSize(image: { is2D: boolean }, size: number): void {
+        this.setPaint({ [sizeKey(image)]: clampSize(size) });
+    }
+
+    resetDrawToggles(): void {
+        this.questionable = false;
+        this.dilateErode = false;
+    }
+
+    setLayerSection(id: LayerSectionId, open: boolean): void {
+        if (this.layerSections[id] === open) return;
+        this.layerSections = { ...this.layerSections, [id]: open };
+        writeLayerSections(this.layerSections);
     }
 
     /** A viewport's viewer registers its handle; the returned function removes it. */

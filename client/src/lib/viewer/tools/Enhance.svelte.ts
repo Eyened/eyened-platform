@@ -1,74 +1,77 @@
-import type { GlobalContext } from "$lib/data/globalContext.svelte";
-import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import { ProbabilityMask } from "$lib/webgl/mask.svelte";
 import type { ViewerContext } from "../viewerContext.svelte";
 import { BrushTool } from "./Brush";
-import type { DrawingExecutor } from "./segmentation";
+import type { DrawingMode, DrawToolDeps } from "./segmentation";
 
+/** Raises a probability segmentation under the brush while held, or lowers it with X. */
 export class EnhanceTool extends BrushTool {
     private drawInterval: ReturnType<typeof setInterval> | undefined;
-    public readonly hardness = $state(0.5); // higher hardness means sharper edge near brush border
-    public readonly pressure = $state(0.25); // higher pressure means more effect
 
-    constructor(
-        drawingExecutor: DrawingExecutor,
-        viewerContext: ViewerContext,
-        segmentationContext: SegmentationContext,
-        private readonly globalContext: GlobalContext,
-    ) {
-        super(drawingExecutor, viewerContext, segmentationContext);
+    constructor(deps: DrawToolDeps) {
+        super(deps, "paint");
     }
 
-    async startDraw() {
-        const segmentationItem = this.segmentationContext.segmentationItem;
-        if (!segmentationItem) {
-            console.warn("No segmentation");
-            this.globalContext.dialogue = "No segmentation selected";
-            return;
-        }
+    protected nextMode(): DrawingMode {
+        return this.view.remove ? "erase" : "paint";
+    }
 
-        const segmentationState = segmentationItem.getSegmentationState(
-            this.viewerContext.index,
-            true,
-        )!;
-        const mask = segmentationState.mask;
-        if (!(mask instanceof ProbabilityMask)) {
-            console.warn("No probability segmentation");
-            this.globalContext.dialogue =
-                "Enhance tool requires a probability segmentation";
-            return;
-        }
-
+    startDraw(viewerContext: ViewerContext) {
+        const state =
+            this.segmentationContext.segmentationItem?.getSegmentationState(
+                viewerContext.index,
+                true,
+            );
+        const mask = state?.mask;
+        // The options bar already says why when the target is not a probability segmentation.
+        if (!(mask instanceof ProbabilityMask)) return;
+        // The undo target must be the loaded slice, so wait for the load; a failed load just skips it.
+        void state?.loaded.then(
+            () => state.ensureInitialCheckpoint(),
+            () => {},
+        );
+        this.stroke = { mode: this.nextMode(), size: this.size };
+        this.setDrawing(true);
         this.drawInterval = setInterval(() => {
-            if (this.lastPosition) {
-                const { rx, ry } = this.imageBrushRadiiToSegmentation(
-                    this.lastPosition,
-                );
-                const settings = {
-                    radiusX: rx,
-                    radiusY: ry,
-                    hardness: this.hardness,
-                    pressure: this.pressure,
-                    erase: this.mode === "erase",
-                    point: this.lastPosition,
-                };
-                mask.drawEnhance(settings);
-            }
+            if (!this.lastPosition || !this.stroke) return;
+            const { rx, ry } = this.imageBrushRadiiToSegmentation(
+                this.lastPosition,
+            );
+            mask.drawEnhance({
+                radiusX: rx,
+                radiusY: ry,
+                hardness: this.view.paint.hardness,
+                pressure: this.view.paint.pressure,
+                erase: this.stroke.mode === "erase",
+                point: this.lastPosition,
+            });
         }, 1000 / 30); // 30 times per second
     }
 
-    endDraw() {
-        this.segmentationContext.isDrawing = false;
-        const segmentationItem = this.segmentationContext.segmentationItem;
-        if (!segmentationItem) {
-            console.warn("No segmentation item");
-            return;
-        }
-        if (this.drawInterval) {
-            clearInterval(this.drawInterval);
-            this.drawInterval = undefined;
-            const scanNr = this.viewerContext.index;
-            segmentationItem.draw(scanNr, null, {});
-        }
+    endDraw(viewerContext: ViewerContext) {
+        this.finish(viewerContext, false);
+    }
+
+    /** Enhance writes while held, so Esc commits the stroke and undoes it at once. */
+    cancel(viewerContext: ViewerContext) {
+        this.finish(viewerContext, true);
+    }
+
+    private finish(viewerContext: ViewerContext, undo: boolean) {
+        this.setDrawing(false);
+        this.stroke = undefined;
+        if (!this.drawInterval) return;
+        clearInterval(this.drawInterval);
+        this.drawInterval = undefined;
+        const item = this.segmentationContext.segmentationItem;
+        if (!item) return;
+        const index = viewerContext.index;
+        item.draw(index, null as never, {})
+            .then(() => (undo ? item.undo(index) : undefined))
+            .catch((error) => {
+                console.error(error);
+                this.report(
+                    "Error drawing on segmentation. Check console for details.",
+                );
+            });
     }
 }

@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { SegmentationGET } from "../../../types/openapi_types";
 import { SegmentationContext } from "./segmentationContext.svelte";
+import { Workspace } from "$lib/workspace/workspace.svelte";
 
 const ME = 5;
 
-function context() {
+function context(viewerWindowContext: unknown = {}) {
     const image = {
         getOrCreateSegmentationItem: (segmentation: unknown) => ({
             segmentation,
         }),
     };
-    return new SegmentationContext("inst-1", 0, {} as never, image as never);
+    return new SegmentationContext(
+        "inst-1",
+        0,
+        viewerWindowContext as never,
+        image as never,
+    );
 }
 
 describe("SegmentationContext groups", () => {
@@ -39,5 +45,25 @@ describe("SegmentationContext groups", () => {
         expect(ctx.isGroupOpen(String(ME), ME)).toBe(true);
         expect(ctx.isGroupOpen("9", ME)).toBe(false);
         expect(ctx.isGroupOpen("ai", ME)).toBe(false);
+    });
+});
+
+describe("SegmentationContext draw toggles", () => {
+    it("choosing another current segmentation turns Questionable and Dilate / Erode off", () => {
+        const workspace = new Workspace();
+        const ctx = context({ viewState: workspace });
+        workspace.questionable = true;
+        workspace.dilateErode = true;
+        ctx.activateSegmentationItem({
+            segmentation: {
+                id: 3,
+                annotation_type: "grader_segmentation",
+                data_representation: "Binary",
+            },
+        } as never);
+        expect([workspace.questionable, workspace.dilateErode]).toEqual([
+            false,
+            false,
+        ]);
     });
 });

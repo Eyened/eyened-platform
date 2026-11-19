@@ -28,7 +28,10 @@
     import { formAnnotations, formSchemasByName } from "$lib/data";
     import type { JSONSchema } from "$lib/forms/schemaType";
     import { eyeKey, pointBinding } from "$lib/layers/pointsets";
+    import { drawBinding } from "$lib/layers/drawBinding";
     import { bindRegistrationPointTool } from "./panelRegistration/bindRegistrationPointTool";
+    import { bindDrawTool } from "./panelSegmentation/bindDrawTool";
+    import { toolById } from "$lib/workspace/tools/registry";
     import { GridLayers } from "$lib/layers/gridLayers.svelte";
     import { ViewportBlend } from "$lib/layers/viewportBlend.svelte";
     import { LocalizerLines } from "$lib/layers/localizerLines.svelte";
@@ -103,6 +106,9 @@
         },
         get pointTarget() {
             return pointTarget;
+        },
+        get drawTarget() {
+            return drawTarget;
         },
         blend,
     };
@@ -228,6 +234,37 @@
             canEdit: (annotation) => globalContext.canEdit(annotation),
         }),
     );
+    const { segmentationContext } = mainViewerContext;
+    // Built whatever tool is armed, so the options bar names the target as soon as a Draw tool is picked.
+    const drawTarget = $derived(
+        drawBinding({
+            segmentation:
+                segmentationContext.segmentationItem?.segmentation ?? null,
+            activeIndices: segmentationContext.activeIndices,
+            toolId: workspace.armedTool,
+            canEdit: (segmentation) => globalContext.canEdit(segmentation),
+        }),
+    );
+    // A primitive, so a new class or a new editable target never rebuilds the tool mid-stroke.
+    const drawEditable = $derived(
+        drawTarget.reason === null && !segmentationContext.regionToolActive,
+    );
+    // The armed Draw tool acts in every viewport that can take it; the others show "can't edit".
+    $effect(() => {
+        const id = workspace.armedTool;
+        const editable = drawEditable;
+        if (!id || toolById(id).group !== "Draw") return;
+        return untrack(() =>
+            bindDrawTool({
+                toolId: id,
+                editable,
+                viewerContext,
+                segmentationContext,
+                workspace,
+                report: (message) => (globalContext.dialogue = message),
+            }),
+        );
+    });
     // Primitives: a drag rewrites the registration, which must not remount the tool mid-drag.
     const pointId = $derived(pointTarget?.id);
     const pointEditable = $derived(pointTarget?.canEdit ?? false);

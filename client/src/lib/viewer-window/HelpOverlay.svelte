@@ -13,7 +13,7 @@
                     keys: "Shift + scroll (or Ctrl / ⌘ + scroll)",
                 },
                 { action: "Reset view", keys: "Escape" },
-                { action: "Hide overlays (hold)", keys: "Space" },
+                { action: "Hide overlays (hold)", keys: "H" },
             ],
         },
         {
@@ -43,43 +43,46 @@
         {
             title: "Render modes (color images)",
             shortcuts: [
-                { action: "Original", keys: "R" },
-                { action: "Luminance", keys: "L" },
-                { action: "Contrast enhanced", keys: "E" },
-                { action: "Color balanced", keys: "B" },
-                { action: "CLAHE", keys: "H" },
-                { action: "Sharpened", keys: "S" },
-                { action: "Histogram matched", keys: "M" },
+                { action: "Original", keys: "1" },
+                { action: "Contrast enhanced", keys: "2" },
+                { action: "Color balanced", keys: "3" },
+                { action: "CLAHE", keys: "4" },
+                { action: "Sharpened", keys: "5" },
+                { action: "Histogram matched", keys: "6" },
+                { action: "Luminance", keys: "7" },
+                { action: "Red / green / blue channel", keys: "8 / 9 / 0" },
             ],
         },
         {
             title: "Render modes (grayscale / OCT)",
             shortcuts: [
-                { action: "Original", keys: "R" },
-                { action: "CLAHE", keys: "H" },
+                { action: "Original", keys: "1" },
+                { action: "CLAHE", keys: "4" },
             ],
         },
         {
             title: "Segmentation",
             shortcuts: [
-                { action: "Paint (hold)", keys: "Q" },
-                { action: "Erase (hold)", keys: "W" },
+                { action: "Paint / erase / enhance (hold)", keys: "Space" },
+                {
+                    action: "Switch brush ↔ eraser (and the other draw modes)",
+                    keys: "X",
+                },
                 {
                     action: "Pick feature / segmentation under cursor",
-                    keys: "A",
+                    keys: "I",
                 },
-                { action: "Set brush radius (1–9)", keys: "1 – 9" },
-                { action: "Increase / decrease brush radius", keys: "+ / −" },
-                { action: "Adjust brush radius", keys: "Alt + scroll" },
-                { action: "Adjust brush radius", keys: "Alt + drag" },
+                { action: "Decrease / increase brush size", keys: "[ / ]" },
+                { action: "Adjust brush size", keys: "Alt + scroll" },
+                { action: "Adjust brush size", keys: "Alt + drag" },
             ],
         },
         {
             title: "ETDRS grid",
             shortcuts: [
                 {
-                    action: "Cycle central / inner / outer circles",
-                    keys: "C / I / O",
+                    action: "Cycle central / inner circles",
+                    keys: "C / I",
                 },
             ],
         },

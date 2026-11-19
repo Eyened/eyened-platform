@@ -159,7 +159,8 @@ export class SegmentationState {
         }
     }
 
-    private ensureInitialCheckpoint() {
+    /** Takes the slice's first history entry, so a stroke that writes live can still be undone. */
+    ensureInitialCheckpoint() {
         if (!this.hasInitialCheckpoint) {
             this.history.checkpoint(this.mask.exportData());
             this.hasInitialCheckpoint = true;
@@ -253,6 +254,7 @@ export class SegmentationState {
     }
 
     async undo() {
+        await this.isDrawing; // the stroke's own checkpoint must land before it is undone
         const data = await this.history.undo();
         if (data) {
             this.mask.importData(data);

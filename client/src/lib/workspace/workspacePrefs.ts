@@ -9,6 +9,7 @@ import {
     type MagnifierPrefs,
     type MagnifierSize,
 } from "./magnifier";
+import { PAINT_DEFAULTS, SIZE_MAX, SIZE_MIN, type PaintPrefs } from "./paint";
 import type { LocalizerMode } from "./workspaceRules";
 import type { ToolMode } from "./tools/registry";
 import type { LayerSectionId } from "$lib/layers/layerSections";
@@ -22,6 +23,7 @@ const TOOL_MODE_KEY = "eyened:viewer:toolMode";
 const LAYER_AREA_KEY = "eyened:viewer:layerArea";
 const LAYER_SECTIONS_KEY = "eyened:viewer:layerSections";
 const MAGNIFIER_KEY = "eyened:viewer:magnifier";
+const PAINT_KEY = "eyened:viewer:paint";
 
 export type LeftPanel = "images" | "info" | "help";
 const PANELS: readonly string[] = ["images", "info", "help"];
@@ -239,6 +241,39 @@ export function readMagnifier(): MagnifierPrefs {
 export function writeMagnifier(m: MagnifierPrefs): void {
     try {
         localStorage.setItem(MAGNIFIER_KEY, JSON.stringify(m));
+    } catch {
+        // Private mode or quota: the choice lasts this session only.
+    }
+}
+
+/** The last paint settings; a missing, non-numeric or out-of-range field takes its default. */
+export function readPaint(): PaintPrefs {
+    try {
+        const raw = localStorage.getItem(PAINT_KEY);
+        const stored: unknown = raw === null ? null : JSON.parse(raw);
+        if (typeof stored !== "object" || stored === null)
+            return { ...PAINT_DEFAULTS };
+        const s = stored as Record<string, unknown>;
+        const pick = (key: keyof PaintPrefs, min: number, max: number) => {
+            const v = s[key];
+            return typeof v === "number" && v >= min && v <= max
+                ? v
+                : PAINT_DEFAULTS[key];
+        };
+        return {
+            size2D: pick("size2D", SIZE_MIN, SIZE_MAX),
+            sizeBscan: pick("sizeBscan", SIZE_MIN, SIZE_MAX),
+            hardness: pick("hardness", 0, 1),
+            pressure: pick("pressure", 0, 1),
+        };
+    } catch {
+        return { ...PAINT_DEFAULTS };
+    }
+}
+
+export function writePaint(p: PaintPrefs): void {
+    try {
+        localStorage.setItem(PAINT_KEY, JSON.stringify(p));
     } catch {
         // Private mode or quota: the choice lasts this session only.
     }

@@ -20,10 +20,7 @@ import {
     modelSegmentation,
 } from "./testContexts";
 
-// The old drawing tools and the region tool add overlays to a real viewer, which jsdom cannot run.
-vi.mock("$lib/viewer-window/panelSegmentation/DrawingTools.svelte", () => ({
-    default: () => {},
-}));
+// The region tool adds overlays to a real viewer, which jsdom cannot run.
 vi.mock(
     "$lib/viewer-window/panelSegmentation/NewSegmentationRegion.svelte",
     () => ({ default: () => {} }),

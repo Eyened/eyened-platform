@@ -17,9 +17,10 @@ export class ScrollOCT implements ViewerEventListener {
     }
 
     wheel(e: ViewerEvent<WheelEvent>) {
-        const { viewerContext, wheel } = e;
+        const { viewerContext, wheel, modifiers } = e;
         const { image, lockScroll, index } = viewerContext;
-        if (wheel?.zoomIntent) return;
+        // Alt+wheel sets the brush size, so it never steps slices.
+        if (wheel?.zoomIntent || modifiers.alt) return;
         if (lockScroll || viewerContext.sliceLocked) return;
         const delta = wheel?.primaryDeltaPx ?? 0;
 

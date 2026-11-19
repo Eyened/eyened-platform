@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { MAGNIFIER_DEFAULTS } from "./magnifier";
+import { PAINT_DEFAULTS } from "./paint";
 import { mockWidth } from "./testUtils";
 import { Workspace } from "./workspace.svelte";
 import {
     readMagnifier,
     readLayerArea,
     readLayerSections,
+    readPaint,
     readToolMode,
     readStripTracking,
     startStripOn,
@@ -122,5 +124,27 @@ describe("magnifier", () => {
             }),
         );
         expect(readMagnifier()).toEqual(MAGNIFIER_DEFAULTS);
+    });
+});
+
+describe("readPaint", () => {
+    it("keeps each valid stored field and falls back per field to the default", () => {
+        localStorage.setItem(
+            "eyened:viewer:paint",
+            JSON.stringify({
+                size2D: 12,
+                sizeBscan: 2000,
+                hardness: "soft",
+                pressure: 0.8,
+            }),
+        );
+        expect(readPaint()).toEqual({
+            size2D: 12,
+            sizeBscan: 4,
+            hardness: 0.5,
+            pressure: 0.8,
+        });
+        localStorage.setItem("eyened:viewer:paint", "{not json");
+        expect(readPaint()).toEqual(PAINT_DEFAULTS);
     });
 });

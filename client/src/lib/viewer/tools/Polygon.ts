@@ -1,47 +1,35 @@
-import type { SegmentationContext } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { ViewerEvent } from "../viewer-utils";
-import type { ViewerContext } from "../viewerContext.svelte";
-import { SegmentationTool, type DrawingExecutor } from "./segmentation";
+import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
+import {
+    casedStroke,
+    SegmentationTool,
+    type DrawingMode,
+} from "./segmentation";
 
-const lineWidth = 2;
-
+/** Drag round an area to fill it, or with X, to erase it. */
 export class PolygonTool extends SegmentationTool {
-    constructor(
-        drawingExecutor: DrawingExecutor,
-        viewerContext: ViewerContext,
-        segmentationContext: SegmentationContext,
-    ) {
-        super(drawingExecutor, viewerContext, segmentationContext);
+    protected nextMode(): DrawingMode {
+        return this.view.remove ? "erase" : "paint";
     }
 
     pointerdown(e: ViewerEvent<PointerEvent>) {
         const { event } = e;
         this.lastPosition = this.eventToSegmentation(e);
-
-        if (event.altKey || event.shiftKey) return;
-
-        if (event.button === 0) this.drawingState = "paint";
-        else if (event.button === 2) this.drawingState = "erase";
-
+        if (event.button !== 0 || event.altKey || event.shiftKey) return;
+        if (this.stroke) return;
         this.startDraw(e.viewerContext);
     }
 
     pointerup(e: ViewerEvent<PointerEvent>) {
-        const { viewerContext } = e;
-        this.endDraw(viewerContext);
+        this.endDraw(e.viewerContext);
     }
 
     pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
         const { event } = pointerEvent;
-        if (event.altKey || event.shiftKey) {
-            return;
-        }
+        if (event.altKey || event.shiftKey) return;
         this.lastPosition = this.eventToSegmentation(pointerEvent);
-
-        if (this.drawingState && this.currentPoints) {
-            this.currentPoints.push(this.eventToSegmentation(pointerEvent));
-        }
+        if (this.currentPoints) this.currentPoints.push(this.lastPosition);
     }
 
     executeDraw(
@@ -49,7 +37,6 @@ export class PolygonTool extends SegmentationTool {
         _viewerContext: ViewerContext,
     ): void {
         ctx.fillStyle = "white";
-
         ctx.beginPath();
         const p = this.currentPoints![0];
         ctx.moveTo(p.x, p.y);
@@ -62,45 +49,25 @@ export class PolygonTool extends SegmentationTool {
 
     repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
         super.repaint(viewerContext, renderTarget);
-        const flipDrawErase = this.flipDrawErase;
-        if (
-            !this.drawingState ||
-            !this.currentPoints ||
-            this.currentPoints.length == 0
-        )
-            return;
+        viewerContext.claimCursor("crosshair", CursorPriority.Tool);
+        if (!this.currentPoints || this.currentPoints.length == 0) return;
 
         const ctx = viewerContext.context2D;
-
-        ctx.lineWidth = lineWidth;
-
-        if ((this.drawingState === "paint") !== flipDrawErase) {
-            ctx.strokeStyle = this.paintColor;
-        } else {
-            ctx.strokeStyle = this.eraseColor;
+        const first = this.segmentationToViewer(this.currentPoints[0]);
+        let last = first;
+        const lasso = new Path2D();
+        lasso.moveTo(first.x, first.y);
+        for (const point of this.currentPoints.slice(1)) {
+            last = this.segmentationToViewer(point);
+            lasso.lineTo(last.x, last.y);
         }
         ctx.fillStyle = this.fillColor;
-        ctx.setLineDash([]);
-
-        ctx.beginPath();
-        let p = this.segmentationToViewer(this.currentPoints[0]);
-        ctx.moveTo(p.x, p.y);
-        for (let i = 1; i < this.currentPoints.length; i++) {
-            p = this.segmentationToViewer(this.currentPoints[i]);
-            ctx.lineTo(p.x, p.y);
-        }
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.setLineDash([5, 5]);
-        ctx.beginPath();
-        p = this.segmentationToViewer(this.currentPoints[0]);
-        ctx.moveTo(p.x, p.y);
-        p = this.segmentationToViewer(
-            this.currentPoints[this.currentPoints.length - 1],
-        );
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.fill(lasso);
+        casedStroke(ctx, lasso, this.drawingColor);
+        // Dashed: the edge the release will close.
+        const closing = new Path2D();
+        closing.moveTo(last.x, last.y);
+        closing.lineTo(first.x, first.y);
+        casedStroke(ctx, closing, this.drawingColor, [5, 5]);
     }
 }
