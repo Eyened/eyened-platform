@@ -62,16 +62,18 @@
         {
             title: "Segmentation",
             shortcuts: [
-                { action: "Paint (hold)", keys: "Q" },
-                { action: "Erase (hold)", keys: "W" },
+                { action: "Paint / erase / enhance (hold)", keys: "Space" },
+                {
+                    action: "Switch brush ↔ eraser (and the other draw modes)",
+                    keys: "X",
+                },
                 {
                     action: "Pick feature / segmentation under cursor",
-                    keys: "A",
+                    keys: "I",
                 },
-                { action: "Set brush radius (1–9)", keys: "1 – 9" },
-                { action: "Increase / decrease brush radius", keys: "+ / −" },
-                { action: "Adjust brush radius", keys: "Alt + scroll" },
-                { action: "Adjust brush radius", keys: "Alt + drag" },
+                { action: "Decrease / increase brush size", keys: "[ / ]" },
+                { action: "Adjust brush size", keys: "Alt + scroll" },
+                { action: "Adjust brush size", keys: "Alt + drag" },
             ],
         },
         {
