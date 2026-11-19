@@ -28,6 +28,7 @@
     import { formAnnotations, formSchemasByName } from "$lib/data";
     import type { JSONSchema } from "$lib/forms/schemaType";
     import { eyeKey, pointBinding } from "$lib/layers/pointsets";
+    import { drawBinding } from "$lib/layers/drawBinding";
     import { bindRegistrationPointTool } from "./panelRegistration/bindRegistrationPointTool";
     import { GridLayers } from "$lib/layers/gridLayers.svelte";
     import { ViewportBlend } from "$lib/layers/viewportBlend.svelte";
@@ -103,6 +104,9 @@
         },
         get pointTarget() {
             return pointTarget;
+        },
+        get drawTarget() {
+            return drawTarget;
         },
         blend,
     };
@@ -226,6 +230,16 @@
                 eyeKey(image.instance),
             ),
             canEdit: (annotation) => globalContext.canEdit(annotation),
+        }),
+    );
+    const { segmentationContext } = mainViewerContext;
+    // Built whatever tool is armed, so the options bar names the target as soon as a Draw tool is picked.
+    const drawTarget = $derived(
+        drawBinding({
+            segmentation: segmentationContext.segmentationItem?.segmentation ?? null,
+            activeIndices: segmentationContext.activeIndices,
+            toolId: workspace.armedTool,
+            canEdit: (segmentation) => globalContext.canEdit(segmentation),
         }),
     );
     // Primitives: a drag rewrites the registration, which must not remount the tool mid-drag.

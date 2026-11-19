@@ -1,5 +1,6 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { pointArming } from "$lib/forms/pointArming.svelte";
+import type { DrawTarget } from "$lib/layers/drawBinding";
 import type { GridLayers } from "$lib/layers/gridLayers.svelte";
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
@@ -78,6 +79,8 @@ export interface LayersTarget {
     readonly localizer: LocalizerLines;
     /** The registration P works on in this viewport; null when there is none. */
     readonly pointTarget: { id: number; canEdit: boolean } | null;
+    /** The current segmentation a Draw tool writes into here, or why it can't. */
+    readonly drawTarget: DrawTarget;
     /** This viewport's blend, kept while it is mounted. */
     readonly blend: ViewportBlend;
 }

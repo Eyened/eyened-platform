@@ -46,6 +46,7 @@ function attach(ws: Workspace, position: number, instanceId: string) {
             projectionSources: [],
             localizer: new LocalizerLines(() => []),
             pointTarget: null,
+            drawTarget: { name: null, reason: null },
             blend: {} as never,
         },
     });
