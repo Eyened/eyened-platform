@@ -107,7 +107,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Draw",
         kind: "modal",
         icon: PaintBrush,
-        hint: "",
+        hint: "Hold Space paints · X brush ↔ eraser · I picks the feature under the pointer",
     },
     {
         id: "eraser",
@@ -116,7 +116,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Draw",
         kind: "modal",
         icon: Erase,
-        hint: "",
+        hint: "Hold Space erases · X brush ↔ eraser · I picks the feature under the pointer",
     },
     {
         id: "polygon",
@@ -125,7 +125,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Draw",
         kind: "modal",
         icon: AreaCustom,
-        hint: "",
+        hint: "Drag round an area · Esc cancels",
     },
     {
         id: "enhance",
@@ -134,7 +134,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Draw",
         kind: "modal",
         icon: MagicWand,
-        hint: "",
+        hint: "Hold Space enhances · X increase ↔ decrease",
     },
     {
         id: "point",
