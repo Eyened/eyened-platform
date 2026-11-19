@@ -1,9 +1,10 @@
 <!--
 @component
-The tool options bar: the armed tool's name, a Draw tool's target or why it can't draw, its options, then a one-line hint for keys without a button. The hint drops first when the bar is short.
+The tool options bar: the armed tool's name, a Draw tool's target or why it can't draw, its options, then a one-line hint for keys without a button. When the bar is short the hint drops first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first.
 -->
 <script lang="ts">
-    import { getContext } from "svelte";
+    import { getContext, tick, untrack } from "svelte";
+    import OverflowMenu from "../OverflowMenu.svelte";
     import type { Workspace } from "../workspace.svelte";
     import { NO_TOOL_HINT, toolById, type ToolId } from "./registry";
     import ToolOption, { type OptionId } from "./ToolOption.svelte";
@@ -68,24 +69,53 @@ The tool options bar: the armed tool's name, a Draw tool's target or why it can'
                 return [];
         }
     }
-    // A reason replaces the options.
-    const options = $derived(reason ? [] : optionsFor(tool?.id));
+    // A reason replaces the options. Size shows nothing without an image, so it is left out.
+    const options = $derived(
+        reason
+            ? []
+            : optionsFor(tool?.id).filter(
+                  (id) =>
+                      id !== "size" || viewport?.layers?.viewerContext.image,
+              ),
+    );
     const isHistory = (id: OptionId) => id === "undo" || id === "redo";
 
     let bar: HTMLElement | undefined = $state();
     let hintElement: HTMLElement | undefined = $state();
     let hintFits = $state(true);
 
-    // The hint shows whole or not at all; measured again when the bar or the hint changes.
+    /** How many trailing options sit in ⋯. */
+    let folds = $state(0);
+    const shown = $derived(options.slice(0, options.length - folds));
+    const folded = $derived(options.slice(options.length - folds));
+
+    let fitting = 0;
+    /** Starts with nothing folded, then moves the last option in the row into ⋯ until the row fits; the hint shows whole or not at all. */
+    async function fit() {
+        const el = bar;
+        if (!el) return;
+        // A newer fit replaces this one.
+        const run = ++fitting;
+        folds = 0;
+        await tick();
+        while (folds < options.length && el.scrollWidth > el.clientWidth) {
+            if (run !== fitting) return;
+            folds += 1;
+            await tick();
+        }
+        if (run !== fitting) return;
+        if (hintElement)
+            hintFits = hintElement.scrollWidth <= hintElement.clientWidth;
+    }
+
+    // Fits again when the bar resizes or what it shows changes.
     $effect(() => {
+        void options;
+        void draw?.name;
         void hint;
-        if (!bar || !hintElement) return;
-        const el = hintElement;
-        const measure = () => {
-            hintFits = el.scrollWidth <= el.clientWidth;
-        };
-        measure();
-        const observer = new ResizeObserver(measure);
+        if (!bar) return;
+        untrack(() => void fit());
+        const observer = new ResizeObserver(() => void fit());
         observer.observe(bar);
         return () => observer.disconnect();
     });
@@ -128,24 +158,33 @@ The tool options bar: the armed tool's name, a Draw tool's target or why it can'
         class="min-w-0 py-1 text-body-compact-01 whitespace-normal text-text-primary"
         class:sr-only={!reason}>{reason ?? ""}</span
     >
-    {#each options.filter((id) => !isHistory(id)) as id (id)}
+    {#each shown.filter((id) => !isHistory(id)) as id (id)}
         <span data-option={id} class="flex shrink-0 items-center"
             ><ToolOption {id} {viewport} /></span
         >
     {/each}
     <!-- Undo and Redo are one group, like Zoom's buttons. -->
-    {#if options.some(isHistory)}
+    {#if shown.some(isHistory)}
         <div
             role="group"
             aria-label="History"
             class="flex shrink-0 items-center"
         >
-            {#each options.filter(isHistory) as id (id)}
+            {#each shown.filter(isHistory) as id (id)}
                 <span data-option={id} class="flex items-center"
                     ><ToolOption {id} {viewport} /></span
                 >
             {/each}
         </div>
+    {/if}
+    {#if folded.length}
+        <OverflowMenu label="More" size="icon-xs">
+            {#each folded as id (id)}
+                <div data-option={id} class="flex items-center px-2 py-1">
+                    <ToolOption {id} {viewport} />
+                </div>
+            {/each}
+        </OverflowMenu>
     {/if}
     <span
         bind:this={hintElement}

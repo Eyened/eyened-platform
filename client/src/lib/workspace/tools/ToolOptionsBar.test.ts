@@ -1,5 +1,12 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
-import { describe, expect, it, vi } from "vitest";
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    within,
+} from "@testing-library/svelte";
+import { tick } from "svelte";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     expectNoAxeViolations,
     workspaceContext,
@@ -115,5 +122,80 @@ describe("ToolOptionsBar", () => {
             "Another grader's segmentation can't be edited. Duplicate it to edit.",
         );
         expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    });
+});
+
+describe("ToolOptionsBar when short", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    /** The options in the bar's row (History's included), not those in More. */
+    function rowOptions(bar: Element) {
+        return [...bar.querySelectorAll("[data-option]")].filter(
+            (el) => !el.closest("[data-slot=overflow-menu]"),
+        );
+    }
+
+    // jsdom has no layout: the bar is `px` wide and each option in its row takes 100 px.
+    function barWidth(px: number) {
+        const isBar = (el: Element) => el.matches("[data-slot=tool-options]");
+        vi.spyOn(Element.prototype, "clientWidth", "get").mockImplementation(
+            function (this: Element) {
+                return isBar(this) ? px : 0;
+            },
+        );
+        vi.spyOn(Element.prototype, "scrollWidth", "get").mockImplementation(
+            function (this: Element) {
+                return isBar(this) ? rowOptions(this).length * 100 : 0;
+            },
+        );
+    }
+
+    function inRow(container: Element) {
+        const bar = container.querySelector("[data-slot=tool-options]")!;
+        return rowOptions(bar).map((el) => el.getAttribute("data-option"));
+    }
+
+    function renderBrush(px: number, target: DrawTarget = EDITABLE) {
+        barWidth(px);
+        const ws = workspaceWith(1);
+        drawViewport(ws, target);
+        ws.arm("brush");
+        return render(ToolOptionsBar, { context: workspaceContext(ws) });
+    }
+
+    it("folds Redo, then Undo, then settings from the right into More, Size last", async () => {
+        const { container } = renderBrush(350);
+        await vi.waitFor(() =>
+            expect(inRow(container)).toEqual([
+                "size",
+                "dilateErode",
+                "questionable",
+            ]),
+        );
+        const menu = container.querySelector<HTMLElement>(
+            "[data-slot=overflow-menu]",
+        )!;
+        for (const name of ["Undo", "Redo"])
+            expect(
+                within(menu).getByRole("button", { name, hidden: true }),
+            ).toBeInTheDocument();
+        cleanup();
+        vi.restoreAllMocks();
+        const narrow = renderBrush(150);
+        await vi.waitFor(() =>
+            expect(inRow(narrow.container)).toEqual(["size"]),
+        );
+    });
+
+    it("never folds a can't-edit reason", async () => {
+        renderBrush(50, {
+            name: null,
+            reason: "No current segmentation. Choose one in Segmentations.",
+        });
+        await tick();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "No current segmentation. Choose one in Segmentations.",
+        );
+        expect(screen.queryByRole("button", { name: "More" })).toBeNull();
     });
 });

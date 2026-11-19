@@ -31,7 +31,7 @@ A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab orde
         children: Snippet<[close: () => void]>;
     } = $props();
 
-    // ASSUMPTION: a disclosure, not Carbon's overflow menu, since its list is a few plain buttons.
+    // ASSUMPTION: a disclosure, not Carbon's overflow menu: its list holds buttons and, in the options bar, sliders.
     const uid = $props.id();
     let open = $state(false);
     let root: HTMLElement | undefined = $state();
