@@ -6,6 +6,8 @@ import {
     type ViewerEventListener,
 } from "$lib/viewer/viewer-utils";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+import type { WorkspaceView } from "$lib/viewer-window/viewerWindowContext.svelte";
+import { SIZE_STEP, sizeKey } from "../paint";
 import { toolForKey } from "./registry";
 
 /** Digits by physical key, so AZERTY works: 1 Original … 0 Blue. */
@@ -17,6 +19,17 @@ export const RENDER_MODE_DIGITS: Record<string, RenderMode> =
 const HIDE_OVERLAYS = "h";
 const LOCALIZER = "o";
 const MAGNIFIER = "m";
+const SWAP = "x";
+const SIZED = ["brush", "eraser", "enhance"];
+
+/** X: Brush and Eraser are two tools; Polygon and Enhance switch between adding and removing. */
+function swap(view: WorkspaceView | undefined): void {
+    if (!view) return;
+    if (view.armedTool === "brush") view.arm("eraser");
+    else if (view.armedTool === "eraser") view.arm("brush");
+    else if (view.armedTool === "polygon" || view.armedTool === "enhance")
+        view.remove = !view.remove;
+}
 
 /** The selected viewport's segmentation state and slice; keys reach the focused viewport, and focus selects it. */
 function selectedSegmentation(viewerContext: ViewerContext) {
@@ -34,9 +47,25 @@ function selectedSegmentation(viewerContext: ViewerContext) {
 export class Keymap implements ViewerEventListener {
     keydown(e: ViewerEvent<KeyboardEvent>) {
         const { event, viewerContext } = e;
+        const view = viewerContext.viewerWindowContext.viewState;
+        const selected = selectedSegmentation(viewerContext);
         // No key acts while a stroke is drawn; Esc is the tool's, which drops the stroke.
-        if (selectedSegmentation(viewerContext)?.segmentationContext.isDrawing)
-            return;
+        if (selected?.segmentationContext.isDrawing) return;
+        if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+            const key = event.key.toLowerCase();
+            const redo =
+                (key === "y" && event.ctrlKey) ||
+                (key === "z" && event.shiftKey);
+            if (redo || key === "z") {
+                event.preventDefault();
+                // Undo acts on the selected viewport's current segmentation, never from a strip tile.
+                if (event.repeat || viewerContext.isStripTile || !selected)
+                    return;
+                if (redo) selected.segmentationContext.redo(selected.index);
+                else selected.segmentationContext.undo(selected.index);
+                return;
+            }
+        }
         if (event.ctrlKey || event.metaKey || event.altKey) return;
         if (event.key === "Escape") {
             viewerContext.initTransform();
@@ -63,16 +92,29 @@ export class Keymap implements ViewerEventListener {
         // Focus in a viewport selects it, so this is the viewport the key was pressed in. A tile selects none.
         if (key === LOCALIZER) {
             if (!viewerContext.isStripTile)
-                viewerContext.viewerWindowContext.viewState?.selectedViewport?.layers?.localizer.toggle();
+                view?.selectedViewport?.layers?.localizer.toggle();
             return;
         }
         if (key === MAGNIFIER) {
-            const view = viewerContext.viewerWindowContext.viewState;
             view?.setMagnifier({ on: !view.magnifier.on });
             return;
         }
+        if (key === SWAP) {
+            swap(view);
+            return;
+        }
+        if (key === "[" || key === "]") {
+            if (view?.armedTool && SIZED.includes(view.armedTool)) {
+                const size = view.paint[sizeKey(viewerContext.image)];
+                view.setSize(
+                    viewerContext.image,
+                    key === "]" ? size * SIZE_STEP : size / SIZE_STEP,
+                );
+            }
+            return;
+        }
         const tool = toolForKey(key);
-        if (tool) viewerContext.viewerWindowContext.viewState?.arm(tool.id);
+        if (tool) view?.arm(tool.id);
     }
 
     keyup(e: ViewerEvent<KeyboardEvent>) {

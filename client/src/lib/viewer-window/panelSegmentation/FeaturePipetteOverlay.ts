@@ -4,7 +4,7 @@ import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { RenderTarget } from "$lib/webgl/types";
 import { handleFeaturePipetteKeydown } from "./featurePipette";
 
-/** Event-only overlay: A picks feature class or binary/questionable segmentation under cursor. */
+/** Event-only overlay: I picks feature class or binary/questionable segmentation under cursor. */
 export class FeaturePipetteOverlay implements Overlay {
     constructor(
         private readonly mainViewerContext: MainViewerContext,

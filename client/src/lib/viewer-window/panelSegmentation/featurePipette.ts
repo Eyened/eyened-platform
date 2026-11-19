@@ -17,8 +17,8 @@ import {
 } from "./segmentationContext.svelte";
 import { orderSegmentationsByCreator } from "./segmentationUtils";
 
-/** Pipette hotkey: A (feature pick). E remains contrast-enhanced render mode. */
-export const FEATURE_PIPETTE_KEY = "KeyA";
+/** Pipette hotkey: I (feature pick), at the pointer. */
+export const FEATURE_PIPETTE_KEY = "KeyI";
 
 type MultiFeatureRep = "MultiClass" | "MultiLabel";
 type IndependentMaskRep = "Binary" | "DualBitMask" | "Probability";
@@ -116,7 +116,7 @@ function isIndependentMaskRep(rep: string): rep is IndependentMaskRep {
     return rep === "Binary" || rep === "DualBitMask" || rep === "Probability";
 }
 
-/** True when A should run the segmentation pipette. */
+/** True when I should run the segmentation pipette. */
 export function shouldHandleFeaturePipetteKey(
     event: KeyboardEvent,
     mainViewerContext: MainViewerContext,
@@ -124,7 +124,10 @@ export function shouldHandleFeaturePipetteKey(
 ): boolean {
     if (event.code !== FEATURE_PIPETTE_KEY || event.repeat) return false;
     if (isTypingTarget(event)) return false;
-    return viewerContext.activePanels.has("Segmentation");
+    // I acts at the pointer, so only in the focused viewport while the pointer is over it.
+    return (
+        viewerContext.active && viewerContext.activePanels.has("Segmentation")
+    );
 }
 
 /** Lowest feature index present at pixel (matches shader layer iteration order). */
