@@ -1,4 +1,5 @@
 import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
+import { segmentationPlaneSize } from "$lib/webgl/segmentationProjection";
 import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
@@ -154,6 +155,7 @@ export class SegmentationContext {
         }
         this.questionableActive = false;
         this.erodeDilateActive = false;
+        this.viewerWindowContext.viewState?.resetDrawToggles();
     }
 
     private activeSegmentationKey(): string | undefined {
@@ -182,6 +184,7 @@ export class SegmentationContext {
         }
         this.questionableActive = false;
         this.erodeDilateActive = false;
+        this.viewerWindowContext.viewState?.resetDrawToggles();
     }
 
     toggleActive(segmentationItem: SegmentationItem) {
@@ -191,10 +194,59 @@ export class SegmentationContext {
             this.activeIndices = [];
             this.questionableActive = false;
             this.erodeDilateActive = false;
+            this.viewerWindowContext.viewState?.resetDrawToggles();
             return;
         }
 
         this.activateSegmentationItem(segmentationItem);
+    }
+
+    /** A canvas the size of the current segmentation's plane, for one stroke. */
+    getCtx(): CanvasRenderingContext2D {
+        const item = this.segmentationItem;
+        if (!item) return this.image.getDrawingCtx();
+        const plane = segmentationPlaneSize(item.segmentation, this.image);
+        return this.image.getDrawingCtx(plane.width, plane.height);
+    }
+
+    /** Writes one stroke into the current segmentation on slice `index`. */
+    async draw(
+        ctx: CanvasRenderingContext2D,
+        mode: "paint" | "erase",
+        index: number,
+    ): Promise<void> {
+        const item = this.segmentationItem;
+        if (!item) return;
+        const view = this.viewerWindowContext.viewState;
+        await item.draw(index, ctx.canvas, {
+            paint: mode === "paint",
+            dilateErode: view?.dilateErode ?? false,
+            questionable: view?.questionable ?? false,
+            activeIndices: this.activeIndices,
+        });
+    }
+
+    canUndo(index: number): boolean {
+        return (
+            this.segmentationItem?.getSegmentationState(index, false)
+                ?.canUndo ?? false
+        );
+    }
+
+    canRedo(index: number): boolean {
+        return (
+            this.segmentationItem?.getSegmentationState(index, false)
+                ?.canRedo ?? false
+        );
+    }
+
+    /** Only segmentations that were written have a history, so an empty one is a silent no-op. */
+    undo(index: number): void {
+        if (this.canUndo(index)) void this.segmentationItem!.undo(index);
+    }
+
+    redo(index: number): void {
+        if (this.canRedo(index)) void this.segmentationItem!.redo(index);
     }
 
     private static readonly ALL_FEATURES_VISIBLE = 0xffffffff >>> 0;
