@@ -53,7 +53,9 @@ describe("drawBinding", () => {
         );
         expect(
             reason(segmentation({ annotation_type: "model_segmentation" })),
-        ).toBe("This model segmentation can't be edited. Duplicate it to edit.");
+        ).toBe(
+            "This model segmentation can't be edited. Duplicate it to edit.",
+        );
         expect(reason(segmentation({ creator: { id: 9 } }))).toBe(
             "Another grader's segmentation can't be edited. Duplicate it to edit.",
         );
@@ -63,7 +65,10 @@ describe("drawBinding", () => {
             "Enhance works on probability segmentations only. Choose one in Segmentations.",
         );
         expect(
-            reason(segmentation({ data_representation: "Probability" }), "enhance"),
+            reason(
+                segmentation({ data_representation: "Probability" }),
+                "enhance",
+            ),
         ).toBeNull();
     });
 });

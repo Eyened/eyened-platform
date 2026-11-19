@@ -121,8 +121,8 @@ export interface ViewerEventListener {
     keydown?: (arg0: ViewerEvent<KeyboardEvent>) => any;
     keyup?: (arg0: ViewerEvent<KeyboardEvent>) => any;
     dblclick?: (arg0: ViewerEvent<MouseEvent>) => any;
-    pointercancel?: (arg0: ViewerEvent<PointerEvent>) => any;
-    blur?: (arg0: ViewerEvent<FocusEvent>) => any;
+    pointercancel?: (arg0: ViewerEvent<PointerEvent>) => void;
+    blur?: (arg0: ViewerEvent<FocusEvent>) => void;
 }
 
 export interface Overlay extends ViewerEventListener {

@@ -13,7 +13,7 @@
                     keys: "Shift + scroll (or Ctrl / ⌘ + scroll)",
                 },
                 { action: "Reset view", keys: "Escape" },
-                { action: "Hide overlays (hold)", keys: "Space" },
+                { action: "Hide overlays (hold)", keys: "H" },
             ],
         },
         {
