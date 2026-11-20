@@ -31,6 +31,29 @@ After configuration, you can test if it works. Errors will be visible in the log
 Try to do the initial setup in your local development environment. Ask the provider to configure the redirect URL `http://localhost:8080/users/oidc-callback` for you.
 :::
 
+### SURFconext
+
+1. Request an OIDC connection from SURFconext, with redirect URL `https://eyened.example.org/users/oidc-callback` (your own host).
+2. Set these in `deploy/.env`, with the client id and secret SURFconext issued:
+
+   ```bash
+   EYENED_API_AUTH_OIDC_ENABLED=true
+   EYENED_OIDC_CLIENT_ID=<client id>
+   EYENED_OIDC_CLIENT_SECRET=<from-surfconext>
+   EYENED_OIDC_METADATA_URL=https://connect.surfconext.nl/.well-known/openid-configuration
+   EYENED_OIDC_REDIRECT_URL=https://eyened.example.org/users/oidc-callback
+   EYENED_OIDC_CREATE_NEW_ACCOUNTS=true
+   EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS=erasmusmc.nl
+   EYENED_OIDC_PROVIDER_NAME=SURFconext
+   ```
+
+3. Run `docker compose up -d` from `deploy/`.
+4. Grant each new Account a project role on the admin page. A first login creates the Account with no project access.
+
+:::note
+SURFconext has no single logout. Logging out of Eyened ends the Eyened session only, so a later login can skip the institution's login page.
+:::
+
 ### OIDC Configuration
 
 The OIDC backend is configured in the same way as the ORM, through env variables. See the [ORM documentation](/eyened-platform/orm/configuration) on how to provide these.
@@ -46,6 +69,7 @@ This is a list of all available configuration options. Further down, more detail
 | EYENED_OIDC_PROVIDER_NAME                | Friendly name of the OIDC provider       |
 | EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS | Additional token validations             |
 | EYENED_OIDC_CREATE_NEW_ACCOUNTS          | Enable creation of new accounts for OIDC |
+| EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS   | Institutions allowed to log in           |
 | EYENED_API_AUTH_OIDC_ENABLED             | Enable OIDC authentication               |
 | EYENED_API_AUTH_PASSWORD_ENABLED         | Enable password authentication           |
 
@@ -77,11 +101,9 @@ At the Eyened login screen, access to the OIDC authentication will be visible th
 - Required: no
 - Default value: -
 
-You can use this configuration option to list additional token claims that need to be validated in `ID tokens`. By default, only the "Audience" claim and various timing claims are checked. OpenID officially requires to also validate the Issuer claim (`iss`), and specific providers might advise to validate claims specific to their implementation. E.g. [MS Entra advises](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation) to also check the "Tenant" claim (`tid`).
+You can use this configuration option to list additional claims that a login must hold. They are checked against the ID token and userinfo claims together. The server already checks the "Issuer" (`iss`), "Audience" and timing claims itself, so you don't need to list `iss`. Specific providers might advise to validate claims specific to their implementation. E.g. [MS Entra advises](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation) to also check the "Tenant" claim (`tid`).
 
-Example: the configuration value `iss=12345,foo=bar` will validate the "Issuer" claim (`iss`) to be `12345`, and the made-up `foo` claim to have value `bar`. Separate key and value from each other using an equals sign (`=`), multiple key-value sets are separated by a comma (`,`).
-
-It's recommended to configure this option to at least validate the "Issuer" claim (`iss`) You should have received the correct value for this claim with your app registration.
+Example: the configuration value `tid=12345,foo=bar` will validate the "Tenant" claim (`tid`) to be `12345`, and the made-up `foo` claim to have value `bar`. A list claim passes if it contains the value. Separate key and value from each other using an equals sign (`=`), multiple key-value sets are separated by a comma (`,`).
 
 #### `EYENED_OIDC_CREATE_NEW_ACCOUNTS`
 
@@ -89,6 +111,13 @@ It's recommended to configure this option to at least validate the "Issuer" clai
 - Default value: `false`
 
 Whether to create new accounts for users that have authenticated successfully using OIDC, but are unknown to the Eyened application. Read [OIDC Access control](#oidc-access-control) below for details.
+
+#### `EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS`
+
+- Required: no
+- Default value: -
+
+A comma-separated list of `schac_home_organization` values allowed to log in through OIDC, e.g. `erasmusmc.nl,uu.nl`. A login from any other institution is refused with 403. Empty admits every institution.
 
 #### `EYENED_API_AUTH_OIDC_ENABLED`
 
@@ -137,7 +166,7 @@ This mode is activated when you set `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true`.
 
 If you handle access control at the OIDC provider, the provider usually allows a way to control which persons are authorized to access the application. Maybe you're connected to your organizations' Active Directory, and you can control access using Groups in AD. This totally depends on the provider, and your organization. Optionally consult your IT department for possibilities.
 
-When enabled, the Eyened platform will accept all authenticated sessions from OIDC. For new accounts, an entry in the `creator` table will be added and linked to their OIDC identity (by recording the "Subject" claim in the `creator.EmployeeIdentifier` field). When creating a new account, the other fields populated in the `creator` table are `CreatorName` (value taken from ID token claim `preferred_username`) and `PasswordHash` (set to an unusable password, so the user cannot log in using password authentication).
+When enabled, the Eyened platform will accept all authenticated sessions from OIDC. For new accounts, an entry in the `creator` table will be added and linked to their OIDC identity (by recording the "Subject" claim in the `creator.EmployeeIdentifier` field). When creating a new account, the other fields populated in the `creator` table are `CreatorName` (the full `email` claim) and `PasswordHash` (set to an unusable password, so the user cannot log in using password authentication). A first login with no `email` claim, or an email address over 45 characters, is refused with 400 and no account is created.
 
 :::tip
 Only the value in the `creator.EmployeeIdentifier` field matters for OIDC authentication. Feel free to adjust the name in `creator.CreatorName` to whatever is convenient for displaying in the Eyened frontend. Values in the `creator` table are only touched during account creation.

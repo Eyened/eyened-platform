@@ -61,11 +61,11 @@ prunes needs the intended membership list from the consortium, not a query.
   as a specific `Creator` and see exactly what its `IsAdmin` flag and
   memberships grant. This path does **not** auto-promote, which is also the
   cheapest way to reproduce a new joiner's view.
-- **The joiner flow, for free:** the bundled Keycloak (`deploy/keycloak/`,
-  enabled by appending `:compose.oidc.yaml` to `COMPOSE_FILE` in
-  `deploy/.env` -- see [Deployment](https://eyened.github.io/eyened-platform/deployment/)) with
-  `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` auto-provisions a fresh login as a
-  zero-access user.
+- **The joiner flow:** create a password Account with **Create user** on the
+  admin page (`/admin`) and log in as it. It holds no memberships, so it sees
+  an empty platform until you grant it a project. An SSO joiner gets the same
+  view: with `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true`, a first login through the
+  provider creates a new Account with no project role.
 - **Testing containment:** a production dump has task 70, which touches several
   projects. Revoke yourself from one of them and the task should vanish from
   `GET /task` entirely rather than appear with fewer subtasks. That single check

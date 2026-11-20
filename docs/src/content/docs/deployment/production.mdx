@@ -74,17 +74,12 @@ passes that upstream — so the application sees `https` rather than the `http` 
 
 Set `EYENED_API_COOKIE_SECURE=true` in `deploy/.env`.
 
-**There is no platform-wide public-origin setting.** `PUBLIC_HOST` and `PUBLIC_URL` in
-`.env.example` apply *only* to the bundled Keycloak layer (`compose.oidc.yaml`); nothing else
-reads them, and setting them on a production stack has no effect.
-
 With OIDC, set `EYENED_OIDC_REDIRECT_URL` to the public `https` URL — see
 [Authentication](/eyened-platform/guides/authentication). Registering it with the provider is
 part of that page, not this one.
 
 :::caution
-This topology has not been exercised end to end. `deploy/keycloak/README.md` records the same
-for the bundled-Keycloak case.
+This topology has not been exercised end to end.
 :::
 
 ## Before you go live

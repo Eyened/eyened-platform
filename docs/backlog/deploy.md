@@ -7,19 +7,6 @@
 - **Fix:** pick one: (A) exit non-zero naming the migrate command; (B) non-zero only when `EYENED_AUTO_MIGRATE` is unset; (C) keep the exit code and have `/health` report a schema behind head.
 - **Note:** A turns a forgotten migrate step into an outage (compose has already stopped the old `server`); B needs a third state, but `deploy/compose.yaml` always sets the variable.
 
-### Reach the bundled Keycloak over the compose network
-- **Status:** open, needs a running stack to verify
-- **Source:** `deploy/` consolidation review, 2026-08-14
-- **Problem:** `EYENED_OIDC_METADATA_URL` is the browser-facing `${PUBLIC_HOST}:${KEYCLOAK_PORT}`, so the server leaves and re-enters via the host (hence `extra_hosts` in `deploy/compose.oidc.yaml`). `KEYCLOAK_BIND=127.0.0.1` then leaves every container healthy while token exchange fails, and Keycloak's admin console must be published on `0.0.0.0`.
-- **Fix:** default the metadata URL to `http://keycloak:8080/realms/eyened-dev/.well-known/openid-configuration` and set `KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"`; if that holds, default `KEYCLOAK_BIND` to `127.0.0.1` and drop `extra_hosts`. Verify with a real login and an `iss` that still matches the browser-facing issuer.
-- **Note:** a browser on another machine still needs the port on the network, so loopback becomes viable, not universal.
-
-### Refuse the `oidc` layer together with the prod layer
-- **Status:** open
-- **Source:** `deploy/` consolidation review, 2026-08-14
-- **Problem:** nothing stops `:compose.oidc.yaml` alongside `:compose.prod.yaml`; the bundled Keycloak runs `start-dev` with embedded H2, no HTTPS enforcement and no volume, so its realm resets on every recreate.
-- **Fix:** decide whether the combination is unsupported or merely unwise, then document it or have the CI config matrix reject it, pointing at an external IdP via `EYENED_OIDC_*`.
-
 ### Build and smoke-test the images CI skips
 - **Status:** open
 - **Source:** deploy slim-down review, 2026-09-18
