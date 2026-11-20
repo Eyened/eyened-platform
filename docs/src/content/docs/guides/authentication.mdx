@@ -33,8 +33,8 @@ Try to do the initial setup in your local development environment. Ask the provi
 
 ### SURFconext
 
-1. Request an OIDC connection from SURFconext, with redirect URL `https://eyened.example.org/users/oidc-callback` (your own host).
-2. Set these in `deploy/.env`, with the client id and secret SURFconext issued:
+1. Request an OIDC connection from SURFconext, with redirect URL `https://eyened.example.org/users/oidc-callback` (your own host). Ask SURFconext to release the `email` and `schac_home_organization` attributes, and for the `schac_home_organization` value of each institution you want to admit.
+2. Set these in `deploy/.env`, with the client id and secret SURFconext issued. For the SURFconext test connection, use `https://connect.test.surfconext.nl/.well-known/openid-configuration` as the metadata URL.
 
    ```bash
    EYENED_API_AUTH_OIDC_ENABLED=true
@@ -48,11 +48,31 @@ Try to do the initial setup in your local development environment. Ask the provi
    ```
 
 3. Run `docker compose up -d` from `deploy/`.
-4. Grant each new Account a project role on the admin page. A first login creates the Account with no project access.
+4. A first login creates the Account with no project access. On the Account's admin page, choose **Add to project** and pick a role; see [Access control](/eyened-platform/guides/access_control).
 
 :::note
 SURFconext has no single logout. Logging out of Eyened ends the Eyened session only, so a later login can skip the institution's login page.
 :::
+
+:::caution
+With `EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS` set, a login that carries no `schac_home_organization` is refused with 403. eduID logins may not carry it.
+:::
+
+### Link an existing Account to SSO
+
+Use this when a person already has an Account, for example a password Account, and should keep it when they switch to SSO.
+
+1. In **Admin**, open the person's Account.
+2. Choose **Link email** and enter the email address exactly as the provider sends it. The match is case-sensitive.
+3. The person logs in with SSO. Their first login with that email lands in this Account and pins it to their SSO identity. From then on the email is no longer used.
+
+The **SSO email** line on the Account's admin page shows *Not linked*, the linked email, or *Signed in with SSO* once the Account is pinned.
+
+- An email already linked to another Account is refused.
+- Linking again replaces the link, including the pin. The old SSO login stops matching until the person logs in with the new email.
+- If the email does not match, for example because of a case difference, the login does not reach this Account. With `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` the person gets a new, empty Account named by their email instead, or 409 if an Account already has that name. Otherwise the login is refused.
+
+Linked Accounts keep their project memberships.
 
 ### OIDC Configuration
 
@@ -117,14 +137,14 @@ Whether to create new accounts for users that have authenticated successfully us
 - Required: no
 - Default value: -
 
-A comma-separated list of `schac_home_organization` values allowed to log in through OIDC, e.g. `erasmusmc.nl,uu.nl`. A login from any other institution is refused with 403. Empty admits every institution.
+A comma-separated list of `schac_home_organization` values allowed to log in through OIDC, e.g. `erasmusmc.nl,uu.nl`. Ask your provider for each institution's value. A login from any other institution, or one without the claim, is refused with 403. Empty admits every institution.
 
 #### `EYENED_API_AUTH_OIDC_ENABLED`
 
 - Required: no
 - Default value: `false`
 
-When configuring authentication options, this option enables OIDC authentication. It will display the "Login with OpenID Connect" button on the login screen.
+When configuring authentication options, this option enables OIDC authentication. It will display the *Login with \[...\]* button on the login screen, named by [`EYENED_OIDC_PROVIDER_NAME`](#eyened_oidc_provider_name).
 
 #### `EYENED_API_AUTH_PASSWORD_ENABLED`
 
@@ -146,18 +166,10 @@ This is the default operation mode, when `EYENED_OIDC_CREATE_NEW_ACCOUNTS=false`
 
 If you decide to keep access control in the Eyened application itself, only users who have an existing account in the Eyened platform (in the `creator` table) are allowed to log in. When adding a new account, you need to link the account to identities received from OIDC. To do this, you'll need to provide a claim available in received ID tokens. For security reasons, the "Subject" claim should be used in the long term, but this claim usually holds some random identifier that you cannot predict up front.
 
-To resolve this, you can use a different claim as a temporary replacement. E.g. if the ID token contains the users' email address in the claim `email`, you need to set the value of the `creator.EmployeeIdentifier` to `oidc:email:John.Doe@example.com`. After the first successful authentication, the value will be replaced with the "Subject" claim (using prefix `oidc:sub:`).
-
-:::note
-Only the `email` claim is supported as a temporary claim. An administrator can set the link with `PUT /api/admin/users/{id}/email-link` and the body `{"email": "John.Doe@example.com"}`, which refuses an email another account holds. The link and the later replacement with the "Subject" claim each write an audit row.
-:::
-
-:::caution
-The claim value (e.g. the email address in the example) is checked case-sensitive.
-:::
+To resolve this, the `email` claim serves as a temporary link. **Link email** stores `oidc:email:<address>` in `creator.EmployeeIdentifier`. After the first successful login, the value is replaced with the "Subject" claim (prefix `oidc:sub:`). The link and that replacement each write an audit row. See [Link an existing Account to SSO](#link-an-existing-account-to-sso) for the steps.
 
 :::tip
-If you're migrating from password authentication to OIDC, the easiest way is to update the `creator.EmployeeIdentifier` field in all existing accounts with a claim value as described above. Now users will be able to sign in using both techniques. When you're sure that users can sign in using OIDC and end up with the same account, disable password authentication.
+If you're migrating from password authentication to OIDC, link an email to each existing Account. Users can then sign in with both. When you're sure they reach the same Account through OIDC, disable password authentication.
 :::
 
 #### At the OIDC provider
@@ -166,7 +178,7 @@ This mode is activated when you set `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true`.
 
 If you handle access control at the OIDC provider, the provider usually allows a way to control which persons are authorized to access the application. Maybe you're connected to your organizations' Active Directory, and you can control access using Groups in AD. This totally depends on the provider, and your organization. Optionally consult your IT department for possibilities.
 
-When enabled, the Eyened platform will accept all authenticated sessions from OIDC. For new accounts, an entry in the `creator` table will be added and linked to their OIDC identity (by recording the "Subject" claim in the `creator.EmployeeIdentifier` field). When creating a new account, the other fields populated in the `creator` table are `CreatorName` (the full `email` claim) and `PasswordHash` (set to an unusable password, so the user cannot log in using password authentication). A first login with no `email` claim, or an email address over 45 characters, is refused with 400 and no account is created.
+When enabled, the Eyened platform accepts every OIDC login that passes [`EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS`](#eyened_oidc_allowed_home_organizations) and [`EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS`](#eyened_oidc_additional_token_validations). For new accounts, an entry in the `creator` table will be added and linked to their OIDC identity (by recording the "Subject" claim in the `creator.EmployeeIdentifier` field). When creating a new account, the other fields populated in the `creator` table are `CreatorName` (the full `email` claim) and `PasswordHash` (set to an unusable password, so the user cannot log in using password authentication). A first login with no `email` claim, or an email address over 45 characters, is refused with 400 and no account is created.
 
 :::tip
 Only the value in the `creator.EmployeeIdentifier` field matters for OIDC authentication. Feel free to adjust the name in `creator.CreatorName` to whatever is convenient for displaying in the Eyened frontend. Logins never change `creator.CreatorName`; only account creation sets it.
@@ -179,7 +191,7 @@ Only the value in the `creator.EmployeeIdentifier` field matters for OIDC authen
 Two limits are worth knowing:
 
 - **It is not instantaneous for `GET /api/auth/me`.** That route resolves the token without re-reading the account's status, so an unexpired access token the user already holds still returns their own account details until it expires on its own schedule. One other authenticated route answers the same way — `GET /api/import/status/{task_id}`, which reports a queued job's bare status and carries no project data. Everything that reads or writes project data resolves the scope fresh and closes.
-- **It is not absolute against OIDC.** A deactivated password-only account has `EmployeeIdentifier = NULL`, which the OIDC existing-account lookup matches on, so with `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` the same person can sign in through the provider under a different username and receive a **new** account. That new account holds no memberships, so it reaches no project data until someone grants it; an exact username match is refused with 409 rather than linked.
+- **It is not absolute against OIDC.** A deactivated password-only account has `EmployeeIdentifier = NULL`, which no OIDC login matches, so with `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true` the same person can sign in through the provider under a different username and receive a **new** account. That new account holds no memberships, so it reaches no project data until someone grants it; an exact username match is refused with 409 rather than linked.
 
 To force re-authentication across the board, set a new `EYENED_API_SECRET_KEY` — this invalidates every outstanding token, including refresh tokens (default lifetime: 7 days).
 
