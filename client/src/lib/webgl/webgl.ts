@@ -17,7 +17,8 @@ export class WebGL {
         const gl = this.canvas.getContext("webgl2", {
             preserveDrawingBuffer: true,
             premultipliedAlpha: false,
-        })!;
+        });
+        if (!gl) throw new Error("WebGL 2 is not available");
         this.gl = gl;
         // needed for odd width textures
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);

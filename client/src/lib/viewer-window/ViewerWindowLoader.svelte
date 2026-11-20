@@ -1,12 +1,14 @@
 <!--
 @component
 Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Workspace.
+Without WebGL 2, or once the browser drops the context, a notice takes the window's place.
 -->
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { Registration } from "$lib/registration/registration.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import { Deferred } from "$lib/utils";
     import { WebGL } from "$lib/webgl/webgl";
     import {
         CLIENT_DEFAULTS,
@@ -24,7 +26,7 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
         createWorkspaceUrlWriter,
         parseWorkspaceParams,
     } from "$lib/workspace/workspaceUrl";
-    import { getContext, onMount, setContext } from "svelte";
+    import { flushSync, getContext, onMount, setContext } from "svelte";
     import ViewerWindow from "./ViewerWindow.svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
@@ -84,23 +86,23 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
     });
     setContext("workspace", workspace);
 
-    const { promise, resolve, reject } = new Deferred<ViewerWindowContext>();
-    let viewerWindowContext: ViewerWindowContext | null = null;
+    let viewerWindowContext = $state<ViewerWindowContext | null>(null);
+    let failure = $state<"no-webgl" | "lost" | null>(null);
     let webgl: WebGL | null = null;
+    let reload = $state<HTMLElement | null>(null);
 
     function handleContextLost(event: Event) {
         event.preventDefault();
         console.error(
             "[WebGL] Context lost - stopping rendering and cleaning up",
         );
-
-        if (viewerWindowContext) {
-            viewerWindowContext.destroy();
-            viewerWindowContext = null;
-        }
-
-        // Reject the promise so the error UI is shown
-        reject(new Error("WebGL context was lost. Please reload the page."));
+        // The window unmounts before its context is destroyed under it.
+        failure = "lost";
+        flushSync();
+        // Reload is the only way on, so it takes focus.
+        reload?.focus();
+        viewerWindowContext?.destroy();
+        viewerWindowContext = null;
     }
 
     function handleContextRestored(_event: Event) {
@@ -116,29 +118,30 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
     }
 
     onMount(() => {
-        window.addEventListener("resize", resizeCanvas);
         resizeCanvas();
-
-        // Add WebGL context event listeners
+        // Before any listener, so a failure leaves nothing behind.
+        try {
+            webgl = new WebGL(mainCanvas);
+        } catch (error) {
+            console.error(error);
+            failure = "no-webgl";
+            return;
+        }
+        window.addEventListener("resize", resizeCanvas);
         mainCanvas.addEventListener("webglcontextlost", handleContextLost);
         mainCanvas.addEventListener(
             "webglcontextrestored",
             handleContextRestored,
         );
 
-        webgl = new WebGL(mainCanvas);
-        const registration = new Registration();
-
         viewerWindowContext = new ViewerWindowContext(
             webgl,
-            registration,
+            new Registration(),
             creator,
             instanceIDs,
             workspace,
             parseWorkspaceParams(new URLSearchParams(window.location.search)),
         );
-
-        resolve(viewerWindowContext);
 
         return () => {
             window.removeEventListener("resize", resizeCanvas);
@@ -174,11 +177,35 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
 
 <canvas bind:this={mainCanvas} class="editor" id="mainCanvas"></canvas>
 
-{#await promise then viewerWindowContext}
+{#if failure}
+    <!-- relative: the absolute canvas would otherwise paint over it. -->
+    <div
+        class="relative flex h-full items-center-safe justify-center overflow-y-auto p-4"
+    >
+        <div
+            class="max-w-md flex min-w-0 flex-col items-start gap-4 break-words"
+        >
+            {#if failure === "lost"}
+                <InlineNotification
+                    title="The viewer stopped"
+                    subtitle="The browser's graphics (WebGL) context was lost. Reload the page to continue."
+                />
+                <Button
+                    variant="secondary"
+                    bind:ref={reload}
+                    onclick={() => location.reload()}>Reload page</Button
+                >
+            {:else}
+                <InlineNotification
+                    title="The viewer can't start"
+                    subtitle="WebGL 2 isn't available. Turn on hardware acceleration or try another browser."
+                />
+            {/if}
+        </div>
+    </div>
+{:else if viewerWindowContext}
     <ViewerWindow {viewerWindowContext} />
-{:catch error}
-    <div class="error">Failed to initialize viewer: {error.message}</div>
-{/await}
+{/if}
 
 <style>
     canvas {
@@ -188,15 +215,5 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
         bottom: 0;
         right: 0;
         pointer-events: none;
-    }
-    .error {
-        color: red;
-        padding: 1rem;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(255, 255, 255, 0.9);
-        border-radius: 4px;
     }
 </style>
