@@ -770,6 +770,34 @@ def test_password_login_follows_the_password_enabled_setting(
         assert "set-cookie" not in response.headers
 
 
+@pytest.mark.parametrize(
+    "password_enabled, expected_status", [(False, 403), (True, 200)], ids=["off", "on"]
+)
+def test_sign_up_follows_the_password_enabled_setting(
+    client_anonymous, session, monkeypatch, password_enabled, expected_status
+):
+    """With password login off, sign-up is refused and creates no account; on, it signs up."""
+    import server.routes.auth as auth_routes
+
+    monkeypatch.setattr(
+        auth_routes,
+        "settings",
+        settings.model_copy(update={"auth_password_enabled": password_enabled}),
+    )
+
+    response = client_anonymous.post(
+        "/auth/register",
+        json={"username": "gated-newcomer", "password": "correct horse battery staple"},
+    )
+
+    assert response.status_code == expected_status, response.text
+    if not password_enabled:
+        assert response.json() == {"detail": "Password login is disabled."}
+        assert session.scalar(
+            select(Creator).where(Creator.CreatorName == "gated-newcomer")
+        ) is None
+
+
 def _cookie_max_ages(response):
     """Each session cookie's Max-Age in seconds, or None for a browser-session cookie."""
     ages = {}

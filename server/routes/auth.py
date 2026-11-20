@@ -318,6 +318,7 @@ def register_user(
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Register a new user."""
+    _refuse_if_password_login_disabled()
     new_user = auth_service.register(user_data.username, user_data.password)
     return _user_response(new_user, auth_service)
 
