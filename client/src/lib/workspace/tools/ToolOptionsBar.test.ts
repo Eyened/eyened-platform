@@ -13,6 +13,10 @@ import {
 } from "../testUtils";
 import type { DrawTarget } from "$lib/layers/drawBinding";
 import type { Workspace } from "../workspace.svelte";
+import { DistanceLines, Line } from "$lib/layers/distanceLines.svelte";
+import type { Scale } from "$lib/layers/imageScale";
+import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
+import type { ToolId } from "./registry";
 import ToolOptionsBar from "./ToolOptionsBar.svelte";
 
 const EDITABLE: DrawTarget = {
@@ -42,6 +46,36 @@ function drawViewport(ws: Workspace, drawTarget: DrawTarget) {
         } as never,
     });
     return segmentationContext;
+}
+
+const STORED: Scale = {
+    x: 11.2,
+    y: 11.2,
+    source: "stored",
+    pick: { kind: "stored" },
+};
+
+/** Arms a tool with one selected viewport whose layers handle carries `layers`. */
+function armWith(tool: ToolId, layers: object) {
+    const ws = workspaceWith(1);
+    ws.attachViewport(0, {
+        zoomPercent: 100,
+        zoomBy: vi.fn(),
+        reset: vi.fn(),
+        layers: {
+            viewerContext: {
+                image: { image_id: "inst-1", width: 100 },
+                index: 0,
+                viewerSize: { width: 100 },
+                setIndex: vi.fn(),
+                focusPoint: vi.fn(),
+                returnFocus: vi.fn(),
+            },
+            ...layers,
+        } as never,
+    });
+    ws.arm(tool);
+    return render(ToolOptionsBar, { context: workspaceContext(ws) });
 }
 
 describe("ToolOptionsBar", () => {
@@ -84,7 +118,7 @@ describe("ToolOptionsBar", () => {
         cleanup();
         show({ id: 640, canEdit: false });
         expect(
-            screen.getByText("Registration [640] · read-only"),
+            screen.getByText("Registration 640 · read-only"),
         ).toBeInTheDocument();
     });
 
@@ -121,6 +155,70 @@ describe("ToolOptionsBar", () => {
             "Another grader's segmentation can't be edited. Duplicate it to edit.",
         );
         expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    });
+
+    it("Distance and the ETDRS circle name the scale and its source; without one, Distance measures in px and the circle says why, keeping the scale button", () => {
+        armWith("distance", { scale: STORED, distance: new DistanceLines() });
+        expect(
+            screen.getByRole("button", { name: /11\.20 µm\/px · stored/ }),
+        ).toBeInTheDocument();
+        cleanup();
+        armWith("distance", { scale: null, distance: new DistanceLines() });
+        expect(
+            screen.getByRole("button", { name: /No scale · lengths in px/ }),
+        ).toBeInTheDocument();
+        cleanup();
+        armWith("circle", { scale: null });
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "Set the image resolution, or show a grid in ETDRS grids.",
+        );
+        expect(
+            screen.getByRole("button", { name: /No scale/ }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("radio", { name: "C1" })).toBeNull();
+    });
+
+    it("Distance's Delete removes the current line and is off when there is none", async () => {
+        const distance = new DistanceLines();
+        distance.add(new Line({ x: 0, y: 0 }, { x: 1, y: 1 }, 0));
+        distance.add(new Line({ x: 0, y: 0 }, { x: 2, y: 2 }, 0));
+        armWith("distance", { scale: null, distance });
+        const remove = screen.getByRole("button", { name: "Delete" });
+        await fireEvent.click(remove);
+        expect(distance.lines.map((l) => l.end.x)).toEqual([1]);
+        expect(remove).toHaveAttribute("aria-disabled", "true");
+        await fireEvent.click(remove);
+        expect(distance.lines).toHaveLength(1);
+    });
+
+    it("Place ETDRS names the grid, or says why it can't write it in place of the options", () => {
+        armWith("etdrs", {
+            etdrsTarget: {
+                name: "Your grid 7",
+                reason: "This grid is on another image.",
+            },
+        });
+        expect(screen.getByText("Your grid 7")).toBeInTheDocument();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "This grid is on another image.",
+        );
+        expect(screen.queryByRole("radio", { name: "Fovea" })).toBeNull();
+    });
+
+    it("Point steps through the registration's points: Point – / 3, then Point 1 / 3", async () => {
+        const tool = new PointTool({ sparse: true });
+        tool.points = [{ x: 1, y: 1 }, null, { x: 3, y: 3 }];
+        const { container } = armWith("point", {
+            pointTarget: { id: 4, canEdit: true },
+            pointTool: tool,
+        });
+        expect(screen.getByText("Registration 4")).toBeInTheDocument();
+        expect(screen.getByText("Point – / 3")).toBeInTheDocument();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Next point" }),
+        );
+        expect(screen.getByText("Point 1 / 3")).toBeInTheDocument();
+        await expectNoAxeViolations(container);
     });
 });
 
@@ -183,6 +281,41 @@ describe("ToolOptionsBar when short", () => {
         const narrow = renderBrush(150);
         await vi.waitFor(() =>
             expect(inRow(narrow.container)).toEqual(["size"]),
+        );
+    });
+
+    it("the scale and Fovea | Disc edge never fold: Place ETDRS folds Delete, then Keep grid size; the circle folds its sizes", async () => {
+        const renderTool = (px: number, tool: ToolId, layers: object) => {
+            barWidth(px);
+            const ws = workspaceWith(1);
+            ws.attachViewport(0, {
+                zoomPercent: 100,
+                zoomBy: vi.fn(),
+                reset: vi.fn(),
+                layers: layers as never,
+            });
+            ws.arm(tool);
+            return render(ToolOptionsBar, { context: workspaceContext(ws) });
+        };
+        const etdrs = { etdrsTarget: { name: "Your grid 12", reason: null } };
+        const wide = renderTool(250, "etdrs", etdrs);
+        await vi.waitFor(() =>
+            expect(inRow(wide.container)).toEqual([
+                "etdrsSlot",
+                "keepGridSize",
+            ]),
+        );
+        cleanup();
+        vi.restoreAllMocks();
+        const narrow = renderTool(50, "etdrs", etdrs);
+        await vi.waitFor(() =>
+            expect(inRow(narrow.container)).toEqual(["etdrsSlot"]),
+        );
+        cleanup();
+        vi.restoreAllMocks();
+        const circle = renderTool(150, "circle", { scale: STORED });
+        await vi.waitFor(() =>
+            expect(inRow(circle.container)).toEqual(["scale"]),
         );
     });
 });

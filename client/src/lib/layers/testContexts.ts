@@ -193,6 +193,8 @@ export function layersContexts(
     };
     const registration = {
         getLinkedImgIds: () => new Set(over.linked ?? []),
+        getRegistrationItem: () => undefined,
+        mapPosition: (_from: string, _to: string, p: unknown) => p,
     };
     const others = over.images ?? [];
     const win: TestWindow = over.win ?? {
@@ -226,6 +228,7 @@ export function layersContexts(
             fraction.current = value;
         },
         etdrsSlot: 0,
+        scalePicks: new SvelteMap<string, unknown>(),
     };
     const viewerContext = {
         image,
@@ -241,11 +244,15 @@ export function layersContexts(
             a.annotation_type !== "model_segmentation" && a.creator.id === ME,
         dialogue: null,
     };
-    const grids = new GridLayers(viewerContext as never, registration as never, {
-        get radiusFraction() {
-            return workspace.etdrsFraction;
+    const grids = new GridLayers(
+        viewerContext as never,
+        registration as never,
+        {
+            get radiusFraction() {
+                return workspace.etdrsFraction;
+            },
         },
-    });
+    );
     const distance = new DistanceLines();
     const context = new Map<string, unknown>([
         ["globalContext", globalContext],

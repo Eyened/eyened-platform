@@ -98,11 +98,15 @@
     $effect(() => blend.apply(viewerContext));
     onDestroy(() => blend.dispose(viewerContext));
     // One fraction for the viewer, so the rings, the circle and the scale agree.
-    const grids = new GridLayers(viewerContext, viewerWindowContext.registration, {
-        get radiusFraction() {
-            return workspace.etdrsFraction;
+    const grids = new GridLayers(
+        viewerContext,
+        viewerWindowContext.registration,
+        {
+            get radiusFraction() {
+                return workspace.etdrsFraction;
+            },
         },
-    });
+    );
     // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
     const distance = workspace.distanceLinesFor(image.image_id);
     const layers: LayersTarget = {
@@ -128,6 +132,9 @@
         },
         get etdrsTool() {
             return etdrsTool?.tool;
+        },
+        get pointTool() {
+            return pointTool?.tool;
         },
         blend,
     };

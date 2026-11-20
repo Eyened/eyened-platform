@@ -104,6 +104,8 @@ export interface LayersTarget {
     readonly etdrsTarget: GridTarget;
     /** Place ETDRS's tool, while it is armed and can write here. */
     readonly etdrsTool: PointTool | undefined;
+    /** P's tool for the eye's current registration, when there is one. */
+    readonly pointTool: PointTool | undefined;
     /** This viewport's blend, kept while it is mounted. */
     readonly blend: ViewportBlend;
 }

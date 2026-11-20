@@ -142,7 +142,11 @@ describe("Keymap", () => {
     it("Esc drops a half-drawn distance line first; the next Esc fits the view and clears the image's lines, not another image's or from a strip tile", () => {
         const workspace = new Workspace();
         const viewer = viewerOf("colour", { workspace, imageId: "a" });
-        const tile = viewerOf("colour", { workspace, imageId: "a", tile: true });
+        const tile = viewerOf("colour", {
+            workspace,
+            imageId: "a",
+            tile: true,
+        });
         const line = () => new Line({ x: 0, y: 0 }, { x: 1, y: 1 }, 0);
         const a = workspace.distanceLinesFor("a");
         a.add(line());
@@ -229,5 +233,21 @@ describe("Keymap", () => {
         press(bscan, { key: "[" });
         expect(workspace.paint).toMatchObject({ size2D: 5, sizeBscan: 3.2 });
         expect(readPaint()).toMatchObject({ size2D: 5, sizeBscan: 3.2 });
+    });
+
+    it("] and [ step the ETDRS circle size and stop at the ends; with Place ETDRS they pick Disc edge and Fovea", () => {
+        const workspace = new Workspace();
+        const viewer = viewerOf("colour", { workspace });
+        workspace.arm("circle");
+        for (let i = 0; i < 8; i++) press(viewer, { key: "]" });
+        expect(workspace.circleSize).toBe("O2");
+        press(viewer, { key: "[" });
+        expect(workspace.circleSize).toBe("O1");
+        workspace.arm("etdrs");
+        press(viewer, { key: "]" });
+        expect(workspace.etdrsSlot).toBe(1);
+        press(viewer, { key: "[" });
+        expect(workspace.etdrsSlot).toBe(0);
+        expect(workspace.circleSize).toBe("O1");
     });
 });

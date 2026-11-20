@@ -114,12 +114,20 @@ export class Keymap implements ViewerEventListener {
             return;
         }
         if (key === "[" || key === "]") {
-            if (view?.armedTool && SIZED.includes(view.armedTool)) {
+            const delta = key === "]" ? 1 : -1;
+            const armed = view?.armedTool;
+            if (!view || !armed) return;
+            if (SIZED.includes(armed)) {
                 const size = view.paint[sizeKey(viewerContext.image)];
                 view.setSize(
                     viewerContext.image,
-                    key === "]" ? size * SIZE_STEP : size / SIZE_STEP,
+                    delta > 0 ? size * SIZE_STEP : size / SIZE_STEP,
                 );
+            } else if (armed === "circle") view.stepCircle(delta);
+            else if (armed === "etdrs") view.etdrsSlot = delta > 0 ? 1 : 0;
+            else if (armed === "point") {
+                const layers = view.selectedViewport?.layers;
+                layers?.pointTool?.step(delta, layers.viewerContext);
             }
             return;
         }

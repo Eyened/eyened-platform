@@ -1,6 +1,6 @@
 <!--
 @component
-The tool options bar: the armed tool's name, a Draw tool's target or why it can't draw, its options, then a one-line hint for keys without a button. When the bar is short the hint drops first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first.
+The tool options bar: the armed tool's name, its target or why it can't act there, its options, then a one-line hint for keys without a button. When the bar is short the hint drops first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first.
 -->
 <script lang="ts">
     import { getContext, tick, untrack } from "svelte";
@@ -14,15 +14,26 @@ The tool options bar: the armed tool's name, a Draw tool's target or why it can'
         workspace.armedTool ? toolById(workspace.armedTool) : null,
     );
     const viewport = $derived(workspace.selectedViewport);
+    const layers = $derived(viewport?.layers ?? null);
     // P names its registration; without one, the hint says what to do first.
     const point = $derived(
-        tool?.id === "point" ? (viewport?.layers?.pointTarget ?? null) : null,
+        tool?.id === "point" ? (layers?.pointTarget ?? null) : null,
     );
     // A Draw tool names the selected viewport's current segmentation, or says why it can't draw there.
     const draw = $derived(
-        tool?.group === "Draw" ? (viewport?.layers?.drawTarget ?? null) : null,
+        tool?.group === "Draw" ? (layers?.drawTarget ?? null) : null,
     );
-    const reason = $derived(draw?.reason ?? null);
+    // Place ETDRS names the grid it writes, or says why it can't.
+    const etdrs = $derived(
+        tool?.id === "etdrs" ? (layers?.etdrsTarget ?? null) : null,
+    );
+    const reason = $derived(
+        draw?.reason ??
+            etdrs?.reason ??
+            (tool?.id === "circle" && layers && !layers.scale
+                ? "Set the image resolution, or show a grid in ETDRS grids."
+                : null),
+    );
     const fullName = $derived(
         draw?.name
             ? [draw.name.segmentation, draw.name.feature]
@@ -65,17 +76,27 @@ The tool options bar: the armed tool's name, a Draw tool's target or why it can'
                     "undo",
                     "redo",
                 ];
+            case "distance":
+                return ["scale", "delete"];
+            case "circle":
+                return ["circleSize", "scale"];
+            case "etdrs":
+                return ["etdrsSlot", "keepGridSize", "delete"];
+            case "point":
+                if (!point) return [];
+                return point.canEdit ? ["pointStep", "delete"] : ["pointStep"];
             default:
                 return [];
         }
     }
-    // A reason replaces the options. Size shows nothing without an image, so it is left out.
-    const options = $derived(
+    // A reason replaces the options; the circle keeps its scale so it can be set here. Size shows nothing without an image, so it is left out.
+    const options = $derived<OptionId[]>(
         reason
-            ? []
+            ? tool?.id === "circle"
+                ? ["scale"]
+                : []
             : optionsFor(tool?.id).filter(
-                  (id) =>
-                      id !== "size" || viewport?.layers?.viewerContext.image,
+                  (id) => id !== "size" || layers?.viewerContext.image,
               ),
     );
     const isHistory = (id: OptionId) => id === "undo" || id === "redo";
@@ -84,10 +105,13 @@ The tool options bar: the armed tool's name, a Draw tool's target or why it can'
     let hintElement: HTMLElement | undefined = $state();
     let hintFits = $state(true);
 
-    /** How many trailing options sit in ⋯. */
+    // A popover can't open from inside ⋯ (it closes ⋯), and Fovea | Disc edge is Place ETDRS's main control, so these never fold.
+    const PINNED: OptionId[] = ["scale", "etdrsSlot"];
+    const foldable = $derived(options.filter((id) => !PINNED.includes(id)));
+    /** How many trailing foldable options sit in ⋯. */
     let folds = $state(0);
-    const shown = $derived(options.slice(0, options.length - folds));
-    const folded = $derived(options.slice(options.length - folds));
+    const folded = $derived(foldable.slice(foldable.length - folds));
+    const shown = $derived(options.filter((id) => !folded.includes(id)));
 
     let fitting = 0;
     /** Starts with nothing folded, then moves the last option in the row into ⋯ until the row fits; the hint shows whole or not at all. */
@@ -98,7 +122,7 @@ The tool options bar: the armed tool's name, a Draw tool's target or why it can'
         const run = ++fitting;
         folds = 0;
         await tick();
-        while (folds < options.length && el.scrollWidth > el.clientWidth) {
+        while (folds < foldable.length && el.scrollWidth > el.clientWidth) {
             if (run !== fitting) return;
             folds += 1;
             await tick();
@@ -112,6 +136,8 @@ The tool options bar: the armed tool's name, a Draw tool's target or why it can'
     $effect(() => {
         void options;
         void draw?.name;
+        void etdrs?.name;
+        void layers?.scale;
         void hint;
         if (!bar) return;
         untrack(() => void fit());
@@ -145,11 +171,15 @@ The tool options bar: the armed tool's name, a Draw tool's target or why it can'
             >
         {/if}
     {/if}
+    {#if etdrs?.name}
+        <span
+            class="min-w-8 truncate text-body-compact-01 text-text-primary"
+            title={etdrs.name}>{etdrs.name}</span
+        >
+    {/if}
     {#if point}
         <span class="text-body-compact-01 text-text-primary"
-            >Registration [{point.id}]{point.canEdit
-                ? ""
-                : " · read-only"}</span
+            >Registration {point.id}{point.canEdit ? "" : " · read-only"}</span
         >
     {/if}
     <!-- Always mounted, so screen readers announce a new reason. -->

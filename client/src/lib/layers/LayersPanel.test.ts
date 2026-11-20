@@ -46,6 +46,7 @@ function attach(ws: Workspace, position: number, instanceId: string) {
             drawTarget: { name: null, reason: null },
             etdrsTarget: { name: null, reason: null },
             etdrsTool: undefined,
+            pointTool: undefined,
             blend: {} as never,
         },
     });
