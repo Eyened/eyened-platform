@@ -78,11 +78,16 @@ PATHS = [
         id="claim-check-failed",
         status=401,
         detail="ID token validation failed",
-        # The claim check reads the ID token, so the claim must be there to reach the mismatch branch.
-        id_token_claims={"sub": SUB, "schac_home_organization": HOME_ORG},
         oidc_settings={
             "additional_token_validations": f"schac_home_organization={EXPECTED_HOME_ORG}"
         },
+    ),
+    OidcPath(
+        id="institution-not-allowed",
+        status=403,
+        detail="Your institution is not allowed to log in to EyeNED.",
+        account={"EmployeeIdentifier": f"oidc:sub:{SUB}"},
+        oidc_settings={"allowed_home_organizations": EXPECTED_HOME_ORG},
     ),
     OidcPath(
         id="wrong-issuer",

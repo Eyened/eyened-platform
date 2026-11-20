@@ -68,10 +68,19 @@ class OIDCSettings(BaseSettings):
                                                                      "for the authentication flow")
     create_new_accounts: bool = Field(default=False, description="Whether or not to create new accounts for unknown "
                                                                  "users that authenticated through OIDC.")
-    additional_token_validations: str = Field(default="", description="A key-value list of static token claims that "
-                                                                      "must be available in received ID tokens, for "
-                                                                      "example `iss=12345,tid=67890`. Keys and values "
-                                                                      "are separated by `=`, key-value pairs by `,`.")
+    additional_token_validations: str = Field(default="", description="A key-value list of static claims that "
+                                                                      "the ID token or userinfo must hold, for "
+                                                                      "example `iss=12345,tid=67890`. A list claim "
+                                                                      "passes if it contains the value. Keys and "
+                                                                      "values are separated by `=`, key-value pairs "
+                                                                      "by `,`.")
+    # ASSUMPTION: the setting is EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS, and it applies
+    # to every SSO login, not only first logins.
+    allowed_home_organizations: str = Field(default="", description="A comma-separated list of "
+                                                                    "`schac_home_organization` values allowed to log "
+                                                                    "in through OIDC, for example "
+                                                                    "`erasmusmc.nl,uu.nl`. Empty admits every "
+                                                                    "institution.")
 
 
 @dataclass(frozen=True)

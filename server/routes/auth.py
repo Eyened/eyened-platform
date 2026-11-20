@@ -529,19 +529,31 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
         logger.warning("Nonce validation failed")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nonce validation failed")
 
-    # Validate additional claims
+    return claims
+
+
+def check_oidc_claims(claims: dict[str, Any]) -> None:
+    """Run the configured claim check and the institution allow list on the merged claims."""
     validations = [v for v in settings.oidc.additional_token_validations.split(",") if v.strip()]
     for validation in validations:
         claim_name, expected_claim_value = validation.split("=", 1)
         claim_value = claims.get(claim_name)
         if claim_name not in claims:
-            logger.error(f" OIDC additional validation claim '{claim_name}' not found in ID token")
+            logger.error(f"OIDC additional validation claim '{claim_name}' not found in the OIDC claims")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed")
-        elif claim_value != expected_claim_value:
+        elif claim_value != expected_claim_value and not (
+            isinstance(claim_value, list) and expected_claim_value in claim_value
+        ):
             logger.error(f"OIDC additional validation claim '{claim_name}' value mismatch")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed")
 
-    return claims
+    allowed = [org.strip() for org in settings.oidc.allowed_home_organizations.split(",") if org.strip()]
+    if allowed and claims.get("schac_home_organization") not in allowed:
+        logger.warning("Denied OIDC login, 'schac_home_organization' is not in the allow list")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your institution is not allowed to log in to EyeNED.",
+        )
 
 
 async def get_oidc_userinfo(access_token: str | None, sub: str) -> dict[str, Any]:
@@ -691,6 +703,7 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nonce validation failed")
     claims = await validate_id_token(id_token, oidc_nonce)
     claims = {**await get_oidc_userinfo(token_data.get("access_token"), claims["sub"]), **claims}
+    check_oidc_claims(claims)
 
     # Check claims with Creator database
     creator = check_oidc_login(claims, session)

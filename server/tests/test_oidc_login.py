@@ -5,6 +5,7 @@ Each test logs in against the SURFconext-shaped fake provider (the
 rest on userinfo.
 """
 
+import pytest
 from sqlalchemy import select
 
 from eyened_orm import AuditLog, Creator, CreatorTagLink
@@ -153,3 +154,69 @@ def test_a_first_login_records_a_provisioning_audit_row(
         "auth:oidc-provision",
         str(response.json()["id"]),
     )
+
+
+def test_the_claim_check_sees_a_userinfo_claim(
+    client_anonymous, session, oidc_provider, oidc_settings
+):
+    """SURFconext sends ``schac_home_organization`` only on userinfo."""
+    _seed(session, "oidc-user", f"oidc:sub:{SUB}")
+    oidc_settings(additional_token_validations="schac_home_organization=erasmusmc.nl")
+    oidc_provider.id_token_claims = {"sub": SUB}
+
+    # control: without the claim the check refuses
+    oidc_provider.userinfo = {"sub": SUB}
+    response = oidc_provider.login(client_anonymous)
+    assert response.status_code == 401
+    assert response.json() == {"detail": "ID token validation failed"}
+
+    oidc_provider.userinfo = {"sub": SUB, "schac_home_organization": "erasmusmc.nl"}
+    response = oidc_provider.login(client_anonymous)
+
+    assert response.status_code == 200, response.text
+
+
+def test_the_claim_check_passes_a_list_claim_that_holds_the_value(
+    client_anonymous, session, oidc_provider, oidc_settings
+):
+    """A multi-valued claim passes when one of its values is the expected one."""
+    _seed(session, "oidc-user", f"oidc:sub:{SUB}")
+    oidc_settings(additional_token_validations="eduperson_affiliation=employee")
+    oidc_provider.id_token_claims = {"sub": SUB}
+
+    # control: a list without the value is refused
+    oidc_provider.userinfo = {"sub": SUB, "eduperson_affiliation": ["member", "student"]}
+    response = oidc_provider.login(client_anonymous)
+    assert response.status_code == 401
+    assert response.json() == {"detail": "ID token validation failed"}
+
+    oidc_provider.userinfo = {"sub": SUB, "eduperson_affiliation": ["member", "employee"]}
+    response = oidc_provider.login(client_anonymous)
+
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.parametrize(
+    "allowed, home_org, status",
+    [
+        ("", "other-university.example", 200),
+        ("erasmusmc.nl,uu.nl", "uu.nl", 200),
+        ("erasmusmc.nl,uu.nl", "other-university.example", 403),
+    ],
+    ids=["empty-admits-all", "listed-admitted", "unlisted-refused"],
+)
+def test_the_institution_allow_list(
+    allowed, home_org, status, client_anonymous, session, oidc_provider, oidc_settings
+):
+    _seed(session, "oidc-user", f"oidc:sub:{SUB}")
+    oidc_settings(allowed_home_organizations=allowed)
+    oidc_provider.id_token_claims = {"sub": SUB}
+    oidc_provider.userinfo = {"sub": SUB, "schac_home_organization": home_org}
+
+    response = oidc_provider.login(client_anonymous)
+
+    assert response.status_code == status, response.text
+    if status == 403:
+        assert response.json() == {
+            "detail": "Your institution is not allowed to log in to EyeNED."
+        }
