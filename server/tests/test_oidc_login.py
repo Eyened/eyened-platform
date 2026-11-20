@@ -71,16 +71,49 @@ def test_a_discovery_issuer_that_differs_from_its_url_turns_sso_off(
     assert client_anonymous.get("/auth/options").json()["oidc_enabled"] is False
 
 
-def test_the_account_lookup_sees_the_userinfo_email(client_anonymous, session, oidc_provider):
-    """SURFconext sends email only on userinfo; an account linked by email still logs in."""
+def test_an_email_link_is_pinned_to_sub_on_first_login(client_anonymous, session, oidc_provider):
+    """SURFconext sends email only on userinfo. The account linked by that email
+    logs in, now holds the ``sub``, and an audit row records the pin."""
     creator = _seed(session, "linked-by-email", f"oidc:email:{EMAIL}")
+    creator_id = creator.CreatorID
     oidc_provider.id_token_claims = {"sub": SUB}
     oidc_provider.userinfo = {"sub": SUB, "email": EMAIL}
 
     response = oidc_provider.login(client_anonymous)
 
     assert response.status_code == 200, response.text
-    assert response.json()["id"] == creator.CreatorID
+    assert response.json()["id"] == creator_id
+    session.expire_all()
+    assert session.get(Creator, creator_id).EmployeeIdentifier == f"oidc:sub:{SUB}"
+    [row] = session.scalars(select(AuditLog).where(AuditLog.Entity == "Creator")).all()
+    assert (row.Action, row.ActorID, row.TrustedPath, row.EntityID, row.Changes) == (
+        "UPDATE",
+        None,
+        "auth:oidc-pin",
+        str(creator_id),
+        {
+            "username": "linked-by-email",
+            "employee_identifier": {"old": f"oidc:email:{EMAIL}", "new": f"oidc:sub:{SUB}"},
+        },
+    )
+
+
+def test_a_preferred_username_link_does_not_log_in(client_anonymous, session, oidc_provider):
+    """OIDC Core 5.7: ``preferred_username`` is not a unique identifier."""
+    _seed(session, "linked-by-name", "oidc:preferred_username:jdoe")
+    _seed(session, "linked-by-email", f"oidc:email:{EMAIL}")
+    oidc_provider.id_token_claims = {"sub": SUB}
+
+    # control: the same login with the email link lands
+    oidc_provider.userinfo = {"sub": SUB, "email": EMAIL, "preferred_username": "jdoe"}
+    assert oidc_provider.login(client_anonymous).json()["username"] == "linked-by-email"
+
+    oidc_provider.id_token_claims = {"sub": "other-sub"}
+    oidc_provider.userinfo = {"sub": "other-sub", "preferred_username": "jdoe"}
+    response = oidc_provider.login(client_anonymous)
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "OIDC account not authorized"}
 
 
 def test_userinfo_with_another_sub_is_refused(client_anonymous, session, oidc_provider):

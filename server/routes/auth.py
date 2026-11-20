@@ -584,9 +584,9 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
         session (Session): database session
     """
     creator = None
-    # Optional: make the list of additional claims configurable
-    additional_claims_to_check = ["email", "preferred_username"]
-    for claim_name in ["sub"] + additional_claims_to_check:
+    # The sub pin first, then an administrator's email link. OIDC Core 5.7:
+    # preferred_username is not a unique identifier, so it is never looked up.
+    for claim_name in ["sub", "email"]:
         if claim_name in id_claims:
             claim_value = id_claims[claim_name]
             lookup_key = f"oidc:{claim_name}:{claim_value}"
@@ -613,9 +613,20 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
             # Eyened backend after a successful authentication if it isn't a 'Subject' claim.
             identifier = f"oidc:sub:{id_claims['sub']}"
             logger.info(f"Replacing OIDC claim '{claim_name}' with claim 'sub' as identifier of CreatorID={creator.CreatorID}")
+            old_identifier = creator.EmployeeIdentifier
             creator.EmployeeIdentifier = identifier
             # flush only; the request boundary (get_db) commits.
             CreatorRepository(session, scope=AccessScope.trusted()).add(creator)
+            get_audit_service(session).record(
+                action="UPDATE",
+                entity="Creator",
+                trusted_path="auth:oidc-pin",
+                entity_id=creator.CreatorID,
+                changes={
+                    "username": creator.CreatorName,
+                    "employee_identifier": {"old": old_identifier, "new": identifier},
+                },
+            )
 
     else:
         # No existing account was found

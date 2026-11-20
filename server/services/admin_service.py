@@ -11,7 +11,11 @@ from eyened_orm import Creator, Project
 from eyened_orm.audit_writer import AuditWriter
 from eyened_orm.authz.account_admin import AccountAdministration
 from eyened_orm.authz.actor import ActingAdmin
-from eyened_orm.authz.errors import AdminEntityExists, AdminEntityNotFound
+from eyened_orm.authz.errors import (
+    AdminEntityExists,
+    AdminEntityNotFound,
+    AdminIdentifierTaken,
+)
 from eyened_orm.authz.membership_admin import (
     GrantResult,
     MembershipAdministration,
@@ -39,6 +43,8 @@ def _admin_errors() -> Iterator[None]:
         raise NotFoundError(str(exc)) from exc
     except AdminEntityExists as exc:
         raise ConflictError({"code": "username_taken", "message": str(exc)}) from exc
+    except AdminIdentifierTaken as exc:
+        raise ConflictError({"code": "email_link_taken", "message": str(exc)}) from exc
 
 
 class AdminService:
@@ -151,6 +157,13 @@ class AdminService:
         """Replace the password. Raises NotFoundError for an unknown user."""
         with _admin_errors(), password_hash_capacity():
             self.accounts.set_password(creator_id=user_id, password=password)
+
+    def link_email(self, user_id: int, email: str) -> Creator:
+        """Link an email for SSO, then return the row. Raises NotFoundError or ConflictError."""
+        with _admin_errors():
+            self.accounts.link_email(creator_id=user_id, email=email)
+        # Resolved by the call above, so an identity-map hit, never None.
+        return cast(Creator, self.creators.get_by_id(user_id))
 
 
 def get_admin_service(

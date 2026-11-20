@@ -18,6 +18,7 @@ from collections.abc import Set as AbstractSet
 __all__ = [
     "AdminEntityExists",
     "AdminEntityNotFound",
+    "AdminIdentifierTaken",
     "AuthorizationError",
     "NotVisibleError",
     "PermissionDeniedError",
@@ -100,3 +101,7 @@ class AdminEntityExists(Exception):
     Not ``ValueError``, for the reason ``AdminEntityNotFound`` is not
     ``LookupError``: catching the builtin would also catch unrelated failures.
     """
+
+
+class AdminIdentifierTaken(Exception):
+    """An administration write named a login identifier another account holds."""
