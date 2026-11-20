@@ -68,7 +68,17 @@ export class Keymap implements ViewerEventListener {
         }
         if (event.ctrlKey || event.metaKey || event.altKey) return;
         if (event.key === "Escape") {
+            // A strip tile only fits its view; a viewport's Esc also acts on its image's distance lines.
+            const lines = viewerContext.isStripTile
+                ? undefined
+                : view?.distanceLinesFor(viewerContext.image.image_id);
+            // Esc first drops a half-drawn line; only the next Esc is Display Reset.
+            if (lines?.drawing) {
+                lines.remove(lines.drawing);
+                return;
+            }
             viewerContext.initTransform();
+            lines?.clear();
             return;
         }
         if (event.repeat) return;

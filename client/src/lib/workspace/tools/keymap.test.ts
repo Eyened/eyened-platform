@@ -9,6 +9,7 @@ vi.mock("cornerstone-wado-image-loader", () => ({
 vi.mock("cornerstone-core", () => ({}));
 vi.mock("dicom-parser", () => ({}));
 
+import { Line } from "$lib/layers/distanceLines.svelte";
 import { viewerOf } from "$lib/viewer/testViewer";
 import type { ViewerEvent } from "$lib/viewer/viewer-utils";
 import Viewer from "$lib/viewer/Viewer.svelte";
@@ -136,6 +137,29 @@ describe("Keymap", () => {
         viewer.zoom(10, 10, 3);
         press(viewer, { key: "Escape", code: "Escape" });
         expect(viewer.transform).toEqual(viewer.getInitTransform());
+    });
+
+    it("Esc drops a half-drawn distance line first; the next Esc fits the view and clears the image's lines, not another image's or from a strip tile", () => {
+        const workspace = new Workspace();
+        const viewer = viewerOf("colour", { workspace, imageId: "a" });
+        const tile = viewerOf("colour", { workspace, imageId: "a", tile: true });
+        const line = () => new Line({ x: 0, y: 0 }, { x: 1, y: 1 }, 0);
+        const a = workspace.distanceLinesFor("a");
+        a.add(line());
+        const half = line();
+        a.add(half);
+        a.drawing = half;
+        workspace.distanceLinesFor("b").add(line());
+        viewer.zoom(10, 10, 3);
+        press(viewer, { key: "Escape", code: "Escape" });
+        expect(a.lines).toHaveLength(1);
+        expect(viewer.transform).not.toEqual(viewer.getInitTransform());
+        press(tile, { key: "Escape", code: "Escape" });
+        expect(a.lines).toHaveLength(1);
+        press(viewer, { key: "Escape", code: "Escape" });
+        expect(a.lines).toHaveLength(0);
+        expect(viewer.transform).toEqual(viewer.getInitTransform());
+        expect(workspace.distanceLinesFor("b").lines).toHaveLength(1);
     });
 
     it("M shows and hides the Magnifier and keeps the armed tool; Esc leaves it on", () => {

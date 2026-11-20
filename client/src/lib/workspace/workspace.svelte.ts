@@ -9,7 +9,7 @@ import {
     type CircleSize,
 } from "$lib/viewer/overlays/etdrsCircles";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
-import type { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
+import { DistanceLines } from "$lib/layers/distanceLines.svelte";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { instanceIdFromImageId } from "$lib/viewer-window/viewerViewState";
 import {
@@ -89,8 +89,8 @@ export interface LayersTarget {
     readonly grids: GridLayers;
     /** The image's scale for Distance and the ETDRS circle; null when nothing gives one. */
     readonly scale: Scale | null;
-    /** Today's Measure tool with this viewport's lines, until the Distance tool replaces it. */
-    readonly measure: MeasureTool;
+    /** This viewport's image's distance lines, shared with every viewport showing it. */
+    readonly distance: DistanceLines;
     /** The OCT projections this viewport's image shows, in strip order, with this viewport's modes. */
     readonly projectionSources: EnfaceOverlaySourceResolved[];
     /** This viewport's localizer lines: the mode and the B-scan positions it draws. */
@@ -193,6 +193,8 @@ export class Workspace {
     private sliceIndex: Record<string, number> = {};
     /** Images whose B-scan the grader locked; kept until reload, like the remembered slice. */
     private readonly lockedIds = new SvelteSet<string>();
+    /** Distance lines per image, kept while the image moves between viewports; this session only. */
+    private readonly distanceLines = new SvelteMap<string, DistanceLines>();
     /** Open images in the order they were opened; every Arrange sort starts from it. */
     // ASSUMPTION: sorts start from the opened list, so ties keep the opened order (plan decision 17).
     private opened: CatalogueEntry[] = [];
@@ -354,6 +356,16 @@ export class Workspace {
     setLocked(imageId: string, on: boolean): void {
         if (on) this.lockedIds.add(imageId);
         else this.lockedIds.delete(imageId);
+    }
+
+    /** An image's distance lines, made the first time they are asked for. */
+    distanceLinesFor(imageId: string): DistanceLines {
+        let lines = this.distanceLines.get(imageId);
+        if (!lines) {
+            lines = new DistanceLines();
+            this.distanceLines.set(imageId, lines);
+        }
+        return lines;
     }
 
     /** A key or a menu pick: arms a modal tool; Reset view, the one action, resets the selected viewport. */

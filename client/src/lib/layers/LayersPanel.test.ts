@@ -7,7 +7,7 @@ import {
     formSchemasByName,
     segmentations,
 } from "$lib/data/stores.svelte";
-import { Line } from "$lib/viewer/tools/Measure.svelte";
+import { Line } from "./distanceLines.svelte";
 import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
 import { workspaceWith } from "$lib/workspace/testUtils";
 import type { Workspace } from "$lib/workspace/workspace.svelte";
@@ -40,7 +40,7 @@ function attach(ws: Workspace, position: number, instanceId: string) {
             mainViewerContext: ctx.mainViewerContext as never,
             grids: ctx.grids,
             scale: null,
-            measure: ctx.measure,
+            distance: ctx.distance,
             projectionSources: [],
             localizer: new LocalizerLines(() => []),
             pointTarget: null,
@@ -127,7 +127,7 @@ describe("LayersPanel", () => {
         const ws = workspaceWith(2);
         const a = attach(ws, 0, "inst-a");
         attach(ws, 1, "inst-b");
-        a.measure.lines.add(new Line({ x: 0, y: 0 }, { x: 3, y: 4 }, 0));
+        a.distance.add(new Line({ x: 0, y: 0 }, { x: 3, y: 4 }, 0));
         renderPanel(ws);
         await fireEvent.click(
             screen.getByRole("button", { name: "ETDRS grids 1" }),

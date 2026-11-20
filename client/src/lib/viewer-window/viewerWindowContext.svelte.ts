@@ -31,6 +31,7 @@ export type WorkspaceView = Pick<
     | "recordIndex"
     | "isLocked"
     | "setLocked"
+    | "distanceLinesFor"
     | "stripTracking"
     | "arm"
     | "armedTool"

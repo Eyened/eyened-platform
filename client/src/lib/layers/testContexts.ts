@@ -6,7 +6,7 @@ import type { SyncState } from "$lib/webgl/segmentationState.svelte";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { fromStore, writable, type Writable } from "svelte/store";
 import { vi } from "vitest";
-import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
+import { DistanceLines } from "./distanceLines.svelte";
 import { BlendStyles } from "./blendStyles";
 import { GridLayers } from "./gridLayers.svelte";
 import { PointsetState } from "./pointsets";
@@ -246,7 +246,7 @@ export function layersContexts(
             return workspace.etdrsFraction;
         },
     });
-    const measure = new MeasureTool(image as never);
+    const distance = new DistanceLines();
     const context = new Map<string, unknown>([
         ["globalContext", globalContext],
         ["viewerContext", viewerContext],
@@ -261,7 +261,7 @@ export function layersContexts(
         mainViewerContext,
         globalContext,
         grids,
-        measure,
+        distance,
         win,
         workspace,
     };

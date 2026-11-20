@@ -102,11 +102,12 @@
         },
     });
     // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
+    const distance = workspace.distanceLinesFor(image.image_id);
     const layers: LayersTarget = {
         viewerContext,
         mainViewerContext,
         grids,
-        measure: new MeasureTool(viewerContext.image),
+        distance,
         localizer,
         get scale() {
             return scale;
@@ -136,6 +137,17 @@
             fraction: workspace.etdrsFraction,
         });
     });
+
+    // Distance lines always show; the tool draws, moves and deletes them only while Distance is armed.
+    onDestroy(
+        viewerContext.addOverlay(
+            new MeasureTool(
+                distance,
+                () => scale,
+                () => workspace.armedTool === "distance",
+            ),
+        ),
+    );
 
     // While mounted, this viewport is a source for its OCT's projection; the newest one wins.
     const position = getContext<(() => number) | undefined>("viewportPosition");
@@ -347,7 +359,10 @@
                 const { width, height } = viewerContext.viewerSize;
                 viewerContext.zoom(width / 2, height / 2, factor);
             },
-            reset: () => viewerContext.initTransform(),
+            reset: () => {
+                viewerContext.initTransform();
+                distance.clear();
+            },
             layers,
             get titleSuffix() {
                 return blend.titleSuffix;
