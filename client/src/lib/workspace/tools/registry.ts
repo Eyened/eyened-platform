@@ -89,7 +89,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Measure",
         kind: "modal",
         icon: Ruler,
-        hint: "",
+        hint: "Click the start, click the end · drag an end to move it · Del removes the line under the pointer · Esc clears this image's lines",
     },
     {
         id: "circle",
@@ -98,7 +98,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Measure",
         kind: "modal",
         icon: CircleDash,
-        hint: "",
+        hint: "The circle follows the pointer in every viewport of this eye · [ ] steps the size",
     },
     {
         id: "brush",
@@ -136,6 +136,7 @@ export const TOOLS: readonly ToolDef[] = [
         icon: MagicWand,
         hint: "Hold Space enhances · X increase ↔ decrease",
     },
+    // ASSUMPTION: one hint for every platform, as the ⌘Z / Ctrl+Z shortcuts do.
     {
         id: "point",
         name: "Point",
@@ -143,7 +144,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Place",
         kind: "modal",
         icon: Location,
-        hint: "Click places the next missing point · drag moves one",
+        hint: "Click places a point · drag a point to move it · click on a point cycles its grade · ⌘ / Ctrl-click places on top · [ ] previous / next",
     },
     {
         id: "etdrs",
@@ -152,7 +153,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Place",
         kind: "modal",
         icon: Target,
-        hint: "",
+        hint: "Click places · hold Space follows the pointer · [ ] Fovea ↔ Disc edge · Del removes the point under the pointer",
     },
 ];
 

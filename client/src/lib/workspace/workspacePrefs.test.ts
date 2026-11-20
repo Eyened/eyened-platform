@@ -56,7 +56,7 @@ describe("layer area", () => {
 });
 
 describe("Layers sections", () => {
-    it("start with Segmentations open, restore the last open set except Distance lines, and ignore a bad value", () => {
+    it("start with Segmentations open, restore the last open set, and ignore a bad value", () => {
         expect(readLayerSections()).toEqual({
             segmentations: true,
             etdrs: false,
@@ -80,7 +80,7 @@ describe("Layers sections", () => {
             etdrs: true,
             pointsets: false,
             blend: false,
-            distance: false,
+            distance: true,
             projection: true,
             localizer: true,
         });

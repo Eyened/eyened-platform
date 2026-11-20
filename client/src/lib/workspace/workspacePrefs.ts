@@ -164,7 +164,7 @@ export function writeLayerArea(on: boolean): void {
     }
 }
 
-/** The Layers sections open at the last visit; Segmentations only on the first. Distance lines always starts closed, since opening it arms the Measure tool. */
+/** The Layers sections open at the last visit; Segmentations only on the first. */
 export function readLayerSections(): Record<LayerSectionId, boolean> {
     const open = {
         segmentations: true,
@@ -184,6 +184,7 @@ export function readLayerSections(): Record<LayerSectionId, boolean> {
             "etdrs",
             "pointsets",
             "blend",
+            "distance",
             "projection",
             "localizer",
         ] as const)

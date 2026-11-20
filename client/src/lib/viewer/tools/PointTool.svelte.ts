@@ -48,8 +48,6 @@ export type PointToolOptions = {
      */
     coordinateSpace?: PointCoordinateSpace;
     slotLabels?: readonly string[];
-    /** Keyboard shortcut → place into that index (also sets placementIndex). */
-    slotKeys?: readonly { index: number; key: string }[];
     enumExtras?: readonly PointEnumExtra[];
     /**
      * Viewer-pixel movement before a press on an existing point becomes a drag.
@@ -78,12 +76,14 @@ export class PointTool implements Overlay {
     points: PointList = $state([]);
 
     /**
-     * When set (ETDRS), empty-click placement always writes this index and
-     * stays there until another point is clicked/dragged (or set externally).
-     * When `undefined` (Registration / free lists), empty click appends /
-     * fill-first-null and never latches an index.
+     * When set (Place ETDRS), an empty click writes this index. Only the caller changes it, never a click.
+     * When `undefined` (Registration / free lists), an empty click appends or fills the first null.
      */
     placementIndex: number | undefined = $state(undefined);
+
+    /** The point Delete and the stepper act on: the last placed, pressed or stepped one. */
+    // ASSUMPTION: placing or pressing a point makes it current too, so a wrong point can be deleted at once.
+    current: number | undefined = $state(undefined);
 
     private activePointIndex: number | undefined;
     private hoverPointIndex: number | undefined;
@@ -112,9 +112,6 @@ export class PointTool implements Overlay {
     private readonly sparse: boolean;
     private readonly coordinateSpace: PointCoordinateSpace | undefined;
     private readonly slotLabels: readonly string[] | undefined;
-    private readonly slotKeys:
-        | readonly { index: number; key: string }[]
-        | undefined;
     private readonly enumExtras: readonly PointEnumExtra[];
     private readonly onChange: ((points: PointList) => void) | undefined;
     private readonly onPersist: ((points: PointList) => void) | undefined;
@@ -132,7 +129,6 @@ export class PointTool implements Overlay {
         this.sparse = options.sparse ?? false;
         this.coordinateSpace = options.coordinateSpace;
         this.slotLabels = options.slotLabels;
-        this.slotKeys = options.slotKeys;
         this.enumExtras = options.enumExtras ?? [];
         this.onChange = options.onChange;
         this.onPersist = options.onPersist;
@@ -199,6 +195,7 @@ export class PointTool implements Overlay {
         }
 
         this.setPoints(after);
+        this.current = newIndex;
         this.pressedExisting = false;
         const placed = after[newIndex];
         this.dragAnchor = placed
@@ -210,12 +207,6 @@ export class PointTool implements Overlay {
               }
             : undefined;
         this.persistOnRelease = true;
-        // Restricted mode (ETDRS): keep sticking to the placement index.
-        // Unrestricted (Registration): leave placementIndex undefined so the
-        // next empty click appends instead of rewriting the last point.
-        if (this.placementIndex !== undefined && targetSlot !== undefined) {
-            this.placementIndex = targetSlot;
-        }
         if (drag) {
             this.beginDrag(viewerContext, newIndex);
         } else {
@@ -273,52 +264,86 @@ export class PointTool implements Overlay {
     }
 
     keyup(e: ViewerEvent<KeyboardEvent>) {
-        const { event, viewerContext, cursor } = e;
+        if (e.event.code === "Space" && this.activePointIndex !== undefined)
+            this.endDrag(e.viewerContext, e.cursor);
+    }
 
-        if (
-            this.slotKeys?.some(
-                (s) => s.key.toLowerCase() === event.key.toLowerCase(),
-            )
-        ) {
-            this.endDrag(viewerContext, cursor);
-        }
-
-        if (
-            this.sparse &&
-            this.placementIndex === undefined &&
-            event.key >= "0" &&
-            event.key <= "9"
-        ) {
-            const index = parseInt(event.key, 10) - 1;
-            const point = this.points[index];
-            if (point) {
-                if (typeof point.index === "number") {
-                    viewerContext.setIndex(point.index);
-                }
-                const w = viewerContext.viewerSize.width;
-                const w_image = viewerContext.image.width;
-                viewerContext.focusPoint(point.x, point.y, (1 * w_image) / w);
-            }
-        }
+    /** Losing focus mid-drag saves the point where it is. */
+    blur(e: ViewerEvent<FocusEvent>) {
+        if (this.activePointIndex !== undefined)
+            this.endDrag(e.viewerContext, e.cursor);
     }
 
     keydown(e: ViewerEvent<KeyboardEvent>) {
         if (!this.canEdit) return;
         const { event, viewerContext, cursor } = e;
-
-        if (!event.repeat && this.slotKeys) {
-            const match = this.slotKeys.find(
-                (s) => s.key.toLowerCase() === event.key.toLowerCase(),
-            );
-            if (match) {
-                this.placementIndex = match.index;
-                this.placeAtCursor(viewerContext, cursor, match.index);
-                return;
-            }
+        // Space and Del act at the pointer, so only in the viewport the pointer is over.
+        if (event.code === "Space" && this.placementIndex !== undefined) {
+            event.preventDefault();
+            if (
+                !event.repeat &&
+                viewerContext.active &&
+                this.activePointIndex === undefined
+            )
+                this.placeAtCursor(viewerContext, cursor);
+            return;
         }
+        if (
+            (event.key === "Delete" || event.key === "Backspace") &&
+            viewerContext.active
+        )
+            this.deleteAt(viewerContext, cursor);
+    }
 
-        if (event.key.toLowerCase() !== "c") return;
-        this.cycleGradeAt(this.activePointIndex ?? this.hoverPointIndex);
+    /** True when the bar's Delete has a point to remove. */
+    get hasCurrent(): boolean {
+        const index = this.placementIndex ?? this.current;
+        return index !== undefined && !!this.points[index];
+    }
+
+    /** Removes the point under the cursor, if any. */
+    private deleteAt(viewerContext: ViewerContext, cursor: Position2D): void {
+        const hit = this.findHit(cursor, viewerContext);
+        if (hit !== undefined) this.deleteIndex(hit);
+    }
+
+    /** Removes the current point; in a fixed slot, the slot's point. */
+    deleteCurrent(): void {
+        if (this.hasCurrent)
+            this.deleteIndex(this.placementIndex ?? this.current!);
+    }
+
+    private deleteIndex(index: number) {
+        if (!this.canEdit) return;
+        const useNullDelete = this.sparse || this.placementIndex !== undefined;
+        this.setPoints(deletePointAt(this.points, index, useNullDelete), {
+            persist: true,
+        });
+        this.current = undefined;
+        this.hoverPointIndex = undefined;
+    }
+
+    /** Goes to the previous or next placed point and stops at the ends: sets its B-scan, centres it at 100 % and makes it current. */
+    step(delta: 1 | -1, viewerContext: ViewerContext): void {
+        const from = this.current ?? (delta > 0 ? -1 : this.points.length);
+        for (
+            let i = from + delta;
+            i >= 0 && i < this.points.length;
+            i += delta
+        ) {
+            const point = this.points[i];
+            if (!point) continue;
+            this.current = i;
+            if (typeof point.index === "number")
+                viewerContext.setIndex(point.index);
+            const w = viewerContext.viewerSize.width;
+            viewerContext.focusPoint(
+                point.x,
+                point.y,
+                viewerContext.image.width / w,
+            );
+            return;
+        }
     }
 
     /** Advance the first enum extra. An unset grade becomes the first value. */
@@ -364,10 +389,10 @@ export class PointTool implements Overlay {
         if (!this.canEdit) return;
 
         if (event.button === 0) {
-            // Ctrl-click places even when the cursor is on a marker, so list
-            // points can share a spot closer than the hit radius. No cycle, no drag.
+            // Ctrl-click (⌘-click on a Mac) places even when the cursor is on a marker,
+            // so list points can share a spot closer than the hit radius. No cycle, no drag.
             if (
-                event.ctrlKey &&
+                (event.ctrlKey || event.metaKey) &&
                 this.cardinality === "list" &&
                 this.placementIndex === undefined
             ) {
@@ -376,11 +401,7 @@ export class PointTool implements Overlay {
             }
             const hit = this.findHit(cursor, viewerContext);
             if (hit !== undefined) {
-                // Only switch the restricted index when one is already set
-                // (ETDRS). Registration must not latch onto the hit index.
-                if (this.placementIndex !== undefined) {
-                    this.placementIndex = hit;
-                }
+                this.current = hit;
                 this.pressOrigin = { x: cursor.x, y: cursor.y };
                 const point = this.points[hit];
                 const image = viewerContext.viewerToImageCoordinates(cursor);
@@ -411,16 +432,7 @@ export class PointTool implements Overlay {
             return;
         }
 
-        if (event.button === 2) {
-            const hit = this.findHit(cursor, viewerContext);
-            if (hit !== undefined) {
-                const useNullDelete =
-                    this.sparse || this.placementIndex !== undefined;
-                this.setPoints(deletePointAt(this.points, hit, useNullDelete), {
-                    persist: true,
-                });
-            }
-        } else if (
+        if (
             event.button === 0 &&
             this.pressedExisting &&
             !this.dragged &&
@@ -464,10 +476,7 @@ export class PointTool implements Overlay {
             if (!pt) continue;
             if (!this.visibleOnSlice(pt, viewerContext)) continue;
             context2D.lineWidth =
-                this.placementIndex !== undefined &&
-                index === this.placementIndex
-                    ? 2
-                    : 1.25;
+                index === (this.placementIndex ?? this.current) ? 2 : 1.25;
             const p = viewerContext.imageToViewerCoordinates(pt);
             this.strokeMarker(context2D, p, r);
 

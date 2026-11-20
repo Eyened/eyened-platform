@@ -31,6 +31,7 @@ export type WorkspaceView = Pick<
     | "recordIndex"
     | "isLocked"
     | "setLocked"
+    | "distanceLinesFor"
     | "stripTracking"
     | "arm"
     | "armedTool"
@@ -44,6 +45,8 @@ export type WorkspaceView = Pick<
     | "questionable"
     | "dilateErode"
     | "resetDrawToggles"
+    | "stepCircle"
+    | "etdrsSlot"
 >;
 
 export class ViewerWindowContext {

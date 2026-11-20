@@ -151,4 +151,24 @@ describe("Layers sections", () => {
         expect(ws.layerSections.segmentations).toBe(true);
         localStorage.clear();
     });
+
+    it("D opens Distance lines, G ETDRS grids and P Pointsets; C opens nothing", () => {
+        localStorage.clear();
+        const ws = new Workspace();
+        for (const id of ["distance", "etdrs", "pointsets"] as const)
+            ws.setLayerSection(id, false);
+        ws.arm("circle");
+        expect(ws.layerSections).toMatchObject({
+            distance: false,
+            etdrs: false,
+            pointsets: false,
+        });
+        ws.arm("distance");
+        expect(ws.layerSections.distance).toBe(true);
+        ws.arm("etdrs");
+        expect(ws.layerSections.etdrs).toBe(true);
+        ws.arm("point");
+        expect(ws.layerSections.pointsets).toBe(true);
+        localStorage.clear();
+    });
 });

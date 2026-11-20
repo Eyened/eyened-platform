@@ -13,10 +13,24 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
         | "hardness"
         | "pressure"
         | "undo"
-        | "redo";
+        | "redo"
+        | "scale"
+        | "circleSize"
+        | "etdrsSlot"
+        | "keepGridSize"
+        | "delete"
+        | "pointStep";
 </script>
 
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
+    import ScalePopover from "$lib/layers/ScalePopover.svelte";
+    import {
+        CIRCLE_SIZES,
+        type CircleSize,
+    } from "$lib/viewer/overlays/etdrsCircles";
+    import ChevronLeft from "carbon-icons-svelte/lib/ChevronLeft.svelte";
+    import ChevronRight from "carbon-icons-svelte/lib/ChevronRight.svelte";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { Slider } from "$lib/components/ui/slider/index.js";
     import { ToggleGroup } from "$lib/components/ui/toggle-group/index.js";
@@ -53,6 +67,25 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
     );
     const canUndo = $derived(segmentation?.canUndo(index) ?? false);
     const canRedo = $derived(segmentation?.canRedo(index) ?? false);
+
+    // The bar's Delete: Distance's current line, Place ETDRS's slot point, or P's current point.
+    const remove = $derived.by(() => {
+        if (workspace.armedTool === "distance") {
+            const distance = layers?.distance;
+            const line = distance?.current;
+            // Only a line on the shown B-scan, so Delete never removes one the grader can't see.
+            return distance &&
+                line &&
+                line.index === layers?.viewerContext.index
+                ? () => distance.remove(line)
+                : null;
+        }
+        const points =
+            workspace.armedTool === "etdrs"
+                ? layers?.etdrsTool
+                : layers?.pointTool;
+        return points?.hasCurrent ? () => points.deleteCurrent() : null;
+    });
 
     // After a mouse click the keys go back to the image; keyboard users stay on the control.
     function done() {
@@ -177,4 +210,98 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
     >
         {#if id === "undo"}<Undo />{:else}<Redo />{/if}
     </IconButton>
+{:else if id === "scale" && layers}
+    <ScalePopover
+        {layers}
+        empty={workspace.armedTool === "circle"
+            ? "No scale"
+            : "No scale · lengths in px"}
+    />
+{:else if id === "circleSize"}
+    <ToggleGroup
+        label="ETDRS circle size"
+        value={workspace.circleSize}
+        onchange={(value) => {
+            workspace.circleSize = value as CircleSize;
+            done();
+        }}
+        items={CIRCLE_SIZES.map((size) => ({
+            value: size,
+            text: size,
+            label: size,
+            tooltip: `${size}  [ ]`,
+        }))}
+    />
+{:else if id === "etdrsSlot"}
+    <ToggleGroup
+        label="Point to place"
+        value={String(workspace.etdrsSlot)}
+        onchange={(value) => {
+            workspace.etdrsSlot = value === "1" ? 1 : 0;
+            done();
+        }}
+        items={[
+            { value: "0", text: "Fovea", label: "Fovea", tooltip: "Fovea  [" },
+            {
+                value: "1",
+                text: "Disc edge",
+                label: "Disc edge",
+                tooltip: "Disc edge  ]",
+            },
+        ]}
+    />
+{:else if id === "keepGridSize"}
+    <Button
+        variant="ghost"
+        size="sm"
+        aria-pressed={workspace.keepGridSize}
+        class="border border-border-strong-01 text-text-secondary aria-pressed:bg-content-switcher-selected aria-pressed:text-text-primary aria-pressed:shadow-content-switcher-selected"
+        onclick={() => {
+            workspace.keepGridSize = !workspace.keepGridSize;
+            done();
+        }}>Keep grid size</Button
+    >
+{:else if id === "delete"}
+    <!-- aria-disabled, not disabled, so focus stays on the button once nothing is left to delete. -->
+    <Button
+        variant="ghost"
+        size="sm"
+        aria-disabled={!remove}
+        onclick={() => {
+            if (!remove) return;
+            remove();
+            done();
+        }}>Delete</Button
+    >
+{:else if id === "pointStep" && layers?.pointTool}
+    {@const points = layers.pointTool}
+    {@const viewer = layers.viewerContext}
+    <div role="group" aria-label="Points" class="flex items-center gap-1">
+        <IconButton
+            size="icon-xs"
+            label="Previous point"
+            shortcut="["
+            onclick={() => {
+                points.step(-1, viewer);
+                done();
+            }}
+        >
+            <ChevronLeft />
+        </IconButton>
+        <span class="text-body-compact-01 text-text-primary tabular-nums"
+            >Point {points.current === undefined ? "–" : points.current + 1} / {points
+                .points.length}</span
+        >
+        <IconButton
+            size="icon-xs"
+            label="Next point"
+            shortcut="]"
+            onclick={() => {
+                points.step(1, viewer);
+                done();
+            }}
+        >
+            <ChevronRight />
+        </IconButton>
+    </div>
 {/if}

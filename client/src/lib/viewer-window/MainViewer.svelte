@@ -3,6 +3,7 @@
         CLIENT_DEFAULTS,
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
+    import { scaleOf } from "$lib/layers/imageScale";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import SliceScrollbar from "$lib/viewer/SliceScrollbar.svelte";
@@ -12,6 +13,7 @@
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { instances } from "$lib/data/stores.svelte";
     import { resolveEnfaceOverlaySources } from "$lib/registration/resolveEnfaceOverlaySources";
+    import { EtdrsCircleOverlay } from "$lib/viewer/overlays/EtdrsCircleOverlay";
     import { EnfaceProjectionOverlay } from "$lib/viewer/overlays/EnfaceProjectionOverlay";
     import { instanceIdFromImageId } from "./viewerViewState";
     import { getContext, onDestroy, setContext, untrack } from "svelte";
@@ -30,9 +32,10 @@
     import { eyeKey, pointBinding } from "$lib/layers/pointsets";
     import { drawBinding } from "$lib/layers/drawBinding";
     import { bindRegistrationPointTool } from "./panelRegistration/bindRegistrationPointTool";
+    import { bindEtdrsTool } from "./panelETRDS/bindEtdrsTool";
     import { bindDrawTool } from "./panelSegmentation/bindDrawTool";
     import { toolById } from "$lib/workspace/tools/registry";
-    import { GridLayers } from "$lib/layers/gridLayers.svelte";
+    import { gridBinding, GridLayers } from "$lib/layers/gridLayers.svelte";
     import { ViewportBlend } from "$lib/layers/viewportBlend.svelte";
     import { LocalizerLines } from "$lib/layers/localizerLines.svelte";
     import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
@@ -94,13 +97,27 @@
     );
     $effect(() => blend.apply(viewerContext));
     onDestroy(() => blend.dispose(viewerContext));
+    // One fraction for the viewer, so the rings, the circle and the scale agree.
+    const grids = new GridLayers(
+        viewerContext,
+        viewerWindowContext.registration,
+        {
+            get radiusFraction() {
+                return workspace.etdrsFraction;
+            },
+        },
+    );
     // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
+    const distance = workspace.distanceLinesFor(image.image_id);
     const layers: LayersTarget = {
         viewerContext,
         mainViewerContext,
-        grids: new GridLayers(viewerContext, viewerWindowContext.registration),
-        measure: new MeasureTool(viewerContext.image),
+        grids,
+        distance,
         localizer,
+        get scale() {
+            return scale;
+        },
         get projectionSources() {
             return projectionSources;
         },
@@ -110,8 +127,56 @@
         get drawTarget() {
             return drawTarget;
         },
+        get etdrsTarget() {
+            return etdrsTarget;
+        },
+        get etdrsTool() {
+            return etdrsTool?.tool;
+        },
+        get pointTool() {
+            return pointTool?.tool;
+        },
         blend,
     };
+
+    // One scale per image, shared by Distance and the ETDRS circle.
+    const scale = $derived.by(() => {
+        // Grid points map through registration, which notifies only through its revision.
+        void viewerWindowContext.registration.revision;
+        return scaleOf({
+            stored: image.resolution,
+            grids: grids.scaleGrids(),
+            currentId: grids.currentId,
+            shown: grids.shownKeys(),
+            pick: workspace.scalePicks.get(image.image_id),
+            fraction: workspace.etdrsFraction,
+        });
+    });
+
+    // Distance lines always show; the tool draws, moves and deletes them only while Distance is armed.
+    onDestroy(
+        viewerContext.addOverlay(
+            new MeasureTool(
+                distance,
+                () => scale,
+                () => workspace.armedTool === "distance",
+            ),
+        ),
+    );
+
+    // The ETDRS circle follows the shared pointer in every viewport, each sized with its own image's scale.
+    $effect(() => {
+        if (workspace.armedTool !== "circle") return;
+        return untrack(() =>
+            viewerContext.addOverlay(
+                new EtdrsCircleOverlay(
+                    viewerWindowContext.registration,
+                    () => workspace.circleSize,
+                    () => scale,
+                ),
+            ),
+        );
+    });
 
     // While mounted, this viewport is a source for its OCT's projection; the newest one wins.
     const position = getContext<(() => number) | undefined>("viewportPosition");
@@ -312,6 +377,62 @@
         };
     });
 
+    // Built whatever tool is armed, so the options bar names the grid as soon as G is picked.
+    const etdrsTarget = $derived(
+        gridBinding({
+            grid:
+                grids.currentId === undefined
+                    ? undefined
+                    : formAnnotations.get(grids.currentId),
+            instanceId: image.instance.id,
+            userId: globalContext.user.id,
+            canEdit: (grid) => globalContext.canEdit(grid),
+        }),
+    );
+    // A primitive, so a save of the grid never rebuilds the tool mid-drag.
+    const etdrsWritable = $derived(
+        etdrsTarget.reason === null ? grids.currentId : undefined,
+    );
+    let etdrsTool = $state.raw<ReturnType<typeof bindEtdrsTool>>();
+    // Place ETDRS acts in every viewport that can take it; the others show "can't edit".
+    $effect(() => {
+        if (workspace.armedTool !== "etdrs") return;
+        const id = etdrsWritable;
+        return untrack(() => {
+            if (id === undefined) {
+                const remove = viewerContext.addOverlay(new NoEditCursor());
+                return () => {
+                    remove();
+                    viewerContext.resetCursor();
+                };
+            }
+            const binding = bindEtdrsTool({
+                viewerContext,
+                gridId: id,
+                keepSize: () => workspace.keepGridSize,
+            });
+            etdrsTool = binding;
+            return () => {
+                binding.dispose();
+                if (etdrsTool === binding) etdrsTool = undefined;
+            };
+        });
+    });
+    // The bar's Fovea | Disc edge reaches this viewport's tool.
+    $effect(() => {
+        const slot = workspace.etdrsSlot;
+        if (etdrsTool) etdrsTool.tool.placementIndex = slot;
+    });
+    // Another viewport's edit of the grid reaches this viewport's tool.
+    $effect(() => {
+        const formData =
+            etdrsWritable === undefined
+                ? undefined
+                : formAnnotations.get(etdrsWritable)?.form_data;
+        const binding = etdrsTool;
+        if (binding) untrack(() => binding.sync(formData));
+    });
+
     // Reset view and the options bar act on the selected viewport through this handle.
     $effect(() => {
         if (!position) return;
@@ -323,7 +444,10 @@
                 const { width, height } = viewerContext.viewerSize;
                 viewerContext.zoom(width / 2, height / 2, factor);
             },
-            reset: () => viewerContext.initTransform(),
+            reset: () => {
+                viewerContext.initTransform();
+                distance.clear();
+            },
             layers,
             get titleSuffix() {
                 return blend.titleSuffix;

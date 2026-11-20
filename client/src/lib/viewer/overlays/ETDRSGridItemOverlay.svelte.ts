@@ -1,27 +1,18 @@
 import { formAnnotations } from "$lib/data";
 import type { Registration } from "$lib/registration/registration.svelte";
 import type { Position, Position2D } from "$lib/types";
-import type { Overlay, ViewerEvent } from "../viewer-utils";
-import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
+import type { Overlay } from "../viewer-utils";
+import type { ViewerContext } from "../viewerContext.svelte";
 import { cased, casedText } from "./casing";
+import { ETDRS_CIRCLES } from "./etdrsCircles";
 
 // Carbon magenta 40, over a darker casing: on a bright fundus the default casing leaves it under 3:1.
 const AI_COLOUR = "#ff7eb6";
 const AI_CASING = "rgba(0, 0, 0, 0.8)";
 
-/** The interim f / d placing's cross, until the Place ETDRS tool comes. */
+/** Place ETDRS's cross on the fovea and the disc edge. */
 export const ETDRS_LANDMARK_COLOUR = "rgba(0, 255, 0, 1)";
 
-const [C, I, O] = [1, 3, 6];
-const additionalCircles: Record<string, number> = {
-    C0: C / 16,
-    C1: C / 8,
-    C2: C / 4,
-    I1: I / 8,
-    I2: I / 4,
-    O1: O / 8,
-    O2: O / 4,
-};
 export type etdrsGridType = {
     image_id: string;
     form_data: {
@@ -35,11 +26,47 @@ export type ETDRSGridSource =
     | { kind: "annotation"; id: number }
     | { kind: "snapshot"; data: etdrsGridType };
 
+/** A grid's stored points; either may be missing while it is being placed. */
+export type GridData = { fovea?: Position2D; disc_edge?: Position2D };
+
+/**
+ * ETDRS landmarks are always en-face 2D `(x, y)`. An OCT volume's en-face plane is `${id}_proj`, so map from that node and never through OCTToProj, which remaps `index → y`.
+ * A plain CF id has no proj edge and stays as is.
+ */
+function enfaceSourceId(
+    registration: Registration,
+    gridImageId: string,
+): string {
+    if (gridImageId.endsWith("_proj")) return gridImageId;
+    const projId = `${gridImageId}_proj`;
+    return registration.getRegistrationItem(gridImageId, projId)
+        ? projId
+        : gridImageId;
+}
+
+/** A grid's fovea and disc edge in another image's pixels, through registration; null for a point that is missing or doesn't map. */
+export function gridPointsIn(
+    registration: Registration,
+    gridImageId: string,
+    data: GridData | null | undefined,
+    imageId: string,
+): { fovea: Position2D | null; discEdge: Position2D | null } {
+    const source = enfaceSourceId(registration, gridImageId);
+    const map = (p: Position2D | undefined) =>
+        p
+            ? (registration.mapPosition(source, imageId, {
+                  x: p.x,
+                  y: p.y,
+                  index: 0,
+              } as Position) ?? null)
+            : null;
+    return { fovea: map(data?.fovea), discEdge: map(data?.disc_edge) };
+}
+
 export class ETDRSGridItemOverlay implements Overlay {
     lineWidth = 1;
     strokeStyle = "rgba(255,255,255, 1)";
     name: string = "ETRDR grid item";
-    cursorCircle: string | undefined = undefined;
 
     constructor(
         private readonly source: ETDRSGridSource,
@@ -79,61 +106,22 @@ export class ETDRSGridItemOverlay implements Overlay {
         };
     }
 
-    keydown(keyEvent: ViewerEvent<KeyboardEvent>) {
-        const { event } = keyEvent;
-        const circles: Record<string, string[]> = {
-            C: ["C0", "C1", "C2"],
-            I: ["I1", "I2"],
-        };
-        const cycle = circles[event.key.toUpperCase()];
-        if (cycle !== undefined) {
-            const i = this.cursorCircle ? cycle.indexOf(this.cursorCircle) : 0;
-            this.cursorCircle = cycle[(i + 1) % cycle.length];
-        } else {
-            this.cursorCircle = undefined;
-        }
-    }
-
     repaint(viewerContext: ViewerContext) {
-        const { image, context2D } = viewerContext;
         const resolved = this.resolveGrid();
         if (!resolved) return;
-
-        const f = resolved.form_data?.fovea;
-        const d = resolved.form_data?.disc_edge;
-        if (!f || !d) return;
-
-        const srcId = this.enfaceSourceId(String(resolved.image_id));
-        const fovea = this.registration.mapPosition(srcId, image.image_id, {
-            x: f.x,
-            y: f.y,
-            index: 0,
-        } as Position);
-        const discEdge = this.registration.mapPosition(srcId, image.image_id, {
-            x: d.x,
-            y: d.y,
-            index: 0,
-        } as Position);
+        const { fovea, discEdge } = gridPointsIn(
+            this.registration,
+            String(resolved.image_id),
+            resolved.form_data,
+            viewerContext.image.image_id,
+        );
         if (!fovea || !discEdge) return;
-
-        this.paint(context2D, viewerContext, fovea, discEdge);
+        this.paint(viewerContext.context2D, viewerContext, fovea, discEdge);
         if (this.source.kind === "snapshot")
-            this.paintAiPoints(context2D, viewerContext, [fovea, discEdge]);
-    }
-
-    /**
-     * ETDRS landmarks are always enface 2D `(x, y)`.
-     * For OCT volumes the enface plane is `${id}_proj` — use that node so we
-     * never go through OCTToProj (which remaps `index → y` and drops enface y).
-     * Plain CF PublicIDs have no proj edge and stay as-is (do *not* append `_proj`).
-     */
-    private enfaceSourceId(annotationImageId: string): string {
-        if (annotationImageId.endsWith("_proj")) return annotationImageId;
-        const projId = `${annotationImageId}_proj`;
-        if (this.registration.getRegistrationItem(annotationImageId, projId)) {
-            return projId;
-        }
-        return annotationImageId;
+            this.paintAiPoints(viewerContext.context2D, viewerContext, [
+                fovea,
+                discEdge,
+            ]);
     }
 
     private paint(
@@ -160,7 +148,7 @@ export class ETDRSGridItemOverlay implements Overlay {
 
         // One path, so a casing never covers a line drawn before it.
         ctx.beginPath();
-        for (const diameter of [C, I, O]) {
+        for (const diameter of [1, 3, 6]) {
             const r = (diameter / 2) * pix_per_mm;
             ctx.moveTo(p_fovea.x + r, p_fovea.y);
             ctx.ellipse(p_fovea.x, p_fovea.y, r, r, 0, 0, 2 * Math.PI);
@@ -178,19 +166,13 @@ export class ETDRSGridItemOverlay implements Overlay {
         cased(ctx, () => ctx.stroke());
 
         // Draw additionalCircles legend with labels (bottom-left), if size allows
-        const r_max = 0.5 * additionalCircles["O2"] * pix_per_mm;
+        const r_max = 0.5 * ETDRS_CIRCLES.O2 * pix_per_mm;
         const y = viewerContext.viewerSize.height - 10 - r_max;
         let x = 10;
         if (r_max < 0.1 * viewerContext.viewerSize.height) {
-            for (const [name, diameter] of Object.entries(additionalCircles)) {
-                const selected = name === this.cursorCircle;
-                if (selected) {
-                    ctx.lineWidth = 4 * this.lineWidth;
-                    ctx.strokeStyle = "rgba(100, 255, 100, 1)";
-                } else {
-                    ctx.lineWidth = this.lineWidth;
-                    ctx.strokeStyle = this.strokeStyle;
-                }
+            for (const [name, diameter] of Object.entries(ETDRS_CIRCLES)) {
+                ctx.lineWidth = this.lineWidth;
+                ctx.strokeStyle = this.strokeStyle;
                 const r = diameter / 2;
                 x += r * pix_per_mm;
                 ctx.beginPath();
@@ -208,31 +190,6 @@ export class ETDRSGridItemOverlay implements Overlay {
                 x += Math.max(r * pix_per_mm, 20);
                 x += 10;
             }
-        }
-
-        // Draw cursor-following circle if active
-        const cursor = this.registration.getPosition(
-            viewerContext.image.image_id,
-        );
-        if (cursor && this.cursorCircle) {
-            ctx.lineWidth = this.lineWidth;
-            ctx.strokeStyle = this.strokeStyle;
-            const diameter = additionalCircles[this.cursorCircle];
-            const r_c = diameter / 2;
-            const { x: cx, y: cy } =
-                viewerContext.imageToViewerCoordinates(cursor);
-            ctx.beginPath();
-            ctx.ellipse(
-                cx,
-                cy,
-                r_c * pix_per_mm,
-                r_c * pix_per_mm,
-                0,
-                0,
-                2 * Math.PI,
-            );
-            cased(ctx, () => ctx.stroke());
-            viewerContext.claimCursor("none", CursorPriority.Hide);
         }
     }
 

@@ -46,7 +46,6 @@ Provides the selected viewport's viewer and segmentation contexts to the section
         grids={target.grids}
         open={open.etdrs}
         ontoggle={() => ontoggle("etdrs")}
-        {shown}
     />
 {/if}
 {#if sections.includes("pointsets")}
@@ -64,11 +63,10 @@ Provides the selected viewport's viewer and segmentation contexts to the section
 {/if}
 {#if sections.includes("distance")}
     <DistanceSection
-        measure={target.measure}
-        grids={target.grids}
+        distance={target.distance}
+        scale={target.scale}
         open={open.distance}
         ontoggle={() => ontoggle("distance")}
-        {shown}
     />
 {/if}
 {#if sections.includes("projection")}

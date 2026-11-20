@@ -1,141 +1,116 @@
 import type { Position2D } from "$lib/types";
-import type { Overlay, ViewerEvent } from "../viewer-utils";
 import type { RenderTarget } from "$lib/webgl/types";
+import {
+    lengthText,
+    Line,
+    type DistanceLines,
+} from "$lib/layers/distanceLines.svelte";
+import type { Scale } from "$lib/layers/imageScale";
+import type { Overlay, ViewerEvent } from "../viewer-utils";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
-import type { AbstractImage } from "$lib/webgl/abstractImage";
-import { SvelteSet } from "svelte/reactivity";
 import { cased, casedText } from "../overlays/casing";
 
 const radius = 12;
-const strokeStyle = "rgba(255, 255, 255, 1)";
-const fillStyle = "rgba(255, 255, 255, 1)";
+const colour = "rgba(255, 255, 255, 1)";
+const selectedColour = "yellow";
 
-export class Line {
-    start = $state({ x: 0, y: 0 });
-    end = $state({ x: 0, y: 0 });
+/** Distance: paints an image's lines in this viewport and, while armed, draws, moves and deletes them. */
+export class MeasureTool implements Overlay {
+    private hover: { line: Line; point: Position2D } | undefined;
+    private dragging: Position2D | undefined;
 
     constructor(
-        start: Position2D,
-        end: Position2D,
-        public readonly index: number,
-    ) {
-        this.start = start;
-        this.end = end;
-    }
-    *[Symbol.iterator]() {
-        yield this.start;
-        yield this.end;
-    }
-}
+        private readonly store: DistanceLines,
+        private readonly scale: () => Scale | null,
+        private readonly armed: () => boolean,
+    ) {}
 
-export class MeasureTool implements Overlay {
-    hover: { line: Line; point: Position2D } | undefined = undefined;
-    dragging: Position2D | undefined = undefined;
-    lines = new SvelteSet<Line>();
-    highligtLine: Line | undefined = undefined;
-
-    imageResX = $state(0);
-    imageResY = $state(0);
-
-    dbResAvailable = false;
-
-    constructor(image: AbstractImage) {
-        this.imageResX = image.resolution.x;
-        this.imageResY = image.resolution.y;
-        this.dbResAvailable = image.resolution.x >= 0;
-
-        if (!this.dbResAvailable) {
-            this.imageResX = 0;
-            this.imageResY = 0;
-        }
-    }
-
-    setResolution(resolution: number) {
-        this.imageResX = resolution;
-        this.imageResY = resolution;
-    }
-
-    highlight(Line: Line | undefined) {
-        this.highligtLine = Line;
-    }
-
-    findHit(cursor: Position2D, viewerContext: ViewerContext) {
-        for (const line of this.lines) {
+    private findHit(cursor: Position2D, viewerContext: ViewerContext) {
+        for (const line of this.store.lines) {
+            if (line.index !== viewerContext.index) continue;
             for (const point of line) {
-                if (line.index != viewerContext.index) {
-                    continue;
-                }
                 const pt = viewerContext.imageToViewerCoordinates(point);
-                const dx = pt.x - cursor.x;
-                const dy = pt.y - cursor.y;
-
-                if (dx * dx + dy * dy < radius * radius) {
+                if (Math.hypot(pt.x - cursor.x, pt.y - cursor.y) < radius)
                     return { point, line };
-                }
             }
         }
     }
 
-    pointerdown(pointerEvent: ViewerEvent<PointerEvent>) {
-        const { event, viewerContext, cursor } = pointerEvent;
-        if (event.shiftKey) {
-            return;
-        }
-        // const cursor = viewerContext.imageToViewerCoordinates(position);
+    pointerdown(e: ViewerEvent<PointerEvent>) {
+        const { event, viewerContext, cursor } = e;
+        // Shift+drag pans; the right button does nothing.
+        if (!this.armed() || event.shiftKey || event.button !== 0) return;
         const position = viewerContext.viewerToImageCoordinates(cursor);
-
-        if (this.hover) {
-            if (event.button == 2) {
-                this.lines.delete(this.hover.line);
-                this.hover = this.findHit(cursor, viewerContext);
-            } else {
-                this.dragging = this.hover.point;
-            }
-        } else {
-            const index = viewerContext.index;
-            const line = new Line({ ...position }, { ...position }, index);
-            this.lines.add(line);
-            this.dragging = line.end;
-        }
-    }
-
-    pointerup(pointerEvent: ViewerEvent<PointerEvent>) {
-        const { event } = pointerEvent;
-        if (event.shiftKey) {
+        const { drawing } = this.store;
+        if (drawing) {
+            Object.assign(drawing.end, position);
+            this.store.drawing = undefined;
             return;
         }
+        // The hover is refreshed on pointermove only, so its line may be gone.
+        const hover =
+            this.hover && this.store.lines.includes(this.hover.line)
+                ? this.hover
+                : undefined;
+        if (hover) {
+            this.dragging = hover.point;
+            this.store.current = hover.line;
+            return;
+        }
+        const line = new Line(
+            { ...position },
+            { ...position },
+            viewerContext.index,
+        );
+        this.store.add(line);
+        this.store.drawing = line;
+    }
+
+    pointerup(e: ViewerEvent<PointerEvent>) {
+        if (e.event.shiftKey) return;
         this.dragging = undefined;
     }
 
-    pointermove(pointerEvent: ViewerEvent<PointerEvent>) {
-        const { cursor, viewerContext } = pointerEvent;
-        const position = viewerContext.viewerToImageCoordinates(cursor);
+    pointermove(e: ViewerEvent<PointerEvent>) {
+        if (!this.armed()) return;
+        const { cursor, viewerContext } = e;
+        const moving = this.store.drawing?.end ?? this.dragging;
+        if (moving)
+            Object.assign(
+                moving,
+                viewerContext.viewerToImageCoordinates(cursor),
+            );
+        else this.hover = this.findHit(cursor, viewerContext);
+    }
 
-        if (this.dragging) {
-            Object.assign(this.dragging, position);
-        } else {
-            this.hover = this.findHit(cursor, viewerContext);
-        }
+    keydown(e: ViewerEvent<KeyboardEvent>) {
+        const { event, viewerContext, cursor } = e;
+        if (
+            !this.armed() ||
+            (event.key !== "Delete" && event.key !== "Backspace")
+        )
+            return;
+        // Del acts at the pointer, so only in the viewport the pointer is over.
+        if (!viewerContext.active) return;
+        const hit = this.findHit(cursor, viewerContext);
+        if (!hit) return;
+        this.store.remove(hit.line);
+        this.hover = undefined;
     }
 
     repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
-        const ctx = viewerContext.context2D;
-        ctx.lineWidth = 1;
-
-        ctx.textAlign = "center";
-        for (const line of this.lines) {
-            if (line.index == viewerContext.index) {
+        viewerContext.context2D.textAlign = "center";
+        for (const line of this.store.lines) {
+            if (line.index === viewerContext.index)
                 this.paintLine(line, viewerContext);
-            }
         }
-        if (this.hover) {
+        if (!this.armed()) return;
+        if (this.hover)
             viewerContext.claimCursor("pointer", CursorPriority.Hover);
-        } else {
-            viewerContext.claimCursor("crosshair", CursorPriority.Tool);
-        }
+        else viewerContext.claimCursor("crosshair", CursorPriority.Tool);
     }
 
-    paintLine(line: Line, viewerContext: ViewerContext) {
+    private paintLine(line: Line, viewerContext: ViewerContext) {
         const ctx = viewerContext.context2D;
         const { x: x0, y: y0 } = viewerContext.imageToViewerCoordinates(
             line.start,
@@ -145,21 +120,17 @@ export class MeasureTool implements Overlay {
         );
         const cx = (x0 + x1) / 2;
         const cy = (y0 + y1) / 2;
-
         const dx = x1 - x0;
         const dy = y1 - y0;
         const l = Math.sqrt(dx * dx + dy * dy) / radius;
         const nx = -dy / l;
         const ny = dx / l;
-        if (this.highligtLine == line) {
-            ctx.strokeStyle = "yellow";
-            ctx.fillStyle = "yellow";
-            ctx.lineWidth = 2;
-        } else {
-            ctx.strokeStyle = strokeStyle;
-            ctx.fillStyle = fillStyle;
-            ctx.lineWidth = 1;
-        }
+        // The current line, and the one a Layers row points at, stand out.
+        const selected =
+            line === this.store.current || line === this.store.highlighted;
+        ctx.strokeStyle = selected ? selectedColour : colour;
+        ctx.fillStyle = selected ? selectedColour : colour;
+        ctx.lineWidth = selected ? 2 : 1;
 
         ctx.beginPath();
         ctx.moveTo(x0, y0);
@@ -169,24 +140,6 @@ export class MeasureTool implements Overlay {
         ctx.moveTo(x1 - nx, y1 - ny);
         ctx.lineTo(x1 + nx, y1 + ny);
         cased(ctx, () => ctx.stroke());
-        casedText(ctx, this.getDistance(line), cx + 3 * nx, cy - ny);
-    }
-
-    getDistance(line: Line) {
-        const { x: x0, y: y0 } = line.start;
-        const { x: x1, y: y1 } = line.end;
-
-        const dx = x1 - x0;
-        const dy = y1 - y0;
-
-        const dx_um = this.imageResX * dx;
-        const dy_um = this.imageResY * dy;
-
-        const l = Math.sqrt(dx_um * dx_um + dy_um * dy_um);
-        if (l > 1000) {
-            return `${(l / 1000).toFixed(2)} mm`;
-        } else {
-            return `${l.toFixed(2)} µm`;
-        }
+        casedText(ctx, lengthText(line, this.scale()), cx + 3 * nx, cy - ny);
     }
 }

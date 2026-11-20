@@ -84,7 +84,6 @@ function renderSection(
             grids: ctx.grids,
             open: true,
             ontoggle: vi.fn(),
-            shown: true,
             ...props,
         },
         context,
@@ -124,54 +123,26 @@ describe("EtdrsSection", () => {
         await expectNoAxeViolations(container);
     });
 
-    it("the name sets the current grid, shows it and arms Fovea; closing stops placing; pressing it again unsets it", async () => {
+    it("the name sets the current grid and shows it with its points as text; the section mounts no tool; pressing it again unsets it", async () => {
         formAnnotations.set(11, grid(11, ME));
-        formAnnotations.set(12, grid(12, 9));
-        const { grids, viewerContext, rerender } = renderSection();
-        const addOverlay = vi.mocked(viewerContext.addOverlay);
+        const { grids, viewerContext } = renderSection();
         const name = () =>
             screen.getByRole("button", { name: "ETDRS grid, Grader 5" });
         await fireEvent.click(name());
         expect(name()).toHaveAttribute("aria-pressed", "true");
         expect(grids.isShown(11)).toBe(true);
-        expect(pointTool(addOverlay).tool).toBeDefined();
-        const fovea = screen.getByRole("button", {
-            name: "Fovea (f) 512, 498",
-        });
-        const disc = screen.getByRole("button", {
-            name: "Disc edge (d) 801, 470",
-        });
-        expect(fovea).toHaveAttribute("aria-pressed", "true");
-        await fireEvent.click(disc);
-        expect(disc).toHaveAttribute("aria-pressed", "true");
-        expect(fovea).toHaveAttribute("aria-pressed", "false");
-
-        // Closing the section stops the f / d placing but keeps the grid shown.
-        await rerender({ open: false });
-        expect(pointTool(addOverlay).dispose).toHaveBeenCalled();
-        expect(grids.isShown(11)).toBe(true);
-        await rerender({ open: true });
-
+        expect(screen.getByText("Fovea 512, 498")).toBeInTheDocument();
+        expect(screen.getByText("Disc edge 801, 470")).toBeInTheDocument();
+        // Only the grid overlay mounts, so a click with Pan or Distance armed places nothing.
+        expect(
+            pointTool(vi.mocked(viewerContext.addOverlay)).tool,
+        ).toBeUndefined();
         await fireEvent.click(name());
         expect(name()).toHaveAttribute("aria-pressed", "false");
-        expect(screen.queryByRole("button", { name: /^Fovea/ })).toBeNull();
-        // Setting it current again starts at Fovea, not the Disc edge armed before.
-        await fireEvent.click(name());
-        expect(screen.getByRole("button", { name: /^Fovea/ })).toHaveAttribute(
-            "aria-pressed",
-            "true",
-        );
-
-        // A colleague's grid can be current; its points show as text.
-        addOverlay.mockClear();
-        await fireEvent.click(
-            screen.getByRole("button", { name: "ETDRS grid, Grader 9" }),
-        );
-        expect(screen.getByText("Fovea 512, 498")).toBeInTheDocument();
-        expect(pointTool(addOverlay).tool).toBeUndefined();
+        expect(screen.queryByText(/^Fovea/)).toBeNull();
     });
 
-    it("New opens a closed section, hides every grid, creates one in this task and puts focus on its Fovea", async () => {
+    it("New opens a closed section, hides every grid, creates one in this task, makes it current and arms Place ETDRS at Fovea", async () => {
         formAnnotations.set(11, grid(11, ME));
         const ontoggle = vi.fn();
         const view = renderSection({ cfKeypoints: KEYPOINTS }, 7, {
@@ -179,13 +150,9 @@ describe("EtdrsSection", () => {
             ontoggle,
         });
         ontoggle.mockImplementation(() => view.rerender({ open: true }));
-        const { grids } = view;
+        const { grids, workspace } = view;
+        workspace.etdrsSlot = 1;
         grids.setCurrent(11);
-        await view.rerender({ open: true });
-        await fireEvent.click(
-            screen.getByRole("button", { name: /^Disc edge \(d\)/ }),
-        );
-        await view.rerender({ open: false });
         grids.setShown(AI_GRID, true);
         vi.mocked(createFormAnnotation).mockImplementation(async () => {
             const created = grid(99, ME, "inst-1", {
@@ -212,11 +179,12 @@ describe("EtdrsSection", () => {
             grids.isShown(AI_GRID),
             grids.isShown(99),
         ]).toEqual([false, false, true]);
-        const fovea = within(
+        expect(workspace.arm).toHaveBeenCalledWith("etdrs");
+        expect(workspace.etdrsSlot).toBe(0);
+        const name = within(
             screen.getByRole("group", { name: "ETDRS grid, Grader 5 [99]" }),
-        ).getByRole("button", { name: "Fovea (f) —" });
-        expect(fovea).toHaveAttribute("aria-pressed", "true");
-        await vi.waitFor(() => expect(fovea).toHaveFocus());
+        ).getByRole("button", { name: "ETDRS grid, Grader 5" });
+        await vi.waitFor(() => expect(name).toHaveFocus());
     });
 
     it("Delete asks first, then deletes your grid and unsets it", async () => {
@@ -255,18 +223,18 @@ describe("EtdrsSection", () => {
 
     it("Radius fraction applies on commit, not per keystroke, and reverts an empty or out-of-range entry", async () => {
         formAnnotations.set(11, grid(11, ME));
-        const { grids } = renderSection();
+        const { workspace } = renderSection();
         const field = screen.getByLabelText("Radius fraction");
         expect(field).toHaveAttribute("step", "0.01");
         await fireEvent.input(field, { target: { value: "0.9" } });
-        expect(grids.settings.radiusFraction).toBe(0.85);
+        expect(workspace.etdrsFraction).toBe(0.85);
         await fireEvent.change(field);
-        expect(grids.settings.radiusFraction).toBe(0.9);
+        expect(workspace.etdrsFraction).toBe(0.9);
         for (const bad of ["", "1.5"]) {
             await fireEvent.input(field, { target: { value: bad } });
             await fireEvent.keyDown(field, { key: "Enter" });
             expect(field).toHaveValue(0.9);
         }
-        expect(grids.settings.radiusFraction).toBe(0.9);
+        expect(workspace.etdrsFraction).toBe(0.9);
     });
 });

@@ -350,10 +350,15 @@ export async function getFormAnnotationValue(annotationId: number) {
     return res.data as unknown;
 }
 
+/** The latest save per annotation, so an older save that resolves last can't roll the store back. */
+const latestSave = new Map<number, number>();
+
 export async function setFormAnnotationValue(
     annotationId: number,
     form_data: unknown,
 ) {
+    const save = (latestSave.get(annotationId) ?? 0) + 1;
+    latestSave.set(annotationId, save);
     // Save to server first (server is source of truth)
     await apiInvoke(() =>
         api.PUT("/form-annotations/{form_annotation_id}/value", {
@@ -361,6 +366,7 @@ export async function setFormAnnotationValue(
             body: form_data as any,
         }),
     );
+    if (latestSave.get(annotationId) !== save) return;
 
     // Then update local store so other components see the change
     const existing = formAnnotations.get(annotationId);

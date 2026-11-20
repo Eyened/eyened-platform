@@ -52,9 +52,14 @@ export function bindRegistrationPointTool(args: {
     canEdit: boolean;
     pointMarker: { style: PointMarkerStyle; radius: number; color: string };
     onSync?: (sync: SyncState) => void;
-}): { dispose: () => void; sync: (formData: unknown) => void } {
+}): {
+    tool: PointTool | undefined;
+    dispose: () => void;
+    sync: (formData: unknown) => void;
+} {
     const analysis = registrationAnalysis(args.schema);
-    if (!analysis) return { dispose: () => {}, sync: () => {} };
+    if (!analysis)
+        return { tool: undefined, dispose: () => {}, sync: () => {} };
     const publicId = args.viewerContext.image.instance.id;
     const annotationId = args.annotationId;
     // A failed save shows on the registration's row; the next move saves the whole set again.
@@ -102,6 +107,7 @@ export function bindRegistrationPointTool(args: {
     tool.points = getPointsForImage(existing, publicId, analysis);
     const removeOverlay = args.viewerContext.addOverlay(tool);
     return {
+        tool,
         dispose: () => {
             tool.destroy();
             removeOverlay();

@@ -15,6 +15,7 @@ function mockViewer(
         is3D?: boolean;
         image_id?: string;
         index?: number;
+        active?: boolean;
     } = {},
 ): ViewerContext {
     const ctx2d = {
@@ -42,6 +43,7 @@ function mockViewer(
             width: 100,
         },
         index: overrides.index ?? 0,
+        active: overrides.active ?? true,
         viewerSize: { width: 100, height: 100 },
         context2D: ctx2d,
         viewerToImageCoordinates: (c: Position2D) => c,
@@ -142,7 +144,7 @@ describe("PointTool", () => {
         expect(tool.placementIndex).toBe(2);
     });
 
-    it("drags an existing hit and right-click deletes", () => {
+    it("drags an existing hit; the right button deletes nothing; Del removes the point under the pointer, only with the pointer over this viewport", () => {
         const onPersist = vi.fn();
         const tool = new PointTool({ onPersist, radius: 16 });
         const viewer = mockViewer();
@@ -150,11 +152,19 @@ describe("PointTool", () => {
 
         tool.pointerdown(pointerEvent(viewer, { x: 10, y: 10 }));
         tool.pointermove(pointerEvent(viewer, { x: 30, y: 40 }));
+        tool.pointerup(pointerEvent(viewer, { x: 30, y: 40 }));
         expect(tool.points[0]).toMatchObject({ x: 30, y: 40 });
 
         tool.pointerup(pointerEvent(viewer, { x: 30, y: 40 }, { button: 2 }));
+        tool.keydown(
+            keyEvent(mockViewer({ active: false }), { x: 30, y: 40 }, "Delete"),
+        );
+        tool.keydown(keyEvent(viewer, { x: 90, y: 90 }, "Delete"));
+        expect(tool.points).toHaveLength(1);
+        onPersist.mockClear();
+        tool.keydown(keyEvent(viewer, { x: 30, y: 40 }, "Delete"));
         expect(tool.points).toEqual([]);
-        expect(onPersist).toHaveBeenCalled();
+        expect(onPersist).toHaveBeenCalledWith([]);
     });
 
     it("ignores shift-clicks", () => {
@@ -247,30 +257,26 @@ describe("PointTool", () => {
         expect(tool.points[0]).toEqual({ x: 12, y: 11, severity: "mild" });
     });
 
-    it("ctrl-click stacks a point on an existing marker without cycling or dragging", () => {
-        const onPersist = vi.fn();
-        const tool = new PointTool({
-            onPersist,
-            enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
-        });
-        const viewer = mockViewer();
-        tool.points = [{ x: 10, y: 10, severity: "mild" }];
+    it("Ctrl-click or ⌘-click stacks a point on an existing marker without cycling or dragging", () => {
+        for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
+            const onPersist = vi.fn();
+            const tool = new PointTool({
+                onPersist,
+                enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
+            });
+            const viewer = mockViewer();
+            tool.points = [{ x: 10, y: 10, severity: "mild" }];
 
-        tool.pointerdown(
-            pointerEvent(viewer, { x: 10, y: 10 }, { ctrlKey: true }),
-        );
-        tool.pointermove(
-            pointerEvent(viewer, { x: 40, y: 50 }, { ctrlKey: true }),
-        );
-        tool.pointerup(
-            pointerEvent(viewer, { x: 40, y: 50 }, { ctrlKey: true }),
-        );
+            tool.pointerdown(pointerEvent(viewer, { x: 10, y: 10 }, modifier));
+            tool.pointermove(pointerEvent(viewer, { x: 40, y: 50 }, modifier));
+            tool.pointerup(pointerEvent(viewer, { x: 40, y: 50 }, modifier));
 
-        expect(tool.points).toEqual([
-            { x: 10, y: 10, severity: "mild" },
-            { x: 10, y: 10 },
-        ]);
-        expect(onPersist).toHaveBeenCalledTimes(1);
+            expect(tool.points).toEqual([
+                { x: 10, y: 10, severity: "mild" },
+                { x: 10, y: 10 },
+            ]);
+            expect(onPersist).toHaveBeenCalledTimes(1);
+        }
     });
 
     it("does not cycle a grade when the same click places the point", () => {
@@ -283,40 +289,6 @@ describe("PointTool", () => {
         tool.pointerdown(pointerEvent(viewer, { x: 4, y: 5 }));
         tool.pointerup(pointerEvent(viewer, { x: 4, y: 5 }));
         expect(tool.points[0]).toEqual({ x: 4, y: 5, severity: "mild" });
-    });
-
-    it("cycles enum extras on C key", () => {
-        const onPersist = vi.fn();
-        const tool = new PointTool({
-            onPersist,
-            enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
-        });
-        const viewer = mockViewer();
-        tool.points = [{ x: 10, y: 10, severity: "mild" }];
-        tool.pointermove(pointerEvent(viewer, { x: 10, y: 10 }));
-        tool.keydown(keyEvent(viewer, { x: 10, y: 10 }, "c"));
-        expect(tool.points[0]).toMatchObject({ severity: "severe" });
-        expect(onPersist).toHaveBeenCalled();
-    });
-
-    it("places into a slot from a shortcut key", () => {
-        const tool = new PointTool({
-            slotKeys: [{ index: 1, key: "f" }],
-        });
-        const viewer = mockViewer();
-        tool.keydown(keyEvent(viewer, { x: 4, y: 5 }, "F"));
-        expect(tool.points[1]).toEqual({ x: 4, y: 5 });
-        tool.keyup(keyEvent(viewer, { x: 4, y: 5 }, "F"));
-        expect(viewer.resetCursor).toHaveBeenCalled();
-    });
-
-    it("focuses a sparse numbered slot on keyup", () => {
-        const tool = new PointTool({ sparse: true });
-        const viewer = mockViewer({ is3D: true, index: 0 });
-        tool.points = [null, { x: 2, y: 3, index: 7 }];
-        tool.keyup(keyEvent(viewer, { x: 0, y: 0 }, "2"));
-        expect(viewer.setIndex).toHaveBeenCalledWith(7);
-        expect(viewer.focusPoint).toHaveBeenCalled();
     });
 
     it("repaints visible markers including rect and cross styles", () => {
@@ -367,9 +339,11 @@ describe("PointTool", () => {
     it("ignores keyboard and pointer when not editable", () => {
         const tool = new PointTool({ canEdit: false });
         const viewer = mockViewer();
-        tool.keydown(keyEvent(viewer, { x: 1, y: 1 }, "c"));
-        tool.pointerup(pointerEvent(viewer, { x: 1, y: 1 }));
-        expect(tool.points).toEqual([]);
+        tool.points = [{ x: 1, y: 1 }];
+        tool.keydown(keyEvent(viewer, { x: 1, y: 1 }, "Delete"));
+        tool.pointerdown(pointerEvent(viewer, { x: 50, y: 50 }));
+        tool.pointerup(pointerEvent(viewer, { x: 50, y: 50 }));
+        expect(tool.points).toEqual([{ x: 1, y: 1 }]);
         tool.destroy();
     });
 
@@ -383,5 +357,105 @@ describe("PointTool", () => {
             expect.any(Number),
             expect.any(Number),
         );
+    });
+
+    it("C and digit keys do nothing: a click cycles grades, digits are render presets", () => {
+        const onPersist = vi.fn();
+        const tool = new PointTool({
+            onPersist,
+            sparse: true,
+            enumExtras: [{ key: "severity", values: ["mild", "severe"] }],
+        });
+        const viewer = mockViewer({ is3D: true });
+        tool.points = [
+            { x: 10, y: 10, index: 0, severity: "mild" },
+            { x: 2, y: 3, index: 7 },
+        ];
+        tool.pointermove(pointerEvent(viewer, { x: 10, y: 10 }));
+        tool.keydown(keyEvent(viewer, { x: 10, y: 10 }, "c"));
+        tool.keyup(keyEvent(viewer, { x: 10, y: 10 }, "2"));
+        expect(tool.points[0]).toMatchObject({ severity: "mild" });
+        expect(viewer.setIndex).not.toHaveBeenCalled();
+        expect(onPersist).not.toHaveBeenCalled();
+    });
+
+    it("step goes to the previous or next placed point, skipping gaps and stopping at the ends; it sets the B-scan, centres at 100 % and makes the point current", () => {
+        const tool = new PointTool({ sparse: true });
+        const viewer = mockViewer({ is3D: true });
+        tool.points = [
+            { x: 1, y: 2, index: 3 },
+            null,
+            { x: 5, y: 6, index: 7 },
+        ];
+        tool.step(1, viewer);
+        expect(tool.current).toBe(0);
+        tool.step(-1, viewer);
+        expect(tool.current).toBe(0);
+        tool.step(1, viewer);
+        expect(tool.current).toBe(2);
+        expect(viewer.setIndex).toHaveBeenLastCalledWith(7);
+        // The viewer and the image are both 100 px wide, so 100 % is one image pixel per screen pixel.
+        expect(viewer.focusPoint).toHaveBeenLastCalledWith(5, 6, 1);
+        tool.step(1, viewer);
+        expect(tool.current).toBe(2);
+    });
+
+    it("Delete removes the current point, the last placed or stepped one; in a fixed slot, the slot's point", () => {
+        const tool = new PointTool({ sparse: true });
+        const viewer = mockViewer();
+        tool.pointerdown(pointerEvent(viewer, { x: 10, y: 10 }));
+        tool.pointerup(pointerEvent(viewer, { x: 10, y: 10 }));
+        tool.pointerdown(pointerEvent(viewer, { x: 60, y: 60 }));
+        tool.pointerup(pointerEvent(viewer, { x: 60, y: 60 }));
+        expect(tool.hasCurrent).toBe(true);
+        tool.deleteCurrent();
+        expect(tool.points[0]).toEqual({ x: 10, y: 10 });
+        expect(tool.points[1] ?? null).toBeNull();
+        expect(tool.hasCurrent).toBe(false);
+
+        const slots = new PointTool({ sparse: true });
+        slots.points = [
+            { x: 1, y: 1 },
+            { x: 60, y: 60 },
+        ];
+        slots.placementIndex = 1;
+        slots.deleteCurrent();
+        expect(slots.points[0]).toEqual({ x: 1, y: 1 });
+        expect(slots.points[1] ?? null).toBeNull();
+    });
+
+    it("in a fixed slot, pressing a placed point drags it and keeps the slot", () => {
+        const tool = new PointTool({ sparse: true });
+        tool.points = [
+            { x: 10, y: 10 },
+            { x: 60, y: 60 },
+        ];
+        tool.placementIndex = 0;
+        const viewer = mockViewer();
+        tool.pointerdown(pointerEvent(viewer, { x: 60, y: 60 }));
+        tool.pointermove(pointerEvent(viewer, { x: 80, y: 80 }));
+        tool.pointerup(pointerEvent(viewer, { x: 80, y: 80 }));
+        expect(tool.points[1]).toMatchObject({ x: 80, y: 80 });
+        expect(tool.placementIndex).toBe(0);
+    });
+
+    it("in a fixed slot, hold Space places the slot's point at the pointer and follows it until release; not with the pointer elsewhere", () => {
+        const onPersist = vi.fn();
+        const tool = new PointTool({ sparse: true, onPersist });
+        tool.placementIndex = 1;
+        const viewer = mockViewer();
+        const space = { code: "Space", preventDefault: vi.fn() };
+        tool.keydown(
+            keyEvent(mockViewer({ active: false }), { x: 5, y: 5 }, " ", space),
+        );
+        expect(tool.points[1] ?? null).toBeNull();
+        tool.keydown(keyEvent(viewer, { x: 5, y: 5 }, " ", space));
+        tool.pointermove(pointerEvent(viewer, { x: 20, y: 30 }));
+        expect(tool.points[1]).toEqual({ x: 20, y: 30 });
+        expect(onPersist).not.toHaveBeenCalled();
+        tool.keyup(keyEvent(viewer, { x: 20, y: 30 }, " ", space));
+        expect(onPersist).toHaveBeenCalledOnce();
+        tool.pointermove(pointerEvent(viewer, { x: 70, y: 70 }));
+        expect(tool.points[1]).toEqual({ x: 20, y: 30 });
     });
 });

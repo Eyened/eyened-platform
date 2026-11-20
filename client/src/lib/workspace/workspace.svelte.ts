@@ -1,10 +1,16 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { pointArming } from "$lib/forms/pointArming.svelte";
 import type { DrawTarget } from "$lib/layers/drawBinding";
-import type { GridLayers } from "$lib/layers/gridLayers.svelte";
+import type { GridLayers, GridTarget } from "$lib/layers/gridLayers.svelte";
+import type { Scale, ScalePick } from "$lib/layers/imageScale";
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
+import {
+    CIRCLE_SIZES,
+    type CircleSize,
+} from "$lib/viewer/overlays/etdrsCircles";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
-import type { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
+import { DistanceLines } from "$lib/layers/distanceLines.svelte";
+import type { PointTool } from "$lib/viewer/tools/PointTool.svelte";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { instanceIdFromImageId } from "$lib/viewer-window/viewerViewState";
 import {
@@ -50,6 +56,17 @@ import {
     type ToolMode,
 } from "./tools/registry";
 
+/** The Layers section each tool opens when armed; the ETDRS circle opens none. */
+const OPENS: Partial<Record<ToolId, LayerSectionId>> = {
+    brush: "segmentations",
+    eraser: "segmentations",
+    polygon: "segmentations",
+    enhance: "segmentations",
+    distance: "distance",
+    etdrs: "etdrs",
+    point: "pointsets",
+};
+
 export interface WorkspaceOptions {
     /** Receives the URL state after every change; the loader passes workspaceUrl's writer. */
     writeUrl?: (state: WorkspaceUrlState) => void;
@@ -71,8 +88,10 @@ export interface LayersTarget {
     readonly mainViewerContext: MainViewerContext;
     /** ETDRS grids state, kept while Layers remounts its sections. */
     readonly grids: GridLayers;
-    /** Today's Measure tool with this viewport's lines, until the Distance tool replaces it. */
-    readonly measure: MeasureTool;
+    /** The image's scale for Distance and the ETDRS circle; null when nothing gives one. */
+    readonly scale: Scale | null;
+    /** This viewport's image's distance lines, shared with every viewport showing it. */
+    readonly distance: DistanceLines;
     /** The OCT projections this viewport's image shows, in strip order, with this viewport's modes. */
     readonly projectionSources: EnfaceOverlaySourceResolved[];
     /** This viewport's localizer lines: the mode and the B-scan positions it draws. */
@@ -81,6 +100,12 @@ export interface LayersTarget {
     readonly pointTarget: { id: number; canEdit: boolean } | null;
     /** The current segmentation a Draw tool writes into here, or why it can't. */
     readonly drawTarget: DrawTarget;
+    /** The grid Place ETDRS writes here, or why it can't. */
+    readonly etdrsTarget: GridTarget;
+    /** Place ETDRS's tool, while it is armed and can write here. */
+    readonly etdrsTool: PointTool | undefined;
+    /** P's tool for the eye's current registration, when there is one. */
+    readonly pointTool: PointTool | undefined;
     /** This viewport's blend, kept while it is mounted. */
     readonly blend: ViewportBlend;
 }
@@ -116,6 +141,16 @@ export class Workspace {
     /** Questionable and Dilate / Erode: off again when the target changes or a tool outside Draw is armed. */
     questionable = $state(false);
     dilateErode = $state(false);
+    /** One ETDRS fraction for the viewer: fovea to disc edge × fraction = 3 mm. This session only. */
+    etdrsFraction = $state(0.85);
+    /** The scale source the grader picked, per image; this session only. */
+    readonly scalePicks = new SvelteMap<string, ScalePick>();
+    /** The ETDRS circle's size; this session only. */
+    circleSize: CircleSize = $state("C1");
+    /** Place ETDRS's slot, 0 Fovea and 1 Disc edge; only the grader changes it. This session only. */
+    etdrsSlot: 0 | 1 = $state(0);
+    /** Place ETDRS: a moved fovea takes the disc edge along. This session only. */
+    keepGridSize = $state(false);
     /** The open Layers sections, kept here so arming a Draw tool can open Segmentations; stored per browser. */
     layerSections: Record<LayerSectionId, boolean> =
         $state.raw(readLayerSections());
@@ -165,6 +200,8 @@ export class Workspace {
     private sliceIndex: Record<string, number> = {};
     /** Images whose B-scan the grader locked; kept until reload, like the remembered slice. */
     private readonly lockedIds = new SvelteSet<string>();
+    /** Distance lines per image, kept while the image moves between viewports; this session only. */
+    private readonly distanceLines = new SvelteMap<string, DistanceLines>();
     /** Open images in the order they were opened; every Arrange sort starts from it. */
     // ASSUMPTION: sorts start from the opened list, so ties keep the opened order (plan decision 17).
     private opened: CatalogueEntry[] = [];
@@ -328,6 +365,16 @@ export class Workspace {
         else this.lockedIds.delete(imageId);
     }
 
+    /** An image's distance lines, made the first time they are asked for. */
+    distanceLinesFor(imageId: string): DistanceLines {
+        let lines = this.distanceLines.get(imageId);
+        if (!lines) {
+            lines = new DistanceLines();
+            this.distanceLines.set(imageId, lines);
+        }
+        return lines;
+    }
+
     /** A key or a menu pick: arms a modal tool; Reset view, the one action, resets the selected viewport. */
     arm(id: ToolId): void {
         const tool = toolById(id);
@@ -335,11 +382,12 @@ export class Workspace {
             this.selectedViewport?.reset();
             return;
         }
-        // One point tool at a time: P drops an armed form point field.
-        if (id === "point") pointArming.disarm();
-        // A Draw tool opens Segmentations, as if by hand; it never closes it.
-        if (tool.group === "Draw") this.setLayerSection("segmentations", true);
-        else this.resetDrawToggles();
+        // One point tool at a time: P and G drop an armed form point field.
+        if (id === "point" || id === "etdrs") pointArming.disarm();
+        // Arming opens the tool's section, as if by hand; it never closes one.
+        const section = OPENS[id];
+        if (section) this.setLayerSection(section, true);
+        if (tool.group !== "Draw") this.resetDrawToggles();
         this.armedTool = id;
         this.lastPick = { ...this.lastPick, [tool.group]: id };
     }
@@ -367,6 +415,13 @@ export class Workspace {
     /** Sets the brush size for this image's kind, within the size limits, and stores it. */
     setSize(image: { is2D: boolean }, size: number): void {
         this.setPaint({ [sizeKey(image)]: clampSize(size) });
+    }
+
+    /** `[` `]` with the ETDRS circle: the next size, stopping at C0 and O2. */
+    stepCircle(delta: 1 | -1): void {
+        const i = CIRCLE_SIZES.indexOf(this.circleSize) + delta;
+        if (i >= 0 && i < CIRCLE_SIZES.length)
+            this.circleSize = CIRCLE_SIZES[i];
     }
 
     resetDrawToggles(): void {

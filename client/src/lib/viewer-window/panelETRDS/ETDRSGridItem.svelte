@@ -1,10 +1,9 @@
 <!--
 @component
 One ETDRS grid on this image in Layers: eye, the creator's name (sets or unsets the current grid), "This task" and Delete on your own grids.
-The current grid shows its fovea and disc edge: on your own grid as today's f / d buttons, which arm the next click, else as text.
+The current grid shows its fovea and disc edge as text; Place ETDRS (G) places them.
 -->
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
     import * as Tooltip from "$lib/components/ui/tooltip/index.js";
@@ -23,20 +22,15 @@ The current grid shows its fovea and disc edge: on your own grid as today's f / 
         formAnnotation,
         shown,
         current,
-        armedSlot,
         ontoggleshown,
         ontogglecurrent,
-        onarm,
         ondelete,
     }: {
         formAnnotation: FormAnnotationGET;
         shown: boolean;
         current: boolean;
-        /** While this is your current grid: the slot the next click places, 0 fovea, 1 disc edge. */
-        armedSlot?: number;
         ontoggleshown: () => void;
         ontogglecurrent: () => void;
-        onarm: (slot: number) => void;
         ondelete: () => void;
     } = $props();
 
@@ -55,8 +49,8 @@ The current grid shows its fovea and disc edge: on your own grid as today's f / 
             Position2D | undefined
         >;
         return [
-            { label: "Fovea", key: "f", point: data.fovea },
-            { label: "Disc edge", key: "d", point: data.disc_edge },
+            { label: "Fovea", point: data.fovea },
+            { label: "Disc edge", point: data.disc_edge },
         ];
     });
 
@@ -110,27 +104,13 @@ The current grid shows its fovea and disc edge: on your own grid as today's f / 
     {#if current}
         <!-- Starts under the eye, as a segmentation row's details do. -->
         <div class="flex flex-col items-start gap-1 ps-7 pe-2 pb-1">
-            {#each landmarks as landmark, slot (landmark.key)}
-                {#if armedSlot !== undefined}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        class="tabular-nums aria-pressed:bg-background-selected aria-pressed:text-text-primary aria-pressed:shadow-content-switcher-selected"
-                        aria-pressed={armedSlot === slot}
-                        data-landmark={slot}
-                        onclick={() => onarm(slot)}
-                        >{landmark.label} ({landmark.key}) {coords(
-                            landmark.point,
-                        )}</Button
-                    >
-                {:else}
-                    <p
-                        class="px-1 text-body-compact-01 text-text-primary tabular-nums"
-                    >
-                        {landmark.label}
-                        {coords(landmark.point)}
-                    </p>
-                {/if}
+            {#each landmarks as landmark (landmark.label)}
+                <p
+                    class="px-1 text-body-compact-01 text-text-primary tabular-nums"
+                >
+                    {landmark.label}
+                    {coords(landmark.point)}
+                </p>
             {/each}
         </div>
     {/if}

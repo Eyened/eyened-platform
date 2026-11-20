@@ -81,8 +81,12 @@
             title: "ETDRS grid",
             shortcuts: [
                 {
-                    action: "Cycle central / inner circles",
-                    keys: "C / I",
+                    action: "ETDRS circle size; with Place ETDRS, Fovea / Disc edge; with Point, previous / next point",
+                    keys: "[ / ]",
+                },
+                {
+                    action: "Remove the point or line under the pointer",
+                    keys: "Del",
                 },
             ],
         },
