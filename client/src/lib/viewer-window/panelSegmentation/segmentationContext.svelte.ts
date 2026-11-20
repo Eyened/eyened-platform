@@ -68,6 +68,10 @@ export class SegmentationContext {
     /** Drag-to-define region tool for new segmentations. */
     public regionToolActive = $state(false);
     public pendingRegionBox: ImageBox | undefined = $state(undefined);
+    /** The header's progress text while a quick create or a duplicate saves; New is hidden meanwhile. */
+    public busy: "Creating…" | "Duplicating…" | null = $state(null);
+    /** The last quick create or duplicate failure, shown at the top of the section until the next one starts. */
+    public failed: string | null = $state(null);
 
     /** Per-segmentation bitmask: bit (i-1) = 1 means subfeature i is shown in multi-class / multi-label shaders. */
     private visibleFeatureMaskBySegmentationKey = new SvelteMap<

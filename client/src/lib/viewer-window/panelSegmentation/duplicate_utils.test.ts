@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GlobalContext } from "$lib/data/globalContext.svelte";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
@@ -65,7 +64,7 @@ async function copy(
     duplicateVolume = false,
 ) {
     return duplicate(
-        { dialogue: null } as GlobalContext,
+        { busy: null, failed: null } as never,
         segmentation,
         item,
         source,
@@ -141,5 +140,34 @@ describe("duplicate", () => {
         const [, array] = vi.mocked(createSegmentation).mock.calls[0];
         expect(array.shape).toEqual([2, 2, 3]);
         expect(Array.from(array.data)).toEqual([...first, ...second]);
+    });
+
+    it("a failed copy clears the header's progress and leaves the section notice", async () => {
+        vi.mocked(createSegmentation).mockRejectedValueOnce(
+            new Error("offline"),
+        );
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        const context = {
+            busy: null as string | null,
+            failed: null as string | null,
+        };
+
+        const result = await duplicate(
+            context as never,
+            modelSegmentation(),
+            segmentationItem([new Uint8Array(16)]),
+            image(),
+            { index: 0 } as ViewerContext,
+            false,
+            "B",
+            0.5,
+            0.5,
+        );
+
+        expect(result).toBeUndefined();
+        expect(context).toEqual({
+            busy: null,
+            failed: "Couldn't duplicate the segmentation",
+        });
     });
 });

@@ -1,10 +1,11 @@
 <!--
 @component
-New on the Segmentations header: a popover with the feature search, where focus starts, then Advanced… and Region box….
+New on the Segmentations header: a popover with the Feature combo box, where focus starts, then Advanced… and Region box….
 `open` is bindable so the empty state's button opens the same popover.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
+    import { ComboBox } from "$lib/components/ui/combo-box/index.js";
     import * as Popover from "$lib/components/ui/popover/index.js";
     import { features } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
@@ -12,10 +13,8 @@ New on the Segmentations header: a popover with the feature search, where focus 
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import type { FeatureGET } from "../../../types/openapi_types";
     import CreateSegmentationDialog from "./CreateSegmentationDialog.svelte";
     import { createQuestionableSegmentation } from "./createSegmentationHelpers";
-    import FeatureSelect from "./FeatureSelect.svelte";
 
     let { open = $bindable(false) }: { open?: boolean } = $props();
 
@@ -29,18 +28,35 @@ New on the Segmentations header: a popover with the feature search, where focus 
     let content: HTMLElement | null = $state(null);
     let trigger: HTMLElement | null = $state(null);
 
-    async function createQuestionable(feature: FeatureGET) {
+    let text = $state("");
+    const items = $derived.by(() => {
+        const q = text.trim().toLowerCase();
+        return features
+            .filter((f) => f.name.toLowerCase().includes(q))
+            .map((f) => ({ id: String(f.id), text: f.name }));
+    });
+
+    // While it saves, the header shows "Creating…" in New's place; the section moves focus back to New after.
+    async function createQuestionable(id: string) {
+        const feature = features.get(Number(id));
+        if (!feature) return;
         open = false;
-        await createQuestionableSegmentation(
-            globalContext,
-            segmentationContext,
-            image,
-            axis,
-            feature,
-            taskContext?.subTask?.id,
-        );
-        // The progress dialog takes focus and drops it when it closes.
-        trigger?.focus();
+        segmentationContext.failed = null;
+        segmentationContext.busy = "Creating…";
+        try {
+            await createQuestionableSegmentation(
+                globalContext,
+                segmentationContext,
+                image,
+                axis,
+                feature,
+                taskContext?.subTask?.id,
+            );
+        } catch {
+            segmentationContext.failed = "Couldn't create the segmentation";
+        } finally {
+            segmentationContext.busy = null;
+        }
     }
 
     function openAdvanced() {
@@ -63,7 +79,7 @@ New on the Segmentations header: a popover with the feature search, where focus 
         segmentationContext.regionToolActive = true;
     }
 
-    // Typing a feature name is the next step, so focus starts in the search.
+    // Typing a feature name is the next step, so focus starts in the combo box.
     function onOpenAutoFocus(e: Event) {
         const input = content?.querySelector<HTMLInputElement>("input");
         if (!input) return;
@@ -96,9 +112,10 @@ New on the Segmentations header: a popover with the feature search, where focus 
         {onCloseAutoFocus}
         class="flex flex-col gap-2"
     >
-        <FeatureSelect
-            label="Search feature to create"
-            values={features.map((f) => f)}
+        <ComboBox
+            titleText="Feature"
+            {items}
+            bind:value={text}
             onselect={createQuestionable}
         />
         <Button

@@ -6,6 +6,8 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     import { Button } from "$lib/components/ui/button/index.js";
     import * as Empty from "$lib/components/ui/empty/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
+    import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { Slider } from "$lib/components/ui/slider/index.js";
     import { Toggle } from "$lib/components/ui/toggle/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
@@ -24,7 +26,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
         writeLayerArea,
     } from "$lib/workspace/workspacePrefs";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
-    import { getContext } from "svelte";
+    import { getContext, untrack } from "svelte";
     import LayerSection from "./LayerSection.svelte";
     import SegmentationDeleteModal from "./SegmentationDeleteModal.svelte";
 
@@ -90,6 +92,27 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     let deleting: Segmentation | null = $state(null);
     let deleteOpen = $state(false);
     let header: HTMLElement | undefined = $state();
+
+    // Looked up each time: New unmounts while a create or duplicate saves.
+    function focusNew() {
+        header
+            ?.querySelector<HTMLElement>('[aria-label="New segmentation"]')
+            ?.focus();
+    }
+
+    // If New took focus with it when it unmounted, focus goes back to it once the save ends.
+    let wasBusy = false;
+    $effect(() => {
+        const busy = segmentationContext.busy !== null;
+        if (wasBusy && !busy && document.activeElement === document.body)
+            focusNew();
+        wasBusy = busy;
+    });
+
+    // The notice is in the body, so a collapsed section opens to show it; collapsing again is up to the user.
+    $effect(() => {
+        if (segmentationContext.failed) untrack(() => !open && ontoggle());
+    });
     function askDelete(segmentation: Segmentation) {
         deleting = segmentation;
         deleteOpen = true;
@@ -99,8 +122,28 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
 <div bind:this={header}>
     <LayerSection title="Segmentations" {count} {open} {ontoggle}>
         {#snippet action()}
-            <NewSegmentation bind:open={newOpen} />
+            <!-- Stays mounted so the progress text is announced. -->
+            <div role="status">
+                {#if segmentationContext.busy}
+                    <InlineLoading
+                        class="w-auto"
+                        status="active"
+                        description={segmentationContext.busy}
+                    />
+                {:else}
+                    <NewSegmentation bind:open={newOpen} />
+                {/if}
+            </div>
         {/snippet}
+        {#if segmentationContext.failed}
+            <div class="px-4 py-2">
+                <InlineNotification
+                    title={segmentationContext.failed}
+                    subtitle="Try again."
+                    role="status"
+                />
+            </div>
+        {/if}
         {#if count > 0}
             <div class="flex items-center gap-3 px-4 py-2">
                 <span class="text-label-01 text-text-secondary">Opacity</span>
@@ -165,6 +208,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
                 <Button
                     variant="ghost"
                     size="sm"
+                    disabled={segmentationContext.busy !== null}
                     onclick={() => (newOpen = true)}
                     >New segmentation <Add /></Button
                 >

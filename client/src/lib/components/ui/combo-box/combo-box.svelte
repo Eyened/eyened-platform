@@ -26,6 +26,8 @@
     } = $props();
 
     let open = $state(false);
+    // No match shows no list, not an empty panel.
+    const listOpen = $derived(open && items.length > 0);
     let picked = $state("");
     let input = $state<HTMLInputElement | null>(null);
 
@@ -44,7 +46,7 @@
     <Label for={id}>{titleText}</Label>
     <Combobox.Root
         type="single"
-        bind:open
+        bind:open={() => listOpen, (v) => (open = v)}
         bind:value={picked}
         inputValue={value}
         items={items.map((i) => ({ value: i.id, label: i.text }))}
@@ -81,19 +83,25 @@
             {/if}
             <Combobox.Trigger
                 tabindex={-1}
-                aria-label={open ? "Close" : "Open"}
-                title={open ? "Close" : "Open"}
+                aria-label={listOpen ? "Close" : "Open"}
+                title={listOpen ? "Close" : "Open"}
                 class="absolute end-3 top-1/2 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center text-icon-primary"
             >
                 <ChevronDown
                     aria-hidden="true"
-                    class={cn("transition-transform", open && "rotate-180")}
+                    class={cn("transition-transform", listOpen && "rotate-180")}
                 />
             </Combobox.Trigger>
         </div>
         <Select.Content class="max-h-55 w-(--bits-combobox-anchor-width)">
             {#each items as item (item.id)}
-                <Select.Item value={item.id} label={item.text} class="h-10" />
+                <!-- The item truncates a long name, so the tooltip gives it in full. -->
+                <Select.Item
+                    value={item.id}
+                    label={item.text}
+                    title={item.text}
+                    class="h-10"
+                />
             {/each}
         </Select.Content>
     </Combobox.Root>

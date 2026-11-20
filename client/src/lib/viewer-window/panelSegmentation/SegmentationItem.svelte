@@ -116,7 +116,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
 
     function applyDuplicateAI() {
         duplicate(
-            globalContext,
+            segmentationContext,
             segmentation,
             segmentationItem,
             image,

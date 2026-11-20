@@ -1,7 +1,7 @@
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
     import { RadioButtonGroup } from "$lib/components/ui/radio-button/index.js";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
@@ -21,7 +21,8 @@
     let { segmentation, image, segmentationItem, oncreate }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
-    const globalContext = getContext<GlobalContext>("globalContext");
+    const { segmentationContext } =
+        getContext<MainViewerContext>("mainViewerContext");
     const taskContext = getContext<TaskContext>("taskContext");
     const uid = $props.id();
 
@@ -42,7 +43,7 @@
     function applyDuplicate() {
         oncreate?.();
         duplicate(
-            globalContext,
+            segmentationContext,
             segmentation,
             segmentationItem,
             image,
