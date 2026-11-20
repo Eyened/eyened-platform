@@ -84,7 +84,7 @@ export function keepGridSize(before: PointList, after: PointList): PointList {
     return [f1, { ...d1, x: d1.x + dx, y: d1.y + dy }];
 }
 
-/** One viewport's ETDRS grids: which show, the current grid and its armed slot, and the radius fraction. */
+/** One viewport's ETDRS grids: which show, the current grid and its armed slot. */
 export class GridLayers {
     currentId: number | undefined = $state();
     private armedSlot: { id: number; index: number } | undefined = $state();
