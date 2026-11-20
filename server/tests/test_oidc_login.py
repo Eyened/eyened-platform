@@ -8,7 +8,7 @@ rest on userinfo.
 import pytest
 from sqlalchemy import select
 
-from eyened_orm import AuditLog, Creator, CreatorTagLink
+from eyened_orm import AuditLog, Creator, CreatorTagLink, ProjectMember
 from eyened_orm.tag import TagType
 from eyened_orm.utils.factories import make_tag
 
@@ -136,10 +136,11 @@ def test_a_deactivated_account_is_refused(client_anonymous, session, oidc_provid
     assert response.json() == {"detail": "OIDC account not authorized"}
 
 
-def test_a_first_login_records_a_provisioning_audit_row(
+def test_a_first_login_creates_an_account_named_by_email(
     client_anonymous, session, oidc_provider, oidc_settings
 ):
-    """Auto-provisioning attributes the new account to its own trusted path."""
+    """The new account is named by the userinfo email, has no project role,
+    and records a provisioning audit row on its own trusted path."""
     oidc_settings(create_new_accounts=True)
     oidc_provider.id_token_claims = {"sub": SUB}
     oidc_provider.userinfo = {"sub": SUB, "email": EMAIL, "preferred_username": "new-oidc-user"}
@@ -147,12 +148,17 @@ def test_a_first_login_records_a_provisioning_audit_row(
     response = oidc_provider.login(client_anonymous)
 
     assert response.status_code == 200, response.text
+    body = response.json()
+    assert (body["username"], body["is_admin"]) == (EMAIL, False)
+    creator = session.get(Creator, body["id"])
+    assert creator.EmployeeIdentifier == f"oidc:sub:{SUB}"
+    assert session.scalars(select(ProjectMember).filter_by(CreatorID=creator.CreatorID)).all() == []
     [row] = session.scalars(select(AuditLog).where(AuditLog.Entity == "Creator")).all()
     assert (row.Action, row.ActorID, row.TrustedPath, row.EntityID) == (
         "INSERT",
         None,
         "auth:oidc-provision",
-        str(response.json()["id"]),
+        str(body["id"]),
     )
 
 
@@ -220,3 +226,47 @@ def test_the_institution_allow_list(
         assert response.json() == {
             "detail": "Your institution is not allowed to log in to EyeNED."
         }
+
+
+def test_a_first_login_without_an_email_is_refused(
+    client_anonymous, session, oidc_provider, oidc_settings
+):
+    """``preferred_username`` is not a stand-in for the email."""
+    oidc_settings(create_new_accounts=True)
+    oidc_provider.id_token_claims = {"sub": SUB}
+    oidc_provider.userinfo = {"sub": SUB, "preferred_username": "new-oidc-user"}
+
+    response = oidc_provider.login(client_anonymous)
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Your login did not include an email address, which EyeNED needs to create your account."
+    }
+    assert session.scalars(select(Creator).filter_by(EmployeeIdentifier=f"oidc:sub:{SUB}")).all() == []
+
+
+@pytest.mark.parametrize(
+    "email, status",
+    [
+        ("a" * 33 + "@example.org", 200),  # 45 characters, the account-name limit
+        ("a" * 34 + "@example.org", 400),  # 46 characters
+    ],
+    ids=["45-accepted", "46-refused"],
+)
+def test_a_first_login_email_longer_than_45_characters_is_refused(
+    email, status, client_anonymous, session, oidc_provider, oidc_settings
+):
+    oidc_settings(create_new_accounts=True)
+    oidc_provider.id_token_claims = {"sub": SUB}
+    oidc_provider.userinfo = {"sub": SUB, "email": email}
+
+    response = oidc_provider.login(client_anonymous)
+
+    assert response.status_code == status, response.text
+    if status == 200:
+        assert response.json()["username"] == email
+    else:
+        assert response.json() == {
+            "detail": "Your email address is longer than 45 characters, so EyeNED can't create an account for it yet. Ask an administrator for help."
+        }
+        assert session.scalars(select(Creator).filter_by(CreatorName=email)).all() == []

@@ -20,9 +20,10 @@ USERNAME = "jdoe-leak"
 NAME = "Jane Leakdoe"
 HOME_ORG = "leak-university.example"
 EXPECTED_HOME_ORG = "allowed-university.example"
+LONG_EMAIL = "jdoe.leak.with.a.very.long.name@leak-university.example"  # over 45 characters
 
 # Synthetic identity data; none of it may reach the log.
-SECRETS = [SUB, OTHER_SUB, EMAIL, USERNAME, NAME, HOME_ORG, EXPECTED_HOME_ORG]
+SECRETS = [SUB, OTHER_SUB, EMAIL, USERNAME, NAME, HOME_ORG, EXPECTED_HOME_ORG, LONG_EMAIL]
 ALL_CLAIMS = {
     "sub": SUB,
     "email": EMAIL,
@@ -43,6 +44,7 @@ class OidcPath:
     token_issuer: str | None = None  # None: the provider's own issuer
     account: dict | None = None  # Creator fields seeded before the login
     oidc_settings: dict = field(default_factory=dict)
+    username: str = USERNAME  # the Account's name in the response and the row
     # The Account row after the login, as (CreatorName, EmployeeIdentifier).
     row_after: tuple | None = None
 
@@ -64,7 +66,22 @@ PATHS = [
         id="created",
         status=200,
         oidc_settings={"create_new_accounts": True},
-        row_after=(USERNAME, f"oidc:sub:{SUB}"),
+        username=EMAIL,
+        row_after=(EMAIL, f"oidc:sub:{SUB}"),
+    ),
+    OidcPath(
+        id="email-missing",
+        status=400,
+        detail="Your login did not include an email address, which EyeNED needs to create your account.",
+        oidc_settings={"create_new_accounts": True},
+        userinfo={k: v for k, v in ALL_CLAIMS.items() if k != "email"},
+    ),
+    OidcPath(
+        id="email-too-long",
+        status=400,
+        detail="Your email address is longer than 45 characters, so EyeNED can't create an account for it yet. Ask an administrator for help.",
+        oidc_settings={"create_new_accounts": True},
+        userinfo={**ALL_CLAIMS, "email": LONG_EMAIL},
     ),
     OidcPath(
         id="deactivated",
@@ -134,11 +151,11 @@ def test_oidc_login_logs_no_identity_data(
     # control: the path logged something, and the values did reach the server
     assert any(r.name == "server.routes.auth" for r in caplog.records)
     if path.status == 200:
-        assert response.json()["username"] == USERNAME
+        assert response.json()["username"] == path.username
     else:
         assert response.json() == {"detail": path.detail}
     if path.row_after is not None:
-        row = session.query(Creator).filter_by(CreatorName=USERNAME).one()
+        row = session.query(Creator).filter_by(CreatorName=path.username).one()
         assert (row.CreatorName, row.EmployeeIdentifier) == path.row_after
 
     # ASSUMPTION: the eyened.audit stream mirrors the audit row, which keeps the
