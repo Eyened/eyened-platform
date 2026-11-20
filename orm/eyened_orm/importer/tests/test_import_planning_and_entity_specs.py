@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import func, select
 
 from eyened_orm import Contact, ImageInstance, Project, Series, Study, Patient
+from eyened_orm.utils.factories import image_by_sop
 from eyened_orm.importer.importer import (
     build_image_import_rows,
     entity_build_order,
@@ -157,7 +158,7 @@ def test_series_anonymous_identity_scoped_per_study_not_across_patients(session)
 
 
 def test_sop_natural_key_ignores_conflicting_public_id_on_followup_import(session):
-    """First lookup on ``ImageInstance`` is ``SOPInstanceUid``; a later row cannot replace ``PublicID`` (non-mutable)."""
+    """SOP Instance UID identifies the file. A later row with that UID cannot replace ``PublicID``."""
     defaults = {
         "project_external": "Y",
         "manufacturer": "m",
@@ -190,7 +191,7 @@ def test_sop_natural_key_ignores_conflicting_public_id_on_followup_import(sessio
     run1.apply()
     session.commit()
 
-    img = ImageInstance.by_column(session, SOPInstanceUid=sop)
+    img = image_by_sop(session, sop)
     assert img is not None
     pub_after_first = img.PublicID
 

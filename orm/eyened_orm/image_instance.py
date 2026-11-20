@@ -141,6 +141,14 @@ class ImageStorage(Base):
             "ix_ImageStorage_ImageInstanceID_IsPrimary", "ImageInstanceID", "IsPrimary"
         ),
         Index(
+            "ix_ImageStorage_ImageInstanceID_Role", "ImageInstanceID", "Role"
+        ),
+        Index(
+            "uq_ImageStorage_SOPInstanceUid",
+            "SOPInstanceUid",
+            unique=True,
+        ),
+        Index(
             "ObjectKey_StorageBackendID_UNIQUE",
             "ObjectKey",
             "StorageBackendID",
@@ -168,15 +176,19 @@ class ImageStorage(Base):
         String(128), nullable=True, default=None
     )
 
-    # The format of the object
-    # Currently supported formats: image/png, image/jpeg, dicom, png_series, binary
-    # Should perhaps be an enum?
+    # How to read the bytes: image/png, image/jpeg, dicom, png_series, binary, mhd.
     Format: Mapped[str] = mapped_column(String(256))
 
     # Whether this is the primary storage location for the image
     # Each image instance can have multiple storage locations, but only one can be primary
     # This is currently not enforced in the database however
     IsPrimary: Mapped[bool] = mapped_column(default=True, server_default=text("1"))
+
+    # Channel of this file, such as angio_flow. Null when the file has no special channel.
+    Role: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    # DICOM SOP Instance UID of this file. Unique per file; null for non-DICOM.
+    SOPInstanceUid: Mapped[Optional[str]] = mapped_column(String(64))
 
     # Datetimes - automatically filled
     DateInserted: Mapped[datetime] = mapped_column(server_default=func.current_timestamp())
@@ -218,11 +230,6 @@ class ImageInstance(AttributeValueLookupMixin, Base):
             "Modality",
             "Inactive",
             "ETDRSField",
-        ),
-        Index(
-            "SOPInstanceUid_UNIQUE",
-            "SOPInstanceUid",
-            unique=True,
         ),
         # The parent half of SubTaskImageLink's composite foreign key -- see the
         # equivalent on Patient for why InnoDB needs it declared.
@@ -282,8 +289,7 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     # Image modality
     Modality: Mapped[Optional[Modality]] = mapped_column(OptionalEnum(Modality))
 
-    # DICOM metadata
-    SOPInstanceUid: Mapped[Optional[str]] = mapped_column(String(64))
+    # DICOM metadata. SOP Instance UID lives on ImageStorage (one per file).
     SOPClassUid: Mapped[Optional[str]] = mapped_column(String(64))
     PhotometricInterpretation: Mapped[Optional[str]] = mapped_column(String(64))
     SamplesPerPixel: Mapped[Optional[int]]
@@ -494,6 +500,12 @@ class ImageInstance(AttributeValueLookupMixin, Base):
     def path(self) -> Path:
         adapter = get_data_access_adapter()
         return adapter.image_path(self)
+
+    @property
+    def SOPInstanceUid(self) -> Optional[str]:
+        """SOP Instance UID of the primary file. The column lives on ImageStorage."""
+        storage = self.primary_storage
+        return storage.SOPInstanceUid if storage else None
 
     @property
     def primary_storage(self) -> Optional["ImageStorage"]:

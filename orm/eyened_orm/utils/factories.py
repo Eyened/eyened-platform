@@ -134,10 +134,13 @@ def make_image(
 ) -> ImageInstance:
     """Create an ImageInstance plus the primary ImageStorage the DTO layer requires.
 
+    ``SOPInstanceUid`` is stored on that primary file, not on the instance.
+
     ``DTOConverter.image_instance_to_get`` raises without a primary storage, so
     the storage row is part of the instance's minimum viable shape, not an extra.
     ``DatasetIdentifier`` is deprecated but still NOT NULL, hence set here.
     """
+    sop_instance_uid = cols.pop("SOPInstanceUid", None)
     img = ImageInstance(
         PublicID=public_id,
         SeriesID=series.SeriesID,
@@ -158,10 +161,17 @@ def make_image(
             ObjectKey=f"obj-{public_id}",
             Format="png",
             IsPrimary=True,
+            SOPInstanceUid=sop_instance_uid,
         )
     )
     session.flush()
     return img
+
+
+def image_by_sop(session, sop: str) -> ImageInstance | None:
+    """The instance whose primary (or any) file has this SOP Instance UID."""
+    storage = ImageStorage.by_column(session, SOPInstanceUid=sop)
+    return storage.ImageInstance if storage is not None else None
 
 
 def make_feature(session, name: str) -> Feature:

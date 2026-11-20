@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Union
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -244,6 +244,9 @@ class ImportRow(InstancePOST):
     )
     image_storage_is_primary: Optional[bool] = Field(
         None, description="If set, maps to ImageStorage.IsPrimary"
+    )
+    image_storage_role: Optional[Literal["angio_flow"]] = Field(
+        None, description="If set, maps to ImageStorage.Role"
     )
     image_storage_hash: Optional[bytes] = Field(
         None, description="SHA-256 digest (32 bytes); maps to ImageStorage.Hash"
