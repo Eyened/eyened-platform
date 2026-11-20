@@ -169,7 +169,7 @@ If you handle access control at the OIDC provider, the provider usually allows a
 When enabled, the Eyened platform will accept all authenticated sessions from OIDC. For new accounts, an entry in the `creator` table will be added and linked to their OIDC identity (by recording the "Subject" claim in the `creator.EmployeeIdentifier` field). When creating a new account, the other fields populated in the `creator` table are `CreatorName` (the full `email` claim) and `PasswordHash` (set to an unusable password, so the user cannot log in using password authentication). A first login with no `email` claim, or an email address over 45 characters, is refused with 400 and no account is created.
 
 :::tip
-Only the value in the `creator.EmployeeIdentifier` field matters for OIDC authentication. Feel free to adjust the name in `creator.CreatorName` to whatever is convenient for displaying in the Eyened frontend. Values in the `creator` table are only touched during account creation.
+Only the value in the `creator.EmployeeIdentifier` field matters for OIDC authentication. Feel free to adjust the name in `creator.CreatorName` to whatever is convenient for displaying in the Eyened frontend. Logins never change `creator.CreatorName`; only account creation sets it.
 :::
 
 ## Locking an account out

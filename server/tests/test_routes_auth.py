@@ -174,8 +174,6 @@ def test_check_oidc_login_creates_new_account_but_does_not_commit(session, monke
     assert session.query(Creator).filter_by(CreatorName="new.oidc.user@example.org").count() == 0
 
 
-
-
 def test_check_oidc_login_migrates_non_subject_identifier_but_does_not_commit(session):
     """check_oidc_login replaces a non-Subject OIDC identifier with the
     Subject-claim identifier, but only flushes -- same request-boundary-owns-
@@ -418,8 +416,6 @@ def test_a_deactivated_account_cannot_authenticate(
     from eyened_orm.utils.db_users import verify_password
 
     assert verify_password("correct horse battery staple", session.get(Creator, creator_id).PasswordHash)
-
-
 
 
 def test_registering_a_taken_username_is_a_409_not_a_500(client, session):
@@ -723,8 +719,6 @@ def test_refresh_rejects_a_well_signed_token_it_cannot_use(
     assert response.status_code == 401
     # control: each branch has its own detail, so reaching a different 401 fails
     assert response.json() == {"detail": detail}
-
-
 
 
 def test_login_marks_both_auth_cookies_secure_when_cookie_secure_is_on(
