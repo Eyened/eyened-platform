@@ -44,8 +44,14 @@ function attachSelected(
     workspace: Workspace,
     viewer: ViewerCtx,
     isDrawing = false,
+    regionToolActive = false,
 ) {
-    const segmentationContext = { isDrawing, undo: vi.fn(), redo: vi.fn() };
+    const segmentationContext = {
+        isDrawing,
+        regionToolActive,
+        undo: vi.fn(),
+        redo: vi.fn(),
+    };
     workspace.attachViewport(0, {
         zoomPercent: 100,
         zoomBy: vi.fn(),
@@ -60,6 +66,46 @@ function attachSelected(
 
 describe("Keymap", () => {
     afterEach(() => localStorage.clear());
+
+    it("the armed tool's key again returns to No tool", () => {
+        const workspace = new Workspace();
+        const viewer = viewerOf("colour", { workspace });
+        press(viewer, { key: "b", code: "KeyB" });
+        expect(workspace.armedTool).toBe("brush");
+        press(viewer, { key: "b", code: "KeyB" });
+        expect(workspace.armedTool).toBeNull();
+    });
+
+    it("Esc cancels a waiting region box and keeps the view (#325)", () => {
+        const workspace = new Workspace();
+        const viewer = viewerOf("colour", { workspace });
+        const segmentation = attachSelected(workspace, viewer, false, true);
+        const reset = vi.spyOn(viewer, "initTransform");
+        press(viewer, { key: "Escape", code: "Escape" });
+        expect(segmentation.regionToolActive).toBe(false);
+        expect(reset).not.toHaveBeenCalled();
+        press(viewer, { key: "Escape", code: "Escape" });
+        expect(reset).toHaveBeenCalledOnce();
+    });
+
+    it("Esc leaves the keyboard cursor before it resets the view", () => {
+        const workspace = new Workspace();
+        const viewer = viewerOf("colour", { workspace });
+        viewer.keyboardCursor.host = {
+            size: () => ({ width: 100, height: 100 }),
+            send: () => {},
+            changed: () => {},
+        };
+        viewer.keyboardCursor.keydown(
+            new KeyboardEvent("keydown", { key: "Enter", code: "Enter" }),
+        );
+        const reset = vi.spyOn(viewer, "initTransform");
+        press(viewer, { key: "Escape", code: "Escape" });
+        expect(viewer.keyboardCursor.on).toBe(false);
+        expect(reset).not.toHaveBeenCalled();
+        press(viewer, { key: "Escape", code: "Escape" });
+        expect(reset).toHaveBeenCalledOnce();
+    });
 
     it("arms a tool by its letter only while a viewport has focus", async () => {
         const workspace = new Workspace();

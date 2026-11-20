@@ -16,6 +16,7 @@ import { ScrollOCT } from "./controls/scrollOCT";
 import { UpdatePosition } from "./controls/updatePosition";
 import { ZoomPan } from "./controls/zoomPan";
 import { CursorOverlay } from "./overlays/CursorOverlay";
+import { KeyboardCursor } from "./keyboardCursor.svelte";
 import { boxToPaint, clipBox, sameBox } from "./viewportGeometry";
 import { lastInputWasKeyboard } from "./lastInput";
 import type { MeasureTool } from "./tools/Measure.svelte.js";
@@ -100,6 +101,8 @@ export class ViewerContext {
     cursorStyle: cursorStyle = $state("default");
     private cursorClaimPriority = 0;
     active: boolean = $state(false);
+    /** The viewport's keyboard cursor; the viewer drives it. */
+    readonly keyboardCursor = new KeyboardCursor();
     updatePosition: boolean = $state(true);
     axis: 0 | 1 | 2 = $state(0);
 

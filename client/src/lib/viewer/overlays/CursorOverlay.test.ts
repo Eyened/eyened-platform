@@ -17,6 +17,9 @@ function strokes(viewer: ViewerContext, index: number): number {
         moveTo: vi.fn(),
         lineTo: vi.fn(),
         stroke: vi.fn(),
+        save: vi.fn(),
+        restore: vi.fn(),
+        setLineDash: vi.fn(),
         lineWidth: 0,
         strokeStyle: "",
     };
@@ -41,6 +44,27 @@ describe("CursorOverlay", () => {
         expect(strokes(viewer, 0)).toBe(0);
         workspace.arm("crosshair");
         expect(strokes(viewer, 0)).toBe(1);
+    });
+
+    it("draws the keyboard cursor's cross while it is on, with any tool", () => {
+        vi.stubGlobal(
+            "Path2D",
+            class {
+                moveTo() {}
+                lineTo() {}
+            },
+        );
+        const workspace = new Workspace();
+        const viewer = viewerOf("grey", { workspace });
+        viewer.active = true;
+        workspace.arm("point");
+        expect(strokes(viewer, 0)).toBe(0);
+        viewer.keyboardCursor.on = true;
+        // Two strokes: the casing, then the white line.
+        expect(strokes(viewer, 0)).toBe(2);
+        workspace.arm("brush");
+        expect(strokes(viewer, 0)).toBe(2);
+        vi.unstubAllGlobals();
     });
 
     it("draws none on a strip tile while Crosshair tracking is off", () => {

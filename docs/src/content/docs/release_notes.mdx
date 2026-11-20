@@ -9,6 +9,25 @@ This page is the only copy of the release notes. `RELEASE_NOTES.md` in the repos
 
 Changes merged since v2026.09.0. This section is renamed to the version heading when the next release is cut. Add an entry here in the same pull request that changes behaviour — reconstructing it at release time is how things get missed.
 
+### Viewer keys
+
+The viewer's keys changed with the new tool palette. Character keys act while an image has focus.
+
+| Today | New |
+|---|---|
+| R L E B H S M render modes | Digits 1–0; M toggles the Magnifier |
+| Hold Q / W paint / erase | Hold Space; X swaps (brush ↔ eraser; add ↔ remove for Polygon and Enhance) |
+| A pipette | I |
+| f / d ETDRS fovea / disc | G, then `[` `]` |
+| C point grade | Click on the point |
+| Digits 1–9 brush radius and point jump | `[` `]` |
+| + / − brush radius | `[` `]` |
+| Space hides overlays | Hold H |
+| Right-click erase / delete | Fill \| Erase, Del |
+| Only a second click returns to No tool | The armed tool's key again too |
+| No keyboard route for pointer tools | Enter keyboard cursor: arrows move, Space clicks, hold Space + arrows drags, Esc leaves |
+| Esc resets the view while a region box waits | Esc cancels the region box |
+
 ### Deployment
 
 The three compose stacks are replaced by one. Everything in this section is about moving from

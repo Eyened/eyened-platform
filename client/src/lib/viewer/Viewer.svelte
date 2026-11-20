@@ -82,6 +82,37 @@
         y: 0,
     };
 
+    const keyboardCursor = viewerContext.keyboardCursor;
+    // The cursor's pointer events carry no modifiers, so Shift+arrow never reads as Shift+drag.
+    const NO_MODIFIERS: ViewerModifiers = {
+        shift: false,
+        ctrl: false,
+        alt: false,
+        meta: false,
+    };
+    let pointerInside = false;
+    let announcement = $state("");
+
+    onMount(() => {
+        keyboardCursor.host = {
+            size: () => viewerContext.viewerSize,
+            send: (name, event) => {
+                cursor = { ...keyboardCursor.position };
+                forwardEvent(name, event, NO_MODIFIERS);
+            },
+            changed: (on) => {
+                viewerContext.active = on || pointerInside;
+                announcement = on
+                    ? "Keyboard cursor on"
+                    : "Keyboard cursor off";
+            },
+        };
+        return () => {
+            keyboardCursor.leave();
+            keyboardCursor.host = undefined;
+        };
+    });
+
     // A press that closes an open popover, dropdown list or ⋯ list only closes it.
     const OPEN_FLOATING =
         '[data-slot="popover-content"], [data-slot="tag-popover"], [data-slot="select-content"], [data-slot="overflow-menu"]:not([hidden])';
@@ -149,9 +180,12 @@
         modifierState = { shift: false, ctrl: false, alt: false, meta: false };
     }
 
-    function forwardEvent(eventName: EventName, event: Event) {
+    function forwardEvent(
+        eventName: EventName,
+        event: Event,
+        modifiers: ViewerModifiers = buildModifiers(event),
+    ) {
         const position = viewerContext.viewerToImageCoordinates(cursor);
-        const modifiers = buildModifiers(event);
         const wheel =
             event instanceof WheelEvent
                 ? buildWheelData(event, modifiers)
@@ -167,12 +201,15 @@
     }
 
     function onpointerenter(e: PointerEvent) {
+        pointerInside = true;
         viewerContext.active = true;
         forwardEvent("pointerenter", e);
     }
 
     function onpointerleave(e: PointerEvent) {
-        if (!pointerDown) {
+        pointerInside = false;
+        // The keyboard cursor keeps the viewport active after the mouse has gone.
+        if (!pointerDown && !keyboardCursor.on) {
             viewerContext.active = false;
         }
         resetModifierState();
@@ -208,11 +245,14 @@
 
     function onkeydown(e: KeyboardEvent) {
         updateModifierState(e, true);
+        // A strip tile has no keyboard cursor.
+        if (!viewerContext.isStripTile && keyboardCursor.keydown(e)) return;
         forwardEvent("keydown", e);
     }
 
     function onkeyup(e: KeyboardEvent) {
         updateModifierState(e, false);
+        if (keyboardCursor.keyup(e)) return;
         forwardEvent("keyup", e);
     }
 
@@ -221,6 +261,7 @@
             x: e.x - viewerContext.viewingRect.left,
             y: e.y - viewerContext.viewingRect.top,
         };
+        keyboardCursor.follow(cursor);
         forwardEvent("pointermove", e);
     }
 
@@ -237,6 +278,7 @@
     }
 
     function onblur(e: FocusEvent) {
+        keyboardCursor.leave();
         resetModifierState();
         // The H keyup never arrives once focus has left, so end the hold here.
         viewerContext.hideOverlays = false;
@@ -264,6 +306,7 @@
         {onblur}
         {oncontextmenu}
     ></div>
+    <span role="status" class="sr-only">{announcement}</span>
 </div>
 
 <style>
