@@ -743,11 +743,12 @@ def test_login_marks_both_auth_cookies_secure_when_cookie_secure_is_on(
     assert all("; Secure" in cookie for cookie in set_cookies)
 
 
+@pytest.mark.parametrize("route", ["/auth/login", "/auth/token"])
 @pytest.mark.parametrize(
     "password_enabled, expected_status", [(False, 403), (True, 200)], ids=["off", "on"]
 )
 def test_password_login_follows_the_password_enabled_setting(
-    client_anonymous, session, signed_jwts, monkeypatch, password_enabled, expected_status
+    client_anonymous, session, signed_jwts, monkeypatch, route, password_enabled, expected_status
 ):
     """With password login off, correct credentials are refused; on, they log in."""
     import server.routes.auth as auth_routes
@@ -760,7 +761,7 @@ def test_password_login_follows_the_password_enabled_setting(
     _seed_user(session, "gated-user")
 
     response = client_anonymous.post(
-        "/auth/login", json={"username": "gated-user", "password": "pw0"}
+        route, json={"username": "gated-user", "password": "pw0"}
     )
 
     assert response.status_code == expected_status, response.text

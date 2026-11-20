@@ -224,6 +224,15 @@ def _user_response(creator: Creator, auth_service: AuthService) -> UserResponse:
     return creator_to_response(creator, auth_service.starred_tag_ids(creator.CreatorID))
 
 
+def _refuse_if_password_login_disabled() -> None:
+    """Refuse before any user lookup, so the reply says nothing about the account."""
+    # ASSUMPTION: 403, not 404 or 405: the route exists but this server forbids its use.
+    if not settings.auth_password_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Password login is disabled."
+        )
+
+
 # API endpoints
 @router.post("/auth/login", response_model=UserResponse)
 def login(
@@ -232,12 +241,7 @@ def login(
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Login with username and password, return user info and set JWT cookies or return token."""
-    # Refused before any user lookup, so the reply says nothing about the account.
-    # ASSUMPTION: 403, not 404 or 405: the route exists but this server forbids its use.
-    if not settings.auth_password_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Password login is disabled."
-        )
+    _refuse_if_password_login_disabled()
     creator = auth_service.authenticate(user_data.username, user_data.password)
 
     # Create both tokens
@@ -265,6 +269,7 @@ def get_token(
     user_data: UserLogin, auth_service: AuthService = Depends(get_auth_service)
 ):
     """Get access token for API clients."""
+    _refuse_if_password_login_disabled()
     creator = auth_service.authenticate(user_data.username, user_data.password)
 
     access_token = create_access_token(creator.CreatorID, creator.CreatorName)
