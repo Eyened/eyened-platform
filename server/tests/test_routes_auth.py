@@ -929,3 +929,53 @@ def test_a_refresh_token_from_before_the_remember_claim_refreshes_as_ticked(
 
     assert response.status_code == 200, response.text
     assert (_cookie_max_ages(response), _refresh_token_lifetime(response)) == TICKED
+
+
+def _refresh_token_cookie(creator_id, **claims):
+    """A refresh token cookie value for creator_id, valid for 7 more days."""
+    now = datetime.now(timezone.utc)
+    return jwt.encode(
+        {"sub": str(creator_id), "type": "refresh", "iat": now, "exp": now + timedelta(days=7), **claims},
+        settings.secret_key_value,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+@pytest.mark.parametrize(
+    "days_since_login, status_code", [(31, 401), (29, 200)], ids=["past-the-cap", "within-the-cap"]
+)
+def test_a_refresh_more_than_30_days_after_login_is_refused(
+    client_anonymous, session, signed_jwts, days_since_login, status_code
+):
+    """The session ends 30 days after login, however often it was refreshed."""
+    creator_id = _seed_user(session, "capped-user")
+    login_time = datetime.now(timezone.utc) - timedelta(days=days_since_login)
+    client_anonymous.cookies.set(
+        settings.refresh_cookie_name,
+        _refresh_token_cookie(creator_id, auth_time=int(login_time.timestamp())),
+    )
+
+    response = client_anonymous.post("/auth/refresh")
+
+    assert response.status_code == status_code, response.text
+
+
+def test_a_refresh_token_without_a_login_time_counts_from_its_iat(
+    client_anonymous, session, signed_jwts
+):
+    """A pre-release refresh token refreshes, and its iat becomes the login time carried forward."""
+    creator_id = _seed_user(session, "pre-cap-user")
+    issued_at = int((datetime.now(timezone.utc) - timedelta(days=3)).timestamp())
+    client_anonymous.cookies.set(
+        settings.refresh_cookie_name, _refresh_token_cookie(creator_id, iat=issued_at)
+    )
+
+    response = client_anonymous.post("/auth/refresh")
+
+    assert response.status_code == 200, response.text
+    claims = jwt.decode(
+        response.cookies[settings.refresh_cookie_name],
+        settings.secret_key_value,
+        algorithms=[settings.jwt_algorithm],
+    )
+    assert claims["auth_time"] == issued_at
