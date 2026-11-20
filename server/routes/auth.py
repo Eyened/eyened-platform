@@ -522,7 +522,7 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
             logger.error(f" OIDC additional validation claim '{claim_name}' not found in ID token")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed")
         elif claim_value != expected_claim_value:
-            logger.error(f"OIDC additional validation claim '{claim_name}' value mismatch, {expected_claim_value=} {claim_value=}")
+            logger.error(f"OIDC additional validation claim '{claim_name}' value mismatch")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed")
 
     return claims
@@ -545,7 +545,7 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
             lookup_key = f"oidc:{claim_name}:{claim_value}"
             creator = session.query(Creator).where(Creator.EmployeeIdentifier == lookup_key).first()
             if creator:
-                logger.debug(f"Found creator {creator.CreatorName} matching '{lookup_key}'")
+                logger.debug(f"Found CreatorID={creator.CreatorID} matching OIDC claim '{claim_name}'")
                 break
 
     if creator:
@@ -553,9 +553,7 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
             # Same revocation as the password path, a different front door.
             # Refused before the identifier-migration write below, so a
             # deactivated account's row is not touched on a denied login.
-            logger.warning(
-                f"Denied OIDC access to deactivated account '{creator.CreatorName}'"
-            )
+            logger.warning(f"Denied OIDC access to deactivated account CreatorID={creator.CreatorID}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="OIDC account not authorized",
@@ -567,7 +565,7 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
             # To make sure that the authentication stays consistent and secure we update the identifier in the
             # Eyened backend after a successful authentication if it isn't a 'Subject' claim.
             identifier = f"oidc:sub:{id_claims['sub']}"
-            logger.info(f"Replacing temporary OIDC authentication claim '{creator.EmployeeIdentifier}' with {identifier}")
+            logger.info(f"Replacing OIDC claim '{claim_name}' with claim 'sub' as identifier of CreatorID={creator.CreatorID}")
             creator.EmployeeIdentifier = identifier
             # flush only; the request boundary (get_db) commits.
             CreatorRepository(session, scope=AccessScope.trusted()).add(creator)
@@ -597,9 +595,9 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
                 entity_id=creator.CreatorID,
                 changes={"username": creator.CreatorName, "employee_identifier": identifier},
             )
-            logger.info(f"Created new account '{username}' for OIDC authenticated session, {identifier=}")
+            logger.info(f"Created new account CreatorID={creator.CreatorID} for OIDC authenticated session")
         else:
-            logger.warning(f"Denied access to authenticated OIDC session, no existing account found and not creating a new one. Received claims: {id_claims}")
+            logger.warning("Denied access to authenticated OIDC session, no existing account found and not creating a new one")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="OIDC account not authorized")
 
     return creator
@@ -660,7 +658,7 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
 
     # Check claims with Creator database
     creator = check_oidc_login(claims, session)
-    logger.info(f"OIDC authenticated session for {creator.CreatorName}")
+    logger.info(f"OIDC authenticated session for CreatorID={creator.CreatorID}")
 
     response.delete_cookie(key="oidc_csrf_token")
     response.delete_cookie(key="oidc_nonce")
