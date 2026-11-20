@@ -146,6 +146,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+    # Refresh token lifetime when "Keep me logged in" is unticked.
+    refresh_token_short_expire_minutes: int = 60
     jwt_cookie_name: str = "jwt_token"
     refresh_cookie_name: str = "refresh_token"
     # Enable only behind HTTPS; login fails over plain HTTP.

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "$lib/api/client";
 import { authClient } from "../auth";
+import { json, stubFetch } from "../../vitest-fetch";
 import LoginForm from "./LoginForm.svelte";
 
 vi.mock("$app/paths", () => ({
@@ -102,6 +103,50 @@ describe("LoginForm", () => {
             expect(password).toHaveValue("");
             expect(screen.queryByRole("alert")).toBeNull();
             expect(describedAtFocus).toContain(title);
+        },
+    );
+
+    it.each([
+        { untick: false, rememberMe: true },
+        { untick: true, rememberMe: false },
+    ])(
+        "sends Keep me logged in as remember_me $rememberMe",
+        async ({ untick, rememberMe }) => {
+            let body: unknown;
+            stubFetch({
+                "POST /api/auth/login": (sent) => {
+                    body = sent;
+                    return json({ id: 1, username: "ada" });
+                },
+            });
+            renderForm(
+                vi.fn((username: string, password: string, remember: boolean) =>
+                    authClient.login(username, password, remember),
+                ),
+            );
+            await fireEvent.input(await screen.findByLabelText("Username"), {
+                target: { value: "ada" },
+            });
+            await fireEvent.input(screen.getByLabelText("Password"), {
+                target: { value: "pw0" },
+            });
+            if (untick) {
+                await fireEvent.click(
+                    screen.getByRole("checkbox", { name: "Keep me logged in" }),
+                );
+            }
+
+            await fireEvent.click(
+                screen.getByRole("button", { name: "Log in" }),
+            );
+
+            await waitFor(() =>
+                expect(body).toEqual({
+                    username: "ada",
+                    password: "pw0",
+                    remember_me: rememberMe,
+                }),
+            );
         },
     );
 
