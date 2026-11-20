@@ -1,3 +1,4 @@
+import { ImageLoad } from "$lib/data-loading/imageLoad.svelte";
 import { ImageLoader, type LoadedImages } from "$lib/data-loading/imageLoader";
 import {
     fetchInstance,
@@ -46,6 +47,10 @@ export class ViewerWindowContext {
     public mainPanels: MainPanelType[] = $state([]);
 
     public readonly imageLoader: ImageLoader;
+    public readonly imageLoads = new SvelteMap<
+        string,
+        ImageLoad<LoadedImages>
+    >();
     public readonly topViewers = new SvelteMap<AbstractImage, ViewerContext>();
     public readonly enfaceProjectionManagers = new SvelteMap<
         string,
@@ -232,6 +237,7 @@ export class ViewerWindowContext {
         this.viewers.clear();
         this.foregroundViewers.clear();
         this.imagesIndex.clear();
+        this.imageLoads.clear();
         this.bySOPInstanceUID.clear();
         this.photoLocators.clear();
         this.photoLocatorSets = [];
@@ -246,44 +252,52 @@ export class ViewerWindowContext {
     async loadImage(instance: ImageGET): Promise<LoadedImages> {
         // Start loading if not already in progress
         if (!this.imagesIndex.has(instance.id)) {
-            const loadPromise = this.imageLoader
-                .load(instance)
-                .then((loadedImages) => {
-                    // Process images once loaded
-                    for (const image of loadedImages) {
-                        this.importPhotoLocators(image);
-                    }
-
-                    // Set up indices
-                    this.bySOPInstanceUID.set(
-                        instance.sop_instance_uid,
-                        loadedImages,
-                    );
-
-                    // Create viewer contexts
-                    for (const image of loadedImages) {
-                        const viewerContext = new ViewerContext(image, this);
-                        if (image.image_id.endsWith("_proj")) {
-                            viewerContext.enfaceProjectionMode = "binary";
+            const load = new ImageLoad((progress) =>
+                this.imageLoader
+                    .load(instance, progress)
+                    .then((loadedImages) => {
+                        // Process images once loaded
+                        for (const image of loadedImages) {
+                            this.importPhotoLocators(image);
                         }
-                        this.topViewers.set(image, viewerContext);
-                    }
 
-                    const projImage = loadedImages.find((img) =>
-                        img.image_id.endsWith("_proj"),
-                    );
-                    const octImage = loadedImages.find((img) => img.is3D);
-                    if (projImage?.is2D && octImage?.is3D) {
-                        this.enfaceProjectionManagers.set(
-                            instance.id,
-                            new EnfaceProjectionManager(octImage as Image3D),
+                        // Set up indices
+                        this.bySOPInstanceUID.set(
+                            instance.sop_instance_uid,
+                            loadedImages,
                         );
-                    }
 
-                    return loadedImages;
-                });
+                        // Create viewer contexts
+                        for (const image of loadedImages) {
+                            const viewerContext = new ViewerContext(
+                                image,
+                                this,
+                            );
+                            if (image.image_id.endsWith("_proj")) {
+                                viewerContext.enfaceProjectionMode = "binary";
+                            }
+                            this.topViewers.set(image, viewerContext);
+                        }
 
-            this.imagesIndex.set(instance.id, loadPromise);
+                        const projImage = loadedImages.find((img) =>
+                            img.image_id.endsWith("_proj"),
+                        );
+                        const octImage = loadedImages.find((img) => img.is3D);
+                        if (projImage?.is2D && octImage?.is3D) {
+                            this.enfaceProjectionManagers.set(
+                                instance.id,
+                                new EnfaceProjectionManager(
+                                    octImage as Image3D,
+                                ),
+                            );
+                        }
+
+                        return loadedImages;
+                    }),
+            );
+
+            this.imageLoads.set(instance.id, load);
+            this.imagesIndex.set(instance.id, load.promise);
         }
 
         // Return cached promise (either existing or newly created)

@@ -332,10 +332,5 @@
     "svelte/prefer-svelte-reactivity": {
       "count": 1
     }
-  },
-  "src/types/cornerstone-core.d.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 6
-    }
   }
 }
