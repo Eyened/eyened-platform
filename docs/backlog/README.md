@@ -29,7 +29,6 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Make the session guards fail on stale allow-list entries | [rbac-authz](rbac-authz.md) | open |
 | Decide whether `AuthService.change_password` keeps its `actor` parameter | [rbac-authz](rbac-authz.md) | open |
 | Decide what `init` does on a schema behind head | [deploy](deploy.md) | open |
-| Refuse the `oidc` layer together with the prod layer | [deploy](deploy.md) | open |
 | Build and smoke-test the images CI skips | [deploy](deploy.md) | open |
 | Run the upgrade path end to end once | [deploy](deploy.md) | open |
 | Tidy the slim-down's stale messages | [deploy](deploy.md) | open |

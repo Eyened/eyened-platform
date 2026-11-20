@@ -7,12 +7,6 @@
 - **Fix:** pick one: (A) exit non-zero naming the migrate command; (B) non-zero only when `EYENED_AUTO_MIGRATE` is unset; (C) keep the exit code and have `/health` report a schema behind head.
 - **Note:** A turns a forgotten migrate step into an outage (compose has already stopped the old `server`); B needs a third state, but `deploy/compose.yaml` always sets the variable.
 
-### Refuse the `oidc` layer together with the prod layer
-- **Status:** open
-- **Source:** `deploy/` consolidation review, 2026-08-14
-- **Problem:** nothing stops `:compose.oidc.yaml` alongside `:compose.prod.yaml`; the bundled Keycloak runs `start-dev` with embedded H2, no HTTPS enforcement and no volume, so its realm resets on every recreate.
-- **Fix:** decide whether the combination is unsupported or merely unwise, then document it or have the CI config matrix reject it, pointing at an external IdP via `EYENED_OIDC_*`.
-
 ### Build and smoke-test the images CI skips
 - **Status:** open
 - **Source:** deploy slim-down review, 2026-09-18

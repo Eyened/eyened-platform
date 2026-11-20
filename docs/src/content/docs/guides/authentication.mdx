@@ -101,11 +101,9 @@ At the Eyened login screen, access to the OIDC authentication will be visible th
 - Required: no
 - Default value: -
 
-You can use this configuration option to list additional token claims that need to be validated in `ID tokens`. By default, only the "Audience" claim and various timing claims are checked. OpenID officially requires to also validate the Issuer claim (`iss`), and specific providers might advise to validate claims specific to their implementation. E.g. [MS Entra advises](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation) to also check the "Tenant" claim (`tid`).
+You can use this configuration option to list additional claims that a login must hold. They are checked against the ID token and userinfo claims together. The server already checks the "Issuer" (`iss`), "Audience" and timing claims itself, so you don't need to list `iss`. Specific providers might advise to validate claims specific to their implementation. E.g. [MS Entra advises](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation) to also check the "Tenant" claim (`tid`).
 
-Example: the configuration value `iss=12345,foo=bar` will validate the "Issuer" claim (`iss`) to be `12345`, and the made-up `foo` claim to have value `bar`. Separate key and value from each other using an equals sign (`=`), multiple key-value sets are separated by a comma (`,`).
-
-It's recommended to configure this option to at least validate the "Issuer" claim (`iss`) You should have received the correct value for this claim with your app registration.
+Example: the configuration value `tid=12345,foo=bar` will validate the "Tenant" claim (`tid`) to be `12345`, and the made-up `foo` claim to have value `bar`. A list claim passes if it contains the value. Separate key and value from each other using an equals sign (`=`), multiple key-value sets are separated by a comma (`,`).
 
 #### `EYENED_OIDC_CREATE_NEW_ACCOUNTS`
 
