@@ -58,6 +58,8 @@ class TokenLoginRequest(BaseModel):
     username: str
     password: str
     api_client: bool = False
+    # ASSUMPTION: a caller that omits it keeps today's long session.
+    remember_me: bool = True
 
 
 class UserResponse(BaseModel):
@@ -117,27 +119,37 @@ def create_access_token(user_id: int, username: str) -> str:
     )
 
 
-def create_refresh_token(user_id: int) -> str:
-    """Create a JWT refresh token."""
+def create_refresh_token(user_id: int, remember: bool = True) -> str:
+    """Create a JWT refresh token; ``remember`` picks its lifetime and is carried in it."""
+    now = datetime.now(timezone.utc)
+    if remember:
+        lifetime = timedelta(days=settings.refresh_token_expire_days)
+    else:
+        lifetime = timedelta(minutes=settings.refresh_token_short_expire_minutes)
     payload = {
         "sub": str(user_id),  # Convert to string
         "type": "refresh",
-        "exp": datetime.now(timezone.utc)
-        + timedelta(days=settings.refresh_token_expire_days),
-        "iat": datetime.now(timezone.utc),
+        "remember": remember,
+        "exp": now + lifetime,
+        "iat": now,
     }
     return jwt.encode(
         payload, settings.secret_key_value, algorithm=settings.jwt_algorithm
     )
 
 
-def _set_session_cookies(response: Response, access_token: str, refresh_token: str) -> None:
-    """Set the access and refresh cookies, the same for every way of logging in."""
+def _set_session_cookies(
+    response: Response, access_token: str, refresh_token: str, remember: bool
+) -> None:
+    """Set the access and refresh cookies, the same for every way of logging in.
+
+    Unremembered, both are browser-session cookies: no lifetime of their own.
+    """
     response.set_cookie(
         key=settings.jwt_cookie_name,
         value=access_token,
         httponly=True,
-        max_age=settings.access_token_expire_minutes * 60,
+        max_age=settings.access_token_expire_minutes * 60 if remember else None,
         secure=settings.cookie_secure,
         samesite="strict",
         path="/",
@@ -146,7 +158,7 @@ def _set_session_cookies(response: Response, access_token: str, refresh_token: s
         key=settings.refresh_cookie_name,
         value=refresh_token,
         httponly=True,
-        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60 if remember else None,
         secure=settings.cookie_secure,
         samesite="strict",
         path="/",
@@ -216,7 +228,7 @@ def login(
 
     # Create both tokens
     access_token = create_access_token(creator.CreatorID, creator.CreatorName)
-    refresh_token = create_refresh_token(creator.CreatorID)
+    refresh_token = create_refresh_token(creator.CreatorID, user_data.remember_me)
 
     # If API client, return token in response body
     if user_data.api_client:
@@ -229,7 +241,7 @@ def login(
         }
 
     # Otherwise, set cookies (existing behavior)
-    _set_session_cookies(response, access_token, refresh_token)
+    _set_session_cookies(response, access_token, refresh_token, user_data.remember_me)
 
     return _user_response(creator, auth_service)
 
@@ -321,10 +333,14 @@ def refresh_token(
         # Create new access token
         new_access_token = create_access_token(creator.CreatorID, creator.CreatorName)
 
-        # Create NEW refresh token (extends session for active users)
-        new_refresh_token = create_refresh_token(creator.CreatorID)
+        # The login's choice is copied forward. Tokens issued before the claim
+        # existed count as ticked, so nobody is logged out by the release.
+        remember = payload.get("remember", True)
 
-        _set_session_cookies(response, new_access_token, new_refresh_token)
+        # Create NEW refresh token (extends session for active users)
+        new_refresh_token = create_refresh_token(creator.CreatorID, remember)
+
+        _set_session_cookies(response, new_access_token, new_refresh_token, remember)
 
         return _user_response(creator, auth_service)
 
@@ -650,8 +666,9 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
     response.delete_cookie(key="oidc_nonce")
 
     access_token = create_access_token(creator.CreatorID, creator.CreatorName)
-    refresh_token = create_refresh_token(creator.CreatorID)
+    # ASSUMPTION: SSO has no "Keep me logged in" box, so it always counts as ticked.
+    refresh_token = create_refresh_token(creator.CreatorID, remember=True)
 
-    _set_session_cookies(response, access_token, refresh_token)
+    _set_session_cookies(response, access_token, refresh_token, remember=True)
 
     return _user_response(creator, auth_service)

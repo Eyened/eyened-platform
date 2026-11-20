@@ -844,3 +844,88 @@ def test_login_marks_both_auth_cookies_secure_when_cookie_secure_is_on(
     set_cookies = response.headers.get_list("set-cookie")
     assert len(set_cookies) == 2
     assert all("; Secure" in cookie for cookie in set_cookies)
+
+
+def _cookie_max_ages(response):
+    """Each session cookie's Max-Age in seconds, or None for a browser-session cookie."""
+    ages = {}
+    for header in response.headers.get_list("set-cookie"):
+        name = header.split("=", 1)[0]
+        attrs = dict(
+            part.strip().partition("=")[::2] for part in header.split(";")[1:]
+        )
+        ages[name] = int(attrs["Max-Age"]) if "Max-Age" in attrs else None
+    return ages
+
+
+def _refresh_token_lifetime(response):
+    """Seconds between the issued refresh token's iat and exp."""
+    claims = jwt.decode(
+        response.cookies[settings.refresh_cookie_name],
+        settings.secret_key_value,
+        algorithms=[settings.jwt_algorithm],
+    )
+    return claims["exp"] - claims["iat"]
+
+
+# Unticked: browser-session cookies and a 60-minute refresh token. Ticked: a
+# 30-minute access cookie and a 7-day refresh cookie and token, as before.
+UNTICKED = ({"jwt_token": None, "refresh_token": None}, 60 * 60)
+TICKED = ({"jwt_token": 30 * 60, "refresh_token": 7 * 24 * 60 * 60}, 7 * 24 * 60 * 60)
+
+
+@pytest.mark.parametrize(
+    "remember_me, expected", [(False, UNTICKED), (True, TICKED)], ids=["unticked", "ticked"]
+)
+def test_keep_me_logged_in_sets_the_session_lifetime(
+    client_anonymous, session, signed_jwts, remember_me, expected
+):
+    """The "Keep me logged in" choice decides the cookie and refresh token lifetimes."""
+    _seed_user(session, "session-user")
+
+    response = client_anonymous.post(
+        "/auth/login",
+        json={"username": "session-user", "password": "pw0", "remember_me": remember_me},
+    )
+
+    assert response.status_code == 200, response.text
+    assert (_cookie_max_ages(response), _refresh_token_lifetime(response)) == expected
+
+
+@pytest.mark.parametrize(
+    "remember_me, expected", [(False, UNTICKED), (True, TICKED)], ids=["unticked", "ticked"]
+)
+def test_a_refresh_keeps_the_keep_me_logged_in_choice(
+    client_anonymous, session, signed_jwts, remember_me, expected
+):
+    """A refresh issues cookies and a refresh token with the lifetimes the login chose."""
+    _seed_user(session, "refreshing-user")
+    login = client_anonymous.post(
+        "/auth/login",
+        json={"username": "refreshing-user", "password": "pw0", "remember_me": remember_me},
+    )
+    assert login.status_code == 200, login.text
+
+    response = client_anonymous.post("/auth/refresh")
+
+    assert response.status_code == 200, response.text
+    assert (_cookie_max_ages(response), _refresh_token_lifetime(response)) == expected
+
+
+def test_a_refresh_token_from_before_the_remember_claim_refreshes_as_ticked(
+    client_anonymous, session, signed_jwts
+):
+    """A refresh token minted without the remember claim keeps the long session."""
+    creator_id = _seed_user(session, "pre-release-user")
+    now = datetime.now(timezone.utc)
+    pre_release_token = jwt.encode(
+        {"sub": str(creator_id), "type": "refresh", "iat": now, "exp": now + timedelta(days=7)},
+        settings.secret_key_value,
+        algorithm=settings.jwt_algorithm,
+    )
+    client_anonymous.cookies.set(settings.refresh_cookie_name, pre_release_token)
+
+    response = client_anonymous.post("/auth/refresh")
+
+    assert response.status_code == 200, response.text
+    assert (_cookie_max_ages(response), _refresh_token_lifetime(response)) == TICKED
