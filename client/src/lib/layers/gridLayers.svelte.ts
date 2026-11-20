@@ -86,8 +86,6 @@ export function keepGridSize(before: PointList, after: PointList): PointList {
 
 /** One viewport's ETDRS grids: which show, the current grid and its armed slot, and the radius fraction. */
 export class GridLayers {
-    /** Sizes every grid in this viewport, the AI grid included. */
-    readonly settings = $state({ radiusFraction: 0.85 });
     currentId: number | undefined = $state();
     private armedSlot: { id: number; index: number } | undefined = $state();
     private readonly shown = new SvelteMap<GridKey, () => void>();
@@ -95,6 +93,8 @@ export class GridLayers {
     constructor(
         readonly viewerContext: ViewerContext,
         private readonly registration: Registration,
+        /** Sizes every grid in this viewport, the AI grid included. */
+        private readonly settings: { readonly radiusFraction: number },
     ) {}
 
     /** ETDRS grids on this image or on an image registered to it, oldest first. */

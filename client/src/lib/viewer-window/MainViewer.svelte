@@ -3,6 +3,7 @@
         CLIENT_DEFAULTS,
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
+    import { scaleOf } from "$lib/layers/imageScale";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import SliceScrollbar from "$lib/viewer/SliceScrollbar.svelte";
@@ -94,13 +95,22 @@
     );
     $effect(() => blend.apply(viewerContext));
     onDestroy(() => blend.dispose(viewerContext));
+    // One fraction for the viewer, so the rings, the circle and the scale agree.
+    const grids = new GridLayers(viewerContext, viewerWindowContext.registration, {
+        get radiusFraction() {
+            return workspace.etdrsFraction;
+        },
+    });
     // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
     const layers: LayersTarget = {
         viewerContext,
         mainViewerContext,
-        grids: new GridLayers(viewerContext, viewerWindowContext.registration),
+        grids,
         measure: new MeasureTool(viewerContext.image),
         localizer,
+        get scale() {
+            return scale;
+        },
         get projectionSources() {
             return projectionSources;
         },
@@ -112,6 +122,20 @@
         },
         blend,
     };
+
+    // One scale per image, shared by Distance and the ETDRS circle.
+    const scale = $derived.by(() => {
+        // Grid points map through registration, which notifies only through its revision.
+        void viewerWindowContext.registration.revision;
+        return scaleOf({
+            stored: image.resolution,
+            grids: grids.scaleGrids(),
+            currentId: grids.currentId,
+            shown: grids.shownKeys(),
+            pick: workspace.scalePicks.get(image.image_id),
+            fraction: workspace.etdrsFraction,
+        });
+    });
 
     // While mounted, this viewport is a source for its OCT's projection; the newest one wins.
     const position = getContext<(() => number) | undefined>("viewportPosition");

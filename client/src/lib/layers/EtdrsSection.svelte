@@ -27,6 +27,7 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
     import View from "carbon-icons-svelte/lib/View.svelte";
     import ViewOff from "carbon-icons-svelte/lib/ViewOff.svelte";
     import { getContext, tick, untrack } from "svelte";
+    import type { Workspace } from "$lib/workspace/workspace.svelte";
     import type { FormAnnotationGET } from "../../types/openapi_types";
     import { AI_GRID, aiGrid, type GridLayers } from "./gridLayers.svelte";
     import CommitNumberInput from "./CommitNumberInput.svelte";
@@ -51,6 +52,7 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
     const globalContext = getContext<GlobalContext>("globalContext");
     const taskContext = getContext<TaskContext | undefined>("taskContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
+    const workspace = getContext<Workspace>("workspace");
     const { instance } = viewerContext.image;
     let section: HTMLElement | undefined = $state();
 
@@ -198,11 +200,11 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
             <div class="px-4 py-2">
                 <CommitNumberInput
                     labelText="Radius fraction"
-                    value={grids.settings.radiusFraction}
+                    value={workspace.etdrsFraction}
                     step={0.01}
                     min={0.01}
                     max={1}
-                    oncommit={(v) => (grids.settings.radiusFraction = v)}
+                    oncommit={(v) => (workspace.etdrsFraction = v)}
                 />
             </div>
             <ul>

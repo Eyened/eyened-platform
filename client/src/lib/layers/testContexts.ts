@@ -213,10 +213,19 @@ export function layersContexts(
     };
     for (const loaded of [image, ...others])
         win.images.set(loaded.image_id, loaded);
+    // Reactive like the real Workspace, so a section re-renders after it writes the fraction.
+    const fraction = fromStore(writable(0.85));
     const workspace = {
         catalogue: [image.image_id, ...others.map((i) => i.image_id)],
         arm: vi.fn(),
         armedTool: null,
+        get etdrsFraction() {
+            return fraction.current;
+        },
+        set etdrsFraction(value: number) {
+            fraction.current = value;
+        },
+        etdrsSlot: 0,
     };
     const viewerContext = {
         image,
@@ -232,7 +241,11 @@ export function layersContexts(
             a.annotation_type !== "model_segmentation" && a.creator.id === ME,
         dialogue: null,
     };
-    const grids = new GridLayers(viewerContext as never, registration as never);
+    const grids = new GridLayers(viewerContext as never, registration as never, {
+        get radiusFraction() {
+            return workspace.etdrsFraction;
+        },
+    });
     const measure = new MeasureTool(image as never);
     const context = new Map<string, unknown>([
         ["globalContext", globalContext],

@@ -39,6 +39,7 @@ function attach(ws: Workspace, position: number, instanceId: string) {
             viewerContext: ctx.viewerContext as never,
             mainViewerContext: ctx.mainViewerContext as never,
             grids: ctx.grids,
+            scale: null,
             measure: ctx.measure,
             projectionSources: [],
             localizer: new LocalizerLines(() => []),

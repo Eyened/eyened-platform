@@ -255,18 +255,18 @@ describe("EtdrsSection", () => {
 
     it("Radius fraction applies on commit, not per keystroke, and reverts an empty or out-of-range entry", async () => {
         formAnnotations.set(11, grid(11, ME));
-        const { grids } = renderSection();
+        const { workspace } = renderSection();
         const field = screen.getByLabelText("Radius fraction");
         expect(field).toHaveAttribute("step", "0.01");
         await fireEvent.input(field, { target: { value: "0.9" } });
-        expect(grids.settings.radiusFraction).toBe(0.85);
+        expect(workspace.etdrsFraction).toBe(0.85);
         await fireEvent.change(field);
-        expect(grids.settings.radiusFraction).toBe(0.9);
+        expect(workspace.etdrsFraction).toBe(0.9);
         for (const bad of ["", "1.5"]) {
             await fireEvent.input(field, { target: { value: bad } });
             await fireEvent.keyDown(field, { key: "Enter" });
             expect(field).toHaveValue(0.9);
         }
-        expect(grids.settings.radiusFraction).toBe(0.9);
+        expect(workspace.etdrsFraction).toBe(0.9);
     });
 });

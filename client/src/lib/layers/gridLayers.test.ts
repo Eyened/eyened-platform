@@ -115,7 +115,9 @@ describe("GridLayers.scaleGrids", () => {
                 instance: { id: "inst-1", cf_keypoints: null },
             },
         };
-        const grids = new GridLayers(viewer as never, registration as never);
+        const grids = new GridLayers(viewer as never, registration as never, {
+            radiusFraction: 0.85,
+        });
         expect(grids.scaleGrids()).toMatchObject([
             { key: 9, fovea: { x: 0, y: 0 }, discEdge: { x: 200, y: 0 } },
         ]);
