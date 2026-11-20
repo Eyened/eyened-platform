@@ -34,6 +34,7 @@ export type WorkspaceView = Pick<
     | "distanceLinesFor"
     | "stripTracking"
     | "arm"
+    | "toggleTool"
     | "armedTool"
     | "selectedViewport"
     | "magnifier"

@@ -77,6 +77,19 @@ export class Keymap implements ViewerEventListener {
                 lines.remove(lines.drawing);
                 return;
             }
+            // A waiting New › Region box is cancelled before anything resets.
+            if (
+                !viewerContext.isStripTile &&
+                selected?.segmentationContext.regionToolActive
+            ) {
+                selected.segmentationContext.regionToolActive = false;
+                return;
+            }
+            // Then Esc leaves the keyboard cursor; only the next Esc resets the view.
+            if (viewerContext.keyboardCursor.on) {
+                viewerContext.keyboardCursor.leave();
+                return;
+            }
             viewerContext.initTransform();
             lines?.clear();
             return;
@@ -131,8 +144,9 @@ export class Keymap implements ViewerEventListener {
             }
             return;
         }
+        // A letter does what a click on its button does: the armed tool's key returns to No tool.
         const tool = toolForKey(key);
-        if (tool) view?.arm(tool.id);
+        if (tool) view?.toggleTool(tool.id);
     }
 
     keyup(e: ViewerEvent<KeyboardEvent>) {
