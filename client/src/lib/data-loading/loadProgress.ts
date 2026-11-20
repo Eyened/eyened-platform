@@ -4,6 +4,8 @@ export type ImageLoadState = {
 
 export type ImageLoadProgress = {
     loading?: ImageLoadState;
+    /** OCTA: angio_flow attached after structural was already shown. */
+    onFlowReady?: (imageId: string) => void;
 };
 
 export function setLoadMessage(

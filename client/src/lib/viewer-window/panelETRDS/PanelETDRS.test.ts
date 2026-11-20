@@ -6,9 +6,6 @@ import type {
     FormSchemaGET,
 } from "../../../types/openapi_types";
 
-vi.mock("cornerstone-wado-image-loader", () => ({ default: {} }));
-vi.mock("@cornerstonejs/dicom-image-loader", () => ({ default: {} }));
-vi.mock("cornerstone-core", () => ({ default: {} }));
 vi.mock("../viewerWindowContext.svelte", () => ({
     ViewerWindowContext: class ViewerWindowContext {},
 }));

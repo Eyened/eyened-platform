@@ -4,6 +4,10 @@ import type { AbstractImage } from "./abstractImage";
 import type { RenderTarget } from "./types";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import {
+    angioModeUniform,
+    type AngioDisplayMode,
+} from "$lib/viewer/angioDisplayMode";
+import {
     isRenderModeAvailable,
     type RenderMode,
 } from "$lib/viewer/viewer-utils";
@@ -11,12 +15,18 @@ import fs_renderImage2D from "./glsl/fs_render_image2D.frag";
 import fs_renderLuminance from "./glsl/fs_render_luminance.frag";
 import fs_renderImage3D from "./glsl/fs_render_image3D.frag";
 import fs_renderSliceArray from "./glsl/fs_render_slice_array.frag";
-import type { Image3D } from "./image3D";
+import { Image3D } from "./image3D";
 import { ImageSliceStack } from "./imageSliceStack";
+import type { TextureData } from "./texture";
 
 export interface ImageRenderer {
     renderImage(viewerContext: ViewerContext, renderTarget: RenderTarget): void;
 }
+
+type ClaheVolume = {
+    getClaheSliceTexture(index: number): Promise<TextureData | undefined>;
+    getClaheSliceTextureSync(index: number): TextureData | undefined;
+};
 
 export class BaseImageRenderer implements ImageRenderer {
     private readonly shaderBase: TextureShaderProgram;
@@ -40,58 +50,38 @@ export class BaseImageRenderer implements ImageRenderer {
 
     renderImage(viewerContext: ViewerContext, renderTarget: RenderTarget) {
         const { image } = viewerContext;
-
         const uniforms = getBaseUniforms(viewerContext);
         const renderMode = resolveRenderMode(image, viewerContext.renderMode);
+        // CLAHE is structural-only; flow / overlay need the volume shaders.
+        const allowClahe = resolveAngioMode(viewerContext) === "structural";
 
         if (image instanceof ImageSliceStack) {
-            if (renderMode == "CLAHE") {
-                void image
-                    .getClaheSliceTexture(viewerContext.index)
-                    .catch((err) =>
-                        console.error("CLAHE slice processing failed", err),
-                    );
-                const claheTexture = image.getClaheSliceTextureSync(
-                    viewerContext.index,
-                );
-                if (claheTexture) {
-                    uniforms.u_image = claheTexture.texture;
-                    this.shaderBase.pass(renderTarget, uniforms);
-                } else {
-                    this.shaderSliceArray.pass(renderTarget, uniforms);
-                }
-            } else {
-                this.shaderSliceArray.pass(renderTarget, uniforms);
+            if (
+                allowClahe &&
+                this.tryClahePass(image, viewerContext, renderTarget, uniforms)
+            ) {
+                return;
             }
-
+            this.shaderSliceArray.pass(renderTarget, uniforms);
             return;
         }
 
         if (image.is3D) {
-            if (renderMode == "CLAHE") {
-                const img3d = image as Image3D;
-                void img3d
-                    .getClaheSliceTexture(viewerContext.index)
-                    .catch((err) =>
-                        console.error("CLAHE slice processing failed", err),
-                    );
-                const claheTexture = img3d.getClaheSliceTextureSync(
-                    viewerContext.index,
-                );
-                if (claheTexture) {
-                    uniforms.u_image = claheTexture.texture;
-                    this.shaderBase.pass(renderTarget, uniforms);
-                } else {
-                    this.shader3D.pass(renderTarget, uniforms);
-                }
-            } else {
-                this.shader3D.pass(renderTarget, uniforms);
+            if (
+                allowClahe &&
+                this.tryClahePass(
+                    image as Image3D,
+                    viewerContext,
+                    renderTarget,
+                    uniforms,
+                )
+            ) {
+                return;
             }
-
+            this.shader3D.pass(renderTarget, uniforms);
             return;
         }
 
-        // image stores different textures for different render modes
         uniforms.u_image = (image as Image2D).selectTexture(renderMode);
 
         if (
@@ -100,7 +90,6 @@ export class BaseImageRenderer implements ImageRenderer {
             renderMode == "Green" ||
             renderMode == "Blue"
         ) {
-            // luminance, red, green, blue are not stored in a separate texture, but calculated in the fragment shader
             uniforms.u_channel = {
                 R: 0,
                 G: 1,
@@ -111,6 +100,32 @@ export class BaseImageRenderer implements ImageRenderer {
         } else {
             this.shaderBase.pass(renderTarget, uniforms);
         }
+    }
+
+    /** Draw a cached CLAHE slice if ready; kick off async prep otherwise. */
+    private tryClahePass(
+        image: ClaheVolume,
+        viewerContext: ViewerContext,
+        renderTarget: RenderTarget,
+        uniforms: Record<string, unknown>,
+    ): boolean {
+        if (viewerContext.renderMode !== "CLAHE") {
+            return false;
+        }
+        void image
+            .getClaheSliceTexture(viewerContext.index)
+            .catch((err) =>
+                console.error("CLAHE slice processing failed", err),
+            );
+        const claheTexture = image.getClaheSliceTextureSync(
+            viewerContext.index,
+        );
+        if (!claheTexture) {
+            return false;
+        }
+        uniforms.u_image = claheTexture.texture;
+        this.shaderBase.pass(renderTarget, uniforms);
+        return true;
     }
 }
 
@@ -123,12 +138,23 @@ function resolveRenderMode(
         : "Original";
 }
 
+function resolveAngioMode(viewerContext: ViewerContext): AngioDisplayMode {
+    if (!viewerContext.image.hasFlow) {
+        return "structural";
+    }
+    return viewerContext.angioDisplayMode;
+}
+
 export function getBaseUniforms(viewerContext: ViewerContext): any {
     const { webglTransform, image, index, windowLevel } = viewerContext;
+    const angioMode = resolveAngioMode(viewerContext);
 
     return {
         u_index: index,
         u_image: image.texture,
+        // Always bind a valid sampler3D/2DArray; unused when mode is structural.
+        u_flow: image.flowTexture ?? image.texture,
+        u_angio_mode: angioModeUniform(angioMode),
         u_image_size: [image.width, image.height, image.depth],
         u_transform: webglTransform.asUniform,
         u_window_level: [windowLevel.min, windowLevel.max],

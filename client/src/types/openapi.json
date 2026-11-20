@@ -639,7 +639,7 @@
     "/images/{image_id}/data": {
       "get": {
         "summary": "Get Public Image Data",
-        "description": "Redirect to the stored image data for an instance (by PublicID).",
+        "description": "Redirect to the stored image data for an instance (by PublicID).\n\nOptional ``storage_id`` selects an ImageStorage row on this instance. When omitted, the primary storage is used.",
         "operationId": "get_public_image_data_images__image_id__data_get",
         "parameters": [
           {
@@ -675,6 +675,22 @@
               "type": "boolean",
               "default": false,
               "title": "Meta"
+            }
+          },
+          {
+            "name": "storage_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Storage Id"
             }
           },
           {
@@ -7354,6 +7370,13 @@
             ],
             "title": "Date Preprocessed"
           },
+          "storages": {
+            "items": {
+              "$ref": "#/components/schemas/ImageStorageGET"
+            },
+            "type": "array",
+            "title": "Storages"
+          },
           "id": {
             "type": "string",
             "title": "Id"
@@ -7452,6 +7475,7 @@
           "resolution_vertical",
           "resolution_axial",
           "date_inserted",
+          "storages",
           "id",
           "project",
           "patient",
@@ -7464,6 +7488,53 @@
           "attrs"
         ],
         "title": "ImageGET"
+      },
+      "ImageStorageGET": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "is_primary": {
+            "type": "boolean",
+            "title": "Is Primary"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "Channel of this file, such as angio_flow"
+          },
+          "sop_instance_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sop Instance Uid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "format",
+          "is_primary"
+        ],
+        "title": "ImageStorageGET",
+        "description": "One on-disk (or object-store) file belonging to an ImageInstance."
       },
       "ImportOptions": {
         "properties": {
@@ -8418,6 +8489,19 @@
             ],
             "title": "Image Storage Is Primary",
             "description": "If set, maps to ImageStorage.IsPrimary"
+          },
+          "image_storage_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["angio_flow"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Storage Role",
+            "description": "If set, maps to ImageStorage.Role"
           },
           "image_storage_hash": {
             "anyOf": [

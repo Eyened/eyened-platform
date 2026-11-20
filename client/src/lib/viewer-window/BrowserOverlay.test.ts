@@ -28,7 +28,7 @@ vi.mock("$lib/browser/browserContext.svelte", () => ({
 // The real Browser pulls in the whole search UI; none of it is under test here.
 vi.mock("$lib/browser/Browser.svelte", () => ({ default: () => {} }));
 
-// viewerWindowContext reaches cornerstone's WADO loader, which throws on import
+// viewerWindowContext pulls image loading; keep overlay isolated from WebGL/DICOM
 // under jsdom. The test supplies a spy for this prop, so the real class is dead
 // weight either way.
 vi.mock("./viewerWindowContext.svelte", () => ({
