@@ -164,14 +164,14 @@ def test_check_oidc_login_creates_new_account_but_does_not_commit(session, monke
         SimpleNamespace(oidc=SimpleNamespace(create_new_accounts=True)),
     )
 
-    claims = {"sub": "abc123", "preferred_username": "new-oidc-user"}
+    claims = {"sub": "abc123", "email": "new.oidc.user@example.org"}
     creator = check_oidc_login(claims, session)
 
-    assert creator.CreatorName == "new-oidc-user"
+    assert creator.CreatorName == "new.oidc.user@example.org"
     assert creator.EmployeeIdentifier == "oidc:sub:abc123"
 
     session.rollback()  # get_db does this in production on a later exception
-    assert session.query(Creator).filter_by(CreatorName="new-oidc-user").count() == 0
+    assert session.query(Creator).filter_by(CreatorName="new.oidc.user@example.org").count() == 0
 
 
 

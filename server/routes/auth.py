@@ -620,11 +620,20 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
     else:
         # No existing account was found
         if settings.oidc.create_new_accounts:
-            username = id_claims.get("preferred_username")
+            # ASSUMPTION: the provider's email is institution-issued; no email_verified check.
+            username = id_claims.get("email")
             if not username:
+                logger.warning("Denied OIDC account creation, the 'email' claim is missing")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="OIDC token is missing the required preferred_username claim",
+                    detail="Your login did not include an email address, which EyeNED needs to create your account.",
+                )
+            # The account-name column holds 45 characters.
+            if len(username) > 45:
+                logger.warning("Denied OIDC account creation, the 'email' claim is longer than 45 characters")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Your email address is longer than 45 characters, so EyeNED can't create an account for it yet. Ask an administrator for help.",
                 )
             identifier = f"oidc:sub:{id_claims['sub']}"
             try:
