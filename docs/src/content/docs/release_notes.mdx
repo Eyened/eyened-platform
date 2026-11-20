@@ -184,6 +184,16 @@ database.
   built from it (e.g. CLI stdout) would report.
 - **`eorm create-user` writes an audit row.** It previously wrote none.
 
+**Viewer**
+
+- **Creating a segmentation shows its progress in the Segmentations header**, not in a box
+  over the page; so does duplicating one. A failure shows a notice at the top of the section.
+  New › Advanced… is a modal: Type, then one Feature combo box, then Placement. Create stays
+  unavailable until a feature is picked and, for a region box, a box is drawn.
+- **The viewer says when it can't run.** Without WebGL 2 it shows a message instead of a blank
+  page. When the browser drops the graphics context, it shows "The viewer stopped" with a Reload
+  page button; before, that message never appeared.
+
 ## v2026.09.0
 
 Per-project access control is now enforced, tasks declare the projects they span, and the
