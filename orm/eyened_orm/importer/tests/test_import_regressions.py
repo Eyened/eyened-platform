@@ -39,12 +39,14 @@ def test_import_missing_manufacturer_model_name_raises_informative_error(session
     """
     GH #119: manufacturer is present and device_description comes from defaults,
     but manufacturer_model_name is missing so DeviceModel/DeviceInstance cannot
-    be resolved and ImageInstance creation fails with a actionable message.
+    be resolved. The file row is what the SOP UID identifies, so creation fails
+    on ImageStorage and still names the missing field.
     """
     with pytest.raises(
         RuntimeError,
         match=(
-            r"Cannot create ImageInstance: cannot resolve DeviceInstance; "
+            r"Cannot create ImageStorage: cannot resolve ImageInstance "
+            r"\(requires DeviceInstance\); "
             r"provide row field\(s\): manufacturer_model_name"
         ),
     ):
