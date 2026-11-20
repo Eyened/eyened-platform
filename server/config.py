@@ -148,6 +148,8 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     # Refresh token lifetime when "Keep me logged in" is unticked.
     refresh_token_short_expire_minutes: int = 60
+    # A refresh more than this long after login is refused (NIST AAL1).
+    session_max_age_days: int = 30
     jwt_cookie_name: str = "jwt_token"
     refresh_cookie_name: str = "refresh_token"
     # Enable only behind HTTPS; login fails over plain HTTP.

@@ -119,9 +119,16 @@ def create_access_token(user_id: int, username: str) -> str:
     )
 
 
-def create_refresh_token(user_id: int, remember: bool = True) -> str:
-    """Create a JWT refresh token; ``remember`` picks its lifetime and is carried in it."""
+def create_refresh_token(
+    user_id: int, remember: bool = True, auth_time: int | None = None
+) -> str:
+    """Create a JWT refresh token; ``remember`` picks its lifetime and is carried in it.
+
+    ``auth_time`` is the login time in epoch seconds; omitted, the login is now.
+    """
     now = datetime.now(timezone.utc)
+    if auth_time is None:
+        auth_time = int(now.timestamp())
     if remember:
         lifetime = timedelta(days=settings.refresh_token_expire_days)
     else:
@@ -130,6 +137,7 @@ def create_refresh_token(user_id: int, remember: bool = True) -> str:
         "sub": str(user_id),  # Convert to string
         "type": "refresh",
         "remember": remember,
+        "auth_time": auth_time,
         "exp": now + lifetime,
         "iat": now,
     }
@@ -337,8 +345,15 @@ def refresh_token(
         # existed count as ticked, so nobody is logged out by the release.
         remember = payload.get("remember", True)
 
+        # The session ends a fixed time after login, however often it is
+        # refreshed. Tokens issued before the claim existed count from iat.
+        auth_time = payload.get("auth_time", payload["iat"])
+        session_age = datetime.now(timezone.utc) - datetime.fromtimestamp(auth_time, timezone.utc)
+        if session_age > timedelta(days=settings.session_max_age_days):
+            raise HTTPException(status_code=401, detail="Session expired")
+
         # Create NEW refresh token (extends session for active users)
-        new_refresh_token = create_refresh_token(creator.CreatorID, remember)
+        new_refresh_token = create_refresh_token(creator.CreatorID, remember, auth_time)
 
         _set_session_cookies(response, new_access_token, new_refresh_token, remember)
 
