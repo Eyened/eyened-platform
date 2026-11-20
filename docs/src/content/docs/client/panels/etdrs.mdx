@@ -25,33 +25,33 @@ When AI keypoints are present, the panel shows an **Automatic** row. Toggle it t
 ### Workflow
 
 1. Open a 2D enface image in the viewer.
-2. Expand the **ETDRS** panel.
-3. Optionally toggle **Automatic** to preview AI-detected landmarks.
-4. Click **Create new** for a manual annotation (the edit tool activates automatically).
-5. **Left click** in the image to set the **fovea**; **right click** to set the **optic disc edge**.
-6. Use **show/hide** on an annotation to display or hide the grid overlay.
+2. Open **Layers › ETDRS grids**.
+3. Optionally show the **AI grid** to preview AI-detected landmarks.
+4. Click **New**: the grid becomes current and **Place ETDRS grid** (`G`) arms at **Fovea**.
+5. Click the fovea. Press `]` (or **Disc edge** in the options bar) and click the optic disc edge. Drag a point to move it; **Del** removes the point under the pointer.
+6. Use the eye button on a grid row to show or hide its overlay.
 
-Hold **Shift** while clicking to pan or zoom without placing landmarks when the edit tool is active.
-
-The grid overlay and edit tool can stay active after you collapse the ETDRS panel — deactivate the tool when you are done editing.
+**Shift**+drag pans without placing a point.
 
 Annotations from registered linked images may appear when registration connects them to the current view.
 
 ### Grid geometry
 
-Three concentric circles represent **1 mm** (central), **3 mm** (inner), and **6 mm** (outer) ETDRS subfields. Scale uses the fovea–disc distance; the **ETDRS radius fraction** (default **0.85**) treats that fraction of the distance as 3 mm.
+Three concentric circles represent **1 mm** (central), **3 mm** (inner), and **6 mm** (outer) ETDRS subfields. Scale uses the fovea–disc distance; the **Radius fraction** in ETDRS grids (default **0.85**, one for the whole viewer) treats that fraction of the distance as 3 mm.
 
 ### Keyboard shortcuts
 
 | Keys | Action |
 |------|--------|
-| `C` | Cycle central subfield circles (C0, C1, C2) |
-| `I` | Cycle inner subfield circles (I1, I2) |
-| `O` | Cycle outer subfield circles (O1, O2) |
+| `G` | Place ETDRS grid |
+| `[` / `]` | Fovea / Disc edge |
+| Hold `Space` | Place the selected point and follow the pointer |
+| `Del` | Remove the point under the pointer |
+| `C`, then `[` / `]` | ETDRS circle at the pointer, C0 to O2 |
 
-### Measure panel
+### Scale
 
-The **[Measure](/eyened-platform/client/panels/measure)** panel can derive µm/pixel from ETDRS coordinates. Use the same radius fraction as in this panel.
+Distance and the ETDRS circle share one scale per image: the stored resolution, else the current grid, else the only grid shown. Their scale button names the source and lets you pick another.
 
 ## Implementation & analysis
 
