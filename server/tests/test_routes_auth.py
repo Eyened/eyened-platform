@@ -743,6 +743,32 @@ def test_login_marks_both_auth_cookies_secure_when_cookie_secure_is_on(
     assert all("; Secure" in cookie for cookie in set_cookies)
 
 
+@pytest.mark.parametrize(
+    "password_enabled, expected_status", [(False, 403), (True, 200)], ids=["off", "on"]
+)
+def test_password_login_follows_the_password_enabled_setting(
+    client_anonymous, session, signed_jwts, monkeypatch, password_enabled, expected_status
+):
+    """With password login off, correct credentials are refused; on, they log in."""
+    import server.routes.auth as auth_routes
+
+    monkeypatch.setattr(
+        auth_routes,
+        "settings",
+        settings.model_copy(update={"auth_password_enabled": password_enabled}),
+    )
+    _seed_user(session, "gated-user")
+
+    response = client_anonymous.post(
+        "/auth/login", json={"username": "gated-user", "password": "pw0"}
+    )
+
+    assert response.status_code == expected_status, response.text
+    if not password_enabled:
+        assert response.json() == {"detail": "Password login is disabled."}
+        assert "set-cookie" not in response.headers
+
+
 def _cookie_max_ages(response):
     """Each session cookie's Max-Age in seconds, or None for a browser-session cookie."""
     ages = {}

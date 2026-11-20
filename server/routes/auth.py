@@ -232,6 +232,12 @@ def login(
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Login with username and password, return user info and set JWT cookies or return token."""
+    # Refused before any user lookup, so the reply says nothing about the account.
+    # ASSUMPTION: 403, not 404 or 405: the route exists but this server forbids its use.
+    if not settings.auth_password_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Password login is disabled."
+        )
     creator = auth_service.authenticate(user_data.username, user_data.password)
 
     # Create both tokens
