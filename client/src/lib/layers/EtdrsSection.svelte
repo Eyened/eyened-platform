@@ -94,10 +94,6 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
             // Fovea and disc edge are en-face 2D landmarks, without a B-scan index.
             coordinateSpace: "enface2d",
             slotLabels: ["Fovea", "Disc edge"],
-            slotKeys: [
-                { index: 0, key: "f" },
-                { index: 1, key: "d" },
-            ],
             onChange: (points) => writeLandmarks(id, points, false),
             onPersist: (points) => writeLandmarks(id, points, true),
         });
