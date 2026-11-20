@@ -149,7 +149,7 @@ If you decide to keep access control in the Eyened application itself, only user
 To resolve this, you can use a different claim as a temporary replacement. E.g. if the ID token contains the users' email address in the claim `email`, you need to set the value of the `creator.EmployeeIdentifier` to `oidc:email:John.Doe@example.com`. After the first successful authentication, the value will be replaced with the "Subject" claim (using prefix `oidc:sub:`).
 
 :::note
-Only the `email` or the `preferred_username` claims are currently supported as a temporary claim.
+Only the `email` claim is supported as a temporary claim. An administrator can set the link with `PUT /api/admin/users/{id}/email-link` and the body `{"email": "John.Doe@example.com"}`, which refuses an email another account holds. The link and the later replacement with the "Subject" claim each write an audit row.
 :::
 
 :::caution
