@@ -4,6 +4,7 @@ from eyened_orm import Tag
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.tag_repository import TagRepository
 from eyened_orm.authz.ownership import require_owner_or_project_admin
+from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
 from sqlalchemy.exc import IntegrityError
@@ -25,12 +26,11 @@ class TagService:
     overlay an empty project set; the comment at that call site says what it
     makes of it.
 
-    ``update_tag`` carries no authorization check at all. A tag *definition*
-    is application-wide data rather than an annotation -- applying a tag is the
-    annotation, and those links are guarded elsewhere -- so renaming a shared
-    label is unrestricted (§4.3). Bound to ownership instead, a label whose
-    author is deactivated would be un-renameable by everyone, administrators
-    included.
+    Creating or renaming a tag needs Grader or above in at least one project,
+    or administrator: a tag name gives meaning to every annotation it is
+    applied to, so an Account with no project role cannot change it. Renaming
+    is not bound to ownership, so a label whose author is deactivated stays
+    renameable. Starring stays open, because a star is per Account.
     """
 
     def __init__(
@@ -56,6 +56,7 @@ class TagService:
         tag_type: TagType,
     ) -> Tag:
         """Create a tag owned by the acting user."""
+        self.scope.require_in_any_project(ProjectRole.grader, entity="Tag")
         tag = Tag(
             TagName=name,
             TagDescription=description,
@@ -89,6 +90,9 @@ class TagService:
         Raises:
             NotFoundError: If the tag does not exist.
         """
+        self.scope.require_in_any_project(
+            ProjectRole.grader, entity="Tag", entity_id=tag_id
+        )
         tag = self.repository.get_by_id(tag_id)
         if tag is None:
             raise NotFoundError(f"Tag {tag_id} not found")
