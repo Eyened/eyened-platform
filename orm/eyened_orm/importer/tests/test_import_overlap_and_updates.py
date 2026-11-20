@@ -17,6 +17,7 @@ from eyened_orm import (
 )
 from eyened_orm.importer.importer import plan_image_import
 from eyened_orm.importer.importer_dtos import ImportRow
+from eyened_orm.utils.factories import image_by_sop
 
 
 def _count(session, model) -> int:
@@ -174,7 +175,7 @@ def test_two_phase_import_partial_overlap_reuses_and_updates(session):
     assert proj2 is not None
     assert proj2.Description == "updated project description"
 
-    sop1 = ImageInstance.by_column(session, SOPInstanceUid="SOP-1")
+    sop1 = image_by_sop(session, "SOP-1")
     assert sop1 is not None
     assert getattr(sop1.Laterality, "value", sop1.Laterality) == "R"
 

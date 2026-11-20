@@ -19,6 +19,7 @@ from eyened_orm import (
 )
 from eyened_orm.importer.importer import plan_image_import
 from eyened_orm.importer.importer_dtos import ImportRow
+from eyened_orm.utils.factories import image_by_sop
 
 
 def _count(session, model) -> int:
@@ -205,7 +206,7 @@ def test_import_image_then_update_modality(session):
     run1.apply()
     session.commit()
 
-    img1 = ImageInstance.by_column(session, SOPInstanceUid="SOP-1")
+    img1 = image_by_sop(session, "SOP-1")
     assert img1 is not None
     assert getattr(img1.Modality, "value", img1.Modality) == "ColorFundus"
 
@@ -229,7 +230,7 @@ def test_import_image_then_update_modality(session):
     run2.apply()
     session.commit()
 
-    img2 = ImageInstance.by_column(session, SOPInstanceUid="SOP-1")
+    img2 = image_by_sop(session, "SOP-1")
     assert img2 is not None
     assert getattr(img2.Modality, "value", img2.Modality) == "OCT"
 
@@ -266,7 +267,7 @@ def test_import_image_then_update_device_fk(session):
     run1.apply()
     session.commit()
 
-    img1 = ImageInstance.by_column(session, SOPInstanceUid="SOP-1")
+    img1 = image_by_sop(session, "SOP-1")
     assert img1 is not None
     assert img1.DeviceInstance is not None
     assert img1.DeviceInstance.Description == "dev-A"
@@ -296,7 +297,7 @@ def test_import_image_then_update_device_fk(session):
     session.commit()
 
     assert _count(session, DeviceInstance) == 1  # same device instance is reused
-    img2 = ImageInstance.by_column(session, SOPInstanceUid="SOP-1")
+    img2 = image_by_sop(session, "SOP-1")
     assert img2 is not None
     assert img2.DeviceInstance is not None
     assert img2.DeviceInstance.Description == "dev-B"
@@ -333,7 +334,7 @@ def test_image_instance_can_be_looked_up_by_sop_uid_public_id_or_pk(session):
     run1.apply()
     session.commit()
 
-    img1 = ImageInstance.by_column(session, SOPInstanceUid="SOP-1")
+    img1 = image_by_sop(session, "SOP-1")
     assert img1 is not None
 
     image_instance_id = img1.ImageInstanceID
@@ -395,7 +396,7 @@ def test_import_image_public_id_cannot_be_changed(session):
     run1.apply()
     session.commit()
 
-    img1 = ImageInstance.by_column(session, SOPInstanceUid="SOP-1")
+    img1 = image_by_sop(session, "SOP-1")
     assert img1 is not None
     public_id = img1.PublicID
 
@@ -454,14 +455,16 @@ def test_import_image_lookup_by_pk_can_edit_sop_instance_uid(session):
     run1.apply()
     session.commit()
 
-    img1 = ImageInstance.by_column(session, SOPInstanceUid="SOP-OLD")
+    img1 = image_by_sop(session, "SOP-OLD")
     assert img1 is not None
+    storage = img1.primary_storage
+    assert storage is not None
 
     run2 = plan_image_import(
         session,
         [
             ImportRow(
-                image_instance_id=img1.ImageInstanceID,
+                image_storage_id=storage.ImageStorageID,
                 sop_instance_uid="SOP-NEW",
             )
         ],
@@ -470,9 +473,9 @@ def test_import_image_lookup_by_pk_can_edit_sop_instance_uid(session):
     run2.apply()
     session.commit()
 
-    assert ImageInstance.by_column(session, SOPInstanceUid="SOP-OLD") is None
+    assert image_by_sop(session, "SOP-OLD") is None
 
-    img2 = ImageInstance.by_column(session, SOPInstanceUid="SOP-NEW")
+    img2 = image_by_sop(session, "SOP-NEW")
     assert img2 is not None
     assert img2.ImageInstanceID == img1.ImageInstanceID
 
@@ -576,7 +579,7 @@ def test_import_scan_mode_creates_scan_and_links_image(session):
     assert scan is not None
     assert scan.ScanMode == "Radial"
 
-    img = ImageInstance.by_column(session, SOPInstanceUid="SOP-SCAN-1")
+    img = image_by_sop(session, "SOP-SCAN-1")
     assert img is not None
     assert img.ScanID == scan.ScanID
     assert img.Scan is not None
@@ -667,7 +670,7 @@ def test_import_modality_tag_creates_modality_row_and_links(session):
     assert mt is not None
     assert mt.ModalityTag == "VendorRaw_OCT"
 
-    img = ImageInstance.by_column(session, SOPInstanceUid="SOP-MTAG-1")
+    img = image_by_sop(session, "SOP-MTAG-1")
     assert img is not None
     assert img.ModalityID == mt.ModalityID
     assert img._Modality is not None
