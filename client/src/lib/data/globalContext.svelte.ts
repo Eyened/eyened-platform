@@ -12,14 +12,8 @@ import type {
 } from "../../types/openapi_types";
 import { fetchFeatures, fetchFormSchemas, fetchTags } from "./api";
 
-export type ComponentDef = {
-    component: any;
-    props?: any;
-};
-
 export class GlobalContext {
     public userManager: UserManager;
-    public dialogue: ComponentDef | string | null = $state(null);
     public passwordEnabled: boolean = $state(false);
 
     public formShortcut: string | null = $state("WARMGS");

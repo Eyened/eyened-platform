@@ -242,7 +242,6 @@ export function layersContexts(
         user: { id: ME },
         canEdit: (a: { annotation_type?: string; creator: { id: number } }) =>
             a.annotation_type !== "model_segmentation" && a.creator.id === ME,
-        dialogue: null,
     };
     const grids = new GridLayers(
         viewerContext as never,

@@ -17,6 +17,7 @@
     import { EnfaceProjectionOverlay } from "$lib/viewer/overlays/EnfaceProjectionOverlay";
     import { instanceIdFromImageId } from "./viewerViewState";
     import { getContext, onDestroy, setContext, untrack } from "svelte";
+    import { toast } from "svelte-sonner";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     import { magnifierFeed } from "$lib/workspace/magnifier";
@@ -326,7 +327,7 @@
                 viewerContext,
                 segmentationContext,
                 workspace,
-                report: (message) => (globalContext.dialogue = message),
+                report: (message) => toast.error(message),
             }),
         );
     });
