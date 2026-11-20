@@ -44,7 +44,7 @@
   },
   "src/lib/data/globalContext.svelte.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 5
+      "count": 3
     },
     "svelte/prefer-svelte-reactivity": {
       "count": 4
@@ -173,16 +173,6 @@
   },
   "src/lib/viewer-window/panelInfo/panelInfo.svelte": {
     "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelSegmentation/CreateSegmentationDialog.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelSegmentation/FeatureSelect.svelte": {
-    "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
   },

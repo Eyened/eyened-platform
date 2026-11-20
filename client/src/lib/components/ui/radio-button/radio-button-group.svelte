@@ -7,19 +7,32 @@
         legendText,
         items,
         selected = $bindable(),
+        disabled = false,
+        describedBy,
         class: className,
     }: {
         legendText: string;
         items: readonly { value: T; labelText: string }[];
         selected: T;
+        disabled?: boolean;
+        /** Id of helper text for the whole group. */
+        describedBy?: string;
         class?: string;
     } = $props();
 
     const name = $props.id();
 </script>
 
-<fieldset class={cn("flex min-w-0 flex-col", className)}>
-    <legend class="mb-2 text-label-01 text-text-secondary">{legendText}</legend>
+<!-- A disabled fieldset disables every radio in it, so Tab skips them; the helper says why. -->
+<fieldset
+    class={cn("group/radios flex min-w-0 flex-col", className)}
+    {disabled}
+    aria-describedby={describedBy}
+>
+    <legend
+        class="mb-2 text-label-01 text-text-secondary group-disabled/radios:text-text-disabled"
+        >{legendText}</legend
+    >
     <div class="flex flex-wrap gap-2">
         {#each items as item (item.value)}
             <RadioButton

@@ -4,6 +4,8 @@
         fetchTask,
     } from "../../../../../lib/data/api";
     import { tasks, subtasks } from "../../../../../lib/data/stores.svelte";
+    import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import TaskMain from "../../../../../lib/tasks/TaskMain.svelte";
     import type {
         SubTaskWithImagesGET,
@@ -50,13 +52,37 @@
 </svelte:head>
 
 {#await loadPromise}
-    <p>Loading subtask...</p>
+    <div
+        class="flex h-full items-center-safe justify-center overflow-y-auto p-4"
+    >
+        <InlineLoading
+            class="w-auto"
+            status="active"
+            description="Loading task…"
+        />
+    </div>
 {:then}
     {#if task && subTask}
         <TaskMain {task} {subTask} {subTaskIndex} />
     {:else}
-        <p>Error: Task or subtask not found in store</p>
+        <div
+            class="flex h-full items-center-safe justify-center overflow-y-auto p-4"
+        >
+            <InlineNotification
+                class="max-w-112 break-words"
+                title="Task failed to load"
+                subtitle="Task or sub-task not found."
+            />
+        </div>
     {/if}
 {:catch e}
-    <p>Error: {e?.message ?? String(e)}</p>
+    <div
+        class="flex h-full items-center-safe justify-center overflow-y-auto p-4"
+    >
+        <InlineNotification
+            class="max-w-112 break-words"
+            title="Task failed to load"
+            subtitle={e?.message ?? String(e)}
+        />
+    </div>
 {/await}

@@ -1,4 +1,4 @@
-import type { GlobalContext } from "$lib/data/globalContext.svelte";
+import type { SegmentationContext } from "./segmentationContext.svelte";
 import type {
     SegmentationDataRepresentation,
     SegmentationDataType,
@@ -83,8 +83,25 @@ function copyMaskData(
     }
 }
 
+/** Copies a segmentation into a new one. The header shows progress meanwhile; a failure becomes the section notice. */
 export async function duplicate(
-    globalContext: GlobalContext,
+    segmentationContext: SegmentationContext,
+    ...args: Parameters<typeof postCopy>
+) {
+    segmentationContext.failed = null;
+    segmentationContext.busy = "Duplicating…";
+    try {
+        return await postCopy(...args);
+    } catch (err) {
+        console.error(err);
+        segmentationContext.failed = "Couldn't duplicate the segmentation";
+        return undefined;
+    } finally {
+        segmentationContext.busy = null;
+    }
+}
+
+async function postCopy(
     segmentation: SegmentationGET | ModelSegmentationGET,
     segmentationItem: SegmentationItem,
     image: AbstractImage,
@@ -95,8 +112,6 @@ export async function duplicate(
     newThreshold: number,
     taskContext?: TaskContext,
 ) {
-    globalContext.dialogue = `Duplicating segmentation ${segmentation.id}...`;
-
     let data_representation: SegmentationDataRepresentation;
     if (
         segmentation.data_representation == "MultiClass" ||
@@ -170,6 +185,5 @@ export async function duplicate(
     }
     const newSegmentation = await createSegmentation(item, array);
 
-    globalContext.dialogue = null;
     return newSegmentation;
 }

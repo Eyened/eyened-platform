@@ -6,6 +6,8 @@
         fetchInstance,
         fetchSegmentation,
     } from "$lib/data/api";
+    import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import ViewerWindowLoader from "$lib/viewer-window/ViewerWindowLoader.svelte";
 
     function getURLStrings(param: string): string[] {
@@ -102,9 +104,25 @@
     <title>Eyened viewer</title>
 </svelte:head>
 {#await instanceIDsPromise}
-    <div>Loading:</div>
+    <div
+        class="flex h-full items-center-safe justify-center overflow-y-auto p-4"
+    >
+        <InlineLoading
+            class="w-auto"
+            status="active"
+            description="Loading images…"
+        />
+    </div>
 {:then instanceIDs}
     <ViewerWindowLoader {instanceIDs} />
 {:catch error}
-    <div>Error: {error.message}</div>
+    <div
+        class="flex h-full items-center-safe justify-center overflow-y-auto p-4"
+    >
+        <InlineNotification
+            class="max-w-112 break-words"
+            title="Viewer failed to load"
+            subtitle={error.message}
+        />
+    </div>
 {/await}

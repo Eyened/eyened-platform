@@ -32,7 +32,7 @@ vi.mock("$lib/data/api", async (original) => ({
     }),
 }));
 
-// Creating shows the app's progress dialog, which takes focus and drops it when it closes.
+// A slow save, so the header shows its progress in New's place while it runs.
 vi.mock(
     "$lib/viewer-window/panelSegmentation/createSegmentationHelpers",
     async (original) => ({
@@ -41,12 +41,6 @@ vi.mock(
         >()),
         createQuestionableSegmentation: vi.fn(async () => {
             await new Promise((r) => setTimeout(r, 20));
-            const progress = document.createElement("div");
-            progress.tabIndex = -1;
-            document.body.append(progress);
-            progress.focus();
-            await new Promise((r) => setTimeout(r, 20));
-            progress.remove();
         }),
     }),
 );
@@ -63,6 +57,7 @@ afterEach(() => {
     segmentations.clear();
     modelSegmentations.clear();
     localStorage.clear();
+    features.clear();
 });
 
 function seed() {
@@ -170,7 +165,7 @@ describe("SegmentationsSection", () => {
         );
     });
 
-    it("an image without segmentations shows the next step; it opens New with focus in the search", async () => {
+    it("an image without segmentations shows the next step; it opens New with focus in the feature combo box", async () => {
         renderSection();
         const empty = screen
             .getByText("No segmentations")
@@ -180,8 +175,8 @@ describe("SegmentationsSection", () => {
         await fireEvent.click(
             within(empty).getByRole("button", { name: "New segmentation" }),
         );
-        const search = await screen.findByRole("textbox", {
-            name: "Search feature to create",
+        const search = await screen.findByRole("combobox", {
+            name: "Feature",
         });
         await vi.waitFor(() => expect(search).toHaveFocus());
         expect(
@@ -192,6 +187,56 @@ describe("SegmentationsSection", () => {
         ).toBeInTheDocument();
     });
 
+    it("Advanced: Multi-class drops a feature without subfeatures, offers only those with, and locks Placement to Full image", async () => {
+        features.set(1, {
+            id: 1,
+            name: "Artery / vein",
+            subfeatures: [{ id: 2, name: "Artery" }],
+        } as never);
+        features.set(3, { id: 3, name: "Drusen" } as never);
+        renderSection();
+        const empty = screen
+            .getByText("No segmentations")
+            .closest('[data-slot="empty"]') as HTMLElement;
+        await fireEvent.click(
+            within(empty).getByRole("button", { name: "New segmentation" }),
+        );
+        await fireEvent.click(
+            await screen.findByRole("button", { name: "Advanced…" }),
+        );
+        const dialog = await screen.findByRole("dialog", {
+            name: "New segmentation",
+        });
+        const feature = within(dialog).getByRole("combobox", {
+            name: "Feature",
+        });
+        await fireEvent.input(feature, { target: { value: "Dru" } });
+        await screen.findByRole("option", { name: "Drusen" });
+        await fireEvent.keyDown(feature, { key: "ArrowDown" });
+        await fireEvent.keyDown(feature, { key: "Enter" });
+        expect(feature).toHaveValue("Drusen");
+        await fireEvent.click(
+            within(dialog).getByRole("radio", { name: "Region box" }),
+        );
+
+        await fireEvent.click(
+            within(dialog).getByRole("radio", { name: "Multi-class" }),
+        );
+
+        expect(feature).toHaveValue("");
+        const full = within(dialog).getByRole("radio", { name: "Full image" });
+        expect(full).toBeChecked();
+        expect(full).toBeDisabled();
+        expect(
+            within(dialog).getByRole("radio", { name: "Region box" }),
+        ).toBeDisabled();
+        await fireEvent.input(feature, { target: { value: "r" } });
+        expect(
+            await screen.findByRole("option", { name: "Artery / vein" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("option", { name: "Drusen" })).toBeNull();
+    });
+
     it("closing the popover opened from the empty state returns focus to the header New", async () => {
         renderSection();
         const empty = screen
@@ -200,15 +245,15 @@ describe("SegmentationsSection", () => {
         await fireEvent.click(
             within(empty).getByRole("button", { name: "New segmentation" }),
         );
-        const search = await screen.findByRole("textbox", {
-            name: "Search feature to create",
+        const search = await screen.findByRole("combobox", {
+            name: "Feature",
         });
         await vi.waitFor(() => expect(search).toHaveFocus());
         await fireEvent.keyDown(search, { key: "Escape" });
         await vi.waitFor(() =>
             expect(
-                screen.queryByRole("textbox", {
-                    name: "Search feature to create",
+                screen.queryByRole("combobox", {
+                    name: "Feature",
                 }),
             ).toBeNull(),
         );
@@ -227,18 +272,21 @@ describe("SegmentationsSection", () => {
         await fireEvent.click(
             within(empty).getByRole("button", { name: "New segmentation" }),
         );
-        const search = await screen.findByRole("textbox", {
-            name: "Search feature to create",
+        const search = await screen.findByRole("combobox", {
+            name: "Feature",
         });
         await fireEvent.input(search, { target: { value: "Dru" } });
-        await fireEvent.click(
-            await screen.findByRole("button", { name: "Drusen" }),
-        );
-        const header = screen
-            .getAllByRole("button", { name: "New segmentation" })
-            .find((b) => !empty.contains(b));
+        await screen.findByRole("option", { name: "Drusen" });
+        await fireEvent.keyDown(search, { key: "ArrowDown" });
+        await fireEvent.keyDown(search, { key: "Enter" });
         await vi.mocked(createQuestionableSegmentation).mock.results[0]!.value;
-        await vi.waitFor(() => expect(header).toHaveFocus());
-        features.clear();
+        // New is replaced by the progress while the save runs, so look the button up again.
+        await vi.waitFor(() =>
+            expect(
+                screen
+                    .getAllByRole("button", { name: "New segmentation" })
+                    .find((b) => !empty.contains(b)),
+            ).toHaveFocus(),
+        );
     });
 });

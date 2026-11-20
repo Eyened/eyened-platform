@@ -3,15 +3,10 @@
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { Toaster } from "$lib/components/ui/sonner";
     import { GlobalContext } from "$lib/data/globalContext.svelte";
-    import Dialogue from "$lib/Dialogue.svelte";
     import { setContext, type Snippet } from "svelte";
     import "../app.css";
 
     let { children }: { children: Snippet } = $props();
-
-    function closeDialogue() {
-        globalContext.dialogue = null;
-    }
 
     const globalContext = new GlobalContext();
 
@@ -19,10 +14,6 @@
 
     const init = globalContext.init(page.url.pathname);
 </script>
-
-{#if globalContext.dialogue}
-    <Dialogue content={globalContext.dialogue} close={closeDialogue} />
-{/if}
 
 {#await init then _}
     {@render children()}

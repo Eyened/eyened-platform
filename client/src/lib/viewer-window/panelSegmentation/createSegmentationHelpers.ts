@@ -6,7 +6,6 @@ import type {
     SegmentationDataType,
 } from "../../../types/openapi_types";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
-import { toast } from "svelte-sonner";
 import type {
     Segmentation,
     SegmentationContext,
@@ -81,7 +80,7 @@ export async function createQuestionableSegmentation(
     subtaskId?: number,
 ) {
     const creatorId = globalContext.user.id;
-    await runCreate(globalContext, segmentationContext, async () => {
+    await runCreate(async () => {
         const segmentation = await createSegmentationFrom(
             image,
             feature.id,
@@ -126,7 +125,6 @@ export async function createSegmentationFromDialog(
 
     if (isMultiSegmentationType(type)) {
         await createMultiFeatureSegmentation(
-            globalContext,
             segmentationContext,
             image,
             axis,
@@ -150,7 +148,7 @@ export async function createSegmentationFromDialog(
         };
     }
 
-    await runCreate(globalContext, segmentationContext, async () => {
+    await runCreate(async () => {
         const segmentation = await createSegmentationFrom(
             image,
             feature.id,
@@ -166,7 +164,6 @@ export async function createSegmentationFromDialog(
 }
 
 export async function createMultiFeatureSegmentation(
-    globalContext: GlobalContext,
     segmentationContext: SegmentationContext,
     image: AbstractImage,
     axis: number,
@@ -174,7 +171,7 @@ export async function createMultiFeatureSegmentation(
     dataRepresentation: "MultiLabel" | "MultiClass",
     creatorId: number,
 ) {
-    await runCreate(globalContext, segmentationContext, async () => {
+    await runCreate(async () => {
         const segmentation = await createSegmentationFrom(
             image,
             featureId,
@@ -187,22 +184,13 @@ export async function createMultiFeatureSegmentation(
     });
 }
 
-async function runCreate(
-    globalContext: GlobalContext,
-    segmentationContext: SegmentationContext,
-    fn: () => Promise<void>,
-) {
-    globalContext.dialogue = `Creating annotation...`;
+// Callers show the failure: the section notice for a quick create, the modal's error for Advanced.
+async function runCreate(fn: () => Promise<void>) {
     try {
         await fn();
     } catch (err) {
         console.error(err);
-        toast.error(
-            err instanceof Error ? err.message : "Could not create annotation",
-        );
         throw err;
-    } finally {
-        globalContext.dialogue = null;
     }
 }
 
