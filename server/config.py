@@ -76,15 +76,17 @@ class OIDCSettings(BaseSettings):
 
 @dataclass(frozen=True)
 class OIDCMetadata:
+    issuer: str
     authorization_endpoint: str
     token_endpoint: str
     jwks_uri: str
+    userinfo_endpoint: str
 
 
 @lru_cache
 def get_oidc_metadata(metadata_url: str) -> OIDCMetadata:
     """Fetch OIDC provider metadata and validate its required endpoints."""
-    return validate_oidc_metadata(_fetch_oidc_metadata(metadata_url))
+    return validate_oidc_metadata(_fetch_oidc_metadata(metadata_url), metadata_url)
 
 
 def _fetch_oidc_metadata(metadata_url: str) -> dict:
@@ -106,16 +108,22 @@ def _fetch_oidc_metadata(metadata_url: str) -> dict:
     return metadata
 
 
-def validate_oidc_metadata(metadata: dict) -> OIDCMetadata:
+def validate_oidc_metadata(metadata: dict, metadata_url: str) -> OIDCMetadata:
     """Validate the OIDC metadata fields used by the authentication flow."""
-    for key in ["authorization_endpoint", "token_endpoint", "jwks_uri"]:
+    for key in ["issuer", "authorization_endpoint", "token_endpoint", "jwks_uri", "userinfo_endpoint"]:
         if key not in metadata:
             raise ValueError(f"OIDC metadata URL response is missing required key '{key}'")
 
+    # OIDC Discovery 4.3: the issuer must be identical to the URL it was read from.
+    if metadata["issuer"] + "/.well-known/openid-configuration" != metadata_url:
+        raise ValueError("OIDC metadata issuer does not match the metadata URL")
+
     return OIDCMetadata(
+        issuer=metadata["issuer"],
         authorization_endpoint=metadata["authorization_endpoint"],
         token_endpoint=metadata["token_endpoint"],
         jwks_uri=metadata["jwks_uri"],
+        userinfo_endpoint=metadata["userinfo_endpoint"],
     )
 
 

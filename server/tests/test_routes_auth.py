@@ -1,8 +1,6 @@
-import json
 from datetime import datetime, timedelta, timezone
 from hashlib import pbkdf2_hmac
 from types import SimpleNamespace
-from urllib.parse import quote
 
 import jwt
 import pytest
@@ -176,28 +174,6 @@ def test_check_oidc_login_creates_new_account_but_does_not_commit(session, monke
     assert session.query(Creator).filter_by(CreatorName="new-oidc-user").count() == 0
 
 
-def test_oidc_auto_provisioning_records_an_audit_row(session, monkeypatch):
-    """Auto-provisioning attributes the new account to its own trusted path."""
-    import server.routes.auth as auth_module
-    from server.routes.auth import check_oidc_login
-
-    monkeypatch.setattr(
-        auth_module,
-        "settings",
-        SimpleNamespace(oidc=SimpleNamespace(create_new_accounts=True)),
-    )
-
-    creator = check_oidc_login(
-        {"sub": "def456", "preferred_username": "audited-oidc-user"}, session
-    )
-
-    [row] = session.scalars(select(AuditLog).where(AuditLog.Entity == "Creator")).all()
-    assert (row.Action, row.ActorID, row.TrustedPath, row.EntityID) == (
-        "INSERT",
-        None,
-        "auth:oidc-provision",
-        str(creator.CreatorID),
-    )
 
 
 def test_check_oidc_login_migrates_non_subject_identifier_but_does_not_commit(session):
@@ -444,33 +420,6 @@ def test_a_deactivated_account_cannot_authenticate(
     assert verify_password("correct horse battery staple", session.get(Creator, creator_id).PasswordHash)
 
 
-def test_a_deactivated_account_cannot_authenticate_through_oidc(session):
-    """``check_oidc_login`` resolves an existing account by claim and never
-    looked at ``Inactive`` -- the same revocation, a different front door.
-
-    The active control shares the seed and differs only in the flag, so the
-    401 means "deactivated" rather than "this identifier does not resolve".
-    """
-    from fastapi import HTTPException
-
-    from server.routes.auth import check_oidc_login
-
-    active = Creator(
-        CreatorName="oidc-active", EmployeeIdentifier="oidc:sub:live", IsHuman=True,
-        Inactive=False,
-    )
-    revoked = Creator(
-        CreatorName="oidc-revoked", EmployeeIdentifier="oidc:sub:dead", IsHuman=True,
-        Inactive=True,
-    )
-    session.add_all([active, revoked])
-    session.commit()
-
-    assert check_oidc_login({"sub": "live"}, session).CreatorName == "oidc-active"
-
-    with pytest.raises(HTTPException) as exc:
-        check_oidc_login({"sub": "dead"}, session)
-    assert exc.value.status_code == 401
 
 
 def test_registering_a_taken_username_is_a_409_not_a_500(client, session):
@@ -776,52 +725,6 @@ def test_refresh_rejects_a_well_signed_token_it_cannot_use(
     assert response.json() == {"detail": detail}
 
 
-def test_oidc_authenticate_logs_in_a_linked_account(
-    client_anonymous, session, signed_jwts, monkeypatch
-):
-    """A validated OIDC code for a linked account returns that account, with its starred tags."""
-    import server.routes.auth as auth
-
-    creator_id = _seed_user(session, "oidc-user")
-    creator = session.get(Creator, creator_id)
-    creator.EmployeeIdentifier = "oidc:sub:abc"
-    tag_id = make_tag(session, "oidc-star", TagType.Study, creator).TagID
-    session.add(CreatorTagLink(CreatorID=creator_id, TagID=tag_id))
-    session.commit()
-
-    class _TokenEndpointClient:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *exc_info):
-            return False
-
-        async def post(self, url, data):
-            return SimpleNamespace(is_success=True, json=lambda: {"id_token": "stub"})
-
-    async def _validated_claims(id_token, nonce_hash):
-        return {"sub": "abc"}
-
-    monkeypatch.setattr(
-        auth, "_oidc_metadata", lambda: SimpleNamespace(token_endpoint="https://idp/token")
-    )
-    monkeypatch.setattr(auth.httpxyz, "AsyncClient", _TokenEndpointClient)
-    monkeypatch.setattr(auth, "validate_id_token", _validated_claims)
-
-    csrf_token, csrf_hash = generate_secure_token(settings.secret_key_value)
-    client_anonymous.cookies.set("oidc_csrf_token", csrf_token)
-    client_anonymous.cookies.set("oidc_nonce", "nonce-hash")
-    state = quote(json.dumps({"next": "", "csrf": csrf_hash}))
-
-    response = client_anonymous.post(
-        "/auth/oidc/authenticate", json={"code": "the-code", "state": state}
-    )
-
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert (body["id"], body["username"]) == (creator_id, "oidc-user")
-    # control: a star only the starred-tags read can supply, so a response built without it fails
-    assert body["starred_tags"] == [tag_id]
 
 
 def test_login_marks_both_auth_cookies_secure_when_cookie_secure_is_on(

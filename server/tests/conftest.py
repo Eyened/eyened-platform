@@ -410,3 +410,49 @@ def signed_jwts(monkeypatch):
         "secret_key_value",
         property(lambda self: "test-secret-key-0123456789abcdef"),
     )
+
+
+@pytest.fixture()
+def oidc_provider(monkeypatch, signed_jwts):
+    """A SURFconext-shaped fake OIDC provider behind the server's HTTP clients.
+
+    OIDC login is on and points at it. Change its attributes to shape a login,
+    and use ``oidc_settings`` to change an OIDC setting.
+    """
+    import httpxyz
+
+    from server.config import get_oidc_metadata
+    from server.tests.fake_oidc_provider import FakeOidcProvider
+
+    provider = FakeOidcProvider()
+    _patch_oidc_settings(monkeypatch)
+    monkeypatch.setattr(httpxyz, "Client", provider.sync_client)
+    monkeypatch.setattr(httpxyz, "AsyncClient", provider.async_client)
+    get_oidc_metadata.cache_clear()
+    yield provider
+    get_oidc_metadata.cache_clear()
+
+
+@pytest.fixture()
+def oidc_settings(oidc_provider, monkeypatch):
+    """Call with OIDC setting fields, e.g. ``oidc_settings(create_new_accounts=True)``."""
+    return lambda **fields: _patch_oidc_settings(monkeypatch, **fields)
+
+
+def _patch_oidc_settings(monkeypatch, **fields):
+    import server.routes.auth as auth
+    from server.config import settings
+    from server.tests.fake_oidc_provider import CLIENT_ID, DISCOVERY_URL
+
+    oidc = settings.oidc.model_copy(
+        update={
+            "client_id": CLIENT_ID,
+            "metadata_url": DISCOVERY_URL,
+            "redirect_url": "https://eyened.test/users/oidc-callback",
+            **fields,
+        }
+    )
+    # Settings is frozen: replace the module's object rather than patch a field.
+    monkeypatch.setattr(
+        auth, "settings", settings.model_copy(update={"auth_oidc_enabled": True, "oidc": oidc})
+    )

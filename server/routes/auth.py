@@ -496,6 +496,7 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
             key=public_key,
             algorithms=["RS256"],
             audience=settings.oidc.client_id,
+            issuer=_oidc_metadata().issuer,
         )
     except jwt.InvalidTokenError as err:
         logger.warning(f"Error while decoding ID Token: {err}")
@@ -528,12 +529,31 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
     return claims
 
 
+async def get_oidc_userinfo(access_token: str | None, sub: str) -> dict[str, Any]:
+    """The userinfo claims for a validated ID token's ``sub``."""
+    async with httpxyz.AsyncClient() as client:
+        response = await client.get(
+            _oidc_metadata().userinfo_endpoint,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    if not response.is_success:
+        logger.error(f"OIDC userinfo retrieval failed, endpoint returned status code {response.status_code}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Userinfo request failed")
+
+    userinfo = response.json()
+    # OIDC Core 5.3.2: the userinfo sub must exactly match the ID token's.
+    if userinfo.get("sub") != sub:
+        logger.warning("OIDC userinfo 'sub' does not match the ID token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Userinfo validation failed")
+    return userinfo
+
+
 def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
     """
     Find or create the creator matching the OIDC claims.
 
     Args:
-        id_claims (dict[str, str]): claims from OIDC ID token
+        id_claims (dict[str, str]): the ID token claims, with the userinfo claims merged under them
         session (Session): database session
     """
     creator = None
@@ -655,6 +675,7 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
         logger.warning(f"No OIDC nonce found in cookie")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nonce validation failed")
     claims = await validate_id_token(id_token, oidc_nonce)
+    claims = {**await get_oidc_userinfo(token_data.get("access_token"), claims["sub"]), **claims}
 
     # Check claims with Creator database
     creator = check_oidc_login(claims, session)
