@@ -35,8 +35,8 @@ export function bindEtdrsTool(args: {
     dispose: () => void;
     sync: (formData: unknown) => void;
 } {
-    // This tool's own last write, so its echo from the store is not taken back mid-drag.
-    let lastWritten: unknown;
+    // Every write of this tool, so a saved write coming back from the store is not taken back mid-drag.
+    const written = new WeakSet<object>();
     const write = (points: PointList, persist: boolean) => {
         const grid = formAnnotations.get(args.gridId);
         if (!grid) return;
@@ -46,7 +46,7 @@ export function bindEtdrsTool(args: {
             if (point == null) delete data[slot];
             else data[slot] = point;
         });
-        lastWritten = data;
+        written.add(data);
         formAnnotations.set(args.gridId, { ...grid, form_data: data });
         if (persist) void setFormAnnotationValue(args.gridId, data);
     };
@@ -72,7 +72,7 @@ export function bindEtdrsTool(args: {
             before = next;
             write(next, false);
         },
-        // onChange may have adjusted the points for Keep grid size, so save the tool's own.
+        // Saving the tool's own points is defensive; they already hold any Keep grid size adjustment.
         onPersist: () => write(tool.points, true),
     });
     tool.points = before;
@@ -85,7 +85,12 @@ export function bindEtdrsTool(args: {
         },
         // Another viewport's edit of this grid, so this tool's next edit starts from it.
         sync: (formData) => {
-            if (formData === lastWritten) return;
+            if (
+                typeof formData === "object" &&
+                formData !== null &&
+                written.has(formData)
+            )
+                return;
             before = landmarksOf(formData);
             tool.points = before;
         },

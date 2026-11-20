@@ -94,4 +94,39 @@ describe("bindEtdrsTool", () => {
             disc_edge: { x: 200, y: 200 },
         });
     });
+
+    it("an earlier save resolving mid-click does not take back the click being made", () => {
+        formAnnotations.set(12, {
+            id: 12,
+            form_data: { fovea: { x: 10, y: 10 }, disc_edge: { x: 40, y: 10 } },
+        } as never);
+        const { tool, sync } = bindEtdrsTool({
+            viewerContext: viewer,
+            gridId: 12,
+            keepSize: () => false,
+        });
+        tool.placementIndex = 0;
+        click(tool, { x: 100, y: 100 });
+        const firstSaved = vi.mocked(setFormAnnotationValue).mock.lastCall![1];
+        tool.placementIndex = 1;
+        const e = {
+            event: { shiftKey: false, button: 0 } as PointerEvent,
+            viewerContext: viewer,
+            cursor: { x: 200, y: 200 },
+        } as unknown as Parameters<PointTool["pointerdown"]>[0];
+        tool.pointerdown(e);
+        // The first save resolves: the store takes the saved data back.
+        const grid = formAnnotations.get(12)!;
+        formAnnotations.set(12, { ...grid, form_data: firstSaved });
+        sync(firstSaved);
+        tool.pointerup(e);
+        expect(formAnnotations.get(12)?.form_data).toMatchObject({
+            fovea: { x: 100, y: 100 },
+            disc_edge: { x: 200, y: 200 },
+        });
+        expect(setFormAnnotationValue).toHaveBeenLastCalledWith(
+            12,
+            expect.objectContaining({ disc_edge: { x: 200, y: 200 } }),
+        );
+    });
 });
