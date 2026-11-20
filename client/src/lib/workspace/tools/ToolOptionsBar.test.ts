@@ -149,6 +149,25 @@ describe("ToolOptionsBar", () => {
         ).toBeInTheDocument();
     });
 
+    it("keeps Point's reason it can't act visible while the keyboard cursor is on", () => {
+        const ws = workspaceWith(1);
+        ws.attachViewport(0, {
+            zoomPercent: 100,
+            zoomBy: vi.fn(),
+            reset: vi.fn(),
+            layers: {
+                pointTarget: null,
+                viewerContext: { keyboardCursor: { on: true } },
+            } as never,
+        });
+        ws.arm("point");
+        render(ToolOptionsBar, { context: workspaceContext(ws) });
+        expect(
+            screen.getByText("Make a registration current in Pointsets."),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/^Keyboard cursor/)).toBeNull();
+    });
+
     it("names the selected viewport's target; Undo at an empty history keeps focus", async () => {
         const ws = workspaceWith(1);
         const segmentation = drawViewport(ws, EDITABLE);

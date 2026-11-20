@@ -47,15 +47,16 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
             : "",
     );
     const hint = $derived.by(() => {
+        // Point's reasons it can't act stay visible; the keyboard cursor's keys replace any other hint.
+        if (tool?.id === "point" && !point)
+            return "Make a registration current in Pointsets.";
+        // ASSUMPTION: the spec says only "read-only" for a colleague's registration.
+        if (tool?.id === "point" && !point?.canEdit)
+            return "Another grader's points can't be moved";
         if (layers?.viewerContext.keyboardCursor.on)
             return KEYBOARD_CURSOR_HINT;
         if (!tool) return NO_TOOL_HINT;
-        if (tool.id !== "point") return tool.hint;
-        if (!point) return "Make a registration current in Pointsets.";
-        // ASSUMPTION: the spec says only "read-only" for a colleague's registration.
-        return point.canEdit
-            ? tool.hint
-            : "Another grader's points can't be moved";
+        return tool.hint;
     });
 
     /** Each tool's options, left to right. */
