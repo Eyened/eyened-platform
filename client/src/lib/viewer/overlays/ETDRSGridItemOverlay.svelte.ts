@@ -35,6 +35,40 @@ export type ETDRSGridSource =
     | { kind: "annotation"; id: number }
     | { kind: "snapshot"; data: etdrsGridType };
 
+/** A grid's stored points; either may be missing while it is being placed. */
+export type GridData = { fovea?: Position2D; disc_edge?: Position2D };
+
+/**
+ * ETDRS landmarks are always en-face 2D `(x, y)`. An OCT volume's en-face plane is `${id}_proj`, so map from that node and never through OCTToProj, which remaps `index → y`.
+ * A plain CF id has no proj edge and stays as is.
+ */
+function enfaceSourceId(registration: Registration, gridImageId: string): string {
+    if (gridImageId.endsWith("_proj")) return gridImageId;
+    const projId = `${gridImageId}_proj`;
+    return registration.getRegistrationItem(gridImageId, projId)
+        ? projId
+        : gridImageId;
+}
+
+/** A grid's fovea and disc edge in another image's pixels, through registration; null for a point that is missing or doesn't map. */
+export function gridPointsIn(
+    registration: Registration,
+    gridImageId: string,
+    data: GridData | null | undefined,
+    imageId: string,
+): { fovea: Position2D | null; discEdge: Position2D | null } {
+    const source = enfaceSourceId(registration, gridImageId);
+    const map = (p: Position2D | undefined) =>
+        p
+            ? (registration.mapPosition(source, imageId, {
+                  x: p.x,
+                  y: p.y,
+                  index: 0,
+              } as Position) ?? null)
+            : null;
+    return { fovea: map(data?.fovea), discEdge: map(data?.disc_edge) };
+}
+
 export class ETDRSGridItemOverlay implements Overlay {
     lineWidth = 1;
     strokeStyle = "rgba(255,255,255, 1)";
@@ -95,45 +129,21 @@ export class ETDRSGridItemOverlay implements Overlay {
     }
 
     repaint(viewerContext: ViewerContext) {
-        const { image, context2D } = viewerContext;
         const resolved = this.resolveGrid();
         if (!resolved) return;
-
-        const f = resolved.form_data?.fovea;
-        const d = resolved.form_data?.disc_edge;
-        if (!f || !d) return;
-
-        const srcId = this.enfaceSourceId(String(resolved.image_id));
-        const fovea = this.registration.mapPosition(srcId, image.image_id, {
-            x: f.x,
-            y: f.y,
-            index: 0,
-        } as Position);
-        const discEdge = this.registration.mapPosition(srcId, image.image_id, {
-            x: d.x,
-            y: d.y,
-            index: 0,
-        } as Position);
+        const { fovea, discEdge } = gridPointsIn(
+            this.registration,
+            String(resolved.image_id),
+            resolved.form_data,
+            viewerContext.image.image_id,
+        );
         if (!fovea || !discEdge) return;
-
-        this.paint(context2D, viewerContext, fovea, discEdge);
+        this.paint(viewerContext.context2D, viewerContext, fovea, discEdge);
         if (this.source.kind === "snapshot")
-            this.paintAiPoints(context2D, viewerContext, [fovea, discEdge]);
-    }
-
-    /**
-     * ETDRS landmarks are always enface 2D `(x, y)`.
-     * For OCT volumes the enface plane is `${id}_proj` — use that node so we
-     * never go through OCTToProj (which remaps `index → y` and drops enface y).
-     * Plain CF PublicIDs have no proj edge and stay as-is (do *not* append `_proj`).
-     */
-    private enfaceSourceId(annotationImageId: string): string {
-        if (annotationImageId.endsWith("_proj")) return annotationImageId;
-        const projId = `${annotationImageId}_proj`;
-        if (this.registration.getRegistrationItem(annotationImageId, projId)) {
-            return projId;
-        }
-        return annotationImageId;
+            this.paintAiPoints(viewerContext.context2D, viewerContext, [
+                fovea,
+                discEdge,
+            ]);
     }
 
     private paint(
