@@ -120,7 +120,7 @@
         class="flex h-full items-center-safe justify-center overflow-y-auto p-4"
     >
         <InlineNotification
-            class="max-w-md break-words"
+            class="max-w-112 break-words"
             title="Viewer failed to load"
             subtitle={error.message}
         />

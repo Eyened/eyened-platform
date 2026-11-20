@@ -183,7 +183,7 @@ Without WebGL 2, or once the browser drops the context, a notice takes the windo
         class="relative flex h-full items-center-safe justify-center overflow-y-auto p-4"
     >
         <div
-            class="max-w-md flex min-w-0 flex-col items-start gap-4 break-words"
+            class="flex max-w-112 min-w-0 flex-col items-start gap-4 break-words"
         >
             {#if failure === "lost"}
                 <InlineNotification
