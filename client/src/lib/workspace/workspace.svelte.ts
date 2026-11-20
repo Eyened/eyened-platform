@@ -413,7 +413,8 @@ export class Workspace {
     /** `[` `]` with the ETDRS circle: the next size, stopping at C0 and O2. */
     stepCircle(delta: 1 | -1): void {
         const i = CIRCLE_SIZES.indexOf(this.circleSize) + delta;
-        if (i >= 0 && i < CIRCLE_SIZES.length) this.circleSize = CIRCLE_SIZES[i];
+        if (i >= 0 && i < CIRCLE_SIZES.length)
+            this.circleSize = CIRCLE_SIZES[i];
     }
 
     resetDrawToggles(): void {
