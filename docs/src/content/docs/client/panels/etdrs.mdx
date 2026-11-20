@@ -13,14 +13,9 @@ The **ETDRS** panel lets you place, review, and persist ETDRS grid coordinates o
 
 The ETDRS panel is available when the current image is **2D enface** (not a volume or OCT stack). If the panel is missing, your deployment may not have the ETDRS form schema configured — contact your administrator.
 
-### Automatic vs manual grids
+### AI grid and your grids
 
-| Source | Editable | Saved to database |
-|--------|----------|-------------------|
-| **Automatic** — AI-detected landmarks | No (read-only overlay) | Already stored on the image |
-| **Manual** — your annotation | Yes (edit tool) | Yes, when you save |
-
-When AI keypoints are present, the panel shows an **Automatic** row. Toggle it to preview the grid. To persist your own coordinates, click **Create new**, then use the edit tool.
+When AI keypoints are present, the list starts with an **AI grid** row. It is a read-only preview. Your own grids are saved when you release a point.
 
 ### Workflow
 
