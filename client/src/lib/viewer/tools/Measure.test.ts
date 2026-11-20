@@ -86,6 +86,21 @@ describe("MeasureTool", () => {
         tool.keydown(key(v, { x: 0, y: 0 }, "Backspace"));
         expect(lines.lines).toHaveLength(0);
     });
+
+    it("a click after the lines were removed without a pointer move starts a new line", () => {
+        const lines = new DistanceLines();
+        const old = new Line({ x: 0, y: 0 }, { x: 30, y: 40 }, 0);
+        lines.add(old);
+        const tool = new MeasureTool(lines, () => null, () => true);
+        const v = viewer();
+        tool.pointermove(pointer(v, { x: 30, y: 40 }));
+        lines.remove(old);
+        tool.pointerdown(pointer(v, { x: 30, y: 40 }));
+        expect(lines.lines).toHaveLength(1);
+        expect(lines.lines[0]).not.toBe(old);
+        expect(lines.drawing).toBe(lines.lines[0]);
+        expect(lines.current).not.toBe(old);
+    });
 });
 
 describe("lengthText", () => {

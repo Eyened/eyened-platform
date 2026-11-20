@@ -47,9 +47,14 @@ export class MeasureTool implements Overlay {
             this.store.drawing = undefined;
             return;
         }
-        if (this.hover) {
-            this.dragging = this.hover.point;
-            this.store.current = this.hover.line;
+        // The hover is refreshed on pointermove only, so its line may be gone.
+        const hover =
+            this.hover && this.store.lines.includes(this.hover.line)
+                ? this.hover
+                : undefined;
+        if (hover) {
+            this.dragging = hover.point;
+            this.store.current = hover.line;
             return;
         }
         const line = new Line(
