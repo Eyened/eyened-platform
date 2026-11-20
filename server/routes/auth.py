@@ -131,6 +131,28 @@ def create_refresh_token(user_id: int) -> str:
     )
 
 
+def _set_session_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """Set the access and refresh cookies, the same for every way of logging in."""
+    response.set_cookie(
+        key=settings.jwt_cookie_name,
+        value=access_token,
+        httponly=True,
+        max_age=settings.access_token_expire_minutes * 60,
+        secure=settings.cookie_secure,
+        samesite="strict",
+        path="/",
+    )
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=refresh_token,
+        httponly=True,
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
+        secure=settings.cookie_secure,
+        samesite="strict",
+        path="/",
+    )
+
+
 def _try_decode_token(token: str) -> dict | None:
     """Decode JWT safely; return None when invalid."""
     try:
@@ -207,25 +229,7 @@ def login(
         }
 
     # Otherwise, set cookies (existing behavior)
-    response.set_cookie(
-        key=settings.jwt_cookie_name,
-        value=access_token,
-        httponly=True,
-        max_age=settings.access_token_expire_minutes * 60,
-        secure=settings.cookie_secure,
-        samesite="strict",
-        path="/",
-    )
-
-    response.set_cookie(
-        key=settings.refresh_cookie_name,
-        value=refresh_token,
-        httponly=True,
-        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
-        secure=settings.cookie_secure,
-        samesite="strict",
-        path="/",
-    )
+    _set_session_cookies(response, access_token, refresh_token)
 
     return _user_response(creator, auth_service)
 
@@ -320,27 +324,7 @@ def refresh_token(
         # Create NEW refresh token (extends session for active users)
         new_refresh_token = create_refresh_token(creator.CreatorID)
 
-        # Update access token cookie
-        response.set_cookie(
-            key=settings.jwt_cookie_name,
-            value=new_access_token,
-            httponly=True,
-            max_age=settings.access_token_expire_minutes * 60,
-            secure=settings.cookie_secure,
-            samesite="strict",
-            path="/",
-        )
-
-        # Update refresh token cookie (extends session)
-        response.set_cookie(
-            key=settings.refresh_cookie_name,
-            value=new_refresh_token,
-            httponly=True,
-            max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
-            secure=settings.cookie_secure,
-            samesite="strict",
-            path="/",
-        )
+        _set_session_cookies(response, new_access_token, new_refresh_token)
 
         return _user_response(creator, auth_service)
 
@@ -668,23 +652,6 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
     access_token = create_access_token(creator.CreatorID, creator.CreatorName)
     refresh_token = create_refresh_token(creator.CreatorID)
 
-    response.set_cookie(
-        key=settings.jwt_cookie_name,
-        value=access_token,
-        httponly=True,
-        max_age=settings.access_token_expire_minutes * 60,
-        secure=settings.cookie_secure,
-        samesite="strict",
-        path="/",
-    )
-    response.set_cookie(
-        key=settings.refresh_cookie_name,
-        value=refresh_token,
-        httponly=True,
-        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
-        secure=settings.cookie_secure,
-        samesite="strict",
-        path="/",
-    )
+    _set_session_cookies(response, access_token, refresh_token)
 
     return _user_response(creator, auth_service)
