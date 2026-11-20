@@ -137,7 +137,7 @@ services:
       EYENED_STORAGE_ROOT: /storage
       # Empty keeps local mode off; see compose.storage.example.yaml.
       EYENED_STORAGE_MOUNTS: ${EYENED_STORAGE_MOUNTS:-}
-      # OIDC. The three URLs must change together; see keycloak/README.md.
+      # OIDC. The three URLs must change together.
       EYENED_API_AUTH_OIDC_ENABLED: ${EYENED_API_AUTH_OIDC_ENABLED:-false}
       EYENED_OIDC_CLIENT_ID: ${EYENED_OIDC_CLIENT_ID:-}
       EYENED_OIDC_CLIENT_SECRET: ${EYENED_OIDC_CLIENT_SECRET:-}
@@ -157,7 +157,6 @@ services:
       init:
         condition: service_completed_successfully
     healthcheck:
-      # 127.0.0.1, not localhost: the oidc layer can alias localhost to the host gateway.
       test:
         - CMD
         - python
