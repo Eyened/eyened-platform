@@ -13,6 +13,7 @@
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { instances } from "$lib/data/stores.svelte";
     import { resolveEnfaceOverlaySources } from "$lib/registration/resolveEnfaceOverlaySources";
+    import { EtdrsCircleOverlay } from "$lib/viewer/overlays/EtdrsCircleOverlay";
     import { EnfaceProjectionOverlay } from "$lib/viewer/overlays/EnfaceProjectionOverlay";
     import { instanceIdFromImageId } from "./viewerViewState";
     import { getContext, onDestroy, setContext, untrack } from "svelte";
@@ -148,6 +149,20 @@
             ),
         ),
     );
+
+    // The ETDRS circle follows the shared pointer in every viewport, each sized with its own image's scale.
+    $effect(() => {
+        if (workspace.armedTool !== "circle") return;
+        return untrack(() =>
+            viewerContext.addOverlay(
+                new EtdrsCircleOverlay(
+                    viewerWindowContext.registration,
+                    () => workspace.circleSize,
+                    () => scale,
+                ),
+            ),
+        );
+    });
 
     // While mounted, this viewport is a source for its OCT's projection; the newest one wins.
     const position = getContext<(() => number) | undefined>("viewportPosition");
