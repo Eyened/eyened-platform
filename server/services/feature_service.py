@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from eyened_orm import Feature
 from eyened_orm.repositories.feature_repository import FeatureRepository
+from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -49,6 +50,7 @@ class FeatureService:
         self, name: str, subfeature_ids: list[int] | None
     ) -> Feature:
         """Create a feature and set its subfeature links."""
+        self.scope.require_in_any_project(ProjectRole.grader, entity="Feature")
         feature = Feature(FeatureName=name)
         self.repository.add(feature)
         self.repository.replace_subfeatures(feature.FeatureID, subfeature_ids)
@@ -69,6 +71,9 @@ class FeatureService:
         Raises:
             NotFoundError: If the feature does not exist.
         """
+        self.scope.require_in_any_project(
+            ProjectRole.grader, entity="Feature", entity_id=feature_id
+        )
         feature = self.repository.get_by_id(feature_id)
         if feature is None:
             raise NotFoundError(f"Feature {feature_id} not found")
@@ -99,6 +104,9 @@ class FeatureService:
             ConflictError: If segmentations reference it (FEATURE_HAS_SEGMENTATIONS)
                 or it is a child of another feature (FEATURE_IS_CHILD).
         """
+        self.scope.require_in_any_project(
+            ProjectRole.grader, entity="Feature", entity_id=feature_id
+        )
         feature = self.repository.get_by_id(feature_id)
         if feature is None:
             raise NotFoundError(f"Feature {feature_id} not found")

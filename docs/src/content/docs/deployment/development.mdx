@@ -71,7 +71,7 @@ If you need a host port instead — DBeaver, or a host-side alembic — append
 | To skip the login screen while developing | `EYENED_API_PUBLIC_AUTH_DISABLED` | [Accounts and access](#accounts-and-access) |
 | Shared or existing platform storage | `PLATFORM_STORAGE_PATH` | [Storage](#storage) |
 | Image datasets mounted into the stack | `EYENED_STORAGE_MOUNTS` | [Storage](#storage) |
-| OIDC login instead of passwords only | `:compose.oidc.yaml` in `COMPOSE_FILE` | [Optional: OIDC login](#optional-oidc-login) |
+| OIDC login instead of passwords only | `EYENED_API_AUTH_OIDC_ENABLED` and `EYENED_OIDC_*` | [Optional: OIDC login](#optional-oidc-login) |
 | To start from an existing database rather than an empty one | — | [Optional: existing data](#optional-existing-data) |
 | To use an existing MySQL server instead of the bundled one | An empty `COMPOSE_PROFILES`, and `EYENED_DATABASE_*` | [Using an external database](/eyened-platform/deployment/production#using-an-external-database), and the caution under [Migrations](#migrations) |
 
@@ -174,11 +174,7 @@ default case; see `server/scripts/generate_openapi.py --help` for pointing at an
 
 ## Optional: OIDC login
 
-The base stack uses password auth only. To test OpenID Connect locally, append
-`:compose.oidc.yaml` to `COMPOSE_FILE` in `deploy/.env` and set `PUBLIC_HOST`, then
-`docker compose up -d` — see `deploy/keycloak/README.md`.
-
-Set `EYENED_API_AUTH_OIDC_ENABLED=true` and the `EYENED_OIDC_*` vars in `deploy/.env`. Full options: [Authentication](/eyened-platform/guides/authentication).
+The base stack uses password auth only. Set `EYENED_API_AUTH_OIDC_ENABLED=true` and the `EYENED_OIDC_*` vars in `deploy/.env`, then `docker compose up -d`. Full options: [Authentication](/eyened-platform/guides/authentication).
 
 ## Optional: existing data
 

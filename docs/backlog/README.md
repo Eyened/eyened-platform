@@ -12,12 +12,9 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | End existing sessions on a password change or reset | [auth-and-sessions](auth-and-sessions.md) | open |
 | Stop a token outliving `docker compose down -v` or a restore | [auth-and-sessions](auth-and-sessions.md) | open |
 | Make `get_current_user` reject deleted and deactivated accounts | [auth-and-sessions](auth-and-sessions.md) | open |
-| Cap the absolute session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
-| Make "Keep me logged in" change the session lifetime | [auth-and-sessions](auth-and-sessions.md) | open |
 | Fix or delete the `api_client` branch of `POST /auth/login` | [auth-and-sessions](auth-and-sessions.md) | open |
 | Check new passwords against a breached/common-password list | [auth-and-sessions](auth-and-sessions.md) | open |
 | Move OIDC login into `AuthService` and pin the auth cookie attributes | [auth-and-sessions](auth-and-sessions.md) | partial |
-| Read OIDC claims from the userinfo endpoint | [auth-and-sessions](auth-and-sessions.md) | open |
 | Keep admin HTTP writes and reads off non-human Creators | [rbac-admin](rbac-admin.md) | open |
 | Rename `has_credential` on `AdminUserResponse` | [rbac-admin](rbac-admin.md) | open |
 | Build the audit-log read endpoint `GET /admin/audit` | [rbac-admin](rbac-admin.md) | open |
@@ -29,8 +26,6 @@ To add: append the item to the fitting file and add a row below. To close: delet
 | Make the session guards fail on stale allow-list entries | [rbac-authz](rbac-authz.md) | open |
 | Decide whether `AuthService.change_password` keeps its `actor` parameter | [rbac-authz](rbac-authz.md) | open |
 | Decide what `init` does on a schema behind head | [deploy](deploy.md) | open |
-| Reach the bundled Keycloak over the compose network | [deploy](deploy.md) | open |
-| Refuse the `oidc` layer together with the prod layer | [deploy](deploy.md) | open |
 | Build and smoke-test the images CI skips | [deploy](deploy.md) | open |
 | Run the upgrade path end to end once | [deploy](deploy.md) | open |
 | Tidy the slim-down's stale messages | [deploy](deploy.md) | open |

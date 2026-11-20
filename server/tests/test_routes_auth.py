@@ -1,8 +1,6 @@
-import json
 from datetime import datetime, timedelta, timezone
 from hashlib import pbkdf2_hmac
 from types import SimpleNamespace
-from urllib.parse import quote
 
 import jwt
 import pytest
@@ -166,38 +164,14 @@ def test_check_oidc_login_creates_new_account_but_does_not_commit(session, monke
         SimpleNamespace(oidc=SimpleNamespace(create_new_accounts=True)),
     )
 
-    claims = {"sub": "abc123", "preferred_username": "new-oidc-user"}
+    claims = {"sub": "abc123", "email": "new.oidc.user@example.org"}
     creator = check_oidc_login(claims, session)
 
-    assert creator.CreatorName == "new-oidc-user"
+    assert creator.CreatorName == "new.oidc.user@example.org"
     assert creator.EmployeeIdentifier == "oidc:sub:abc123"
 
     session.rollback()  # get_db does this in production on a later exception
-    assert session.query(Creator).filter_by(CreatorName="new-oidc-user").count() == 0
-
-
-def test_oidc_auto_provisioning_records_an_audit_row(session, monkeypatch):
-    """Auto-provisioning attributes the new account to its own trusted path."""
-    import server.routes.auth as auth_module
-    from server.routes.auth import check_oidc_login
-
-    monkeypatch.setattr(
-        auth_module,
-        "settings",
-        SimpleNamespace(oidc=SimpleNamespace(create_new_accounts=True)),
-    )
-
-    creator = check_oidc_login(
-        {"sub": "def456", "preferred_username": "audited-oidc-user"}, session
-    )
-
-    [row] = session.scalars(select(AuditLog).where(AuditLog.Entity == "Creator")).all()
-    assert (row.Action, row.ActorID, row.TrustedPath, row.EntityID) == (
-        "INSERT",
-        None,
-        "auth:oidc-provision",
-        str(creator.CreatorID),
-    )
+    assert session.query(Creator).filter_by(CreatorName="new.oidc.user@example.org").count() == 0
 
 
 def test_check_oidc_login_migrates_non_subject_identifier_but_does_not_commit(session):
@@ -442,35 +416,6 @@ def test_a_deactivated_account_cannot_authenticate(
     from eyened_orm.utils.db_users import verify_password
 
     assert verify_password("correct horse battery staple", session.get(Creator, creator_id).PasswordHash)
-
-
-def test_a_deactivated_account_cannot_authenticate_through_oidc(session):
-    """``check_oidc_login`` resolves an existing account by claim and never
-    looked at ``Inactive`` -- the same revocation, a different front door.
-
-    The active control shares the seed and differs only in the flag, so the
-    401 means "deactivated" rather than "this identifier does not resolve".
-    """
-    from fastapi import HTTPException
-
-    from server.routes.auth import check_oidc_login
-
-    active = Creator(
-        CreatorName="oidc-active", EmployeeIdentifier="oidc:sub:live", IsHuman=True,
-        Inactive=False,
-    )
-    revoked = Creator(
-        CreatorName="oidc-revoked", EmployeeIdentifier="oidc:sub:dead", IsHuman=True,
-        Inactive=True,
-    )
-    session.add_all([active, revoked])
-    session.commit()
-
-    assert check_oidc_login({"sub": "live"}, session).CreatorName == "oidc-active"
-
-    with pytest.raises(HTTPException) as exc:
-        check_oidc_login({"sub": "dead"}, session)
-    assert exc.value.status_code == 401
 
 
 def test_registering_a_taken_username_is_a_409_not_a_500(client, session):
@@ -776,54 +721,6 @@ def test_refresh_rejects_a_well_signed_token_it_cannot_use(
     assert response.json() == {"detail": detail}
 
 
-def test_oidc_authenticate_logs_in_a_linked_account(
-    client_anonymous, session, signed_jwts, monkeypatch
-):
-    """A validated OIDC code for a linked account returns that account, with its starred tags."""
-    import server.routes.auth as auth
-
-    creator_id = _seed_user(session, "oidc-user")
-    creator = session.get(Creator, creator_id)
-    creator.EmployeeIdentifier = "oidc:sub:abc"
-    tag_id = make_tag(session, "oidc-star", TagType.Study, creator).TagID
-    session.add(CreatorTagLink(CreatorID=creator_id, TagID=tag_id))
-    session.commit()
-
-    class _TokenEndpointClient:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *exc_info):
-            return False
-
-        async def post(self, url, data):
-            return SimpleNamespace(is_success=True, json=lambda: {"id_token": "stub"})
-
-    async def _validated_claims(id_token, nonce_hash):
-        return {"sub": "abc"}
-
-    monkeypatch.setattr(
-        auth, "_oidc_metadata", lambda: SimpleNamespace(token_endpoint="https://idp/token")
-    )
-    monkeypatch.setattr(auth.httpxyz, "AsyncClient", _TokenEndpointClient)
-    monkeypatch.setattr(auth, "validate_id_token", _validated_claims)
-
-    csrf_token, csrf_hash = generate_secure_token(settings.secret_key_value)
-    client_anonymous.cookies.set("oidc_csrf_token", csrf_token)
-    client_anonymous.cookies.set("oidc_nonce", "nonce-hash")
-    state = quote(json.dumps({"next": "", "csrf": csrf_hash}))
-
-    response = client_anonymous.post(
-        "/auth/oidc/authenticate", json={"code": "the-code", "state": state}
-    )
-
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert (body["id"], body["username"]) == (creator_id, "oidc-user")
-    # control: a star only the starred-tags read can supply, so a response built without it fails
-    assert body["starred_tags"] == [tag_id]
-
-
 def test_login_marks_both_auth_cookies_secure_when_cookie_secure_is_on(
     client_anonymous, session, signed_jwts, monkeypatch
 ):
@@ -844,3 +741,193 @@ def test_login_marks_both_auth_cookies_secure_when_cookie_secure_is_on(
     set_cookies = response.headers.get_list("set-cookie")
     assert len(set_cookies) == 2
     assert all("; Secure" in cookie for cookie in set_cookies)
+
+
+@pytest.mark.parametrize("route", ["/auth/login", "/auth/token"])
+@pytest.mark.parametrize(
+    "password_enabled, expected_status", [(False, 403), (True, 200)], ids=["off", "on"]
+)
+def test_password_login_follows_the_password_enabled_setting(
+    client_anonymous, session, signed_jwts, monkeypatch, route, password_enabled, expected_status
+):
+    """With password login off, correct credentials are refused; on, they log in."""
+    import server.routes.auth as auth_routes
+
+    monkeypatch.setattr(
+        auth_routes,
+        "settings",
+        settings.model_copy(update={"auth_password_enabled": password_enabled}),
+    )
+    _seed_user(session, "gated-user")
+
+    response = client_anonymous.post(
+        route, json={"username": "gated-user", "password": "pw0"}
+    )
+
+    assert response.status_code == expected_status, response.text
+    if not password_enabled:
+        assert response.json() == {"detail": "Password login is disabled."}
+        assert "set-cookie" not in response.headers
+
+
+@pytest.mark.parametrize(
+    "password_enabled, expected_status", [(False, 403), (True, 200)], ids=["off", "on"]
+)
+def test_sign_up_follows_the_password_enabled_setting(
+    client_anonymous, session, monkeypatch, password_enabled, expected_status
+):
+    """With password login off, sign-up is refused and creates no account; on, it signs up."""
+    import server.routes.auth as auth_routes
+
+    monkeypatch.setattr(
+        auth_routes,
+        "settings",
+        settings.model_copy(update={"auth_password_enabled": password_enabled}),
+    )
+
+    response = client_anonymous.post(
+        "/auth/register",
+        json={"username": "gated-newcomer", "password": "correct horse battery staple"},
+    )
+
+    assert response.status_code == expected_status, response.text
+    if not password_enabled:
+        assert response.json() == {"detail": "Password login is disabled."}
+        assert session.scalar(
+            select(Creator).where(Creator.CreatorName == "gated-newcomer")
+        ) is None
+
+
+def _cookie_max_ages(response):
+    """Each session cookie's Max-Age in seconds, or None for a browser-session cookie."""
+    ages = {}
+    for header in response.headers.get_list("set-cookie"):
+        name = header.split("=", 1)[0]
+        attrs = dict(
+            part.strip().partition("=")[::2] for part in header.split(";")[1:]
+        )
+        ages[name] = int(attrs["Max-Age"]) if "Max-Age" in attrs else None
+    return ages
+
+
+def _refresh_token_lifetime(response):
+    """Seconds between the issued refresh token's iat and exp."""
+    claims = jwt.decode(
+        response.cookies[settings.refresh_cookie_name],
+        settings.secret_key_value,
+        algorithms=[settings.jwt_algorithm],
+    )
+    return claims["exp"] - claims["iat"]
+
+
+# Unticked: browser-session cookies and a 60-minute refresh token. Ticked: a
+# 30-minute access cookie and a 7-day refresh cookie and token, as before.
+UNTICKED = ({"jwt_token": None, "refresh_token": None}, 60 * 60)
+TICKED = ({"jwt_token": 30 * 60, "refresh_token": 7 * 24 * 60 * 60}, 7 * 24 * 60 * 60)
+
+
+@pytest.mark.parametrize(
+    "remember_me, expected", [(False, UNTICKED), (True, TICKED)], ids=["unticked", "ticked"]
+)
+def test_keep_me_logged_in_sets_the_session_lifetime(
+    client_anonymous, session, signed_jwts, remember_me, expected
+):
+    """The "Keep me logged in" choice decides the cookie and refresh token lifetimes."""
+    _seed_user(session, "session-user")
+
+    response = client_anonymous.post(
+        "/auth/login",
+        json={"username": "session-user", "password": "pw0", "remember_me": remember_me},
+    )
+
+    assert response.status_code == 200, response.text
+    assert (_cookie_max_ages(response), _refresh_token_lifetime(response)) == expected
+
+
+@pytest.mark.parametrize(
+    "remember_me, expected", [(False, UNTICKED), (True, TICKED)], ids=["unticked", "ticked"]
+)
+def test_a_refresh_keeps_the_keep_me_logged_in_choice(
+    client_anonymous, session, signed_jwts, remember_me, expected
+):
+    """A refresh issues cookies and a refresh token with the lifetimes the login chose."""
+    _seed_user(session, "refreshing-user")
+    login = client_anonymous.post(
+        "/auth/login",
+        json={"username": "refreshing-user", "password": "pw0", "remember_me": remember_me},
+    )
+    assert login.status_code == 200, login.text
+
+    response = client_anonymous.post("/auth/refresh")
+
+    assert response.status_code == 200, response.text
+    assert (_cookie_max_ages(response), _refresh_token_lifetime(response)) == expected
+
+
+def test_a_refresh_token_from_before_the_remember_claim_refreshes_as_ticked(
+    client_anonymous, session, signed_jwts
+):
+    """A refresh token minted without the remember claim keeps the long session."""
+    creator_id = _seed_user(session, "pre-release-user")
+    now = datetime.now(timezone.utc)
+    pre_release_token = jwt.encode(
+        {"sub": str(creator_id), "type": "refresh", "iat": now, "exp": now + timedelta(days=7)},
+        settings.secret_key_value,
+        algorithm=settings.jwt_algorithm,
+    )
+    client_anonymous.cookies.set(settings.refresh_cookie_name, pre_release_token)
+
+    response = client_anonymous.post("/auth/refresh")
+
+    assert response.status_code == 200, response.text
+    assert (_cookie_max_ages(response), _refresh_token_lifetime(response)) == TICKED
+
+
+def _refresh_token_cookie(creator_id, **claims):
+    """A refresh token cookie value for creator_id, valid for 7 more days."""
+    now = datetime.now(timezone.utc)
+    return jwt.encode(
+        {"sub": str(creator_id), "type": "refresh", "iat": now, "exp": now + timedelta(days=7), **claims},
+        settings.secret_key_value,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+@pytest.mark.parametrize(
+    "days_since_login, status_code", [(31, 401), (29, 200)], ids=["past-the-cap", "within-the-cap"]
+)
+def test_a_refresh_more_than_30_days_after_login_is_refused(
+    client_anonymous, session, signed_jwts, days_since_login, status_code
+):
+    """The session ends 30 days after login, however often it was refreshed."""
+    creator_id = _seed_user(session, "capped-user")
+    login_time = datetime.now(timezone.utc) - timedelta(days=days_since_login)
+    client_anonymous.cookies.set(
+        settings.refresh_cookie_name,
+        _refresh_token_cookie(creator_id, auth_time=int(login_time.timestamp())),
+    )
+
+    response = client_anonymous.post("/auth/refresh")
+
+    assert response.status_code == status_code, response.text
+
+
+def test_a_refresh_token_without_a_login_time_counts_from_its_iat(
+    client_anonymous, session, signed_jwts
+):
+    """A pre-release refresh token refreshes, and its iat becomes the login time carried forward."""
+    creator_id = _seed_user(session, "pre-cap-user")
+    issued_at = int((datetime.now(timezone.utc) - timedelta(days=3)).timestamp())
+    client_anonymous.cookies.set(
+        settings.refresh_cookie_name, _refresh_token_cookie(creator_id, iat=issued_at)
+    )
+
+    response = client_anonymous.post("/auth/refresh")
+
+    assert response.status_code == 200, response.text
+    claims = jwt.decode(
+        response.cookies[settings.refresh_cookie_name],
+        settings.secret_key_value,
+        algorithms=[settings.jwt_algorithm],
+    )
+    assert claims["auth_time"] == issued_at

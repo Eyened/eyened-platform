@@ -133,17 +133,20 @@ services:
       EYENED_API_POOL_TIMEOUT: ${EYENED_API_POOL_TIMEOUT:-5}
       EYENED_API_PASSWORD_HASH_CONCURRENCY: ${EYENED_API_PASSWORD_HASH_CONCURRENCY:-4}
       EYENED_API_AUTH_PASSWORD_ENABLED: ${EYENED_API_AUTH_PASSWORD_ENABLED:-true}
+      EYENED_API_SESSION_MAX_AGE_DAYS: ${EYENED_API_SESSION_MAX_AGE_DAYS:-30}
+      EYENED_API_REFRESH_TOKEN_SHORT_EXPIRE_MINUTES: ${EYENED_API_REFRESH_TOKEN_SHORT_EXPIRE_MINUTES:-60}
       EYENED_API_COOKIE_SECURE: ${EYENED_API_COOKIE_SECURE:-false}
       EYENED_STORAGE_ROOT: /storage
       # Empty keeps local mode off; see compose.storage.example.yaml.
       EYENED_STORAGE_MOUNTS: ${EYENED_STORAGE_MOUNTS:-}
-      # OIDC. The three URLs must change together; see keycloak/README.md.
+      # OIDC. The three URLs must change together.
       EYENED_API_AUTH_OIDC_ENABLED: ${EYENED_API_AUTH_OIDC_ENABLED:-false}
       EYENED_OIDC_CLIENT_ID: ${EYENED_OIDC_CLIENT_ID:-}
       EYENED_OIDC_CLIENT_SECRET: ${EYENED_OIDC_CLIENT_SECRET:-}
       EYENED_OIDC_METADATA_URL: ${EYENED_OIDC_METADATA_URL:-}
       EYENED_OIDC_REDIRECT_URL: ${EYENED_OIDC_REDIRECT_URL:-}
       EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS: ${EYENED_OIDC_ADDITIONAL_TOKEN_VALIDATIONS:-}
+      EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS: ${EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS:-}
       # Restated: an empty string would blank the login page's provider label.
       EYENED_OIDC_PROVIDER_NAME: "${EYENED_OIDC_PROVIDER_NAME:-OpenID Connect}"
       EYENED_OIDC_CREATE_NEW_ACCOUNTS: ${EYENED_OIDC_CREATE_NEW_ACCOUNTS:-false}
@@ -156,7 +159,6 @@ services:
       init:
         condition: service_completed_successfully
     healthcheck:
-      # 127.0.0.1, not localhost: the oidc layer can alias localhost to the host gateway.
       test:
         - CMD
         - python

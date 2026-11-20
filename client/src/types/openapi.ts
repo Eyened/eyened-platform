@@ -1359,6 +1359,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/users/{user_id}/email-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link User Email
+         * @description Link an email address; the first SSO login with it lands in this account.
+         */
+        put: operations["link_user_email_admin_users__user_id__email_link_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2050,6 +2070,14 @@ export interface components {
          * @enum {string}
          */
         Laterality: "L" | "R";
+        /**
+         * LinkEmailRequest
+         * @description The email address the account's first SSO login will match.
+         */
+        LinkEmailRequest: {
+            /** Email */
+            email: string;
+        };
         /**
          * MemberGrantResponse
          * @description The membership after a grant; ``changed`` is False if the role was already held.
@@ -2788,6 +2816,11 @@ export interface components {
              * @default false
              */
             api_client: boolean;
+            /**
+             * Remember Me
+             * @default true
+             */
+            remember_me: boolean;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -6198,6 +6231,46 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_user_email_admin_users__user_id__email_link_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -46,7 +46,6 @@ jobs:
           for key in EYENED_API_SECRET_KEY EYENED_REDIS_PASSWORD MYSQL_ROOT_PASSWORD EYENED_DATABASE_PASSWORD EYENED_API_ADMIN_PASSWORD; do
             sed -i "s/^$key=\$/$key=$(openssl rand -hex 32)/" .env
           done
-          echo "KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -hex 32)" >> .env
           cp compose.storage.example.yaml compose.storage.yaml
 
       - name: Every documented layer combination resolves
@@ -56,7 +55,7 @@ jobs:
           check compose.yaml:compose.dev.yaml ""
           check compose.yaml:compose.prod.yaml local-db
           check compose.yaml:compose.prod.yaml ""
-          check compose.yaml:compose.prod.yaml:compose.storage.yaml:compose.oidc.yaml:compose.workers.yaml:compose.host-ports.yaml \
+          check compose.yaml:compose.prod.yaml:compose.storage.yaml:compose.workers.yaml:compose.host-ports.yaml \
                 local-db,backup,gpu-inference,gpu-cfi-amd,gpu-layer-segmentation
           # A GPU host loads the workers layer alone.
           COMPOSE_FILE=compose.workers.yaml docker compose config -q
