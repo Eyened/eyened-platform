@@ -13,6 +13,7 @@ import { UpdatePosition } from "./controls/updatePosition";
 import { ZoomPan } from "./controls/zoomPan";
 import { CursorOverlay } from "./overlays/CursorOverlay";
 import type { MeasureTool } from "./tools/Measure.svelte.js";
+import type { AngioDisplayMode } from "./angioDisplayMode";
 import type {
     EventName,
     EnfaceProjectionMode,
@@ -84,6 +85,8 @@ export class ViewerContext {
         // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Replace the Map to notify $state consumers.
         new Map(),
     );
+    /** OCTA B-scan display; ignored when ``image.hasFlow`` is false. */
+    angioDisplayMode: AngioDisplayMode = $state("structural");
     lockScroll: boolean = $state(false);
     windowLevel: WindowLevel = $state({ min: 0, max: 255 });
     cursorStyle: cursorStyle = $state("default");

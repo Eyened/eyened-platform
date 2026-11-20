@@ -137,12 +137,39 @@ describe("ViewerWindowContext registration editor paint", () => {
         ctx.syncMainPanelsToViewState();
         expect(setOpenViewers).toHaveBeenCalledWith([{ id: "vol", index: 7 }]);
     });
+
+    it("returns an image load that is already in flight", () => {
+        ctx = createContext();
+        const pending = Promise.resolve([]);
+        ctx.imageLoads.set("inst-1", { promise: pending } as never);
+        expect(ctx.getImages("inst-1")).toBe(pending);
+    });
 });
 
-vi.mock("cornerstone-wado-image-loader", () => ({
-    external: {},
-    configure: vi.fn(),
+vi.mock("@cornerstonejs/codec-openjpeg/decodewasmjs", () => ({
+    default: () =>
+        Promise.resolve({
+            J2KDecoder: class {
+                getEncodedBuffer(n: number) {
+                    return new Uint8Array(n);
+                }
+                decode() {}
+                getFrameInfo() {
+                    return {
+                        width: 0,
+                        height: 0,
+                        bitsPerSample: 8,
+                        componentCount: 1,
+                        isSigned: false,
+                    };
+                }
+                getDecodedBuffer() {
+                    return new Uint8Array();
+                }
+            },
+        }),
 }));
-vi.mock("cornerstone-core", () => ({}));
-vi.mock("dicom-parser", () => ({}));
+vi.mock("@cornerstonejs/codec-openjpeg/decodewasm?url", () => ({
+    default: "/mock-openjpeg.wasm",
+}));
 vi.mock("./MainViewer.svelte", () => ({ default: {} }));

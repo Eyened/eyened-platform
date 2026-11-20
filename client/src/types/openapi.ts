@@ -1671,6 +1671,21 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /** ImageGET */
+        ImageStorageGET: {
+            /**
+             * @description One on-disk (or object-store) file belonging to an ImageInstance.
+             */
+            id: number;
+            format: string;
+            is_primary: boolean;
+            /**
+             * Role
+             * @description Channel of this file, such as angio_flow
+             */
+            role?: string | null;
+            /** Sop Instance Uid */
+            sop_instance_uid?: string | null;
+        };
         ImageGET: {
             /** Sop Instance Uid */
             sop_instance_uid: string;
@@ -1717,6 +1732,8 @@ export interface components {
             date_modified?: string | null;
             /** Date Preprocessed */
             date_preprocessed?: string | null;
+            /** Storages */
+            storages: components["schemas"]["ImageStorageGET"][];
             /** Id */
             id: string;
             project: components["schemas"]["ProjectMeta"];
@@ -2029,6 +2046,12 @@ export interface components {
              * @description If set, maps to ImageStorage.IsPrimary
              */
             image_storage_is_primary?: boolean | null;
+            /**
+             * Image Storage Role
+             * @description If set, maps to ImageStorage.Role
+             * @enum {string|null}
+             */
+            image_storage_role?: "angio_flow" | null;
             /**
              * Image Storage Hash
              * @description SHA-256 digest (32 bytes); maps to ImageStorage.Hash

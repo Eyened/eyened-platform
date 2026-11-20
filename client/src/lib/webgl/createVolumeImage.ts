@@ -12,6 +12,11 @@ import {
 
 export type VolumeImage = Image3D | ImageSliceStack;
 
+export type CreateVolumeOptions = {
+    /** Optional OCTA angio_flow mono volume (same W×H×D as structural). */
+    flowData?: Uint8Array | null;
+};
+
 export function createVolumeImage(
     instance: ImageGET,
     webgl: WebGL,
@@ -19,7 +24,9 @@ export function createVolumeImage(
     data: Uint8Array,
     dimensions: Dimensions,
     meta: object,
+    options: CreateVolumeOptions = {},
 ): Image2D | VolumeImage {
+    const flowData = options.flowData ?? null;
     const limits = getVolumeLimits(webgl.gl);
     const { width, height, depth } = dimensions;
 
@@ -40,15 +47,33 @@ export function createVolumeImage(
     }
 
     if (fitsTexture3D(dimensions, limits)) {
+        const flowLabel = flowData ? " +flow" : "";
         console.info(
-            `[volume] image ${img_id}: ${width}x${height}x${depth} → Image3D`,
+            `[volume] image ${img_id}: ${width}x${height}x${depth}${flowLabel} → Image3D`,
         );
-        return new Image3D(instance, webgl, img_id, data, dimensions, meta);
+        return new Image3D(
+            instance,
+            webgl,
+            img_id,
+            data,
+            dimensions,
+            meta,
+            flowData,
+        );
     }
 
     assertSliceStackFits(dimensions, limits);
+    const flowLabel = flowData ? " +flow" : "";
     console.info(
-        `[volume] image ${img_id}: ${width}x${height}x${depth} → ImageSliceStack`,
+        `[volume] image ${img_id}: ${width}x${height}x${depth}${flowLabel} → ImageSliceStack`,
     );
-    return new ImageSliceStack(instance, webgl, img_id, data, dimensions, meta);
+    return new ImageSliceStack(
+        instance,
+        webgl,
+        img_id,
+        data,
+        dimensions,
+        meta,
+        flowData,
+    );
 }
