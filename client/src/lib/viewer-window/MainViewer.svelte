@@ -32,9 +32,10 @@
     import { eyeKey, pointBinding } from "$lib/layers/pointsets";
     import { drawBinding } from "$lib/layers/drawBinding";
     import { bindRegistrationPointTool } from "./panelRegistration/bindRegistrationPointTool";
+    import { bindEtdrsTool } from "./panelETRDS/bindEtdrsTool";
     import { bindDrawTool } from "./panelSegmentation/bindDrawTool";
     import { toolById } from "$lib/workspace/tools/registry";
-    import { GridLayers } from "$lib/layers/gridLayers.svelte";
+    import { gridBinding, GridLayers } from "$lib/layers/gridLayers.svelte";
     import { ViewportBlend } from "$lib/layers/viewportBlend.svelte";
     import { LocalizerLines } from "$lib/layers/localizerLines.svelte";
     import { OCTLinesOverlay } from "$lib/viewer/overlays/OCTLinesOverlays";
@@ -121,6 +122,12 @@
         },
         get drawTarget() {
             return drawTarget;
+        },
+        get etdrsTarget() {
+            return etdrsTarget;
+        },
+        get etdrsTool() {
+            return etdrsTool?.tool;
         },
         blend,
     };
@@ -361,6 +368,62 @@
             remove();
             viewerContext.resetCursor();
         };
+    });
+
+    // Built whatever tool is armed, so the options bar names the grid as soon as G is picked.
+    const etdrsTarget = $derived(
+        gridBinding({
+            grid:
+                grids.currentId === undefined
+                    ? undefined
+                    : formAnnotations.get(grids.currentId),
+            instanceId: image.instance.id,
+            userId: globalContext.user.id,
+            canEdit: (grid) => globalContext.canEdit(grid),
+        }),
+    );
+    // A primitive, so a save of the grid never rebuilds the tool mid-drag.
+    const etdrsWritable = $derived(
+        etdrsTarget.reason === null ? grids.currentId : undefined,
+    );
+    let etdrsTool = $state.raw<ReturnType<typeof bindEtdrsTool>>();
+    // Place ETDRS acts in every viewport that can take it; the others show "can't edit".
+    $effect(() => {
+        if (workspace.armedTool !== "etdrs") return;
+        const id = etdrsWritable;
+        return untrack(() => {
+            if (id === undefined) {
+                const remove = viewerContext.addOverlay(new NoEditCursor());
+                return () => {
+                    remove();
+                    viewerContext.resetCursor();
+                };
+            }
+            const binding = bindEtdrsTool({
+                viewerContext,
+                gridId: id,
+                keepSize: () => workspace.keepGridSize,
+            });
+            etdrsTool = binding;
+            return () => {
+                binding.dispose();
+                if (etdrsTool === binding) etdrsTool = undefined;
+            };
+        });
+    });
+    // The bar's Fovea | Disc edge reaches this viewport's tool.
+    $effect(() => {
+        const slot = workspace.etdrsSlot;
+        if (etdrsTool) etdrsTool.tool.placementIndex = slot;
+    });
+    // Another viewport's edit of the grid reaches this viewport's tool.
+    $effect(() => {
+        const formData =
+            etdrsWritable === undefined
+                ? undefined
+                : formAnnotations.get(etdrsWritable)?.form_data;
+        const binding = etdrsTool;
+        if (binding) untrack(() => binding.sync(formData));
     });
 
     // Reset view and the options bar act on the selected viewport through this handle.

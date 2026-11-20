@@ -84,10 +84,9 @@ export function keepGridSize(before: PointList, after: PointList): PointList {
     return [f1, { ...d1, x: d1.x + dx, y: d1.y + dy }];
 }
 
-/** One viewport's ETDRS grids: which show, the current grid and its armed slot. */
+/** One viewport's ETDRS grids: which show and the current grid. */
 export class GridLayers {
     currentId: number | undefined = $state();
-    private armedSlot: { id: number; index: number } | undefined = $state();
     private readonly shown = new SvelteMap<GridKey, () => void>();
 
     constructor(
@@ -140,7 +139,8 @@ export class GridLayers {
             ...into(String(grid.image_id), grid.form_data),
         }));
         const ai = aiGrid(image);
-        if (ai) grids.push({ key: AI_GRID, ...into(ai.image_id, ai.form_data) });
+        if (ai)
+            grids.push({ key: AI_GRID, ...into(ai.image_id, ai.form_data) });
         return grids;
     }
 
@@ -175,22 +175,10 @@ export class GridLayers {
         for (const key of [...this.shown.keys()]) this.setShown(key, false);
     }
 
-    /** Remembers a grid's armed slot: 0 fovea, 1 disc edge. */
-    saveSlot(id: number, index: number): void {
-        this.armedSlot = { id, index };
-    }
-
-    /** The slot saved for a grid; Fovea when none was. */
-    slotOf(id: number): number {
-        return this.armedSlot?.id === id ? this.armedSlot.index : 0;
-    }
-
-    /** Sets the current grid, which shows it and arms Fovea; undefined unsets it. */
+    /** Sets the current grid, which shows it; undefined unsets it. */
     setCurrent(id: number | undefined): void {
         this.currentId = id;
-        if (id === undefined) return;
-        this.armedSlot = undefined;
-        this.setShown(id, true);
+        if (id !== undefined) this.setShown(id, true);
     }
 
     /** Drops a deleted grid. */

@@ -1,7 +1,7 @@
 <!--
 @component
 Layers › ETDRS grids for the selected viewport: the AI grid, this image's grids, then grids linked from registered images.
-Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
+The section places nothing: a row sets the current grid; New also arms Place ETDRS (G) at Fovea.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
@@ -9,24 +9,15 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
     import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
-    import {
-        createFormAnnotation,
-        formAnnotations,
-        formSchemasByName,
-        setFormAnnotationValue,
-    } from "$lib/data";
-    import type { GlobalContext } from "$lib/data/globalContext.svelte";
-    import type { ImagePoint, PointList } from "$lib/forms/pointSchema";
+    import { createFormAnnotation, formSchemasByName } from "$lib/data";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import { ETDRS_LANDMARK_COLOUR } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
-    import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import ETDRSGridItem from "$lib/viewer-window/panelETRDS/ETDRSGridItem.svelte";
     import ETDRSGridItemLinked from "$lib/viewer-window/panelETRDS/ETDRSGridItemLinked.svelte";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
     import View from "carbon-icons-svelte/lib/View.svelte";
     import ViewOff from "carbon-icons-svelte/lib/ViewOff.svelte";
-    import { getContext, tick, untrack } from "svelte";
+    import { getContext, tick } from "svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import type { FormAnnotationGET } from "../../types/openapi_types";
     import { AI_GRID, aiGrid, type GridLayers } from "./gridLayers.svelte";
@@ -38,18 +29,13 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
         grids,
         open,
         ontoggle,
-        shown,
     }: {
         grids: GridLayers;
         open: boolean;
         ontoggle: () => void;
-        /** True while Layers is on screen. */
-        shown: boolean;
     } = $props();
 
-    const LANDMARK_SLOTS = ["fovea", "disc_edge"] as const;
     const uid = $props.id();
-    const globalContext = getContext<GlobalContext>("globalContext");
     const taskContext = getContext<TaskContext | undefined>("taskContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const workspace = getContext<Workspace>("workspace");
@@ -70,91 +56,6 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
     const aiShown = $derived(grids.isShown(AI_GRID));
     const count = $derived(own.length + linked.length + (ai ? 1 : 0));
 
-    // Today's f / d placing writes into your current grid on this image, while this section is open and on screen.
-    const editableId = $derived.by(() => {
-        if (!shown || !open || grids.currentId === undefined) return undefined;
-        const grid = formAnnotations.get(grids.currentId);
-        return grid &&
-            grid.image_id == instance.id &&
-            globalContext.canEdit(grid)
-            ? grid.id
-            : undefined;
-    });
-    let armed: { id: number; tool: PointTool } | undefined = $state();
-    $effect(() => {
-        const id = editableId;
-        if (id === undefined) return;
-        const tool = new PointTool({
-            canEdit: true,
-            pointStyle: "cross",
-            radius: 16,
-            color: ETDRS_LANDMARK_COLOUR,
-            cardinality: "list",
-            sparse: true,
-            // Fovea and disc edge are en-face 2D landmarks, without a B-scan index.
-            coordinateSpace: "enface2d",
-            slotLabels: ["Fovea", "Disc edge"],
-            onChange: (points) => writeLandmarks(id, points, false),
-            onPersist: (points) => writeLandmarks(id, points, true),
-        });
-        untrack(() => {
-            tool.points = pointsOf(formAnnotations.get(id));
-            tool.placementIndex = grids.slotOf(id);
-        });
-        const remove = viewerContext.addOverlay(tool);
-        armed = { id, tool };
-        return () => {
-            // Keep the armed slot for when this grid shows again.
-            grids.saveSlot(id, tool.placementIndex ?? 0);
-            armed = undefined;
-            tool.destroy();
-            remove();
-        };
-    });
-
-    function armedSlot(grid: FormAnnotationGET): number | undefined {
-        if (grid.id !== editableId) return undefined;
-        // The tool may still be the previous grid's until the effect swaps it.
-        return armed?.id === grid.id
-            ? (armed.tool.placementIndex ?? grids.slotOf(grid.id))
-            : grids.slotOf(grid.id);
-    }
-
-    function arm(slot: number) {
-        if (editableId !== undefined) grids.saveSlot(editableId, slot);
-        if (armed) armed.tool.placementIndex = slot;
-    }
-
-    function isImagePoint(value: unknown): value is ImagePoint {
-        return (
-            typeof value === "object" &&
-            value !== null &&
-            typeof (value as ImagePoint).x === "number" &&
-            typeof (value as ImagePoint).y === "number"
-        );
-    }
-
-    function pointsOf(grid: FormAnnotationGET | undefined): PointList {
-        const data = (grid?.form_data ?? {}) as Record<string, unknown>;
-        return LANDMARK_SLOTS.map((slot) => {
-            const value = data[slot];
-            return isImagePoint(value) ? value : null;
-        });
-    }
-
-    function writeLandmarks(id: number, points: PointList, persist: boolean) {
-        const grid = formAnnotations.get(id);
-        if (!grid) return;
-        const data = { ...(grid.form_data as Record<string, unknown>) };
-        LANDMARK_SLOTS.forEach((slot, i) => {
-            const point = points[i];
-            if (point == null) delete data[slot];
-            else data[slot] = point;
-        });
-        formAnnotations.set(id, { ...grid, form_data: data });
-        if (persist) setFormAnnotationValue(id, data);
-    }
-
     async function create() {
         const schemaId = formSchemasByName.get(
             BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID,
@@ -172,11 +73,14 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
             form_data: {},
         });
         grids.setCurrent(grid.id);
-        // The button that was pressed may be gone (the empty state); the next step is placing the fovea.
+        // The next step is placing the fovea.
+        workspace.etdrsSlot = 0;
+        workspace.arm("etdrs");
+        // The pressed button may be gone (the empty state), so focus goes to the new grid's row.
         await tick();
         section
             ?.querySelector<HTMLElement>(
-                `[aria-label$="[${grid.id}]"] [data-landmark="0"]`,
+                `[aria-label$="[${grid.id}]"] button[aria-pressed]`,
             )
             ?.focus();
     }
@@ -235,7 +139,6 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
                             formAnnotation={grid}
                             shown={grids.isShown(grid.id)}
                             current={grids.currentId === grid.id}
-                            armedSlot={armedSlot(grid)}
                             ontoggleshown={() =>
                                 grids.setShown(
                                     grid.id,
@@ -247,7 +150,6 @@ Until the Place ETDRS tool comes, your current grid keeps today's f / d placing.
                                         ? undefined
                                         : grid.id,
                                 )}
-                            onarm={arm}
                             ondelete={() => askDelete(grid)}
                         />
                     </li>

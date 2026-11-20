@@ -1,7 +1,7 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { pointArming } from "$lib/forms/pointArming.svelte";
 import type { DrawTarget } from "$lib/layers/drawBinding";
-import type { GridLayers } from "$lib/layers/gridLayers.svelte";
+import type { GridLayers, GridTarget } from "$lib/layers/gridLayers.svelte";
 import type { Scale, ScalePick } from "$lib/layers/imageScale";
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import {
@@ -10,6 +10,7 @@ import {
 } from "$lib/viewer/overlays/etdrsCircles";
 import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
 import { DistanceLines } from "$lib/layers/distanceLines.svelte";
+import type { PointTool } from "$lib/viewer/tools/PointTool.svelte";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { instanceIdFromImageId } from "$lib/viewer-window/viewerViewState";
 import {
@@ -99,6 +100,10 @@ export interface LayersTarget {
     readonly pointTarget: { id: number; canEdit: boolean } | null;
     /** The current segmentation a Draw tool writes into here, or why it can't. */
     readonly drawTarget: DrawTarget;
+    /** The grid Place ETDRS writes here, or why it can't. */
+    readonly etdrsTarget: GridTarget;
+    /** Place ETDRS's tool, while it is armed and can write here. */
+    readonly etdrsTool: PointTool | undefined;
     /** This viewport's blend, kept while it is mounted. */
     readonly blend: ViewportBlend;
 }

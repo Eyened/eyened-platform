@@ -46,7 +46,6 @@ Provides the selected viewport's viewer and segmentation contexts to the section
         grids={target.grids}
         open={open.etdrs}
         ontoggle={() => ontoggle("etdrs")}
-        {shown}
     />
 {/if}
 {#if sections.includes("pointsets")}
