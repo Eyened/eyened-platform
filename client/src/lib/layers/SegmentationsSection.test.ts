@@ -187,6 +187,56 @@ describe("SegmentationsSection", () => {
         ).toBeInTheDocument();
     });
 
+    it("Advanced: Multi-class drops a feature without subfeatures, offers only those with, and locks Placement to Full image", async () => {
+        features.set(1, {
+            id: 1,
+            name: "Artery / vein",
+            subfeatures: [{ id: 2, name: "Artery" }],
+        } as never);
+        features.set(3, { id: 3, name: "Drusen" } as never);
+        renderSection();
+        const empty = screen
+            .getByText("No segmentations")
+            .closest('[data-slot="empty"]') as HTMLElement;
+        await fireEvent.click(
+            within(empty).getByRole("button", { name: "New segmentation" }),
+        );
+        await fireEvent.click(
+            await screen.findByRole("button", { name: "Advanced…" }),
+        );
+        const dialog = await screen.findByRole("dialog", {
+            name: "New segmentation",
+        });
+        const feature = within(dialog).getByRole("combobox", {
+            name: "Feature",
+        });
+        await fireEvent.input(feature, { target: { value: "Dru" } });
+        await screen.findByRole("option", { name: "Drusen" });
+        await fireEvent.keyDown(feature, { key: "ArrowDown" });
+        await fireEvent.keyDown(feature, { key: "Enter" });
+        expect(feature).toHaveValue("Drusen");
+        await fireEvent.click(
+            within(dialog).getByRole("radio", { name: "Region box" }),
+        );
+
+        await fireEvent.click(
+            within(dialog).getByRole("radio", { name: "Multi-class" }),
+        );
+
+        expect(feature).toHaveValue("");
+        const full = within(dialog).getByRole("radio", { name: "Full image" });
+        expect(full).toBeChecked();
+        expect(full).toBeDisabled();
+        expect(
+            within(dialog).getByRole("radio", { name: "Region box" }),
+        ).toBeDisabled();
+        await fireEvent.input(feature, { target: { value: "r" } });
+        expect(
+            await screen.findByRole("option", { name: "Artery / vein" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("option", { name: "Drusen" })).toBeNull();
+    });
+
     it("closing the popover opened from the empty state returns focus to the header New", async () => {
         renderSection();
         const empty = screen

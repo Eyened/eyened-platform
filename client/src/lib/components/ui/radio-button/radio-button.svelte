@@ -52,12 +52,12 @@
             // Carbon radios select with Space and arrows; Enter must not submit a surrounding form.
             if (e.key === "Enter") e.preventDefault();
         }}
-        class="grid size-5 shrink-0 cursor-pointer appearance-none place-content-center rounded-full border border-icon-primary bg-transparent before:size-2 before:scale-0 before:rounded-full before:bg-icon-primary before:content-[''] checked:before:scale-100 disabled:cursor-not-allowed disabled:border-icon-disabled disabled:before:bg-icon-disabled"
+        class="peer grid size-5 shrink-0 cursor-pointer appearance-none place-content-center rounded-full border border-icon-primary bg-transparent before:size-2 before:scale-0 before:rounded-full before:bg-icon-primary before:content-[''] checked:before:scale-100 disabled:cursor-not-allowed disabled:border-icon-disabled disabled:before:bg-icon-disabled"
     />
     <label
         for={uid}
         class={cn(
-            "cursor-pointer pt-0.5 text-body-compact-01 text-text-primary",
+            "cursor-pointer pt-0.5 text-body-compact-01 text-text-primary peer-disabled:cursor-not-allowed peer-disabled:text-text-disabled",
             children && "min-w-0 flex-1",
             hideLabel && "sr-only",
         )}

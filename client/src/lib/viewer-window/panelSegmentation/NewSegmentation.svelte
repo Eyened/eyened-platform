@@ -13,7 +13,6 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import CreateSegmentationDialog from "./CreateSegmentationDialog.svelte";
     import { createQuestionableSegmentation } from "./createSegmentationHelpers";
 
     let { open = $bindable(false) }: { open?: boolean } = $props();
@@ -61,21 +60,11 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
 
     function openAdvanced() {
         open = false;
-        globalContext.dialogue = {
-            component: CreateSegmentationDialog,
-            props: {
-                image,
-                axis,
-                segmentationContext,
-                subtaskId: taskContext?.subTask?.id,
-                initialMode: "full",
-            },
-        };
+        segmentationContext.createDialog = {};
     }
 
     function startRegionBox() {
         open = false;
-        segmentationContext.pendingRegionBox = undefined;
         segmentationContext.regionToolActive = true;
     }
 

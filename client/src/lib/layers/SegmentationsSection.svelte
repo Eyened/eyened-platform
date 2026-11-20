@@ -15,6 +15,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import NewSegmentation from "$lib/viewer-window/panelSegmentation/NewSegmentation.svelte";
     import NewSegmentationRegion from "$lib/viewer-window/panelSegmentation/NewSegmentationRegion.svelte";
+    import CreateSegmentationDialog from "$lib/viewer-window/panelSegmentation/CreateSegmentationDialog.svelte";
     import SegmentationItem from "$lib/viewer-window/panelSegmentation/SegmentationItem.svelte";
     import {
         getSegmentationKey,
@@ -223,3 +224,8 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     bind:open={deleteOpen}
     onfallback={() => header?.querySelector<HTMLElement>("button")?.focus()}
 />
+{#if segmentationContext.createDialog}
+    {#key segmentationContext.createDialog}
+        <CreateSegmentationDialog onfocusnew={focusNew} />
+    {/key}
+{/if}

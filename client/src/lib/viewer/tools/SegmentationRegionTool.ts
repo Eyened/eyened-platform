@@ -47,7 +47,7 @@ export class SegmentationRegionTool implements Overlay {
             return;
         }
 
-        this.segmentationContext.pendingRegionBox = box;
+        this.segmentationContext.createDialog = { box };
         this.deactivate();
     }
 

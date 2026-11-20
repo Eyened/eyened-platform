@@ -1,13 +1,20 @@
+<!--
+@component
+The New segmentation modal, from New › Advanced… or a drawn region box: Type, then Feature, then Placement.
+The section remounts it for each open, so every open starts fresh.
+-->
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { ComboBox } from "$lib/components/ui/combo-box/index.js";
+    import { Modal } from "$lib/components/ui/modal/index.js";
+    import { NumberInput } from "$lib/components/ui/number-input/index.js";
+    import { RadioButtonGroup } from "$lib/components/ui/radio-button/index.js";
     import { features } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import type { AbstractImage } from "$lib/webgl/abstractImage";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
+    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
-    import { toast } from "svelte-sonner";
-    import FeatureSelect from "./FeatureSelect.svelte";
-    import type { SegmentationContext } from "./segmentationContext.svelte";
     import {
         createSegmentationFromDialog,
         defaultRegionSize,
@@ -16,399 +23,194 @@
         type CreateSegmentationDialogMode,
         type SegmentationTypeChoice,
     } from "./createSegmentationHelpers";
-    import type { FeatureGET } from "../../../types/openapi_types";
-    import type { ImageBox } from "./segmentationRegion";
 
-    interface Props {
-        image: AbstractImage;
-        axis: number;
-        segmentationContext: SegmentationContext;
-        subtaskId?: number;
-        initialMode?: CreateSegmentationDialogMode;
-        box?: ImageBox;
-        close: () => void;
-    }
+    let { onfocusnew }: { onfocusnew: () => void } = $props();
 
-    let {
-        image,
-        axis,
-        segmentationContext,
-        subtaskId,
-        initialMode = "full",
-        box: regionBoxProp,
-        close,
-    }: Props = $props();
-
+    const uid = $props.id();
     const globalContext = getContext<GlobalContext>("globalContext");
-    const taskContext = getContext<TaskContext>("taskContext");
+    const taskContext = getContext<TaskContext | undefined>("taskContext");
+    const viewerContext = getContext<ViewerContext>("viewerContext");
+    const { segmentationContext } =
+        getContext<MainViewerContext>("mainViewerContext");
+    const { image, axis } = viewerContext;
 
-    let mode = $state<CreateSegmentationDialogMode>(initialMode);
-    let selectedType = $state<SegmentationTypeChoice>("Q");
+    // Fixed for this open: the section remounts the modal for the next one.
+    const box = segmentationContext.createDialog?.box;
+    const size = box
+        ? defaultRegionSize(box)
+        : { width: image.width, height: image.height };
 
-    let segWidth = $state(image.width);
-    let segHeight = $state(image.height);
-
-    let selectedFeature = $state<FeatureGET | undefined>(undefined);
-    let selectedFeatureId = $state("");
-
-    $effect(() => {
-        if (regionBoxProp) {
-            mode = "region";
-            const { width, height } = defaultRegionSize(regionBoxProp);
-            segWidth = width;
-            segHeight = height;
-        }
-    });
-
-    $effect(() => {
-        if (isMultiSegmentationType(selectedType) && mode === "region") {
-            mode = "full";
-        }
-    });
-
-    const regionDisplay = $derived.by(() => {
-        if (!regionBoxProp) return null;
-        return {
-            x0: Math.round(regionBoxProp.x0),
-            y0: Math.round(regionBoxProp.y0),
-            x1: Math.round(regionBoxProp.x1),
-            y1: Math.round(regionBoxProp.y1),
-            imageW: Math.round(regionBoxProp.x1 - regionBoxProp.x0),
-            imageH: Math.round(regionBoxProp.y1 - regionBoxProp.y0),
-        };
-    });
-
-    const allFeatures = $derived(features.map((f) => f));
-    const parentFeatures = $derived(
-        features.filter((f) => (f.subfeatures ?? []).length > 0),
+    // Closing keeps the content while the modal fades out; the next open remounts it.
+    let open = $state(true);
+    let type = $state<SegmentationTypeChoice>("Q");
+    let placement = $state<CreateSegmentationDialogMode>(
+        box ? "region" : "full",
     );
-    const availableFeatures = $derived(
-        isMultiSegmentationType(selectedType) ? parentFeatures : allFeatures,
-    );
+    let featureId = $state("");
+    let featureText = $state("");
+    let width = $state(String(size.width));
+    let height = $state(String(size.height));
+    let drawing = false;
 
-    const placementLockedToFull = $derived(
-        isMultiSegmentationType(selectedType),
-    );
-    const canCreate = $derived(selectedFeature != null);
+    const typeItems = SEGMENTATION_TYPE_OPTIONS.map((o) => ({
+        value: o.value,
+        labelText: o.label,
+    }));
+    const placementItems = [
+        { value: "full", labelText: "Full image" },
+        { value: "region", labelText: "Region box" },
+    ] as const;
 
-    $effect(() => {
-        if (
-            selectedFeature &&
-            !availableFeatures.some((f) => f.id === selectedFeature!.id)
-        ) {
-            selectedFeature = undefined;
-            selectedFeatureId = "";
-        }
+    const multi = $derived(isMultiSegmentationType(type));
+    const offered = $derived(
+        multi
+            ? features.filter((f) => (f.subfeatures ?? []).length > 0)
+            : features.map((f) => f),
+    );
+    // After a pick the field shows its name, so the list then shows every offered feature.
+    const items = $derived.by(() => {
+        const q = featureId ? "" : featureText.trim().toLowerCase();
+        return offered
+            .filter((f) => f.name.toLowerCase().includes(q))
+            .map((f) => ({ id: String(f.id), text: f.name }));
     });
+    const canCreate = $derived(
+        featureId !== "" && !(placement === "region" && !box),
+    );
 
-    function selectFeature(feature: FeatureGET) {
-        selectedFeature = feature;
-        selectedFeatureId = String(feature.id);
-    }
+    const r = Math.round;
+    const placementHelp = $derived(
+        multi
+            ? "Multi-class and multi-label cover the full image."
+            : placement === "full"
+              ? `Covers the full image (${image.width} × ${image.height} px).`
+              : box
+                ? `Box (${r(box.x0)}, ${r(box.y0)}) → (${r(box.x1)}, ${r(box.y1)}), ${r(box.x1 - box.x0)} × ${r(box.y1 - box.y0)} px on the image`
+                : "No region drawn yet.",
+    );
 
-    function onNativeSelectChange() {
-        if (!selectedFeatureId) {
-            selectedFeature = undefined;
-            return;
-        }
-        const feature = availableFeatures.find(
-            (f) => String(f.id) === selectedFeatureId,
-        );
-        if (feature) {
-            selectFeature(feature);
+    // Multi-class and multi-label cover the full image and need a feature with subfeatures.
+    function setType(next: SegmentationTypeChoice) {
+        type = next;
+        if (!isMultiSegmentationType(next)) return;
+        placement = "full";
+        if (featureId && !offered.some((f) => String(f.id) === featureId)) {
+            featureId = "";
+            featureText = "";
         }
     }
 
-    function dismiss() {
-        segmentationContext.pendingRegionBox = undefined;
-        segmentationContext.regionToolActive = false;
-        close();
-    }
-
-    function startRegionDraw() {
-        segmentationContext.pendingRegionBox = undefined;
+    // The box draw opens the modal again when it ends.
+    function draw() {
+        drawing = true;
+        open = false;
         segmentationContext.regionToolActive = true;
-        close();
     }
 
-    async function submitCreate() {
-        if (!selectedFeature) return;
+    // Advanced… closed with its popover, so focus goes to New; after a region draw it goes back to the image.
+    function restoreFocus(event: Event) {
+        event.preventDefault();
+        if (box || drawing) viewerContext.canvas2D.parentElement?.focus();
+        else onfocusnew();
+    }
 
-        if (
-            mode === "region" &&
-            !regionBoxProp &&
-            !isMultiSegmentationType(selectedType)
-        ) {
-            toast.error(
-                "Draw a region on the image first, or choose full image.",
-            );
-            return;
-        }
-
-        const snapshotBox = regionBoxProp
-            ? {
-                  x0: regionBoxProp.x0,
-                  y0: regionBoxProp.y0,
-                  x1: regionBoxProp.x1,
-                  y1: regionBoxProp.y1,
-              }
-            : undefined;
-
-        segmentationContext.pendingRegionBox = undefined;
+    function create() {
+        const feature = features.get(Number(featureId));
+        if (!feature) return false;
         segmentationContext.regionToolActive = false;
-
-        try {
-            await createSegmentationFromDialog(
-                globalContext,
-                segmentationContext,
-                {
-                    image,
-                    axis,
-                    feature: selectedFeature,
-                    subtaskId: subtaskId ?? taskContext?.subTask?.id,
-                    type: selectedType,
-                    mode: isMultiSegmentationType(selectedType) ? "full" : mode,
-                    box:
-                        mode === "region" &&
-                        !isMultiSegmentationType(selectedType)
-                            ? snapshotBox
-                            : undefined,
-                    segWidth,
-                    segHeight,
-                },
-            );
-            close();
-        } catch {
-            // toast shown in helper
-        }
+        // An earlier quick create's notice is stale once this one starts.
+        segmentationContext.failed = null;
+        return createSegmentationFromDialog(
+            globalContext,
+            segmentationContext,
+            {
+                image,
+                axis,
+                feature,
+                subtaskId: taskContext?.subTask?.id,
+                type,
+                mode: placement,
+                box: placement === "region" ? box : undefined,
+                segWidth: Number(width),
+                segHeight: Number(height),
+            },
+        );
     }
 </script>
 
-<div class="dialog">
-    <h3>New segmentation</h3>
-    <p class="hint">Choose placement, type, and feature, then click Create.</p>
-
-    <fieldset class="section">
-        <legend>Placement</legend>
-        <div class="radio-row">
-            <label class="radio-option">
-                <input
-                    type="radio"
-                    name="placement"
-                    value="full"
-                    bind:group={mode}
-                    disabled={placementLockedToFull}
-                />
-                Full image
-            </label>
-            <label class="radio-option">
-                <input
-                    type="radio"
-                    name="placement"
-                    value="region"
-                    bind:group={mode}
-                    disabled={placementLockedToFull}
-                />
-                Region box
-            </label>
-        </div>
-        {#if placementLockedToFull}
-            <p class="coords muted">
-                Multi-class and multi-label use the full image.
-            </p>
-        {/if}
-
-        {#if mode === "region" && !placementLockedToFull}
-            {#if regionDisplay}
-                <p class="coords">
-                    Image box: ({regionDisplay.x0}, {regionDisplay.y0}) → ({regionDisplay.x1},
-                    {regionDisplay.y1})
-                    <span class="dim"
-                        >({regionDisplay.imageW} × {regionDisplay.imageH} px on image)</span
-                    >
-                </p>
-                <Button variant="secondary" size="sm" onclick={startRegionDraw}>
-                    Redraw region on image…
-                </Button>
-            {:else}
-                <p class="coords muted">No region drawn yet.</p>
-                <Button variant="secondary" size="sm" onclick={startRegionDraw}>
-                    Draw region on image…
-                </Button>
-            {/if}
-            <div class="row">
-                <label>
-                    Seg. width
-                    <input type="number" min="1" bind:value={segWidth} />
-                </label>
-                <label>
-                    Seg. height
-                    <input type="number" min="1" bind:value={segHeight} />
-                </label>
-            </div>
-        {:else if !placementLockedToFull}
-            <p class="coords muted">
-                Covers the full image ({image.width} × {image.height} px).
-            </p>
-        {/if}
-    </fieldset>
-
-    <fieldset class="section">
-        <legend>Type & feature</legend>
-
-        <div class="radio-column">
-            {#each SEGMENTATION_TYPE_OPTIONS as opt}
-                <label class="radio-option">
-                    <input
-                        type="radio"
-                        name="seg-type"
-                        value={opt.value}
-                        bind:group={selectedType}
-                    />
-                    {opt.label}
-                </label>
-            {/each}
-        </div>
-
-        {#if isMultiSegmentationType(selectedType)}
-            <p class="coords muted">
-                Parent features with subfeatures only ({availableFeatures.length}
-                available).
-            </p>
-        {/if}
-
-        <FeatureSelect
-            values={availableFeatures}
-            selectedName={selectedFeature?.name ?? ""}
-            onselect={selectFeature}
+<Modal
+    bind:open={
+        () => open,
+        (v) => {
+            open = v;
+            // Cancel, ✕ and Esc end any region draw too; Draw keeps it on.
+            if (!v && !drawing) segmentationContext.regionToolActive = false;
+        }
+    }
+    size="sm"
+    modalLabel="Segmentations"
+    modalHeading="New segmentation"
+    primaryButtonText="Create"
+    primaryButtonLoadingDescription="Creating…"
+    successDescription="Created"
+    errorTitle="Segmentation could not be created"
+    primaryButtonDisabled={!canCreate}
+    onsubmit={create}
+    onCloseAutoFocus={restoreFocus}
+>
+    <div class="flex flex-col gap-6">
+        <RadioButtonGroup
+            legendText="Type"
+            items={typeItems}
+            bind:selected={() => type, setType}
+            class="[&>div]:flex-col"
         />
-
-        <label class="select-label">
-            <span>Or select feature</span>
-            <select
-                class="native-select"
-                bind:value={selectedFeatureId}
-                onchange={onNativeSelectChange}
+        <ComboBox
+            titleText="Feature"
+            {items}
+            bind:value={featureText}
+            bind:selected={featureId}
+            helperText={multi
+                ? "Multi-class and multi-label offer features with subfeatures only."
+                : undefined}
+        />
+        <div class="flex flex-col gap-2">
+            <RadioButtonGroup
+                legendText="Placement"
+                items={placementItems}
+                bind:selected={placement}
+                disabled={multi}
+                describedBy="{uid}-placement"
+            />
+            <p
+                id="{uid}-placement"
+                class="text-helper-text-01 text-text-helper"
             >
-                <option value="">—</option>
-                {#each availableFeatures as f (f.id)}
-                    <option value={String(f.id)}>{f.name}</option>
-                {/each}
-            </select>
-        </label>
-    </fieldset>
-
-    <div class="footer">
-        <Button variant="outline" size="sm" onclick={dismiss}>Cancel</Button>
-        <Button
-            variant="default"
-            size="sm"
-            disabled={!canCreate}
-            onclick={submitCreate}
-        >
-            Create
-        </Button>
+                {placementHelp}
+            </p>
+            {#if placement === "region" && !multi}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    class="self-start"
+                    onclick={draw}
+                    >{box ? "Redraw on image" : "Draw on image"}</Button
+                >
+                {#if box}
+                    <div class="flex flex-wrap gap-4">
+                        <NumberInput
+                            labelText="Mask width (px)"
+                            min="1"
+                            bind:value={width}
+                        />
+                        <NumberInput
+                            labelText="Mask height (px)"
+                            min="1"
+                            bind:value={height}
+                        />
+                    </div>
+                {/if}
+            {/if}
+        </div>
     </div>
-</div>
-
-<style>
-    .dialog {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        min-width: 320px;
-        max-width: 480px;
-        max-height: min(85vh, 640px);
-        overflow-y: auto;
-        padding: 0.25rem;
-    }
-    h3 {
-        margin: 0;
-        font-size: 1.05rem;
-    }
-    .hint {
-        margin: 0;
-        font-size: 0.85em;
-        opacity: 0.8;
-    }
-    .section {
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 0.35rem;
-        padding: 0.6rem 0.75rem;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    legend {
-        font-size: 0.8em;
-        font-weight: 600;
-        padding: 0 0.25em;
-        opacity: 0.9;
-    }
-    .radio-row {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 0.75rem 1.25rem;
-        align-items: center;
-    }
-    .radio-column {
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-    }
-    .radio-option {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 0.4rem;
-        font-size: 0.9em;
-        cursor: pointer;
-    }
-    .coords {
-        margin: 0;
-        font-size: 0.85em;
-    }
-    .coords.muted {
-        opacity: 0.75;
-    }
-    .dim {
-        display: block;
-        margin-top: 0.2em;
-    }
-    .row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.6rem;
-        align-items: flex-end;
-    }
-    label {
-        display: flex;
-        flex-direction: column;
-        font-size: 0.8em;
-        gap: 0.15em;
-    }
-    .select-label {
-        gap: 0.25em;
-    }
-    input[type="number"] {
-        width: 5em;
-    }
-    .native-select {
-        width: 100%;
-        box-sizing: border-box;
-        font-size: 0.9em;
-        color: rgba(255, 255, 255, 0.9);
-        background-color: rgba(255, 255, 255, 0.15);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 0.25rem;
-        padding: 0.35em 0.5em;
-    }
-    .footer {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.5rem;
-        padding-top: 0.25rem;
-    }
-</style>
+</Modal>
