@@ -4,6 +4,7 @@
     import { accountStatus, PASSWORD_HINT } from "$lib/admin/accountStatus";
     import {
         grantMembership,
+        linkEmail,
         listMemberships,
         listProjects,
         listUsers,
@@ -25,7 +26,10 @@
     import { StatusIndicator } from "$lib/components/ui/status-indicator/index.js";
     import * as Table from "$lib/components/ui/table/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
-    import { PasswordInput } from "$lib/components/ui/text-input/index.js";
+    import {
+        PasswordInput,
+        TextInput,
+    } from "$lib/components/ui/text-input/index.js";
     import { cn } from "$lib/utils.js";
     import { untrack } from "svelte";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
@@ -61,6 +65,24 @@
         const held = new Set(data.memberships.map((m) => m.project_id));
         return data.projects.filter((p) => !held.has(p.id));
     });
+
+    const LINK_HELPER =
+        "Their first SSO login with this email signs in to this Account.";
+
+    // The SSO link from employee_identifier; a pinned subject is never shown.
+    function ssoLink(identifier: string | null | undefined) {
+        if (identifier?.startsWith("oidc:email:"))
+            return {
+                text: identifier.slice("oidc:email:".length),
+                helper: LINK_HELPER,
+            };
+        if (identifier?.startsWith("oidc:sub:"))
+            return {
+                text: "Signed in with SSO",
+                helper: "The email is not kept after the first login. Linking an email replaces this link.",
+            };
+        return null;
+    }
 
     function roleLabel(role: RoleName): string {
         return ROLES.find((r) => r.value === role)?.label ?? role;
@@ -147,6 +169,11 @@
     let newPassword = $state("");
     let passwordMissing = $state(false);
 
+    let emailOpen = $state(false);
+    let newEmail = $state("");
+    let emailMissing = $state(false);
+    let emailTaken = $state(false);
+
     function openRemove(m: MembershipResponse) {
         removing = m;
         removeOpen = true;
@@ -171,6 +198,29 @@
             return false;
         }
         return save(setPassword(userId, newPassword));
+    }
+
+    function openEmail() {
+        newEmail = "";
+        emailMissing = false;
+        emailTaken = false;
+        emailOpen = true;
+    }
+
+    function submitEmail() {
+        emailTaken = false;
+        if (!newEmail.trim()) {
+            emailMissing = true;
+            return false;
+        }
+        // A taken email shows on the field; the empty rejection keeps the modal open without its error.
+        return save(linkEmail(userId, newEmail)).catch((e) => {
+            if (e instanceof ApiError && e.code === "email_link_taken") {
+                emailTaken = true;
+                throw new Error("");
+            }
+            throw e;
+        });
     }
 </script>
 
@@ -200,6 +250,7 @@
 {:else}
     {@const user = data.user}
     {@const status = accountStatus(user)}
+    {@const link = ssoLink(user.employee_identifier)}
     <div class="mt-2 mb-10">
         <div class="flex flex-wrap items-center gap-4">
             <!-- tabindex=-1: focus lands here when a removed row's, Deactivate's or Reactivate's button is gone -->
@@ -314,6 +365,19 @@
     <h2 class="mt-10 mb-4 text-heading-compact-02 text-text-primary">
         Account
     </h2>
+    <div class="mb-4">
+        <p class="mb-1 text-label-01 text-text-secondary">SSO email</p>
+        {#if link}
+            <p class="text-body-01 wrap-anywhere text-text-primary">
+                {link.text}
+            </p>
+            <p class="mt-1 text-helper-text-01 text-text-helper">
+                {link.helper}
+            </p>
+        {:else}
+            <p class="text-body-01 text-text-secondary">Not linked</p>
+        {/if}
+    </div>
     <div class="flex flex-wrap gap-4">
         {#if user.active}
             <Button variant="secondary" onclick={() => (deactivateOpen = true)}>
@@ -334,6 +398,7 @@
             </Button>
         {/if}
         <Button variant="secondary" onclick={openPassword}>Set password</Button>
+        <Button variant="secondary" onclick={openEmail}>Link email</Button>
     </div>
 
     <Modal
@@ -431,6 +496,29 @@
             invalidText={passwordMissing && !newPassword
                 ? "Enter a password"
                 : undefined}
+        />
+    </Modal>
+
+    <Modal
+        bind:open={emailOpen}
+        modalHeading="Link email"
+        modalLabel={user.username}
+        primaryButtonText="Link email"
+        primaryButtonLoadingDescription="Linking…"
+        successDescription="Email linked"
+        errorTitle="Email could not be linked"
+        onsubmit={submitEmail}
+    >
+        <TextInput
+            labelText="Email"
+            bind:value={newEmail}
+            autocomplete="off"
+            helperText={LINK_HELPER}
+            invalidText={emailTaken
+                ? "Another Account already has this email linked."
+                : emailMissing && !newEmail.trim()
+                  ? "Enter an email"
+                  : undefined}
         />
     </Modal>
 {/if}
