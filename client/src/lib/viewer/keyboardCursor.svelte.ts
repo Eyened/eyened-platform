@@ -28,7 +28,10 @@ export class KeyboardCursor {
             event.preventDefault();
             const { width, height } = this.host.size();
             this.on = true;
-            this.position = { x: Math.round(width / 2), y: Math.round(height / 2) };
+            this.position = {
+                x: Math.round(width / 2),
+                y: Math.round(height / 2),
+            };
             this.host.changed(true);
             this.send("pointermove");
             return true;
@@ -43,8 +46,14 @@ export class KeyboardCursor {
             const step = event.shiftKey ? 10 : 1;
             const { width, height } = this.host.size();
             this.position = {
-                x: Math.min(width - 1, Math.max(0, this.position.x + arrow[0] * step)),
-                y: Math.min(height - 1, Math.max(0, this.position.y + arrow[1] * step)),
+                x: Math.min(
+                    width - 1,
+                    Math.max(0, this.position.x + arrow[0] * step),
+                ),
+                y: Math.min(
+                    height - 1,
+                    Math.max(0, this.position.y + arrow[1] * step),
+                ),
             };
             this.send("pointermove");
             return true;

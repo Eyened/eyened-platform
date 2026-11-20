@@ -20,7 +20,11 @@ function key(
     key: string,
     init: Partial<KeyboardEventInit> & { code?: string } = {},
 ): KeyboardEvent {
-    return new KeyboardEvent("keydown", { key, code: init.code ?? key, ...init });
+    return new KeyboardEvent("keydown", {
+        key,
+        code: init.code ?? key,
+        ...init,
+    });
 }
 
 describe("KeyboardCursor", () => {
@@ -39,7 +43,9 @@ describe("KeyboardCursor", () => {
     it("leaves every key alone while off", () => {
         const { cursor, sent } = setup();
         for (const k of ["ArrowUp", "ArrowLeft", " "]) {
-            expect(cursor.keydown(key(k, { code: k === " " ? "Space" : k }))).toBe(false);
+            expect(
+                cursor.keydown(key(k, { code: k === " " ? "Space" : k })),
+            ).toBe(false);
         }
         expect(sent).toEqual([]);
     });
@@ -65,7 +71,9 @@ describe("KeyboardCursor", () => {
         cursor.keydown(key(" ", { code: "Space", repeat: true }));
         cursor.keydown(key("ArrowRight"));
         expect(
-            cursor.keyup(new KeyboardEvent("keyup", { key: " ", code: "Space" })),
+            cursor.keyup(
+                new KeyboardEvent("keyup", { key: " ", code: "Space" }),
+            ),
         ).toBe(true);
         expect(sent).toEqual([
             { name: "pointerdown", button: 0, buttons: 1 },
@@ -97,7 +105,9 @@ describe("KeyboardCursor", () => {
         cursor.keydown(key("Enter"));
         sent.length = 0;
         expect(
-            cursor.keyup(new KeyboardEvent("keyup", { key: " ", code: "Space" })),
+            cursor.keyup(
+                new KeyboardEvent("keyup", { key: " ", code: "Space" }),
+            ),
         ).toBe(false);
         expect(sent).toEqual([]);
     });
