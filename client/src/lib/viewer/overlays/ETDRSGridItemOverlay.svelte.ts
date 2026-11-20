@@ -33,7 +33,10 @@ export type GridData = { fovea?: Position2D; disc_edge?: Position2D };
  * ETDRS landmarks are always en-face 2D `(x, y)`. An OCT volume's en-face plane is `${id}_proj`, so map from that node and never through OCTToProj, which remaps `index → y`.
  * A plain CF id has no proj edge and stays as is.
  */
-function enfaceSourceId(registration: Registration, gridImageId: string): string {
+function enfaceSourceId(
+    registration: Registration,
+    gridImageId: string,
+): string {
     if (gridImageId.endsWith("_proj")) return gridImageId;
     const projId = `${gridImageId}_proj`;
     return registration.getRegistrationItem(gridImageId, projId)

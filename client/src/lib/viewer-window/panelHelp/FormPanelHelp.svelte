@@ -43,9 +43,9 @@
             the form keeps a blank choice for it.
         </li>
         <li>
-            On a list of points, <kbd>Ctrl</kbd>-click or <kbd>⌘</kbd>-click places another point even
-            on top of an existing marker. That click does not cycle or drag. A
-            single landmark stays one point.
+            On a list of points, <kbd>Ctrl</kbd>-click or <kbd>⌘</kbd>-click
+            places another point even on top of an existing marker. That click
+            does not cycle or drag. A single landmark stays one point.
         </li>
     </ul>
 </section>

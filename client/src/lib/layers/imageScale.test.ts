@@ -53,7 +53,9 @@ describe("scaleOf", () => {
         expect(
             value(scale({ stored: STORED, pick: { kind: "grid", key: 2 } })),
         ).toEqual([15, "from grid 2"]);
-        expect(scale({ stored: STORED, pick: { kind: "grid", key: 3 } })).toBeNull();
+        expect(
+            scale({ stored: STORED, pick: { kind: "grid", key: 3 } }),
+        ).toBeNull();
         expect(
             scale({ stored: STORED, pick: { kind: "typed", x: 9.84, y: 9.7 } }),
         ).toMatchObject({ x: 9.84, y: 9.7, source: "typed" });

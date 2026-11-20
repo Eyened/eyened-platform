@@ -54,7 +54,11 @@ describe("MeasureTool", () => {
     it("click the start, click the end makes a line; the right button and an unarmed tool do nothing", () => {
         const lines = new DistanceLines();
         let armed = false;
-        const tool = new MeasureTool(lines, () => null, () => armed);
+        const tool = new MeasureTool(
+            lines,
+            () => null,
+            () => armed,
+        );
         const v = viewer();
         click(tool, v, { x: 10, y: 10 });
         armed = true;
@@ -73,7 +77,11 @@ describe("MeasureTool", () => {
     it("drags an end to move it; Del removes the line under the pointer, not over empty image or with the pointer elsewhere", () => {
         const lines = new DistanceLines();
         lines.add(new Line({ x: 0, y: 0 }, { x: 30, y: 40 }, 0));
-        const tool = new MeasureTool(lines, () => null, () => true);
+        const tool = new MeasureTool(
+            lines,
+            () => null,
+            () => true,
+        );
         const v = viewer();
         tool.pointermove(pointer(v, { x: 30, y: 40 }));
         tool.pointerdown(pointer(v, { x: 30, y: 40 }));
@@ -91,7 +99,11 @@ describe("MeasureTool", () => {
         const lines = new DistanceLines();
         const old = new Line({ x: 0, y: 0 }, { x: 30, y: 40 }, 0);
         lines.add(old);
-        const tool = new MeasureTool(lines, () => null, () => true);
+        const tool = new MeasureTool(
+            lines,
+            () => null,
+            () => true,
+        );
         const v = viewer();
         tool.pointermove(pointer(v, { x: 30, y: 40 }));
         lines.remove(old);

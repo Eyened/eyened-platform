@@ -26,7 +26,10 @@ export interface Scale {
 }
 
 /** µm per pixel from a grid; undefined when a point is missing or both points are on one spot. */
-export function gridScale(grid: ScaleGrid, fraction: number): number | undefined {
+export function gridScale(
+    grid: ScaleGrid,
+    fraction: number,
+): number | undefined {
     if (!grid.fovea || !grid.discEdge) return undefined;
     const px = Math.hypot(
         grid.discEdge.x - grid.fovea.x,

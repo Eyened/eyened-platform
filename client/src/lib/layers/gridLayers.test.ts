@@ -94,7 +94,10 @@ describe("keepGridSize", () => {
 
 describe("GridLayers.scaleGrids", () => {
     it("maps a registered image's grid into this image's pixels", () => {
-        formSchemasByName.set(SCHEMA_NAME, { id: 3, name: SCHEMA_NAME } as never);
+        formSchemasByName.set(SCHEMA_NAME, {
+            id: 3,
+            name: SCHEMA_NAME,
+        } as never);
         formAnnotations.set(
             9,
             grid(9, 5, "inst-2", {
@@ -106,8 +109,11 @@ describe("GridLayers.scaleGrids", () => {
         const registration = {
             getLinkedImgIds: () => new Set(["inst-2"]),
             getRegistrationItem: () => undefined,
-            mapPosition: (from: string, to: string, p: { x: number; y: number }) =>
-                from === to ? p : { ...p, x: p.x * 2, y: p.y * 2 },
+            mapPosition: (
+                from: string,
+                to: string,
+                p: { x: number; y: number },
+            ) => (from === to ? p : { ...p, x: p.x * 2, y: p.y * 2 }),
         };
         const viewer = {
             image: {
