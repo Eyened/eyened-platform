@@ -93,6 +93,12 @@ def test_valid_oidc_metadata_is_returned_unchanged():
     assert metadata.jwks_uri == "https://example.com/api/jwks"
 
 
+def test_an_issuer_with_a_trailing_slash_matches_its_metadata_url():
+    # OIDC Discovery 4: a trailing "/" on the issuer is removed before the well-known suffix is added.
+    metadata = validate_oidc_metadata({**OPENID_CONFIG, "issuer": "https://example.com/api/"}, METADATA_URL)
+    assert metadata.issuer == "https://example.com/api/"
+
+
 @pytest.mark.parametrize(
     "metadata_key",
     ["authorization_endpoint", "jwks_uri", "token_endpoint", "issuer", "userinfo_endpoint"],

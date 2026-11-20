@@ -124,7 +124,8 @@ def validate_oidc_metadata(metadata: dict, metadata_url: str) -> OIDCMetadata:
             raise ValueError(f"OIDC metadata URL response is missing required key '{key}'")
 
     # OIDC Discovery 4.3: the issuer must be identical to the URL it was read from.
-    if metadata["issuer"] + "/.well-known/openid-configuration" != metadata_url:
+    # Discovery 4 drops a trailing "/" on the issuer before adding the suffix.
+    if metadata["issuer"].rstrip("/") + "/.well-known/openid-configuration" != metadata_url:
         raise ValueError("OIDC metadata issuer does not match the metadata URL")
 
     return OIDCMetadata(

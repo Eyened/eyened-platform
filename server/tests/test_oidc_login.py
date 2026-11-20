@@ -66,7 +66,7 @@ def test_a_discovery_issuer_that_differs_from_its_url_turns_sso_off(
     from server.config import get_oidc_metadata
 
     get_oidc_metadata.cache_clear()
-    oidc_provider.issuer = "https://connect.surfconext.nl/"
+    oidc_provider.issuer = "https://other-provider.example.org"
 
     assert client_anonymous.get("/auth/options").json()["oidc_enabled"] is False
 
