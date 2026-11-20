@@ -29,7 +29,7 @@
   },
   "src/lib/data-loading/imageLoader.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 7
+      "count": 5
     }
   },
   "src/lib/data-loading/utils.ts": {
@@ -212,11 +212,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/panelRegistration/RegistrationItem.svelte": {
-    "svelte/require-each-key": {
-      "count": 2
-    }
-  },
   "src/lib/viewer-window/panelSegmentation/CreateSegmentationDialog.svelte": {
     "svelte/require-each-key": {
       "count": 1
@@ -331,11 +326,6 @@
   "src/routes/view/+page.svelte": {
     "svelte/prefer-svelte-reactivity": {
       "count": 1
-    }
-  },
-  "src/types/cornerstone-core.d.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 6
     }
   }
 }

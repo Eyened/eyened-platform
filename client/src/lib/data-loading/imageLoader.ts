@@ -5,21 +5,11 @@ import { ImageSliceStack } from "$lib/webgl/imageSliceStack";
 import type { Dimensions } from "$lib/webgl/types";
 import type { WebGL } from "$lib/webgl/webgl";
 import type { ImageGET } from "../../types/openapi_types";
+import { decodeDicomBuffer } from "./dicomDecoder";
+import { buildImageDataUrl } from "./imageDataUrl";
+import type { ImageLoadProgress } from "./loadProgress";
+import { setLoadMessage } from "./loadProgress";
 import { loadMhdRawFromEndpoints } from "./mhdLoader";
-
-import * as cornerstone from "cornerstone-core";
-import * as cornerstoneWADOImageLoader from "cornerstone-wado-image-loader";
-import * as dicomParser from "dicom-parser";
-
-// Configure cornerstone WADO image loader
-cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
-cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
-cornerstoneWADOImageLoader.configure({
-    beforeSend: (xhr: XMLHttpRequest) => {
-        xhr.setRequestHeader("Accept", "application/dicom");
-    },
-    useWebWorkers: true,
-});
 
 export type LoadedImages =
     | [Image2D]
@@ -31,11 +21,13 @@ export class ImageLoader {
     minBscansForEnface = 5;
     constructor(public readonly webgl: WebGL) {}
 
-    async load(instance: ImageGET): Promise<LoadedImages> {
+    async load(
+        instance: ImageGET,
+        progress?: ImageLoadProgress,
+    ): Promise<LoadedImages> {
         const img_id = `${instance.id}`;
         const imageId = instance.id;
         const dataUrl = this.buildDataUrl(imageId);
-        // Convert to lowercase for case-insensitive comparison
         const dataFormat = instance.data_format;
         console.info(
             `[imageLoader] load image ${img_id} format=${dataFormat} ` +
@@ -55,7 +47,7 @@ export class ImageLoader {
             );
             return this.returnLoadedVolume(image);
         } else if (dataFormat === "dicom") {
-            return this.loadDicom(instance, img_id, imageId);
+            return this.loadDicom(instance, img_id, imageId, progress);
         } else if (dataFormat === "png_series") {
             const meta = await this.loadPngSeriesMeta(imageId);
             return this.loadPngSeries(instance, meta, img_id, imageId);
@@ -246,64 +238,45 @@ export class ImageLoader {
         );
     }
 
+    /**
+     * Fetch + decode a DICOM at ``url`` into a mono volume (or single-frame buffer).
+     */
+    async decodeDicomVolume(
+        url: string,
+        logId: string,
+        progress?: ImageLoadProgress,
+    ): Promise<{
+        volume: Uint8Array;
+        dimensions: Dimensions;
+        meta: Record<string, unknown>;
+        photometricInterpretation?: string;
+    }> {
+        setLoadMessage(progress, "Downloading…");
+        const response = await fetch(url, {
+            headers: { Accept: "application/dicom" },
+        });
+        if (!response.ok) {
+            throw new Error(
+                `Failed to fetch DICOM ${logId}: ${response.status}`,
+            );
+        }
+        const buffer = await response.arrayBuffer();
+        setLoadMessage(progress, "Decoding…");
+        return decodeDicomBuffer(buffer, { logId });
+    }
+
     async loadDicom(
         instance: ImageGET,
         img_id: string,
         imageId: string,
+        progress?: ImageLoadProgress,
     ): Promise<LoadedImages> {
         const url = this.buildDataUrl(imageId);
-
-        const dicomImageId = `wadouri:${url}`;
-        const image = await cornerstone.loadImage(dicomImageId);
-        const ds = image.data;
-
-        const meta: any = dicomParser.explicitDataSetToJS(ds);
-        const dimensions = this.extractDimensions(meta);
-
-        const photometricInterpretation = meta.x00280004;
-        const transferSyntax = meta.x00020010;
+        const decoded = await this.decodeDicomVolume(url, img_id, progress);
+        const { volume, dimensions, meta, photometricInterpretation } = decoded;
         const { width, height, depth } = dimensions;
 
-        const pixelData = ds.elements.x7fe00010;
-
-        // pixeldata is already in the correct format
-        if (pixelData.length === width * height * depth) {
-            console.info(
-                `[imageLoader] dicom ${img_id}: uncompressed pixel data ` +
-                    `${width}x${height}x${depth} (transferSyntax=${transferSyntax})`,
-            );
-            const dicomBytes = ds.byteArray as Uint8Array;
-            const volume = dicomBytes.subarray(
-                pixelData.dataOffset,
-                pixelData.dataOffset + pixelData.length,
-            );
-            return this.returnLoadedVolume(
-                createVolumeImage(
-                    instance,
-                    this.webgl,
-                    img_id,
-                    volume,
-                    dimensions,
-                    meta,
-                ),
-            );
-        }
-
-        if (depth > 1 || meta.x00080060 === "OPT") {
-            // 3D OCT — cornerstone/OpenJPEG may emit j2k INFO lines per frame
-            console.info(
-                `[imageLoader] dicom ${img_id}: decoding ${depth} frame(s) via cornerstone ` +
-                    `(${width}x${height}, modality=${meta.x00080060}, transferSyntax=${transferSyntax})`,
-            );
-            const volume = new Uint8Array(width * height * depth);
-            for (let i = 0; i < depth; i++) {
-                const frameImageId = `wadouri:${url}?frame=${i}`;
-                const frameImage = await cornerstone.loadImage(frameImageId);
-                volume.set(
-                    new Uint8Array(frameImage.getPixelData()),
-                    i * width * height,
-                );
-            }
+        if (volume.length === width * height * depth) {
             return this.returnLoadedVolume(
                 createVolumeImage(
                     instance,
@@ -320,17 +293,12 @@ export class ImageLoader {
             photometricInterpretation === "RGB" ||
             photometricInterpretation === "MONOCHROME2"
         ) {
-            console.info(
-                `[imageLoader] dicom ${img_id}: single-frame 2D via cornerstone ` +
-                    `(${width}x${height}, photometric=${photometricInterpretation}, transferSyntax=${transferSyntax})`,
-            );
-            const pixelData = new Uint8Array(image.getPixelData());
             return [
                 Image2D.fromPixelData(
                     instance,
                     this.webgl,
                     img_id,
-                    pixelData,
+                    volume,
                     dimensions,
                     meta,
                 ),
@@ -374,62 +342,11 @@ export class ImageLoader {
         );
     }
 
-    private extractDimensions(meta: any): Dimensions {
-        const width = Number(meta.x00280011); // Rows (width)
-        const height = Number(meta.x00280010); // Columns (height)
-        const depth = Number(meta.x00280008) || 1; // Number of frames (depth)
-
-        let res_w = -1,
-            res_h = -1,
-            res_d = -1;
-
-        // x00280030: PixelSpacing
-        const pixelSpacing = meta.x00280030?.split("\\").map(Number);
-        if (pixelSpacing) {
-            [res_h, res_w] = pixelSpacing;
-        }
-
-        try {
-            // Note: this extracts the values from the first frame
-            // Perhaps we should implement an Image2DArray for multi-frame images
-            // if the resolution varies between frames (e.g. radial + circular scans)
-
-            // x52009229: Shared Functional Groups Sequence
-            const resolutions = meta.x52009229[0].x00289110[0];
-            [res_h, res_w] = resolutions.x00280030.split("\\").map(Number);
-            // x00180050: Slice Thickness
-            res_d = Number(resolutions.x00180050);
-        } catch (e) {
-            if (depth > 1) {
-                console.warn("No depth resolution found in DICOM metadata:", e);
-            }
-        }
-
-        return {
-            width,
-            height,
-            depth,
-            width_mm: width * res_w,
-            height_mm: height * res_h,
-            depth_mm: depth * res_d,
-        };
-    }
-
     private buildDataUrl(
         imageId: string,
         query?: Record<string, string | number | boolean | undefined>,
     ): string {
-        const url = `/api/images/${imageId}/data`;
-        if (!query) {
-            return url;
-        }
-        const search = new URLSearchParams();
-        for (const [key, value] of Object.entries(query)) {
-            if (value !== undefined && value !== null) {
-                search.set(key, String(value));
-            }
-        }
-        return `${url}?${search.toString()}`;
+        return buildImageDataUrl(imageId, query);
     }
 
     private async loadBinaryMeta(imageId: string): Promise<any> {
