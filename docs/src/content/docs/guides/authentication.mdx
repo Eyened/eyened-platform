@@ -5,6 +5,8 @@ description: How to configure authentication backends in Eyened
 
 To access the Eyened platform, users need to authenticate. See below for options on how to manage them.
 
+Moving an existing site to SSO? Follow [Switching to SSO](/eyened-platform/guides/switching_to_sso).
+
 ## Standalone / database backend
 
 By default, accounts are managed in the MySQL database holding all Eyened data. The database table `creator` holds usernames, password hashes and a few other fields describing users. To create a new user, use the ORM command `eorm create-user`. More advanced user management is done by accessing the `Creator` table in the database using SQL.
@@ -60,7 +62,7 @@ With `EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS` set, a login that carries no `scha
 
 ### Link an existing Account to SSO
 
-Use this when a person already has an Account, for example a password Account, and should keep it when they switch to SSO.
+Use this when a person already has an Account, for example a password Account, and should keep it when they switch to SSO. To move a whole site, follow [Switching to SSO](/eyened-platform/guides/switching_to_sso).
 
 1. In **Admin**, open the person's Account.
 2. Choose **Link email** and enter the email address exactly as the provider sends it. The match is case-sensitive.
@@ -151,9 +153,9 @@ When configuring authentication options, this option enables OIDC authentication
 - Required: no
 - Default value: `true`
 
-When configuring authentication options, this option controls password authentication. When enabled, the username + password dialog is shown in the login screen.
+When configuring authentication options, this option controls password authentication. When enabled, the username + password dialog is shown in the login screen. When `false`, the dialog is hidden and the server refuses password logins and sign-ups.
 
-After enabling OIDC authentication, you probably want to disable the default password authentication, which you can do by setting this option to `false`. In the rare case that you want to keep multiple authentication options available at the same time, just set both options to `true`.
+After enabling OIDC authentication, you probably want to disable the default password authentication, which you can do by setting this option to `false`. Link every existing Account first; see [Switching to SSO](/eyened-platform/guides/switching_to_sso). In the rare case that you want to keep multiple authentication options available at the same time, just set both options to `true`.
 
 
 ### OIDC Access control

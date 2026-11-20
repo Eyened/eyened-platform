@@ -1,0 +1,48 @@
+---
+title: Switching to SSO
+description: Move an existing site to SURFconext SSO and keep every Account's project access
+---
+
+Do this once, when a site with password Accounts moves to SURFconext. Linked Accounts keep their project memberships.
+
+After each change to `deploy/.env`, run `docker compose up -d` from `deploy/`.
+
+## Before you start
+
+1. Ask SURFconext to release the `email` and `schac_home_organization` attributes, and for the `schac_home_organization` value of each institution you want to admit.
+2. List the Accounts that have project access, including your own admin Account, and the email address SURFconext sends for each person.
+
+## Switch
+
+1. Configure SSO as in [SURFconext](/eyened-platform/guides/authentication#surfconext), with account creation off, the allow list set and passwords still on:
+
+    ```bash
+    EYENED_OIDC_CREATE_NEW_ACCOUNTS=false
+    EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS=<value>,<value>
+    EYENED_API_AUTH_PASSWORD_ENABLED=true
+    ```
+
+    With account creation off, an unlinked login is refused instead of creating an empty duplicate Account.
+
+2. Link each Account on your list with **Link email**, as in [Link an existing Account to SSO](/eyened-platform/guides/authentication#link-an-existing-account-to-sso). Enter the address SURFconext sends, matched exactly; case counts. Linking replaces any old value the Account held, such as an old employee number.
+
+3. Ask graders to log in with SSO. On each Account's admin page, check that **SSO email** shows *Signed in with SSO*.
+
+4. If a grader is refused with 401, their Account is unlinked or linked with a different spelling. Fix the link, then they retry. A 403 means their institution is not in [`EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS`](/eyened-platform/guides/authentication#eyened_oidc_allowed_home_organizations).
+
+5. Optional: once every existing Account shows *Signed in with SSO*, set `EYENED_OIDC_CREATE_NEW_ACCOUNTS=true`. New graders then get an Account on their first login, with no project access.
+
+6. Once every Account, yours included, shows *Signed in with SSO*, set `EYENED_API_AUTH_PASSWORD_ENABLED=false`. The server then refuses password logins and sign-ups.
+
+## If a duplicate Account already exists
+
+A grader who logged in with SSO before their Account was linked, while account creation was on, has a second, empty Account pinned to their SSO identity.
+
+The login checks that pin before any email link, so linking the old Account has no effect while the duplicate holds the pin. Deactivating the duplicate alone locks the grader out. Move the pin instead:
+
+1. On the duplicate Account, choose **Link email** and enter an address nobody uses, for example `unlinked-<account id>@example.invalid`. This replaces the duplicate's pin.
+2. Deactivate the duplicate Account.
+3. Link the old Account to the grader's email, if it is not linked yet.
+4. Ask the grader to log in again. The login now finds the old Account by email and pins it.
+
+A direct way to remove a pin from the admin page is tracked in [this issue](https://github.com/Eyened/eyened-platform/issues/336).
