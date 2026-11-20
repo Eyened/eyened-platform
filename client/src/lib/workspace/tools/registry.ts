@@ -174,7 +174,11 @@ export const BROWSE: readonly ToolId[] = [
 ];
 
 export const NO_TOOL_HINT =
-    "Shift+drag pans · wheel steps slices · Shift+wheel zooms · hold H hides overlays · O localizer lines";
+    "Shift+drag pans · wheel steps slices · Shift+wheel zooms · Enter keyboard cursor · hold H hides overlays · O localizer lines";
+
+/** Shown in place of the tool's hint while the keyboard cursor is on. */
+export const KEYBOARD_CURSOR_HINT =
+    "Keyboard cursor · arrows move, Shift 10 px · Space clicks, hold to drag · Esc leaves";
 
 export function toolById(id: ToolId): ToolDef {
     return TOOLS.find((t) => t.id === id)!;

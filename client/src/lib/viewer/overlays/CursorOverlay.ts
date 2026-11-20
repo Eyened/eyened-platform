@@ -1,6 +1,7 @@
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 import type { RenderTarget } from "$lib/webgl/types";
+import { casedStroke } from "../tools/segmentation";
 
 export class CursorOverlay implements Overlay {
     lineWidth = 1;
@@ -14,6 +15,12 @@ export class CursorOverlay implements Overlay {
     constructor() {}
 
     repaint(viewerContext: ViewerContext, _renderTarget: RenderTarget) {
+        // The keyboard cursor's cross shows with every tool, so it never vanishes when a tool can't draw its outline.
+        if (viewerContext.keyboardCursor.on)
+            keyboardCross(
+                viewerContext.context2D,
+                viewerContext.keyboardCursor.position,
+            );
         // Under the pointer the pointer is the crosshair, unless Cross-hair is armed and a click set it.
         if (
             viewerContext.active &&
@@ -85,4 +92,22 @@ export class CursorOverlay implements Overlay {
             context2D.stroke();
         }
     }
+}
+
+/** A cross with an open centre, cased like the brush cursor, so it shows on bright and dark images. */
+function keyboardCross(
+    ctx: CanvasRenderingContext2D,
+    p: { x: number; y: number },
+) {
+    const cross = new Path2D();
+    for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+    ]) {
+        cross.moveTo(p.x + dx * 3, p.y + dy * 3);
+        cross.lineTo(p.x + dx * 10, p.y + dy * 10);
+    }
+    casedStroke(ctx, cross, "white");
 }

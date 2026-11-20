@@ -41,6 +41,7 @@ function drawViewport(ws: Workspace, drawTarget: DrawTarget) {
                 image: { is2D: true },
                 index: 0,
                 returnFocus: vi.fn(),
+                keyboardCursor: { on: false },
             },
             mainViewerContext: { segmentationContext },
         } as never,
@@ -70,6 +71,7 @@ function armWith(tool: ToolId, layers: object) {
                 setIndex: vi.fn(),
                 focusPoint: vi.fn(),
                 returnFocus: vi.fn(),
+                keyboardCursor: { on: false },
             },
             ...layers,
         } as never,
@@ -99,6 +101,28 @@ describe("ToolOptionsBar", () => {
         await expectNoAxeViolations(container);
     });
 
+    it("shows the keyboard cursor's keys in place of the tool's hint while it is on", () => {
+        const ws = workspaceWith(1);
+        ws.attachViewport(0, {
+            zoomPercent: 100,
+            zoomBy: vi.fn(),
+            reset: vi.fn(),
+            layers: {
+                viewerContext: { keyboardCursor: { on: true } },
+            } as never,
+        });
+        ws.arm("zoom");
+        render(ToolOptionsBar, { context: workspaceContext(ws) });
+        expect(
+            screen.getByText(
+                "Keyboard cursor · arrows move, Shift 10 px · Space clicks, hold to drag · Esc leaves",
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText("Drag down zooms in, up zooms out"),
+        ).toBeNull();
+    });
+
     it("names the registration P places into, read-only for a colleague's, or asks for one", () => {
         const show = (pointTarget: { id: number; canEdit: boolean } | null) => {
             const ws = workspaceWith(1);
@@ -106,7 +130,10 @@ describe("ToolOptionsBar", () => {
                 zoomPercent: 100,
                 zoomBy: vi.fn(),
                 reset: vi.fn(),
-                layers: { pointTarget } as never,
+                layers: {
+                    pointTarget,
+                    viewerContext: { keyboardCursor: { on: false } },
+                } as never,
             });
             ws.arm("point");
             return render(ToolOptionsBar, { context: workspaceContext(ws) });
@@ -292,7 +319,10 @@ describe("ToolOptionsBar when short", () => {
                 zoomPercent: 100,
                 zoomBy: vi.fn(),
                 reset: vi.fn(),
-                layers: layers as never,
+                layers: {
+                    viewerContext: { keyboardCursor: { on: false } },
+                    ...layers,
+                } as never,
             });
             ws.arm(tool);
             return render(ToolOptionsBar, { context: workspaceContext(ws) });

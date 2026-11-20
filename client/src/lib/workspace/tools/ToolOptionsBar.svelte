@@ -6,7 +6,12 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
     import { getContext, tick, untrack } from "svelte";
     import OverflowMenu from "../OverflowMenu.svelte";
     import type { Workspace } from "../workspace.svelte";
-    import { NO_TOOL_HINT, toolById, type ToolId } from "./registry";
+    import {
+        KEYBOARD_CURSOR_HINT,
+        NO_TOOL_HINT,
+        toolById,
+        type ToolId,
+    } from "./registry";
     import ToolOption, { type OptionId } from "./ToolOption.svelte";
 
     const workspace = getContext<Workspace>("workspace");
@@ -42,6 +47,8 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
             : "",
     );
     const hint = $derived.by(() => {
+        if (layers?.viewerContext.keyboardCursor.on)
+            return KEYBOARD_CURSOR_HINT;
         if (!tool) return NO_TOOL_HINT;
         if (tool.id !== "point") return tool.hint;
         if (!point) return "Make a registration current in Pointsets.";
