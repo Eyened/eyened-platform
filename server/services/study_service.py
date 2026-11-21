@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import logging
 from urllib.parse import quote
 
-import httpxyz
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
@@ -19,11 +17,7 @@ from ..db import get_db
 from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
-from .exceptions import BadRequestError, NotFoundError, UpstreamError
-
-logger = logging.getLogger(__name__)
-
-DATA_SOURCE_TIMEOUT = 10
+from .exceptions import BadRequestError, NotFoundError
 
 
 class StudyService:
@@ -231,16 +225,15 @@ class StudyService:
             raise NotFoundError(f"Study {study_id} not found")
         return study
 
-    def fetch_data_source(self, study_id: int, name: str) -> bytes:
-        """Fetch a study's data from the named source; return the upstream body.
+    def data_source_url(self, study_id: int, name: str) -> str:
+        """The upstream URL of the named source for this study.
 
-        The upstream URL is built from the study's own fields, never from the
-        request, so access to the study is access to its data.
+        The URL is built from the study's own fields, never from the request,
+        so access to the study is access to its data.
 
         Raises:
-            NotFoundError: If the study is missing or out of scope, the source
-                does not apply to it, or the upstream has no data (404).
-            UpstreamError: If the upstream fails or times out.
+            NotFoundError: If the study is missing or out of scope, or the
+                source does not apply to it.
         """
         study = self._visible_study(study_id)
         source = next((s for s in sources_for_project(study.Patient.Project.ProjectName) if s.name == name), None)
@@ -254,22 +247,7 @@ class StudyService:
         # "", "." and ".." survive quoting but change the upstream path.
         if any(v in ("", ".", "..") for v in values.values()):
             raise NotFoundError(f"Data source {name} has no data for this study")
-        url = source.url.format(**{k: quote(v, safe="") for k, v in values.items()})
-        # The URL is not logged: it holds a patient identifier.
-        try:
-            with httpxyz.Client(timeout=DATA_SOURCE_TIMEOUT) as client:
-                response = client.get(url)
-        except httpxyz.HTTPError as exc:
-            logger.warning("Data source %s unreachable: %s", name, type(exc).__name__)
-            raise UpstreamError(f"Data source {name} unavailable") from None
-        if response.status_code == 404:
-            raise NotFoundError(f"Data source {name} has no data for this study")
-        if not response.is_success:
-            logger.warning(
-                "Data source %s returned HTTP %s", name, response.status_code
-            )
-            raise UpstreamError(f"Data source {name} unavailable")
-        return response.content
+        return source.url.format(**{k: quote(v, safe="") for k, v in values.items()})
 
 
 def get_study_service(

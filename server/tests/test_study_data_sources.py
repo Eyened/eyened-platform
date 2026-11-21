@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from datetime import date
 
+import anyio
 import httpxyz
 import pytest
 
 from eyened_orm import Study
 
 import server.config as config
-import server.services.study_service as study_service
+import server.services.data_source_client as data_source_client
 from eyened_orm.utils.factories import make_patient, make_project, make_study, scope_for
 from server.dtos.dto_converter import DTOConverter
 from server.config import DATA_SOURCES_PATH, DataSource, load_data_sources
@@ -33,8 +34,12 @@ def sources(monkeypatch):
 
 
 @pytest.fixture()
-def upstream(monkeypatch):
-    """Fake upstream; set ``.respond`` to a handler, read ``.urls`` after."""
+def upstream():
+    """Fake upstream; set ``.respond`` to a handler, read ``.urls`` after.
+
+    ``.respond`` may be sync or async; MockTransport awaits either.
+    """
+    from server.main import app_api
 
     class Upstream:
         def __init__(self) -> None:
@@ -44,17 +49,15 @@ def upstream(monkeypatch):
             return httpxyz.Response(200, content=BODY)
 
     fake = Upstream()
-    real_client = httpxyz.Client
 
     def handler(request):
         fake.urls.append(str(request.url))
         return fake.respond(request)
 
-    def client(**kwargs):
-        return real_client(transport=httpxyz.MockTransport(handler), **kwargs)
-
-    monkeypatch.setattr(study_service.httpxyz, "Client", client)
-    return fake
+    mock = httpxyz.AsyncClient(transport=httpxyz.MockTransport(handler))
+    app_api.dependency_overrides[data_source_client.get_data_source_client] = lambda: mock
+    yield fake
+    app_api.dependency_overrides.pop(data_source_client.get_data_source_client, None)
 
 
 @pytest.fixture()
@@ -182,3 +185,33 @@ def test_a_site_config_parses(tmp_path):
     assert load_data_sources(path) == (
         DataSource(name="Registry", url="http://h/{project}/{patient}/{date}", projects=["Alpha", "Beta"]),
     )
+
+
+def test_the_upstream_call_holds_no_db_transaction(client, session, sources, upstream, studies):
+    # `session` is the same object get_db yields to the request.
+    seen = []
+
+    def respond(request):
+        seen.append(session.in_transaction())
+        return httpxyz.Response(200, content=BODY)
+
+    upstream.respond = respond
+
+    response = client.get(f"/studies/{studies['Alpha']['study']}/data-sources/Registry")
+
+    assert response.status_code == 200
+    assert seen == [False]
+
+
+def test_an_upstream_that_never_answers_is_502(client, monkeypatch, sources, upstream, studies):
+    monkeypatch.setattr(data_source_client, "DATA_SOURCE_TIMEOUT", 0.05)
+
+    async def respond(request):
+        await anyio.sleep(5)
+        return httpxyz.Response(200, content=BODY)
+
+    upstream.respond = respond
+
+    response = client.get(f"/studies/{studies['Alpha']['study']}/data-sources/Registry")
+
+    assert response.status_code == 502
