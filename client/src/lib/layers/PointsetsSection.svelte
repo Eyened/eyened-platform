@@ -88,11 +88,10 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
     <LayerSection title="Pointsets" count={rows.length} {open} {ontoggle}>
         {#snippet action()}
             {#if canCreate}
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label="New registration"
-                    onclick={create}>New</Button
+                <IconButton
+                    size="icon-xs"
+                    label="New registration"
+                    onclick={create}><Add /></IconButton
                 >
             {/if}
         {/snippet}

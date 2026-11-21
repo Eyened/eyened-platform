@@ -28,11 +28,11 @@ A closed body is not rendered, so its controls leave the Tab order.
     const uid = $props.id();
 </script>
 
-<div class="flex items-center pe-2">
+<div class="flex items-center pe-2 hover:bg-layer-hover-01">
     <svelte:element this={`h${level}`} class="min-w-0 flex-1">
         <button
             type="button"
-            class="flex min-h-8 w-full items-center gap-2 text-start text-text-primary hover:bg-layer-hover-01 {level ===
+            class="flex min-h-8 w-full items-center gap-2 text-start text-text-primary {level ===
             3
                 ? 'ps-4 text-heading-compact-01'
                 : 'ps-8 text-body-compact-01'}"

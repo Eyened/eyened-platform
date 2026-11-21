@@ -104,11 +104,8 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
 <div bind:this={section} data-layer-section="etdrs">
     <LayerSection title="ETDRS grids" {count} {open} {ontoggle}>
         {#snippet action()}
-            <Button
-                variant="ghost"
-                size="sm"
-                aria-label="New ETDRS grid"
-                onclick={create}>New</Button
+            <IconButton size="icon-xs" label="New ETDRS grid" onclick={create}
+                ><Add /></IconButton
             >
         {/snippet}
         {#if count > 0}
