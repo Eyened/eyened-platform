@@ -230,12 +230,13 @@ describe("ToolOptionsBar", () => {
         const distance = new DistanceLines();
         const line = new Line({ x: 0, y: 0 }, { x: 3, y: 4 }, 0);
         distance.add(line);
+        distance.add(new Line({ x: 0, y: 0 }, { x: 6, y: 8 }, 0));
         const selection = new LayerSelection();
         selection.select({ kind: "line", line, lines: distance });
         armWith("distance", { distance, selection, scale: null });
         const remove = screen.getByRole("button", { name: "Delete" });
         await fireEvent.click(remove);
-        expect(distance.lines).toEqual([]);
+        expect(distance.lines.map((l) => l.end.x)).toEqual([6]);
         expect(remove).toHaveAttribute("aria-disabled", "true");
     });
 

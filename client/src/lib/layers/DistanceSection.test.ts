@@ -38,7 +38,7 @@ function renderSection() {
 
 describe("DistanceSection", () => {
     it("lists this B-scan's lines as Line n · length and focus highlights one; Delete line n removes it and focus moves on", async () => {
-        const { distance } = renderSection();
+        const { distance, selection } = renderSection();
         distance.add(new Line({ x: 0, y: 0 }, { x: 30, y: 40 }, 0));
         distance.add(new Line({ x: 0, y: 0 }, { x: 300, y: 400 }, 1));
         distance.add(new Line({ x: 0, y: 0 }, { x: 0, y: 200 }, 0));
@@ -63,5 +63,15 @@ describe("DistanceSection", () => {
         );
         // Focus now sits in Line 1's row, so Line 1 is the highlighted one.
         expect(distance.highlighted?.end).toEqual({ x: 30, y: 40 });
+        selection.select({
+            kind: "line",
+            line: distance.lines[0],
+            lines: distance,
+        });
+        await tick();
+        expect(screen.getByRole("group", { name: "Line 1" })).toHaveAttribute(
+            "aria-current",
+            "true",
+        );
     });
 });

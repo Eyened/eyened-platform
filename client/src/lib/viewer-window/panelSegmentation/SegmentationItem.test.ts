@@ -105,6 +105,7 @@ describe("SegmentationItem", () => {
         await fireEvent.click(
             screen.getByRole("button", { name: "Drusen AI" }),
         );
+        expect(ctx.segmentationContext.segmentationItem?.segmentation).toBe(ai);
         expect(screen.queryByRole("button", { name: "Edit tags" })).toBeNull();
     });
 

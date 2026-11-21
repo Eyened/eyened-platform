@@ -18,6 +18,7 @@ describe("LayerSelection", () => {
         segmentationContext.toggleActive(
             segmentationContext.getSegmentationItem(s),
         );
+        expect(segmentationContext.segmentationItem).toBeDefined();
         selection.select({ kind: "grid", id: 11 });
         expect(segmentationContext.segmentationItem).toBeUndefined();
         expect(selection.gridId()).toBe(11);

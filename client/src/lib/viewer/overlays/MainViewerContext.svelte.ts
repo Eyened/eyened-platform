@@ -1,3 +1,4 @@
+import { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import { toggleInSet, type Color } from "$lib/utils";
 import {
     getImageUiPref,
@@ -23,7 +24,6 @@ import type { ViewerWindowContext } from "../../viewer-window/viewerWindowContex
 import type { Overlay } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
 import { colors } from "./colors";
-import { LayerSelection } from "$lib/layers/layerSelection.svelte";
 
 export class MainViewerContext implements Overlay {
     private featureColors = new SvelteMap<string, Color>();

@@ -125,10 +125,11 @@ describe("EtdrsSection", () => {
 
     it("the name sets the current grid and shows its points as text; the section mounts no tool; pressing it again unsets it", async () => {
         formAnnotations.set(11, grid(11, ME));
-        const { viewerContext } = renderSection();
+        const { viewerContext, grids } = renderSection();
         const name = () =>
             screen.getByRole("button", { name: "ETDRS grid, Grader 5" });
         await fireEvent.click(name());
+        expect(grids.isShown(11)).toBe(false);
         expect(name()).toHaveAttribute("aria-pressed", "true");
         expect(screen.getByText("Fovea 512, 498")).toBeInTheDocument();
         expect(screen.getByText("Disc edge 801, 470")).toBeInTheDocument();
