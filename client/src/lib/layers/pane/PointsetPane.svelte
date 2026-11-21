@@ -1,8 +1,9 @@
 <!--
 @component
-The Selected pane for a pointset: its save state, then its points per image. P places them.
+The Selected pane for a pointset: its save state, then its points per image. Edit with arms Point (P).
 -->
 <script lang="ts">
+    import EditWith from "./EditWith.svelte";
     import { formAnnotations } from "$lib/data";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
@@ -61,3 +62,4 @@ The Selected pane for a pointset: its save state, then its points per image. P p
         <p class="text-body-compact-01 text-text-secondary">No points yet</p>
     {/if}
 </div>
+{#if remove}<EditWith tool="point" />{/if}

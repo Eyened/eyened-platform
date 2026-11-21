@@ -1,8 +1,9 @@
 <!--
 @component
-The Selected pane for a distance line: its length and two points. Lines are not saved, so there is no save status.
+The Selected pane for a distance line: its length and two points. Lines are not saved, so there is no save status. Edit with arms Distance (D).
 -->
 <script lang="ts">
+    import EditWith from "./EditWith.svelte";
     import type { Snippet } from "svelte";
     import {
         lengthText,
@@ -42,3 +43,4 @@ The Selected pane for a distance line: its length and two points. Lines are not 
 <div class="min-h-0 flex-1 overflow-y-auto py-2">
     <PaneFields {rows} />
 </div>
+{#if remove}<EditWith tool="distance" />{/if}

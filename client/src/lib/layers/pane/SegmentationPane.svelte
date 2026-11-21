@@ -13,6 +13,7 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import SliceArea from "$lib/layers/SliceArea.svelte";
     import SyncStatus from "$lib/layers/SyncStatus.svelte";
+    import { toHex } from "$lib/utils";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import Tagger from "$lib/tags/Tagger.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
@@ -25,6 +26,10 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     import MultiFeatureSelector from "$lib/viewer-window/panelSegmentation/MultiFeatureSelector.svelte";
     import ReferenceSegmentationPanel from "$lib/viewer-window/panelSegmentation/ReferenceSegmentationPanel.svelte";
     import type { Segmentation } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
+    import {
+        authorName,
+        groupTitle,
+    } from "$lib/viewer-window/panelSegmentation/segmentationUtils";
     import ThresholdSlider from "$lib/viewer-window/panelSegmentation/ThresholdSlider.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
@@ -63,6 +68,30 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     const sliceState = $derived(item.getSegmentationState(viewerContext.index));
     let duplicateOpen = $state(false);
     let rare: string[] = $state([]);
+    const me = globalContext.user.id;
+    // Read once at mount, as the row's picker does, so the derived read below never assigns a colour.
+    mainViewerContext.getFeatureColor(item.segmentation);
+    const swatch = $derived(
+        isMulti
+            ? undefined
+            : toHex(mainViewerContext.getFeatureColor(item.segmentation)),
+    );
+    const hasMask = $derived(
+        segmentation.annotation_type === "grader_segmentation" &&
+            !!segmentation.reference_segmentation_id,
+    );
+    const appearance = $derived(!isMulti || rep === "Probability" || hasMask);
+    // The reference's feature and author, as Reference image shows it, for the folded title.
+    const referenceSummary = $derived.by(() => {
+        if (segmentation.annotation_type !== "grader_segmentation")
+            return undefined;
+        const referenceId = segmentation.reference_segmentation_id ?? null;
+        if (referenceId === null) return "None";
+        const reference = segmentations.get(referenceId);
+        return reference
+            ? `${reference.feature.name} · ${authorName(reference, me)}`
+            : `[${referenceId}]`;
+    });
 
     function quickDuplicate() {
         duplicate(
@@ -83,7 +112,8 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
 <PaneHeader
     {id}
     name={segmentation.feature.name}
-    type="Segmentation · {rep}"
+    type="Segmentation · {groupTitle(segmentation, me)}"
+    {swatch}
     {remove}
 >
     {#snippet status()}
@@ -127,31 +157,47 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
         {/if}
     {/snippet}
 </PaneHeader>
-<div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-2">
-    {#if !isMulti}
-        <div class="flex items-center gap-2">
-            <span class="text-label-01 text-text-secondary">Color</span>
-            <FeatureColorPicker {segmentation} />
-        </div>
-    {/if}
-    {#if rep === "Probability"}
-        <ThresholdSlider {segmentation} segmentationItem={item} />
-    {/if}
-    {#if segmentation.annotation_type === "grader_segmentation" && segmentation.reference_segmentation_id}
-        <Field.Field orientation="horizontal" class="w-auto">
-            <Toggle
-                id="{id}-mask"
-                bind:checked={
-                    () => mainViewerContext.isMaskingApplied(segmentation),
-                    () => mainViewerContext.toggleMasking(item)
-                }
-            />
-            <Field.Label
-                for="{id}-mask"
-                class="text-body-compact-01 text-text-primary"
-                >Mask with reference</Field.Label
+<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-3">
+    {#if appearance}
+        <section aria-labelledby="{id}-appearance" class="flex flex-col gap-4">
+            <h4
+                id="{id}-appearance"
+                class="text-heading-compact-01 text-text-primary"
             >
-        </Field.Field>
+                Appearance
+            </h4>
+            {#if !isMulti}
+                <div class="flex flex-col items-start gap-2">
+                    <span class="text-label-01 text-text-secondary">Color</span>
+                    <FeatureColorPicker {segmentation} />
+                </div>
+            {/if}
+            {#if rep === "Probability"}
+                <ThresholdSlider {segmentation} segmentationItem={item} />
+            {/if}
+            {#if hasMask}
+                <Field.Field orientation="vertical" class="w-auto">
+                    <Field.Label
+                        for="{id}-mask"
+                        class="text-label-01 text-text-secondary"
+                        >Mask with reference</Field.Label
+                    >
+                    <div class="flex items-center gap-2">
+                        <Toggle
+                            id="{id}-mask"
+                            stateText
+                            bind:checked={
+                                () =>
+                                    mainViewerContext.isMaskingApplied(
+                                        segmentation,
+                                    ),
+                                () => mainViewerContext.toggleMasking(item)
+                            }
+                        />
+                    </div>
+                </Field.Field>
+            {/if}
+        </section>
     {/if}
     {#if isMulti}
         <div role="group" aria-labelledby="{id}-classes">
@@ -171,7 +217,12 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     <Accordion.Root bind:value={rare} class="-mx-4">
         {#if segmentation.annotation_type === "grader_segmentation"}
             <Accordion.Item value="tags">
-                <Accordion.Trigger level={4}>Tags</Accordion.Trigger>
+                <Accordion.Trigger
+                    level={4}
+                    summary={segmentation.tags.length
+                        ? String(segmentation.tags.length)
+                        : undefined}>Tags</Accordion.Trigger
+                >
                 <Accordion.Content>
                     <!-- No comment editing: the segmentation tag API keeps no comment. -->
                     <Tagger
@@ -188,7 +239,9 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
                 </Accordion.Content>
             </Accordion.Item>
             <Accordion.Item value="reference">
-                <Accordion.Trigger level={4}>Reference image</Accordion.Trigger>
+                <Accordion.Trigger level={4} summary={referenceSummary}
+                    >Reference image</Accordion.Trigger
+                >
                 <Accordion.Content>
                     <ReferenceSegmentationPanel
                         {segmentation}

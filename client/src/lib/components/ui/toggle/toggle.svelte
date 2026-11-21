@@ -6,8 +6,12 @@
         ref = $bindable(null),
         checked = $bindable(false),
         class: className,
+        stateText = false,
         ...restProps
-    }: WithoutChildrenOrChild<SwitchPrimitive.RootProps> = $props();
+    }: WithoutChildrenOrChild<SwitchPrimitive.RootProps> & {
+        /** Carbon's "On" / "Off" after the switch; hidden from screen readers, which hear the switch's state. */
+        stateText?: boolean;
+    } = $props();
 </script>
 
 <!-- Carbon small toggle: 32 × 16 track, 10 px handle, a tickmark when on so the state never rests on colour. -->
@@ -32,3 +36,8 @@
         >
     </SwitchPrimitive.Thumb>
 </SwitchPrimitive.Root>
+{#if stateText}
+    <span aria-hidden="true" class="text-body-compact-01 text-text-primary"
+        >{checked ? "On" : "Off"}</span
+    >
+{/if}

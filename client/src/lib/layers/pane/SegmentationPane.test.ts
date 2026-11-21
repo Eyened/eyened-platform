@@ -55,16 +55,18 @@ function renderPane(
 }
 
 describe("SegmentationPane", () => {
-    it("names the type and shows the save state in words in its header", async () => {
+    it("names the type with the list's group and shows the save state in words; an AI one has no save state", async () => {
         const { sync } = renderPane(graderSegmentation(1, ME, "Drusen v2"));
-        expect(
-            screen.getByText("Segmentation · DualBitMask"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Segmentation · Mine")).toBeInTheDocument();
         expect(screen.getByRole("status")).toHaveTextContent("Saved");
         sync.get(1)!.set("error");
         expect(await screen.findByRole("status")).toHaveTextContent(
             "Couldn't save",
         );
+        cleanup();
+        renderPane(modelSegmentation(11, "Drusen AI"));
+        expect(screen.getByText("Segmentation · AI")).toBeInTheDocument();
+        expect(screen.queryByRole("status")).toBeNull();
     });
 
     it("a probability segmentation has Threshold open and Tags folded; an AI one has no Tags", async () => {
@@ -96,14 +98,14 @@ describe("SegmentationPane", () => {
         expect(
             screen.getByRole("button", { name: "Import…" }),
         ).toBeInTheDocument();
-        for (const name of ["Reference image", "Connected components"]) {
+        for (const name of ["Reference image None", "Connected components"]) {
             expect(screen.getByRole("button", { name })).toHaveAttribute(
                 "aria-expanded",
                 "false",
             );
         }
         await fireEvent.click(
-            screen.getByRole("button", { name: "Reference image" }),
+            screen.getByRole("button", { name: "Reference image None" }),
         );
         expect(
             screen.getByRole("button", { name: "Set reference…" }),
@@ -152,5 +154,34 @@ describe("SegmentationPane", () => {
             tags: [{ id: 5, name: "Reviewed" }],
         } as never);
         expect(await screen.findByText("Reviewed")).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Tags 1" }),
+        ).toBeInTheDocument();
+    });
+
+    it("Reference image's title says whose reference it is: Drusen · Mine for yours, a colleague's name for theirs", () => {
+        segmentations.set(2, graderSegmentation(2, ME, "Drusen"));
+        renderPane(
+            graderSegmentation(1, ME, "Drusen v2", {
+                reference_segmentation_id: 2,
+            }),
+        );
+        expect(
+            screen.getByRole("button", {
+                name: "Reference image Drusen · Mine",
+            }),
+        ).toBeInTheDocument();
+        cleanup();
+        segmentations.set(3, graderSegmentation(3, 7, "Drusen"));
+        renderPane(
+            graderSegmentation(1, ME, "Drusen v2", {
+                reference_segmentation_id: 3,
+            }),
+        );
+        expect(
+            screen.getByRole("button", {
+                name: "Reference image Drusen · Grader 7",
+            }),
+        ).toBeInTheDocument();
     });
 });
