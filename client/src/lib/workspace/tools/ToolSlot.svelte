@@ -89,6 +89,7 @@ A short-rail job slot: the button arms the tool it shows; the chevron, or a long
     <IconButton
         label={tool.name}
         shortcut={tool.key ?? undefined}
+        description={tool.does}
         aria-keyshortcuts={tool.key ?? undefined}
         aria-pressed={workspace.armedTool === tool.id}
         class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"

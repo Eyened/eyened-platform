@@ -41,6 +41,8 @@ export interface ToolDef {
     /** A modal tool stays armed; an action runs once. */
     kind: "modal" | "action";
     icon: Component;
+    /** The tooltip's second line: what the tool does. */
+    does: string;
     /** One line for the keys and gestures that have no button; empty when there are none. */
     hint: string;
 }
@@ -53,6 +55,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "View",
         kind: "modal",
         icon: ZoomIn,
+        does: "Drag to zoom in or out",
         hint: "Drag down zooms in, up zooms out",
     },
     {
@@ -62,6 +65,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "View",
         kind: "modal",
         icon: Move,
+        does: "Drag to move the image",
         hint: "Drag pans · click centres there",
     },
     {
@@ -71,6 +75,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "View",
         kind: "modal",
         icon: CenterCircle,
+        does: "Click or drag sets the cross-hair in linked viewports",
         hint: "Click or drag sets the cross-hair",
     },
     {
@@ -80,6 +85,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "View",
         kind: "action",
         icon: ZoomReset,
+        does: "Fits the image again and clears this image's distance lines",
         hint: "",
     },
     {
@@ -89,6 +95,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Measure",
         kind: "modal",
         icon: Ruler,
+        does: "Measures a straight line",
         hint: "Click the start, click the end · drag an end to move it · Del removes the line under the pointer · Esc clears this image's lines",
     },
     {
@@ -98,6 +105,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Measure",
         kind: "modal",
         icon: CircleDash,
+        does: "Shows an ETDRS circle at the pointer in every viewport of this eye",
         hint: "The circle follows the pointer in every viewport of this eye · [ ] steps the size",
     },
     {
@@ -107,6 +115,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Draw",
         kind: "modal",
         icon: PaintBrush,
+        does: "Paints into the selected segmentation",
         hint: "Hold Space paints · X brush ↔ eraser · I picks the feature under the pointer",
     },
     {
@@ -116,6 +125,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Draw",
         kind: "modal",
         icon: Erase,
+        does: "Removes paint from the selected segmentation",
         hint: "Hold Space erases · X brush ↔ eraser · I picks the feature under the pointer",
     },
     {
@@ -125,6 +135,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Draw",
         kind: "modal",
         icon: AreaCustom,
+        does: "Fills or erases an outlined area",
         hint: "Drag round an area · Esc cancels",
     },
     {
@@ -134,6 +145,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Draw",
         kind: "modal",
         icon: MagicWand,
+        does: "Raises or lowers values in the selected probability segmentation",
         hint: "Hold Space enhances · X increase ↔ decrease",
     },
     // ASSUMPTION: one hint for every platform, as the ⌘Z / Ctrl+Z shortcuts do.
@@ -144,6 +156,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Place",
         kind: "modal",
         icon: Location,
+        does: "Places matching points of the selected pointset",
         hint: "Click places a point · drag a point to move it · click on a point cycles its grade · ⌘ / Ctrl-click places on top · [ ] previous / next",
     },
     {
@@ -153,6 +166,7 @@ export const TOOLS: readonly ToolDef[] = [
         group: "Place",
         kind: "modal",
         icon: Target,
+        does: "Places the selected grid's fovea and disc edge",
         hint: "Click places · hold Space follows the pointer · [ ] Fovea ↔ Disc edge · Del removes the point under the pointer",
     },
 ];

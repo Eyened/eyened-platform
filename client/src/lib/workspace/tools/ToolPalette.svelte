@@ -117,6 +117,7 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     <IconButton
         label={tool.name}
         shortcut={tool.key ?? undefined}
+        description={tool.does}
         aria-keyshortcuts={tool.key === "Esc"
             ? "Escape"
             : (tool.key ?? undefined)}
@@ -233,6 +234,7 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     <IconButton
         label="Magnifier"
         shortcut="M"
+        description="Shows the area under the pointer magnified in a floating panel"
         aria-keyshortcuts="M"
         aria-pressed={workspace.magnifier.on}
         class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
