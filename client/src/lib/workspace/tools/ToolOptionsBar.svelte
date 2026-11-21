@@ -4,6 +4,7 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
 -->
 <script lang="ts">
     import { getContext, tick, untrack } from "svelte";
+    import { MediaQuery } from "svelte/reactivity";
     import OverflowMenu from "../OverflowMenu.svelte";
     import type { Workspace } from "../workspace.svelte";
     import {
@@ -15,6 +16,8 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
     import ToolOption, { type OptionId } from "./ToolOption.svelte";
 
     const workspace = getContext<Workspace>("workspace");
+    // Below 42rem there is no rail beside the bar: no tool cell, and the bar may wrap.
+    const md = new MediaQuery("min-width: 42rem");
     const tool = $derived(
         workspace.armedTool ? toolById(workspace.armedTool) : null,
     );
@@ -169,8 +172,22 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
 <div
     bind:this={bar}
     data-slot="tool-options"
-    class="flex h-full min-w-0 items-center gap-3 ps-4 pe-2 whitespace-nowrap"
+    class="flex h-full min-w-0 items-center gap-3 pe-2 whitespace-nowrap"
+    class:ps-4={!md.current}
+    class:flex-wrap={!md.current}
 >
+    {#if md.current}
+        <!-- The armed tool's icon under the rail, in its armed look; the name follows as text. -->
+        <span
+            aria-hidden="true"
+            class="flex w-12 shrink-0 justify-center self-stretch border-e border-border-subtle-01"
+        >
+            {#if tool}<span
+                    class="flex w-10 items-center justify-center selected-look"
+                    ><tool.icon /></span
+                >{/if}
+        </span>
+    {/if}
     {#if tool}
         <span class="shrink-0 text-heading-compact-01 text-text-primary"
             >{tool.name}</span
