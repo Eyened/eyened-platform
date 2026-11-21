@@ -1,8 +1,9 @@
 <!--
 @component
-The Selected pane for an ETDRS grid: creator, fovea and disc edge as text, and "This task". Place ETDRS (G) places the points.
+The Selected pane for an ETDRS grid: creator, fovea and disc edge as text, and "This task". Edit with arms Place ETDRS grid (G).
 -->
 <script lang="ts">
+    import EditWith from "./EditWith.svelte";
     import { Tag } from "$lib/components/ui/tag/index.js";
     import { formAnnotations } from "$lib/data";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
@@ -47,3 +48,4 @@ The Selected pane for an ETDRS grid: creator, fovea and disc edge as text, and "
 <div class="min-h-0 flex-1 overflow-y-auto py-2">
     <PaneFields {rows} />
 </div>
+{#if remove}<EditWith tool="etdrs" />{/if}

@@ -262,6 +262,44 @@ describe("LayersPanel", () => {
         expect(within(pane).getByText("801, 470")).toBeInTheDocument();
     });
 
+    it("Edit with shows on your own grid's pane, not on a colleague's", async () => {
+        const name = BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID;
+        formSchemasByName.set(name, { id: 3, name } as never);
+        for (const [id, creator] of [
+            [11, ME],
+            [12, 9],
+        ] as const)
+            formAnnotations.set(id, {
+                id,
+                form_schema_id: 3,
+                image_id: "inst-a",
+                annotation_type: "grader_form",
+                sub_task_id: null,
+                creator: { id: creator, name: `Grader ${creator}` },
+                form_data: {},
+            } as never);
+        const ws = workspaceWith(1);
+        attach(ws, 0, "inst-a");
+        renderPanel(ws);
+        await fireEvent.click(
+            screen.getByRole("button", { name: "ETDRS grids 2" }),
+        );
+        await fireEvent.click(
+            screen.getByRole("button", { name: `ETDRS grid, Grader ${ME}` }),
+        );
+        expect(
+            within(
+                screen.getByRole("region", {
+                    name: `ETDRS grid, Grader ${ME}`,
+                }),
+            ).getByRole("group", { name: "Edit with" }),
+        ).toBeInTheDocument();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "ETDRS grid, Grader 9" }),
+        );
+        expect(screen.queryByRole("group", { name: "Edit with" })).toBeNull();
+    });
+
     it("Delete in the pane removes the selected segmentation, empties the pane and moves focus to the next row", async () => {
         for (const [id, name] of [
             [1, "Drusen v2"],
