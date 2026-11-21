@@ -1,15 +1,16 @@
 <!--
 @component
-The tool options bar: the armed tool's name, its target or why it can't act there, its options, then a one-line hint for keys without a button. When the bar is short the hint drops first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first.
+The tool options bar: the armed tool's icon and name, its target or why it can't act there, its options, then Keys, which lists the keys without a button. When the bar is short the keyboard cursor's keys cut first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first; Keys never folds.
 -->
 <script lang="ts">
     import { getContext, tick, untrack } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
     import OverflowMenu from "../OverflowMenu.svelte";
+    import KeysPopover from "./KeysPopover.svelte";
     import type { Workspace } from "../workspace.svelte";
     import {
-        KEYBOARD_CURSOR_HINT,
-        NO_TOOL_HINT,
+        KEYBOARD_CURSOR_KEYS,
+        NO_TOOL_KEYS,
         toolById,
         type ToolId,
     } from "./registry";
@@ -50,21 +51,16 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
                   .join(" › ")
             : "",
     );
-    const hint = $derived.by(() => {
-        // Point's reasons it can't act stay visible; the keyboard cursor's keys replace any other hint.
-        // ASSUMPTION: the spec says only "read-only" for a colleague's registration.
-        if (
-            tool?.id === "point" &&
-            point?.id != null &&
-            !point.reason &&
-            !point.canEdit
-        )
-            return "Another grader's points can't be moved";
-        if (layers?.viewerContext.keyboardCursor.on)
-            return KEYBOARD_CURSOR_HINT;
-        if (!tool) return NO_TOOL_HINT;
-        return tool.hint;
-    });
+    const cursorOn = $derived(layers?.viewerContext.keyboardCursor.on ?? false);
+    // The armed tool's keys, or the keyboard cursor's while it is on, then those that work without a tool.
+    const keyLists = $derived([
+        ...(cursorOn
+            ? [{ title: "Keyboard cursor", rows: KEYBOARD_CURSOR_KEYS }]
+            : tool && tool.keys.length > 0
+              ? [{ title: tool.name, rows: tool.keys }]
+              : []),
+        { title: "Without a tool", rows: NO_TOOL_KEYS },
+    ]);
 
     /** Each tool's options, left to right. */
     function optionsFor(id: ToolId | undefined): OptionId[] {
@@ -124,8 +120,6 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
     const isHistory = (id: OptionId) => id === "undo" || id === "redo";
 
     let bar: HTMLElement | undefined = $state();
-    let hintElement: HTMLElement | undefined = $state();
-    let hintFits = $state(true);
 
     // A popover can't open from inside ⋯ (it closes ⋯), and Fovea | Disc edge is Place ETDRS's main control, so these never fold.
     const PINNED: OptionId[] = ["scale", "etdrsSlot"];
@@ -136,7 +130,7 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
     const shown = $derived(options.filter((id) => !folded.includes(id)));
 
     let fitting = 0;
-    /** Starts with nothing folded, then moves the last option in the row into ⋯ until the row fits; the hint shows whole or not at all. */
+    /** Starts with nothing folded, then moves the last option in the row into ⋯ until the row fits. */
     async function fit() {
         const el = bar;
         if (!el) return;
@@ -149,9 +143,6 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
             folds += 1;
             await tick();
         }
-        if (run !== fitting) return;
-        if (hintElement)
-            hintFits = hintElement.scrollWidth <= hintElement.clientWidth;
     }
 
     // Fits again when the bar resizes or what it shows changes.
@@ -160,7 +151,7 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
         void draw?.name;
         void etdrs?.name;
         void layers?.scale;
-        void hint;
+        void cursorOn;
         if (!bar) return;
         untrack(() => void fit());
         const observer = new ResizeObserver(() => void fit());
@@ -191,6 +182,17 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
     {#if tool}
         <span class="shrink-0 text-heading-compact-01 text-text-primary"
             >{tool.name}</span
+        >
+    {:else}
+        <span class="shrink-0 text-body-compact-01 text-text-secondary"
+            >No tool armed · pick one in Tools</span
+        >
+    {/if}
+    {#if cursorOn}
+        <!-- Cuts first when the bar is short. -->
+        <span
+            class="min-w-0 shrink-[100] truncate text-helper-text-01 text-text-secondary"
+            >arrows move · Space clicks · Esc leaves</span
         >
     {/if}
     {#if draw?.name}
@@ -252,10 +254,7 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
             {/each}
         </OverflowMenu>
     {/if}
-    <span
-        bind:this={hintElement}
-        class="min-w-0 flex-1 overflow-hidden text-helper-text-01 text-text-secondary"
-        class:invisible={!hintFits}
-        aria-hidden={!hintFits}>{hint}</span
-    >
+    <div class="ms-auto flex shrink-0">
+        <KeysPopover lists={keyLists} iconOnly={!md.current} />
+    </div>
 </div>

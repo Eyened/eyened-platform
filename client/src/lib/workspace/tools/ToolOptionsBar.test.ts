@@ -26,7 +26,7 @@ const EDITABLE: DrawTarget = {
     reason: null,
 };
 
-function drawViewport(ws: Workspace, drawTarget: DrawTarget) {
+function drawViewport(ws: Workspace, drawTarget: DrawTarget, cursor = false) {
     const segmentationContext = {
         canUndo: () => false,
         canRedo: () => false,
@@ -43,7 +43,7 @@ function drawViewport(ws: Workspace, drawTarget: DrawTarget) {
                 image: { is2D: true },
                 index: 0,
                 returnFocus: vi.fn(),
-                keyboardCursor: { on: false },
+                keyboardCursor: { on: cursor },
             },
             mainViewerContext: { segmentationContext },
         } as never,
@@ -94,9 +94,6 @@ describe("ToolOptionsBar", () => {
         });
         expect(screen.getByText("Zoom")).toBeInTheDocument();
         expect(screen.getByText("150%")).toBeInTheDocument();
-        expect(
-            screen.getByText("Drag down zooms in, up zooms out"),
-        ).toBeInTheDocument();
         await fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
         expect(zoomBy).toHaveBeenLastCalledWith(1.25);
         await fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
@@ -104,7 +101,7 @@ describe("ToolOptionsBar", () => {
         await expectNoAxeViolations(container);
     });
 
-    it("shows the keyboard cursor's keys in place of the tool's hint while it is on", () => {
+    it("shows the keyboard cursor's keys after the tool while it is on", () => {
         const ws = workspaceWith(1);
         ws.attachViewport(0, {
             zoomPercent: 100,
@@ -117,13 +114,41 @@ describe("ToolOptionsBar", () => {
         ws.arm("zoom");
         render(ToolOptionsBar, { context: workspaceContext(ws) });
         expect(
-            screen.getByText(
-                "Keyboard cursor · arrows move, Shift 10 px · Space clicks, hold to drag · Esc leaves",
-            ),
+            screen.getByText("arrows move · Space clicks · Esc leaves"),
         ).toBeInTheDocument();
+    });
+
+    it("with no tool armed says so; Keys lists the keys that work without a tool and leaves focus on Keys", async () => {
+        render(ToolOptionsBar, { context: workspaceContext(workspaceWith(1)) });
         expect(
-            screen.queryByText("Drag down zooms in, up zooms out"),
-        ).toBeNull();
+            screen.getByText("No tool armed · pick one in Tools"),
+        ).toBeInTheDocument();
+        const keys = screen.getByRole("button", { name: "Keys" });
+        keys.focus();
+        await fireEvent.click(keys);
+        const dialog = await screen.findByRole("dialog", { name: "Keys" });
+        expect(
+            within(dialog)
+                .getAllByRole("heading")
+                .map((h) => h.textContent?.trim()),
+        ).toEqual(["Without a tool"]);
+        expect(within(dialog).getByText("Localizer lines")).toBeInTheDocument();
+        expect(keys).toHaveFocus();
+    });
+
+    it("with the keyboard cursor on and Brush armed, Keys lists the cursor's keys first", async () => {
+        const ws = workspaceWith(1);
+        drawViewport(ws, EDITABLE, true);
+        ws.arm("brush");
+        render(ToolOptionsBar, { context: workspaceContext(ws) });
+        await fireEvent.click(screen.getByRole("button", { name: "Keys" }));
+        const dialog = await screen.findByRole("dialog", { name: "Keys" });
+        expect(
+            within(dialog)
+                .getAllByRole("heading")
+                .map((h) => h.textContent?.trim()),
+        ).toEqual(["Keyboard cursor", "Without a tool"]);
+        expect(within(dialog).getByText("Leave")).toBeInTheDocument();
     });
 
     it("names the registration P places into, read-only for a colleague's, or asks for one", () => {

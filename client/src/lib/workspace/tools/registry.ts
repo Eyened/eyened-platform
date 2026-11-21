@@ -14,6 +14,12 @@ import ZoomIn from "carbon-icons-svelte/lib/ZoomIn.svelte";
 import ZoomReset from "carbon-icons-svelte/lib/ZoomReset.svelte";
 import type { Component } from "svelte";
 
+/** One row of the Keys popover: a key or gesture, then what it does. */
+export interface KeyRow {
+    keys: string;
+    action: string;
+}
+
 export type ToolId =
     | "zoom"
     | "pan"
@@ -43,8 +49,8 @@ export interface ToolDef {
     icon: Component;
     /** The tooltip's second line: what the tool does. */
     does: string;
-    /** One line for the keys and gestures that have no button; empty when there are none. */
-    hint: string;
+    /** The Keys popover's rows for keys and gestures that have no button; empty when there are none. */
+    keys: readonly KeyRow[];
 }
 
 export const TOOLS: readonly ToolDef[] = [
@@ -56,7 +62,7 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: ZoomIn,
         does: "Drag to zoom in or out",
-        hint: "Drag down zooms in, up zooms out",
+        keys: [{ keys: "Drag down / up", action: "Zoom in / out" }],
     },
     {
         id: "pan",
@@ -66,7 +72,10 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: Move,
         does: "Drag to move the image",
-        hint: "Drag pans · click centres there",
+        keys: [
+            { keys: "Drag", action: "Pan" },
+            { keys: "Click", action: "Centre there" },
+        ],
     },
     {
         id: "crosshair",
@@ -76,7 +85,7 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: CenterCircle,
         does: "Click or drag sets the cross-hair in linked viewports",
-        hint: "Click or drag sets the cross-hair",
+        keys: [{ keys: "Click or drag", action: "Set the cross-hair" }],
     },
     {
         id: "reset",
@@ -86,7 +95,7 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "action",
         icon: ZoomReset,
         does: "Fits the image again and clears this image's distance lines",
-        hint: "",
+        keys: [],
     },
     {
         id: "distance",
@@ -96,7 +105,12 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: Ruler,
         does: "Measures a straight line",
-        hint: "Click the start, click the end · drag an end to move it · Del removes the line under the pointer · Esc clears this image's lines",
+        keys: [
+            { keys: "Click, then click", action: "Start, then end of a line" },
+            { keys: "Drag an end", action: "Move it" },
+            { keys: "Del", action: "Remove the line under the pointer" },
+            { keys: "Esc", action: "Clear this image's lines" },
+        ],
     },
     {
         id: "circle",
@@ -106,7 +120,7 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: CircleDash,
         does: "Shows an ETDRS circle at the pointer in every viewport of this eye",
-        hint: "The circle follows the pointer in every viewport of this eye · [ ] steps the size",
+        keys: [{ keys: "[ / ]", action: "Previous / next size" }],
     },
     {
         id: "brush",
@@ -116,7 +130,11 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: PaintBrush,
         does: "Paints into the selected segmentation",
-        hint: "Hold Space paints · X brush ↔ eraser · I picks the feature under the pointer",
+        keys: [
+            { keys: "Hold Space", action: "Paint" },
+            { keys: "X", action: "Switch to Eraser" },
+            { keys: "I", action: "Pick the feature under the pointer" },
+        ],
     },
     {
         id: "eraser",
@@ -126,7 +144,11 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: Erase,
         does: "Removes paint from the selected segmentation",
-        hint: "Hold Space erases · X brush ↔ eraser · I picks the feature under the pointer",
+        keys: [
+            { keys: "Hold Space", action: "Erase" },
+            { keys: "X", action: "Switch to Brush" },
+            { keys: "I", action: "Pick the feature under the pointer" },
+        ],
     },
     {
         id: "polygon",
@@ -136,7 +158,10 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: AreaCustom,
         does: "Fills or erases an outlined area",
-        hint: "Drag round an area · Esc cancels",
+        keys: [
+            { keys: "Drag round an area", action: "Fill or erase it" },
+            { keys: "Esc", action: "Cancel" },
+        ],
     },
     {
         id: "enhance",
@@ -146,9 +171,12 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: MagicWand,
         does: "Raises or lowers values in the selected probability segmentation",
-        hint: "Hold Space enhances · X increase ↔ decrease",
+        keys: [
+            { keys: "Hold Space", action: "Enhance" },
+            { keys: "X", action: "Switch increase / decrease" },
+        ],
     },
-    // ASSUMPTION: one hint for every platform, as the ⌘Z / Ctrl+Z shortcuts do.
+    // ASSUMPTION: one key text for every platform, as the ⌘Z / Ctrl+Z shortcuts do.
     {
         id: "point",
         name: "Point",
@@ -157,7 +185,13 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: Location,
         does: "Places matching points of the selected pointset",
-        hint: "Click places a point · drag a point to move it · click on a point cycles its grade · ⌘ / Ctrl-click places on top · [ ] previous / next",
+        keys: [
+            { keys: "Click", action: "Place a point" },
+            { keys: "Drag a point", action: "Move it" },
+            { keys: "Click a point", action: "Cycle its grade" },
+            { keys: "⌘ / Ctrl-click", action: "Place on top of a point" },
+            { keys: "[ / ]", action: "Previous / next point" },
+        ],
     },
     {
         id: "etdrs",
@@ -167,7 +201,15 @@ export const TOOLS: readonly ToolDef[] = [
         kind: "modal",
         icon: Target,
         does: "Places the selected grid's fovea and disc edge",
-        hint: "Click places · hold Space follows the pointer · [ ] Fovea ↔ Disc edge · Del removes the point under the pointer",
+        keys: [
+            { keys: "Click", action: "Place the selected point" },
+            {
+                keys: "Hold Space",
+                action: "Place the selected point and follow the pointer",
+            },
+            { keys: "[ / ]", action: "Fovea / Disc edge" },
+            { keys: "Del", action: "Remove the point under the pointer" },
+        ],
     },
 ];
 
@@ -187,12 +229,24 @@ export const BROWSE: readonly ToolId[] = [
     "distance",
 ];
 
-export const NO_TOOL_HINT =
-    "Shift+drag pans · wheel steps slices · Shift+wheel zooms · Enter keyboard cursor · hold H hides overlays · O localizer lines";
+/** Keys that work with no tool armed. */
+export const NO_TOOL_KEYS: readonly KeyRow[] = [
+    { keys: "Shift+drag", action: "Pan" },
+    { keys: "Wheel", action: "Step slices" },
+    { keys: "Shift+wheel", action: "Zoom" },
+    { keys: "Enter", action: "Keyboard cursor" },
+    { keys: "Hold H", action: "Hide overlays" },
+    { keys: "O", action: "Localizer lines" },
+];
 
-/** Shown in place of the tool's hint while the keyboard cursor is on. */
-export const KEYBOARD_CURSOR_HINT =
-    "Keyboard cursor · arrows move, Shift 10 px · Space clicks, hold to drag · Esc leaves";
+/** Listed in place of the tool's keys while the keyboard cursor is on. */
+export const KEYBOARD_CURSOR_KEYS: readonly KeyRow[] = [
+    { keys: "Arrows", action: "Move" },
+    { keys: "Shift+arrows", action: "Move 10 px" },
+    { keys: "Space", action: "Click" },
+    { keys: "Hold Space + arrows", action: "Drag" },
+    { keys: "Esc", action: "Leave" },
+];
 
 export function toolById(id: ToolId): ToolDef {
     return TOOLS.find((t) => t.id === id)!;
