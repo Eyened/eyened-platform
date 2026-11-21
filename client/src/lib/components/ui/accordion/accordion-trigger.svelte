@@ -22,8 +22,8 @@
     >
         <!-- The space keeps the summary a separate word in the accessible name; a flex container does not draw it. -->
         <span class="flex w-full gap-2 ps-4 text-body-01"
-            ><span class="min-w-0 flex-1">{@render children()}</span
-            >{#if summary}{" "}<span class="shrink-0 pe-2 text-text-secondary"
+            ><span class="min-w-0 flex-1">{@render children()}</span>
+            {#if summary}<span class="shrink-0 pe-2 text-text-secondary"
                     >{summary}</span
                 >{/if}</span
         >
