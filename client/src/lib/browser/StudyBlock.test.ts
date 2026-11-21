@@ -6,9 +6,6 @@ import type { ImageGET, StudyGET } from "../../types/openapi_types";
 vi.mock("$app/paths", () => ({ resolve: (path: string) => path }));
 
 vi.mock("$lib/browser/dataSources", () => ({
-    listDataSources: vi.fn(async () => [
-        { name: "External grades", collapse: false },
-    ]),
     loadDataSource: vi.fn(async () => ({ Scores: [] })),
 }));
 
@@ -21,6 +18,7 @@ const study = {
     project: { name: "Test" },
     series: [],
     tags: [],
+    data_sources: [{ name: "External grades", collapse: false }],
 } as unknown as StudyGET;
 
 const context = new Map<string, unknown>([

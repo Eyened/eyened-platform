@@ -10,7 +10,6 @@ vi.mock("../panelVisits/patientStudies", () => ({
 }));
 
 vi.mock("$lib/browser/dataSources", () => ({
-    listDataSources: vi.fn(async () => []),
     loadDataSource: vi.fn(),
 }));
 
@@ -42,6 +41,7 @@ describe("PanelInfo", () => {
                     date: "2024-06-01",
                     project: { name: "Alpha" },
                     patient: { id: 1, identifier: "P1" },
+                    data_sources: [],
                 },
             ],
             truncated: false,

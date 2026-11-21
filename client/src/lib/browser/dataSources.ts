@@ -1,33 +1,38 @@
 import { fetchApi } from "$lib/api/client";
-import type { DataSourceGET } from "../../types/openapi_types";
 
 export type DataRow = (number | string | null)[];
 export type DataSource = Record<string, DataRow[]>;
 
-const cache = new Map<string, Promise<unknown>>();
-
-function cachedJson<T>(path: string): Promise<T> {
-    if (!cache.has(path)) {
-        const promise = fetchApi(path).then((response) => {
-            if (!response.ok) {
-                throw new Error(`Failed to load ${path}`);
-            }
-            return response.json();
-        });
-        cache.set(path, promise);
+export class DataSourceError extends Error {
+    constructor(
+        message: string,
+        readonly status: number,
+    ) {
+        super(message);
     }
-    return cache.get(path) as Promise<T>;
 }
 
-export function listDataSources(studyId: number): Promise<DataSourceGET[]> {
-    return cachedJson(`/studies/${studyId}/data-sources`);
-}
+const cache = new Map<string, Promise<DataSource>>();
 
 export function loadDataSource(
     studyId: number,
     name: string,
 ): Promise<DataSource> {
-    return cachedJson(
-        `/studies/${studyId}/data-sources/${encodeURIComponent(name)}`,
-    );
+    const path = `/studies/${studyId}/data-sources/${encodeURIComponent(name)}`;
+    let promise = cache.get(path);
+    if (!promise) {
+        promise = fetchApi(path).then((response) => {
+            if (!response.ok) {
+                throw new DataSourceError(
+                    `Failed to load ${path}`,
+                    response.status,
+                );
+            }
+            return response.json();
+        });
+        // Only successful fetches stay cached, so the next render retries a failure.
+        promise.catch(() => cache.delete(path));
+        cache.set(path, promise);
+    }
+    return promise;
 }

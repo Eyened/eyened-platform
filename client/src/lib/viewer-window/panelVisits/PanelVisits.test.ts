@@ -12,9 +12,6 @@ vi.mock("./patientStudies", () => ({
 }));
 
 vi.mock("$lib/browser/dataSources", () => ({
-    listDataSources: vi.fn(async () => [
-        { name: "External grades", collapse: false },
-    ]),
     loadDataSource: vi.fn(async () => ({ Scores: [] })),
 }));
 
@@ -28,6 +25,7 @@ function study(id: number, date: string): StudyGET {
         patient: { id: 1, identifier: "P1" },
         series: [],
         tags: [],
+        data_sources: [{ name: "External grades", collapse: false }],
     } as unknown as StudyGET;
 }
 

@@ -124,6 +124,6 @@
                 <Eye laterality={null} images={unknown} />
             {/if}
         </div>
-        <AdditionalDataSources studyId={study.id} />
+        <AdditionalDataSources {study} />
     </div>
 </section>

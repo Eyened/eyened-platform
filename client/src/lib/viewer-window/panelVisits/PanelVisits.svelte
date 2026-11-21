@@ -91,7 +91,7 @@
                     </button>
                     {#if open}
                         <div class="sources">
-                            <AdditionalDataSources studyId={study.id} />
+                            <AdditionalDataSources {study} />
                         </div>
                     {/if}
                 </li>
