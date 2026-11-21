@@ -136,7 +136,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
             </div>
         {/snippet}
         {#if segmentationContext.failed}
-            <div class="px-4 py-2">
+            <div class="py-2 ps-8 pe-4">
                 <InlineNotification
                     title={segmentationContext.failed}
                     subtitle="Try again."
@@ -145,7 +145,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
             </div>
         {/if}
         {#if count > 0}
-            <div class="flex items-center gap-3 px-4 py-2">
+            <div class="flex items-center gap-3 py-2 ps-8 pe-4">
                 <span class="text-label-01 text-text-secondary">Opacity</span>
                 <Slider
                     class="min-w-0 flex-1"
@@ -161,7 +161,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
                     >{percent}%</span
                 >
             </div>
-            <div class="px-4 pb-2">
+            <div class="ps-8 pe-4 pb-2">
                 <Field.Field orientation="horizontal" class="w-auto">
                     <Toggle
                         id="{uid}-area"

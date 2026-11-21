@@ -161,7 +161,7 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
             {#if linked.length > 0}
                 <p
                     id="{uid}-linked"
-                    class="px-4 pt-2 pb-1 text-label-01 text-text-secondary"
+                    class="ps-8 pe-4 pt-2 pb-1 text-label-01 text-text-secondary"
                 >
                     Linked from registered images
                 </p>

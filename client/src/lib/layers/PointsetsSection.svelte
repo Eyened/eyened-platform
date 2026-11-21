@@ -96,7 +96,7 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
             {/if}
         {/snippet}
         {#if createError}
-            <div class="px-4 py-2">
+            <div class="py-2 ps-8 pe-4">
                 <InlineNotification
                     title="Couldn't create a registration"
                     subtitle="Try again."
