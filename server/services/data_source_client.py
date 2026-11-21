@@ -6,10 +6,14 @@ from contextlib import asynccontextmanager
 
 import anyio
 import httpxyz
+from pydantic import TypeAdapter, ValidationError
 
+from ..dtos.dtos_aux import NamedTables
 from .exceptions import NotFoundError, UpstreamError
 
 logger = logging.getLogger(__name__)
+
+_named_tables = TypeAdapter(NamedTables)
 
 # ASSUMPTION: 10 concurrent upstream calls per worker, 2 s to connect and 10 s
 # for the whole call are enough for the sources sites configure today.
@@ -43,12 +47,13 @@ def get_data_source_client() -> httpxyz.AsyncClient:
     return _client
 
 
-async def fetch_data_source(client: httpxyz.AsyncClient, name: str, url: str) -> bytes:
-    """GET ``url`` for source ``name``; return the upstream body.
+async def fetch_data_source(client: httpxyz.AsyncClient, name: str, url: str) -> NamedTables:
+    """GET ``url`` for source ``name``; return its body as named tables.
 
     Raises:
         NotFoundError: If the upstream has no data (404).
-        UpstreamError: If the upstream fails or does not answer in time.
+        UpstreamError: If the upstream fails, does not answer in time, or
+            returns something that is not named tables.
     """
     # The URL is not logged: it holds a patient identifier.
     try:
@@ -65,4 +70,8 @@ async def fetch_data_source(client: httpxyz.AsyncClient, name: str, url: str) ->
     if not response.is_success:
         logger.warning("Data source %s returned HTTP %s", name, response.status_code)
         raise UpstreamError(f"Data source {name} unavailable")
-    return response.content
+    try:
+        return _named_tables.validate_json(response.content)
+    except ValidationError:
+        logger.warning("Data source %s returned data that is not named tables", name)
+        raise UpstreamError(f"Data source {name} unavailable") from None

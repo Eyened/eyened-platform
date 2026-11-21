@@ -97,7 +97,7 @@ def test_a_matching_study_proxies_the_source(client, sources, upstream, studies)
     fetched = client.get(f"/studies/{study_id}/data-sources/Registry")
 
     assert fetched.status_code == 200
-    assert fetched.content == BODY
+    assert fetched.json() == {"table": [["a", 1]]}
     assert fetched.headers["content-type"] == "application/json"
     # The identifier "a/b c" cannot add a path segment.
     assert upstream.urls == [
@@ -130,7 +130,7 @@ def test_a_project_member_can_fetch(client_scoped, sources, upstream, studies):
     response = client.get(f"/studies/{studies['Alpha']['study']}/data-sources/Registry")
 
     assert response.status_code == 200
-    assert response.content == BODY
+    assert response.json() == {"table": [["a", 1]]}
 
 
 def test_an_unknown_source_is_404(client, sources, upstream, studies):
@@ -170,6 +170,36 @@ def test_upstream_failures_map_to_status(client, sources, upstream, studies, res
     response = client.get(f"/studies/{studies['Alpha']['study']}/data-sources/Registry")
 
     assert response.status_code == status
+    assert "a/b c" not in response.text
+
+
+def test_named_tables_pass_through_unchanged(client, sources, upstream, studies):
+    tables = {"Blood pressure": [[120, 80, "2019-03-01"], [118.5, None, "x"]], "Empty": []}
+    upstream.respond = lambda request: httpxyz.Response(200, json=tables)
+
+    response = client.get(f"/studies/{studies['Alpha']['study']}/data-sources/Registry")
+
+    assert response.status_code == 200
+    assert response.json() == tables
+
+
+@pytest.mark.parametrize(
+    "body",
+    [b"<html>login</html>", b'[["a", 1]]', b'{"table": ["not a row"]}'],
+    ids=["html", "list", "row-not-a-list"],
+)
+def test_a_body_that_is_not_named_tables_is_502(
+    client, sources, upstream, studies, caplog, body
+):
+    upstream.respond = lambda request: httpxyz.Response(200, content=body)
+
+    with caplog.at_level("WARNING"):
+        response = client.get(f"/studies/{studies['Alpha']['study']}/data-sources/Registry")
+
+    assert response.status_code == 502
+    assert "Data source Registry returned data that is not named tables" in caplog.text
+    assert "a/b c" not in caplog.text
+    assert "a%2Fb%20c" not in caplog.text
     assert "a/b c" not in response.text
 
 
