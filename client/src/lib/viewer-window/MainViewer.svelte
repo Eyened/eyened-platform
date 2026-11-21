@@ -107,12 +107,14 @@
                 return workspace.etdrsFraction;
             },
         },
+        mainViewerContext.selection,
     );
     // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
     const distance = workspace.distanceLinesFor(image.image_id);
     const layers: LayersTarget = {
         viewerContext,
         mainViewerContext,
+        selection: mainViewerContext.selection,
         grids,
         distance,
         localizer,
@@ -161,6 +163,7 @@
                 distance,
                 () => scale,
                 () => workspace.armedTool === "distance",
+                mainViewerContext.selection,
             ),
         ),
     );

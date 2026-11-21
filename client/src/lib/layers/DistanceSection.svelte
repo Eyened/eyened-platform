@@ -1,9 +1,10 @@
 <!--
 @component
-Layers › Distance lines for the selected viewport: one row per line on this image or B-scan, the current line marked.
+Layers › Distance lines for the selected viewport: one row per line on this image or B-scan, the selected line marked.
 -->
 <script lang="ts">
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import LineRow from "$lib/viewer-window/panelMeasure/Line.svelte";
     import { getContext, tick } from "svelte";
     import {
@@ -27,6 +28,8 @@ Layers › Distance lines for the selected viewport: one row per line on this im
     } = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
+    const mainViewerContext =
+        getContext<MainViewerContext>("mainViewerContext");
     let section: HTMLElement | undefined = $state();
     const lines = $derived(
         distance.lines.filter((line) => line.index === viewerContext.index),
@@ -55,7 +58,7 @@ Layers › Distance lines for the selected viewport: one row per line on this im
                         {line}
                         n={i + 1}
                         length={lengthText(line, scale)}
-                        current={distance.current === line}
+                        current={mainViewerContext.selection.line() === line}
                         onhighlight={(on) =>
                             (distance.highlighted = on ? line : undefined)}
                         ondelete={() => remove(line, i)}

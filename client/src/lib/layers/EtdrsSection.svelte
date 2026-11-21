@@ -73,6 +73,8 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
             form_data: {},
         });
         grids.setCurrent(grid.id);
+        // New shows the grid it makes; selecting a grid otherwise leaves it hidden or shown.
+        grids.setShown(grid.id, true);
         // The next step is placing the fovea.
         workspace.etdrsSlot = 0;
         workspace.arm("etdrs");

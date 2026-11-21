@@ -70,11 +70,11 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
     const canUndo = $derived(segmentation?.canUndo(index) ?? false);
     const canRedo = $derived(segmentation?.canRedo(index) ?? false);
 
-    // The bar's Delete: Distance's current line, Place ETDRS's slot point, or P's current point.
+    // The bar's Delete: the selected distance line, Place ETDRS's slot point, or P's current point.
     const remove = $derived.by(() => {
         if (workspace.armedTool === "distance") {
             const distance = layers?.distance;
-            const line = distance?.current;
+            const line = layers?.selection.line();
             // Only a line on the shown B-scan, so Delete never removes one the grader can't see.
             return distance &&
                 line &&

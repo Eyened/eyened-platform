@@ -37,7 +37,7 @@ function renderSection() {
 }
 
 describe("DistanceSection", () => {
-    it("lists this B-scan's lines as Line n · length and marks the current one; focus highlights one; Delete line n removes it and focus moves on", async () => {
+    it("lists this B-scan's lines as Line n · length and focus highlights one; Delete line n removes it and focus moves on", async () => {
         const { distance } = renderSection();
         distance.add(new Line({ x: 0, y: 0 }, { x: 30, y: 40 }, 0));
         distance.add(new Line({ x: 0, y: 0 }, { x: 300, y: 400 }, 1));
@@ -48,14 +48,6 @@ describe("DistanceSection", () => {
         ).toBeInTheDocument();
         expect(screen.getByText("Line 1 · 500.00 µm")).toBeInTheDocument();
         expect(screen.getByText("Line 2 · 2.00 mm")).toBeInTheDocument();
-        // The last line drawn is current.
-        expect(screen.getByRole("group", { name: "Line 2" })).toHaveAttribute(
-            "aria-current",
-            "true",
-        );
-        expect(
-            screen.getByRole("group", { name: "Line 1" }),
-        ).not.toHaveAttribute("aria-current");
         const remove = within(
             screen.getByRole("group", { name: "Line 2" }),
         ).getByRole("button", { name: "Delete line 2" });

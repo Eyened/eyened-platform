@@ -6,6 +6,7 @@ import {
     waitFor,
 } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
 import { expectNoAxeViolations } from "$lib/workspace/testUtils";
 import {
     graderSegmentation,
@@ -23,6 +24,8 @@ const { default: SegmentationItem } = await import("./SegmentationItem.svelte");
 
 afterEach(() => {
     cleanup();
+    segmentations.clear();
+    modelSegmentations.clear();
     vi.mocked(duplicate).mockClear();
 });
 
@@ -30,6 +33,8 @@ function renderRow(ondelete = vi.fn()) {
     const ctx = layersContexts();
     const drusen = graderSegmentation(1, ME, "Drusen v2");
     const other = graderSegmentation(2, ME, "Geographic atrophy");
+    segmentations.set(1, drusen);
+    segmentations.set(2, other);
     ctx.segmentationContext.shownSegmentations.add("grader_segmentation_2");
     const view = render(SegmentationItem, {
         props: { segmentation: drusen, showArea: false, ondelete },
@@ -87,9 +92,11 @@ describe("SegmentationItem", () => {
         cleanup();
 
         const ctx = layersContexts();
+        const ai = modelSegmentation(11, "Drusen AI");
+        modelSegmentations.set(11, ai);
         render(SegmentationItem, {
             props: {
-                segmentation: modelSegmentation(11, "Drusen AI"),
+                segmentation: ai,
                 showArea: false,
                 ondelete: vi.fn(),
             },
@@ -106,6 +113,7 @@ describe("SegmentationItem", () => {
         const lesion = graderSegmentation(1, ME, "Drusen v2", {
             data_representation: "Binary",
         });
+        segmentations.set(1, lesion);
         render(SegmentationItem, {
             props: { segmentation: lesion, showArea: false, ondelete: vi.fn() },
             context: ctx.context,
@@ -136,11 +144,13 @@ describe("SegmentationItem", () => {
 
     it("Duplicate… opens the Copy and Type options; Create copy closes them and duplicates", async () => {
         const ctx = layersContexts("inst-1", { is3D: true });
+        const lesion = graderSegmentation(1, ME, "Drusen v2", {
+            data_representation: "Binary",
+        });
+        segmentations.set(1, lesion);
         render(SegmentationItem, {
             props: {
-                segmentation: graderSegmentation(1, ME, "Drusen v2", {
-                    data_representation: "Binary",
-                }),
+                segmentation: lesion,
                 showArea: false,
                 ondelete: vi.fn(),
             },

@@ -123,14 +123,13 @@ describe("EtdrsSection", () => {
         await expectNoAxeViolations(container);
     });
 
-    it("the name sets the current grid and shows it with its points as text; the section mounts no tool; pressing it again unsets it", async () => {
+    it("the name sets the current grid and shows its points as text; the section mounts no tool; pressing it again unsets it", async () => {
         formAnnotations.set(11, grid(11, ME));
-        const { grids, viewerContext } = renderSection();
+        const { viewerContext } = renderSection();
         const name = () =>
             screen.getByRole("button", { name: "ETDRS grid, Grader 5" });
         await fireEvent.click(name());
         expect(name()).toHaveAttribute("aria-pressed", "true");
-        expect(grids.isShown(11)).toBe(true);
         expect(screen.getByText("Fovea 512, 498")).toBeInTheDocument();
         expect(screen.getByText("Disc edge 801, 470")).toBeInTheDocument();
         // Only the grid overlay mounts, so a click with Pan or Distance armed places nothing.
@@ -192,7 +191,7 @@ describe("EtdrsSection", () => {
         formAnnotations.set(12, grid(12, 9));
         const { grids } = renderSection();
         grids.setCurrent(11);
-        expect(grids.isShown(11)).toBe(true);
+        grids.setShown(11, true);
         expect(
             within(
                 screen.getByRole("group", {

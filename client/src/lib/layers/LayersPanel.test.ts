@@ -43,6 +43,7 @@ function attach(
         layers: {
             viewerContext: ctx.viewerContext as never,
             mainViewerContext: ctx.mainViewerContext as never,
+            selection: ctx.selection,
             grids: ctx.grids,
             scale: null,
             distance: ctx.distance,
@@ -157,7 +158,6 @@ describe("LayersPanel", () => {
             await screen.findByRole("button", { name: "ETDRS grid, Grader 5" }),
         ).toHaveAttribute("aria-pressed", "true");
         expect(screen.getByText(/^Line 1 ·/)).toBeInTheDocument();
-        expect(a.grids.isShown(11)).toBe(true);
     });
 
     it("Layers holds the object types and Display the view settings; no Display tab when nothing goes there", async () => {

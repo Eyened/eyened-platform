@@ -9,6 +9,7 @@ import { vi } from "vitest";
 import { DistanceLines } from "./distanceLines.svelte";
 import { BlendStyles } from "./blendStyles";
 import { GridLayers } from "./gridLayers.svelte";
+import { LayerSelection } from "./layerSelection.svelte";
 import { PointsetState } from "./pointsets";
 import { twinNumbers, type ImageMeta } from "$lib/workspace/imageMeta";
 import type {
@@ -170,14 +171,17 @@ export function layersContexts(
             return items.get(key);
         },
     };
+    const selection = new LayerSelection();
     const segmentationContext = new SegmentationContext(
         instanceId,
         0,
         {} as never,
         image as never,
+        selection,
     );
     const mainViewerContext = {
         segmentationContext,
+        selection,
         alpha: 1,
         saveOpacity: vi.fn(),
         getFeatureColor: () => [255, 0, 0],
@@ -251,6 +255,7 @@ export function layersContexts(
                 return workspace.etdrsFraction;
             },
         },
+        selection,
     );
     const distance = new DistanceLines();
     const context = new Map<string, unknown>([
@@ -268,6 +273,7 @@ export function layersContexts(
         globalContext,
         grids,
         distance,
+        selection,
         win,
         workspace,
     };

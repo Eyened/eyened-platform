@@ -12,6 +12,7 @@ import {
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
 import type { ScaleGrid } from "./imageScale";
+import type { LayerSelection } from "./layerSelection.svelte";
 import { SvelteMap } from "svelte/reactivity";
 import type { FormAnnotationGET } from "../../types/openapi_types";
 
@@ -84,9 +85,12 @@ export function keepGridSize(before: PointList, after: PointList): PointList {
     return [f1, { ...d1, x: d1.x + dx, y: d1.y + dy }];
 }
 
-/** One viewport's ETDRS grids: which show and the current grid. */
+/** One viewport's ETDRS grids: which show, and the selected one. */
 export class GridLayers {
-    currentId: number | undefined = $state();
+    /** The selected grid, when the viewport's selection is a grid. */
+    get currentId(): number | undefined {
+        return this.selection.gridId();
+    }
     private readonly shown = new SvelteMap<GridKey, () => void>();
 
     constructor(
@@ -94,6 +98,8 @@ export class GridLayers {
         private readonly registration: Registration,
         /** Sizes every grid in this viewport, the AI grid included. */
         private readonly settings: { readonly radiusFraction: number },
+        /** The viewport's selection; a grid row selects through it. */
+        private readonly selection: LayerSelection,
     ) {}
 
     /** ETDRS grids on this image or on an image registered to it, oldest first. */
@@ -175,15 +181,14 @@ export class GridLayers {
         for (const key of [...this.shown.keys()]) this.setShown(key, false);
     }
 
-    /** Sets the current grid, which shows it; undefined unsets it. */
+    /** Selects a grid, or ends a grid selection with undefined; a hidden grid stays hidden. */
     setCurrent(id: number | undefined): void {
-        this.currentId = id;
-        if (id !== undefined) this.setShown(id, true);
+        if (id !== undefined) this.selection.select({ kind: "grid", id });
+        else if (this.currentId !== undefined) this.selection.select(null);
     }
 
     /** Drops a deleted grid. */
     forget(id: number): void {
         this.setShown(id, false);
-        if (this.currentId === id) this.currentId = undefined;
     }
 }

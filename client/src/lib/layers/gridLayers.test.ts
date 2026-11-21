@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
 import { formAnnotations, formSchemasByName } from "$lib/data/stores.svelte";
 import type { FormAnnotationGET } from "../../types/openapi_types";
+import { LayerSelection } from "./layerSelection.svelte";
 import {
     aiGrid,
     gridBinding,
@@ -121,9 +122,12 @@ describe("GridLayers.scaleGrids", () => {
                 instance: { id: "inst-1", cf_keypoints: null },
             },
         };
-        const grids = new GridLayers(viewer as never, registration as never, {
-            radiusFraction: 0.85,
-        });
+        const grids = new GridLayers(
+            viewer as never,
+            registration as never,
+            { radiusFraction: 0.85 },
+            new LayerSelection(),
+        );
         expect(grids.scaleGrids()).toMatchObject([
             { key: 9, fovea: { x: 0, y: 0 }, discEdge: { x: 200, y: 0 } },
         ]);

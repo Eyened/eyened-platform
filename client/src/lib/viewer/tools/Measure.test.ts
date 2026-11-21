@@ -7,6 +7,7 @@ import {
 import type { Position2D } from "$lib/types";
 import type { ViewerEvent } from "../viewer-utils";
 import type { ViewerContext } from "../viewerContext.svelte";
+import { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import { MeasureTool } from "./Measure.svelte";
 
 function viewer(active = true): ViewerContext {
@@ -53,11 +54,13 @@ function click(
 describe("MeasureTool", () => {
     it("click the start, click the end makes a line; the right button and an unarmed tool do nothing", () => {
         const lines = new DistanceLines();
+        const selection = new LayerSelection();
         let armed = false;
         const tool = new MeasureTool(
             lines,
             () => null,
             () => armed,
+            selection,
         );
         const v = viewer();
         click(tool, v, { x: 10, y: 10 });
@@ -71,16 +74,18 @@ describe("MeasureTool", () => {
         tool.pointermove(pointer(v, { x: 90, y: 90 }));
         expect(lines.lines).toHaveLength(1);
         expect(lines.lines[0].end).toEqual({ x: 40, y: 50 });
-        expect(lines.current).toBe(lines.lines[0]);
+        expect(selection.line()).toBe(lines.lines[0]);
     });
 
     it("drags an end to move it; Del removes the line under the pointer, not over empty image or with the pointer elsewhere", () => {
         const lines = new DistanceLines();
+        const selection = new LayerSelection();
         lines.add(new Line({ x: 0, y: 0 }, { x: 30, y: 40 }, 0));
         const tool = new MeasureTool(
             lines,
             () => null,
             () => true,
+            selection,
         );
         const v = viewer();
         tool.pointermove(pointer(v, { x: 30, y: 40 }));
@@ -97,12 +102,14 @@ describe("MeasureTool", () => {
 
     it("a click after the lines were removed without a pointer move starts a new line", () => {
         const lines = new DistanceLines();
+        const selection = new LayerSelection();
         const old = new Line({ x: 0, y: 0 }, { x: 30, y: 40 }, 0);
         lines.add(old);
         const tool = new MeasureTool(
             lines,
             () => null,
             () => true,
+            selection,
         );
         const v = viewer();
         tool.pointermove(pointer(v, { x: 30, y: 40 }));
@@ -111,7 +118,7 @@ describe("MeasureTool", () => {
         expect(lines.lines).toHaveLength(1);
         expect(lines.lines[0]).not.toBe(old);
         expect(lines.drawing).toBe(lines.lines[0]);
-        expect(lines.current).not.toBe(old);
+        expect(selection.line()).toBe(lines.lines[0]);
     });
 });
 

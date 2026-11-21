@@ -2,6 +2,7 @@ import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { pointArming } from "$lib/forms/pointArming.svelte";
 import type { DrawTarget } from "$lib/layers/drawBinding";
 import type { GridLayers, GridTarget } from "$lib/layers/gridLayers.svelte";
+import type { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import type { Scale, ScalePick } from "$lib/layers/imageScale";
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import {
@@ -75,6 +76,8 @@ export interface WorkspaceOptions {
 export interface LayersTarget {
     readonly viewerContext: ViewerContext;
     readonly mainViewerContext: MainViewerContext;
+    /** This viewport's selection: what the Selected pane shows and tools edit. */
+    readonly selection: LayerSelection;
     /** ETDRS grids state, kept while Layers remounts its sections. */
     readonly grids: GridLayers;
     /** The image's scale for Distance and the ETDRS circle; null when nothing gives one. */

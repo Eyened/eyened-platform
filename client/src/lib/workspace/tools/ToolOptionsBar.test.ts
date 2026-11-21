@@ -14,6 +14,7 @@ import {
 import type { DrawTarget } from "$lib/layers/drawBinding";
 import type { Workspace } from "../workspace.svelte";
 import { DistanceLines, Line } from "$lib/layers/distanceLines.svelte";
+import { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import type { Scale } from "$lib/layers/imageScale";
 import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
 import type { ToolId } from "./registry";
@@ -73,6 +74,7 @@ function armWith(tool: ToolId, layers: object) {
                 returnFocus: vi.fn(),
                 keyboardCursor: { on: false },
             },
+            selection: new LayerSelection(),
             ...layers,
         } as never,
     });
@@ -224,17 +226,17 @@ describe("ToolOptionsBar", () => {
         expect(screen.queryByRole("radio", { name: "C1" })).toBeNull();
     });
 
-    it("Distance's Delete removes the current line and is off when there is none", async () => {
+    it("Distance's Delete removes the selected line and is off when there is none", async () => {
         const distance = new DistanceLines();
-        distance.add(new Line({ x: 0, y: 0 }, { x: 1, y: 1 }, 0));
-        distance.add(new Line({ x: 0, y: 0 }, { x: 2, y: 2 }, 0));
-        armWith("distance", { scale: null, distance });
+        const line = new Line({ x: 0, y: 0 }, { x: 3, y: 4 }, 0);
+        distance.add(line);
+        const selection = new LayerSelection();
+        selection.select({ kind: "line", line, lines: distance });
+        armWith("distance", { distance, selection, scale: null });
         const remove = screen.getByRole("button", { name: "Delete" });
         await fireEvent.click(remove);
-        expect(distance.lines.map((l) => l.end.x)).toEqual([1]);
+        expect(distance.lines).toEqual([]);
         expect(remove).toHaveAttribute("aria-disabled", "true");
-        await fireEvent.click(remove);
-        expect(distance.lines).toHaveLength(1);
     });
 
     it("Place ETDRS names the grid, or says why it can't write it in place of the options", () => {
