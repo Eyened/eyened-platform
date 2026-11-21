@@ -49,6 +49,7 @@ The icons keep their space at rest and show on hover, on focus inside the row an
 
 <div
     {...rest}
+    data-layer-row
     class="row border-s-3 {bar} {className}"
     class:selected
     role="group"

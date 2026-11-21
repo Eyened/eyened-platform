@@ -151,13 +151,15 @@ describe("LayersPanel", () => {
 
         ws.select(1);
         await tick();
-        expect(screen.queryByText(/^Line 1/)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Line 1" })).toBeNull();
         ws.select(0);
 
         expect(
             await screen.findByRole("button", { name: "ETDRS grid, Grader 5" }),
         ).toHaveAttribute("aria-pressed", "true");
-        expect(screen.getByText(/^Line 1 ·/)).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Line 1" }),
+        ).toBeInTheDocument();
     });
 
     it("Layers holds the object types and Display the view settings; no Display tab when nothing goes there", async () => {

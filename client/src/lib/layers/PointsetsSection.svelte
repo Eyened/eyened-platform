@@ -1,7 +1,7 @@
 <!--
 @component
 Layers › Pointsets for the selected viewport: this eye's registrations with points on this image, created on it, or current.
-The name sets the eye's current registration for every viewport of that eye; P places its points.
+A row selects the pointset P edits in this viewport; the eye's registration in use is set in Display › Registration.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
@@ -18,6 +18,7 @@ The name sets the eye's current registration for every viewport of that eye; P p
     } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+    import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { EyeLaterality } from "$lib/viewer-window/panelRegistration/groupOpenImages";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
@@ -39,6 +40,7 @@ The name sets the eye's current registration for every viewport of that eye; P p
     const workspace = getContext<Workspace>("workspace");
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const { instance } = viewerContext.image;
+    const { selection } = getContext<MainViewerContext>("mainViewerContext");
     const win = viewerContext.viewerWindowContext;
     const pointsets = win.pointsets;
     const eye = eyeKey(instance);
@@ -49,7 +51,7 @@ The name sets the eye's current registration for every viewport of that eye; P p
             BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
         )?.id,
     );
-    const currentId = $derived(pointsets.currentId(eye));
+    const inUseId = $derived(pointsets.currentId(eye));
     const rows = $derived(
         schemaId === undefined
             ? []
@@ -58,7 +60,7 @@ The name sets the eye's current registration for every viewport of that eye; P p
                   instanceId: instance.id,
                   patientId: instance.patient.id,
                   laterality: (instance.laterality ?? null) as EyeLaterality,
-                  currentId,
+                  currentId: inUseId,
                   imageLaterality: (id) =>
                       (instances.get(id)?.laterality ?? null) as EyeLaterality,
               }),
@@ -98,7 +100,10 @@ The name sets the eye's current registration for every viewport of that eye; P p
                 sub_task_id: taskContext?.subTask?.id,
                 form_data: {},
             });
-            pointsets.setCurrent(eye, created.id);
+            // New selects what it makes; it is put in use only when the eye has none.
+            selection.select({ kind: "pointset", id: created.id });
+            if (pointsets.currentId(eye) === undefined)
+                pointsets.setCurrent(eye, created.id);
             workspace.arm("point");
         } catch {
             createError = true;
@@ -133,16 +138,17 @@ The name sets the eye's current registration for every viewport of that eye; P p
         {#if rows.length > 0}
             <ul>
                 {#each rows as row (row.id)}
-                    {@const current = row.id === currentId}
+                    {@const current = selection.pointsetId() === row.id}
                     <li>
                         <LayerRow
                             label="Registration [{row.id}]"
                             name="Registration [{row.id}]"
                             selected={current}
                             onselect={() =>
-                                pointsets.setCurrent(
-                                    eye,
-                                    current ? undefined : row.id,
+                                selection.select(
+                                    current
+                                        ? null
+                                        : { kind: "pointset", id: row.id },
                                 )}
                         >
                             {#snippet tags()}

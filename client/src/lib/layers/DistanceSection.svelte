@@ -59,6 +59,12 @@ Layers › Distance lines for the selected viewport: one row per line on this im
                         n={i + 1}
                         length={lengthText(line, scale)}
                         current={mainViewerContext.selection.line() === line}
+                        onselect={() =>
+                            mainViewerContext.selection.select(
+                                mainViewerContext.selection.line() === line
+                                    ? null
+                                    : { kind: "line", line, lines: distance },
+                            )}
                         onhighlight={(on) =>
                             (distance.highlighted = on ? line : undefined)}
                         ondelete={() => remove(line, i)}

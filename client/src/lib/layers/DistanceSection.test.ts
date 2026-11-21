@@ -37,7 +37,7 @@ function renderSection() {
 }
 
 describe("DistanceSection", () => {
-    it("lists this B-scan's lines as Line n · length and focus highlights one; Delete line n removes it and focus moves on", async () => {
+    it("lists this B-scan's lines as Line n with the length in the sub-line and focus highlights one; Delete line n removes it and focus moves on", async () => {
         const { distance, selection } = renderSection();
         distance.add(new Line({ x: 0, y: 0 }, { x: 30, y: 40 }, 0));
         distance.add(new Line({ x: 0, y: 0 }, { x: 300, y: 400 }, 1));
@@ -46,8 +46,8 @@ describe("DistanceSection", () => {
         expect(
             screen.getByRole("button", { name: "Distance lines 2" }),
         ).toBeInTheDocument();
-        expect(screen.getByText("Line 1 · 500.00 µm")).toBeInTheDocument();
-        expect(screen.getByText("Line 2 · 2.00 mm")).toBeInTheDocument();
+        expect(screen.getByText(/^500\.00 µm ·/)).toBeInTheDocument();
+        expect(screen.getByText(/^2\.00 mm ·/)).toBeInTheDocument();
         const remove = within(
             screen.getByRole("group", { name: "Line 2" }),
         ).getByRole("button", { name: "Delete line 2" });
@@ -69,8 +69,21 @@ describe("DistanceSection", () => {
             lines: distance,
         });
         await tick();
-        expect(screen.getByRole("group", { name: "Line 1" })).toHaveAttribute(
-            "aria-current",
+        expect(screen.getByRole("button", { name: "Line 1" })).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
+    });
+
+    it("a line's name selects it in this viewport", async () => {
+        const { distance, selection } = renderSection();
+        const line = new Line({ x: 0, y: 0 }, { x: 3, y: 4 }, 0);
+        distance.add(line);
+        await tick();
+        await fireEvent.click(screen.getByRole("button", { name: "Line 1" }));
+        expect(selection.line()).toBe(line);
+        expect(screen.getByRole("button", { name: "Line 1" })).toHaveAttribute(
+            "aria-pressed",
             "true",
         );
     });
