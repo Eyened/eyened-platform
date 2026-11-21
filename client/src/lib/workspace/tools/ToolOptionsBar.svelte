@@ -5,6 +5,7 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
 <script lang="ts">
     import { getContext, tick, untrack } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
+    import WarningAltFilled from "carbon-icons-svelte/lib/WarningAltFilled.svelte";
     import OverflowMenu from "../OverflowMenu.svelte";
     import KeysPopover from "./KeysPopover.svelte";
     import type { Workspace } from "../workspace.svelte";
@@ -50,6 +51,11 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
                   .filter(Boolean)
                   .join(" › ")
             : "",
+    );
+    const hasTarget = $derived(
+        !!draw?.name ||
+            !!etdrs?.name ||
+            (point !== null && point.id !== null && !point.reason),
     );
     const cursorOn = $derived(layers?.viewerContext.keyboardCursor.on ?? false);
     // The armed tool's keys, or the keyboard cursor's while it is on, then those that work without a tool.
@@ -160,6 +166,13 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
     });
 </script>
 
+{#snippet divider()}
+    <span
+        aria-hidden="true"
+        class="my-2.5 w-px shrink-0 self-stretch bg-border-subtle-01"
+    ></span>
+{/snippet}
+
 <div
     bind:this={bar}
     data-slot="tool-options"
@@ -188,6 +201,44 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
             >No tool armed · pick one in Tools</span
         >
     {/if}
+    {#if hasTarget}
+        {@render divider()}
+        {#if draw?.name}
+            <!-- The segmentation name cuts with …; the class stays whole. -->
+            <span class="flex min-w-0 items-center gap-2">
+                {#if draw.color}
+                    <span
+                        aria-hidden="true"
+                        class="size-3 shrink-0 rounded-full"
+                        style:background-color={draw.color}
+                    ></span>
+                {/if}
+                <span
+                    class="min-w-8 truncate text-body-compact-01 text-text-primary"
+                    title={fullName}>{draw.name.segmentation}</span
+                >
+                {#if draw.name.feature}
+                    <span aria-hidden="true" class="text-text-secondary">›</span
+                    >
+                    <span
+                        class="shrink-0 text-body-compact-01 text-text-primary"
+                        title={fullName}>{draw.name.feature}</span
+                    >
+                {/if}
+            </span>
+        {:else if etdrs?.name}
+            <span
+                class="min-w-8 truncate text-body-compact-01 text-text-primary"
+                title={etdrs.name}>{etdrs.name}</span
+            >
+        {:else if point && point.id !== null}
+            <span class="text-body-compact-01 text-text-primary"
+                >Registration {point.id}{point.canEdit
+                    ? ""
+                    : " · read-only"}</span
+            >
+        {/if}
+    {/if}
     {#if cursorOn}
         <!-- Cuts first when the bar is short. -->
         <span
@@ -195,36 +246,18 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
             >arrows move · Space clicks · Esc leaves</span
         >
     {/if}
-    {#if draw?.name}
-        <!-- The segmentation name cuts with …; the class stays whole. -->
-        <span
-            class="min-w-8 truncate text-body-compact-01 text-text-primary"
-            title={fullName}>{draw.name.segmentation}</span
-        >
-        {#if draw.name.feature}
-            <span aria-hidden="true" class="-ms-2 text-text-secondary">›</span>
-            <span
-                class="-ms-2 shrink-0 text-body-compact-01 text-text-primary"
-                title={fullName}>{draw.name.feature}</span
-            >
-        {/if}
-    {/if}
-    {#if etdrs?.name}
-        <span
-            class="min-w-8 truncate text-body-compact-01 text-text-primary"
-            title={etdrs.name}>{etdrs.name}</span
-        >
-    {/if}
-    {#if point && point.id !== null && !point.reason}
-        <span class="text-body-compact-01 text-text-primary"
-            >Registration {point.id}{point.canEdit ? "" : " · read-only"}</span
-        >
+    {#if reason || shown.length > 0 || folded.length > 0}
+        {@render divider()}
     {/if}
     <!-- Always mounted, so screen readers announce a new reason. -->
     <span
         role="status"
-        class="min-w-0 py-1 text-body-compact-01 whitespace-normal text-text-primary"
-        class:sr-only={!reason}>{reason ?? ""}</span
+        class="flex min-w-0 items-center gap-2 py-1 text-body-compact-01 whitespace-normal text-text-primary"
+        class:sr-only={!reason}
+        >{#if reason}<WarningAltFilled
+                aria-hidden="true"
+                class="shrink-0 text-support-warning"
+            />{/if}{reason ?? ""}</span
     >
     {#each shown.filter((id) => !isHistory(id)) as id (id)}
         <span data-option={id} class="flex shrink-0 items-center"

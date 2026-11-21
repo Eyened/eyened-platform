@@ -94,6 +94,11 @@ export class MainViewerContext implements Overlay {
         this.featureColors.set(getSegmentationKey(segmentation), color);
     }
 
+    /** The colour this segmentation already has, without giving it one, so it can be read in a derived. */
+    assignedFeatureColor(segmentation: Segmentation): Color | undefined {
+        return this.featureColors.get(getSegmentationKey(segmentation));
+    }
+
     private _colorIndex = 0;
     getFeatureColor(segmentation: Segmentation): Color {
         let color = this.featureColors.get(getSegmentationKey(segmentation));

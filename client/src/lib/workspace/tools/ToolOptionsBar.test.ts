@@ -23,6 +23,7 @@ import ToolOptionsBar from "./ToolOptionsBar.svelte";
 
 const EDITABLE: DrawTarget = {
     name: { segmentation: "AMD grading", feature: "Drusen" },
+    color: null,
     reason: null,
 };
 
@@ -224,16 +225,18 @@ describe("ToolOptionsBar", () => {
         await expectNoAxeViolations(container);
     });
 
-    it("says in the status why it can't draw, in place of the options", () => {
-        const other = workspaceWith(1);
-        drawViewport(other, {
+    it("can't edit: a model segmentation's target stays and the reason replaces the options", () => {
+        const ws = workspaceWith(1);
+        drawViewport(ws, {
             name: { segmentation: "Vessels", feature: null },
-            reason: "Another grader's segmentation can't be edited. Duplicate it to edit.",
+            color: "#e5c07b",
+            reason: "This model segmentation can't be edited. Duplicate it to edit.",
         });
-        other.arm("brush");
-        render(ToolOptionsBar, { context: workspaceContext(other) });
+        ws.arm("brush");
+        render(ToolOptionsBar, { context: workspaceContext(ws) });
+        expect(screen.getByText("Vessels")).toBeInTheDocument();
         expect(screen.getByRole("status")).toHaveTextContent(
-            "Another grader's segmentation can't be edited. Duplicate it to edit.",
+            "This model segmentation can't be edited. Duplicate it to edit.",
         );
         expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
     });

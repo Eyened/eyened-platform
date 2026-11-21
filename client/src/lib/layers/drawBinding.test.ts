@@ -30,20 +30,36 @@ describe("drawBinding", () => {
         expect(
             drawBinding({
                 segmentation: segmentation(),
+                color: null,
                 activeIndices: 1,
                 toolId: "brush",
                 canEdit: mine,
             }),
         ).toEqual({
             name: { segmentation: "AMD grading", feature: "Drusen" },
+            color: null,
             reason: null,
         });
+    });
+
+    it("gives a one-class target its colour for the bar's chip; a class mask has none", () => {
+        const color = (data_representation: string) =>
+            drawBinding({
+                segmentation: segmentation({ data_representation }),
+                color: "#e5c07b",
+                activeIndices: [],
+                toolId: "brush",
+                canEdit: mine,
+            }).color;
+        expect(color("Binary")).toBe("#e5c07b");
+        expect(color("MultiClass")).toBeNull();
     });
 
     it("gives the reason it can't, in order: none, model, another grader's, Enhance on a non-probability one", () => {
         const reason = (s: Segmentation | null, toolId = "brush") =>
             drawBinding({
                 segmentation: s,
+                color: null,
                 activeIndices: [],
                 toolId: toolId as never,
                 canEdit: mine,

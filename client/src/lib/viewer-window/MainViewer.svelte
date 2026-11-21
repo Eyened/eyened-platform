@@ -4,6 +4,7 @@
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
     import { scaleOf } from "$lib/layers/imageScale";
+    import { toHex } from "$lib/utils";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import SliceScrollbar from "$lib/viewer/SliceScrollbar.svelte";
@@ -309,15 +310,20 @@
     );
     const { segmentationContext } = mainViewerContext;
     // Built whatever tool is armed, so the options bar names the target as soon as a Draw tool is picked.
-    const drawTarget = $derived(
-        drawBinding({
-            segmentation:
-                segmentationContext.segmentationItem?.segmentation ?? null,
+    const drawTarget = $derived.by(() => {
+        const segmentation =
+            segmentationContext.segmentationItem?.segmentation ?? null;
+        const color = segmentation
+            ? mainViewerContext.assignedFeatureColor(segmentation)
+            : undefined;
+        return drawBinding({
+            segmentation,
+            color: color ? toHex(color) : null,
             activeIndices: segmentationContext.activeIndices,
             toolId: workspace.armedTool,
             canEdit: (segmentation) => globalContext.canEdit(segmentation),
-        }),
-    );
+        });
+    });
     // A primitive, so a new class or a new editable target never rebuilds the tool mid-stroke.
     const drawEditable = $derived(
         drawTarget.reason === null && !segmentationContext.regionToolActive,
