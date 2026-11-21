@@ -1,7 +1,7 @@
 <!--
 @component
 A Layers section (level 3) or a group inside one (level 4): a 24 px disclosure button with a count (left out for settings sections), an optional action on the trailing edge, and the body while open.
-A layer type or group (one with a count) draws a guide line down its open body under its chevron. A closed body is not rendered, so its controls leave the Tab order.
+A layer type or group (one with a count) draws a guide line down its open body under its chevron. With a count of 0 it shows `empty` as one hint line there. A closed body is not rendered, so its controls leave the Tab order.
 -->
 <script lang="ts">
     import ChevronRight from "carbon-icons-svelte/lib/ChevronRight.svelte";
@@ -13,6 +13,7 @@ A layer type or group (one with a count) draws a guide line down its open body u
         open,
         ontoggle,
         level = 3,
+        empty,
         action,
         children,
     }: {
@@ -21,6 +22,8 @@ A layer type or group (one with a count) draws a guide line down its open body u
         open: boolean;
         ontoggle: () => void;
         level?: 3 | 4;
+        /** One hint line under an open type with no rows. */
+        empty?: string;
         action?: Snippet;
         children: Snippet;
     } = $props();
@@ -59,6 +62,13 @@ A layer type or group (one with a count) draws a guide line down its open body u
         style:--guide={level === 3 ? "23px" : "39px"}
     >
         {@render children()}
+        {#if count === 0 && empty}
+            <p
+                class="flex min-h-6 items-center ps-8 pe-4 text-label-01 text-text-secondary"
+            >
+                {empty}
+            </p>
+        {/if}
     </div>
 {/if}
 

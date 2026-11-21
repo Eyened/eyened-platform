@@ -4,8 +4,6 @@ Layers › ETDRS grids for the selected viewport: the AI grid, this image's grid
 The section places nothing: a row sets the current grid; New also arms Place ETDRS (G) at Fovea.
 -->
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button/index.js";
-    import * as Empty from "$lib/components/ui/empty/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
     import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
@@ -91,7 +89,7 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
         // The next step is placing the fovea.
         workspace.etdrsSlot = 0;
         workspace.arm("etdrs");
-        // The pressed button may be gone (the empty state), so focus goes to the new grid's row.
+        // Focus goes to the new grid's row, where placing continues.
         await tick();
         section
             ?.querySelector<HTMLElement>(
@@ -102,10 +100,19 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
 </script>
 
 <div bind:this={section} data-layer-section="etdrs">
-    <LayerSection title="ETDRS grids" {count} {open} {ontoggle}>
+    <LayerSection
+        title="ETDRS grids"
+        {count}
+        {open}
+        {ontoggle}
+        empty="Use + to place the fovea and disc edge."
+    >
         {#snippet action()}
-            <IconButton size="icon-xs" label="New ETDRS grid" onclick={create}
-                ><Add /></IconButton
+            <IconButton
+                size="icon-xs"
+                variant="secondary"
+                label="New ETDRS grid"
+                onclick={create}><Add /></IconButton
             >
         {/snippet}
         {#if count > 0}
@@ -181,19 +188,6 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
                     {/each}
                 </ul>
             {/if}
-        {:else}
-            <Empty.Root class="px-4 py-6">
-                <Empty.Header>
-                    <!-- ASSUMPTION: the spec asks for a title and a description but gives no text. -->
-                    <Empty.Title>No ETDRS grids</Empty.Title>
-                    <Empty.Description
-                        >Create one to place the fovea and disc edge.</Empty.Description
-                    >
-                </Empty.Header>
-                <Button variant="ghost" size="sm" onclick={create}
-                    >New ETDRS grid <Add /></Button
-                >
-            </Empty.Root>
         {/if}
     </LayerSection>
 </div>
