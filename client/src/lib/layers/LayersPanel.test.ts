@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    within,
+} from "@testing-library/svelte";
 import { tick } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
@@ -216,5 +222,36 @@ describe("LayersPanel", () => {
         expect(
             screen.queryByText("Select a layer to see its options."),
         ).toBeNull();
+    });
+
+    it("a selected grid's pane shows its creator, fovea and disc edge", async () => {
+        const name = BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID;
+        formSchemasByName.set(name, { id: 3, name } as never);
+        formAnnotations.set(11, {
+            id: 11,
+            form_schema_id: 3,
+            image_id: "inst-a",
+            annotation_type: "grader_form",
+            sub_task_id: null,
+            creator: { id: ME, name: `Grader ${ME}` },
+            form_data: {
+                fovea: { x: 512, y: 498 },
+                disc_edge: { x: 801, y: 470 },
+            },
+        } as never);
+        const ws = workspaceWith(1);
+        attach(ws, 0, "inst-a");
+        renderPanel(ws);
+        await fireEvent.click(
+            screen.getByRole("button", { name: "ETDRS grids 1" }),
+        );
+        await fireEvent.click(
+            screen.getByRole("button", { name: `ETDRS grid, Grader ${ME}` }),
+        );
+        const pane = screen.getByRole("region", {
+            name: `ETDRS grid, Grader ${ME}`,
+        });
+        expect(within(pane).getByText("512, 498")).toBeInTheDocument();
+        expect(within(pane).getByText("801, 470")).toBeInTheDocument();
     });
 });

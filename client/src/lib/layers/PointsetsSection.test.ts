@@ -10,9 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
 import { formAnnotations, formSchemasByName } from "$lib/data/stores.svelte";
 import { expectNoAxeViolations } from "$lib/workspace/testUtils";
-import type { FormAnnotationGET } from "../../types/openapi_types";
 import { eyeKey } from "./pointsets";
-import { fakeImage, layersContexts, ME } from "./testContexts";
+import { fakeImage, layersContexts, ME, reg } from "./testContexts";
 
 vi.mock("$lib/data/api", async (original) => ({
     ...(await original<typeof import("$lib/data/api")>()),
@@ -36,27 +35,6 @@ afterEach(() => {
     formAnnotations.clear();
     formSchemasByName.delete(SCHEMA_NAME);
 });
-
-/** A synthetic registration of patient 1's right eye. */
-function reg(
-    id: number,
-    creatorId: number,
-    form_data: Record<string, unknown>,
-    over: Partial<FormAnnotationGET> = {},
-) {
-    const a = {
-        id,
-        form_schema_id: 4,
-        patient_id: 1,
-        laterality: "R",
-        image_id: "elsewhere",
-        creator: { id: creatorId, name: `Grader ${creatorId}` },
-        form_data,
-        ...over,
-    } as unknown as FormAnnotationGET;
-    formAnnotations.set(id, a);
-    return a;
-}
 
 function renderSection(
     instanceId = "inst-1",
@@ -96,7 +74,7 @@ describe("PointsetsSection", () => {
         await expectNoAxeViolations(container);
     });
 
-    it("a row selects the pointset here and leaves the eye's registration in use alone; the selected row shows its points and save state", async () => {
+    it("a row selects the pointset here and leaves the eye's registration in use alone", async () => {
         reg(12, 9, { "inst-1": [pt, pt, pt], "inst-2": [pt, pt, null] });
         reg(13, ME, { "inst-1": [pt] });
         const { win, selection } = renderSection();
@@ -114,29 +92,6 @@ describe("PointsetsSection", () => {
         expect(
             screen.getByRole("button", { name: "Registration [12]" }),
         ).toHaveAttribute("aria-pressed", "true");
-        expect(screen.getByText("This CF · 2022-05-10")).toBeInTheDocument();
-        expect(screen.getByText("2 · no 3")).toBeInTheDocument();
-        win.pointsets.sync.set(12, "error");
-        expect(await screen.findByText("Couldn't save")).toBeInTheDocument();
-    });
-
-    it("numbers a retake of this image by the window's strip order: this image is the first, the other line reads #2", async () => {
-        reg(12, 9, { "inst-1": [pt], "inst-2": [pt] });
-        renderSection("inst-1", {
-            images: [
-                fakeImage("inst-2", {
-                    modality: "ColorFundus",
-                    date: "2022-05-10",
-                    device: { manufacturer: "Topcon", model: "Maestro2" },
-                }),
-            ],
-        });
-        await fireEvent.click(
-            screen.getByRole("button", { name: "Registration [12]" }),
-        );
-        expect(screen.getByText("This CF · 2022-05-10")).toBeInTheDocument();
-        expect(screen.getByText("CF · 2022-05-10 #2")).toBeInTheDocument();
-        expect(screen.getAllByText("Topcon Maestro2")).toHaveLength(2);
     });
 
     it("New creates on this image, selects it, puts it in use when the eye has none and arms P; a failed New says so and arms nothing", async () => {

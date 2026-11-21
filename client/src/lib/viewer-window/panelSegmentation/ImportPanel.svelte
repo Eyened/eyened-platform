@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button/index.js";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import SegmentationPickerModal from "$lib/layers/SegmentationPickerModal.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
@@ -7,6 +7,7 @@
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { converters } from "$lib/webgl/segmentationConverter";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
+    import Upload from "carbon-icons-svelte/lib/Upload.svelte";
     import { getContext } from "svelte";
     import type { Segmentation } from "./segmentationContext.svelte";
     import { orderSegmentationsByCreator } from "./segmentationUtils";
@@ -55,9 +56,13 @@
     }
 </script>
 
-<Button variant="ghost" size="sm" onclick={() => (open = true)}
-    >{image.is3D ? "Import into this B-scan…" : "Import…"}</Button
+<IconButton
+    size="icon-xs"
+    label={image.is3D ? "Import into this B-scan…" : "Import…"}
+    onclick={() => (open = true)}
 >
+    <Upload />
+</IconButton>
 <SegmentationPickerModal
     bind:open
     modalHeading={image.is3D

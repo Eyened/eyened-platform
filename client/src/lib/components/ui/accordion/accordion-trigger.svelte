@@ -3,10 +3,17 @@
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
     import type { Snippet } from "svelte";
 
-    let { children }: { children: Snippet } = $props();
+    let {
+        level = 3,
+        children,
+    }: {
+        /** The heading level, one below the heading the accordion sits under. */
+        level?: 2 | 3 | 4 | 5 | 6;
+        children: Snippet;
+    } = $props();
 </script>
 
-<AccordionPrimitive.Header level={3}>
+<AccordionPrimitive.Header {level}>
     <AccordionPrimitive.Trigger
         class="group flex min-h-10 w-full cursor-pointer items-center pe-4 text-start text-text-primary hover:bg-layer-hover-01 in-dialog:hover:bg-layer-hover-02 in-study:hover:bg-layer-hover-02 in-dialog:in-study:hover:bg-layer-hover-03"
     >

@@ -156,7 +156,7 @@ describe("EtdrsSection", () => {
         ).toBeNull();
     });
 
-    it("the name sets the current grid and shows its points as text; the section mounts no tool; pressing it again unsets it", async () => {
+    it("the name sets and unsets the current grid; the section mounts no tool", async () => {
         formAnnotations.set(11, grid(11, ME));
         const { viewerContext, grids } = renderSection();
         const name = () =>
@@ -164,15 +164,12 @@ describe("EtdrsSection", () => {
         await fireEvent.click(name());
         expect(grids.isShown(11)).toBe(false);
         expect(name()).toHaveAttribute("aria-pressed", "true");
-        expect(screen.getByText("Fovea 512, 498")).toBeInTheDocument();
-        expect(screen.getByText("Disc edge 801, 470")).toBeInTheDocument();
         // Only the grid overlay mounts, so a click with Pan or Distance armed places nothing.
         expect(
             pointTool(vi.mocked(viewerContext.addOverlay)).tool,
         ).toBeUndefined();
         await fireEvent.click(name());
         expect(name()).toHaveAttribute("aria-pressed", "false");
-        expect(screen.queryByText(/^Fovea/)).toBeNull();
     });
 
     it("New opens a closed section, hides every grid, creates one in this task, makes it current and arms Place ETDRS at Fovea", async () => {

@@ -4,7 +4,10 @@ The selected item's options under the Layers list: a fixed header, then a scroll
 -->
 <script lang="ts">
     import type { LayersTarget } from "$lib/workspace/workspace.svelte";
-    import PaneHeader from "./pane/PaneHeader.svelte";
+    import GridPane from "./pane/GridPane.svelte";
+    import LinePane from "./pane/LinePane.svelte";
+    import PointsetPane from "./pane/PointsetPane.svelte";
+    import SegmentationPane from "./pane/SegmentationPane.svelte";
 
     let { target }: { target: LayersTarget } = $props();
     const uid = $props.id();
@@ -18,22 +21,20 @@ The selected item's options under the Layers list: a fixed header, then a scroll
 {:else}
     <section aria-labelledby="{uid}-name" class="flex min-h-0 flex-1 flex-col">
         {#if selected.kind === "segmentation"}
-            <PaneHeader
-                id="{uid}-name"
-                name={selected.item.segmentation.feature.name}
-                type="Segmentation · {selected.item.segmentation
-                    .data_representation}"
-            />
+            {#key selected.item}
+                <SegmentationPane id="{uid}-name" item={selected.item} />
+            {/key}
         {:else if selected.kind === "grid"}
-            <PaneHeader id="{uid}-name" name="ETDRS grid" type="ETDRS grid" />
+            <GridPane id="{uid}-name" gridId={selected.id} />
         {:else if selected.kind === "pointset"}
-            <PaneHeader
-                id="{uid}-name"
-                name="Registration [{selected.id}]"
-                type="Pointset"
-            />
+            <PointsetPane id="{uid}-name" pointsetId={selected.id} />
         {:else}
-            <PaneHeader id="{uid}-name" name="Line" type="Distance line" />
+            <LinePane
+                id="{uid}-name"
+                line={selected.line}
+                lines={selected.lines}
+                scale={target.scale}
+            />
         {/if}
     </section>
 {/if}

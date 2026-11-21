@@ -6,7 +6,11 @@ import {
     type EyeLaterality,
 } from "$lib/viewer-window/panelRegistration/groupOpenImages";
 import type { SyncState } from "$lib/webgl/segmentationState.svelte";
-import type { ImageName } from "$lib/workspace/imageMeta";
+import {
+    imageName,
+    type ImageMeta,
+    type ImageName,
+} from "$lib/workspace/imageMeta";
 import { SvelteMap } from "svelte/reactivity";
 import type { FormAnnotationGET } from "../../types/openapi_types";
 
@@ -112,6 +116,31 @@ export function eyeRegistrationRows(
               imageLaterality: (id) =>
                   (instances.get(id)?.laterality ?? null) as EyeLaterality,
           });
+}
+
+/** This eye's loaded 2D images, in strip order. */
+export function loadedEyeImages(
+    catalogue: readonly string[],
+    win: {
+        images: ReadonlyMap<string, { is2D: boolean; instance: ImageMeta }>;
+        twins: ReadonlyMap<string, string>;
+    },
+    eye: string,
+): ({ id: string } & ImageName)[] {
+    return catalogue.flatMap((imageId) => {
+        const image = win.images.get(imageId);
+        return image?.is2D && eyeKey(image.instance) === eye
+            ? [
+                  {
+                      id: image.instance.id,
+                      ...imageName(
+                          image.instance,
+                          win.twins.get(imageId) ?? "",
+                      ),
+                  },
+              ]
+            : [];
+    });
 }
 
 export type ImageLine = {

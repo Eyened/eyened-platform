@@ -46,7 +46,9 @@ import {
 import { clampSize, PAINT_DEFAULTS, sizeKey, type PaintPrefs } from "./paint";
 import type { LayerSectionId } from "$lib/layers/layerSections";
 import {
+    readLayerArea,
     readLayerSections,
+    writeLayerArea,
     writeLayerSections,
     writeMagnifier,
     writePaint,
@@ -147,6 +149,8 @@ export class Workspace {
     /** The open Layers sections; stored per browser. */
     layerSections: Record<LayerSectionId, boolean> =
         $state.raw(readLayerSections());
+    /** Area on Segmentations rows and in the Selected pane; stored per browser. */
+    layerArea = $state(readLayerArea());
     arrange: ArrangeOrder = $state("opened");
     preset: Preset = $state.raw(getPreset(DEFAULT_PRESET_ID)!);
     page = $state(1);
@@ -423,6 +427,11 @@ export class Workspace {
         if (this.layerSections[id] === open) return;
         this.layerSections = { ...this.layerSections, [id]: open };
         writeLayerSections(this.layerSections);
+    }
+
+    setLayerArea(on: boolean): void {
+        this.layerArea = on;
+        writeLayerArea(on);
     }
 
     /** A viewport's viewer registers its handle; the returned function removes it. */

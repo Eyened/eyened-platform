@@ -19,18 +19,16 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
     import { getContext } from "svelte";
     import type { FormAnnotationGET } from "../../types/openapi_types";
-    import { imageName } from "$lib/workspace/imageMeta";
     import LayerRow from "./LayerRow.svelte";
     import LayerSection from "./LayerSection.svelte";
     import {
         eyeKey,
         eyeRegistrationRows,
         eyeSuffix,
-        imageLines,
+        loadedEyeImages,
         registrationSchemaId,
     } from "./pointsets";
     import RegistrationDeleteModal from "./RegistrationDeleteModal.svelte";
-    import SyncStatus from "./SyncStatus.svelte";
 
     let { open, ontoggle }: { open: boolean; ontoggle: () => void } = $props();
 
@@ -48,20 +46,7 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
     const inUseId = $derived(pointsets.currentId(eye));
     const rows = $derived(eyeRegistrationRows(instance, inUseId));
 
-    /** This eye's loaded 2D images, in strip order. */
-    const loaded = $derived(
-        workspace.catalogue.flatMap((id) => {
-            const image = win.images.get(id);
-            return image?.is2D && eyeKey(image.instance) === eye
-                ? [
-                      {
-                          id: image.instance.id,
-                          ...imageName(image.instance, win.twins.get(id) ?? ""),
-                      },
-                  ]
-                : [];
-        }),
-    );
+    const loaded = $derived(loadedEyeImages(workspace.catalogue, win, eye));
     // A registration pairs this image with another image of the eye.
     const canCreate = $derived(
         loaded.some((image) => image.id !== instance.id),
@@ -160,55 +145,6 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
                                     </IconButton>
                                 {/if}
                             {/snippet}
-                            {#if current}
-                                {@const lines = imageLines(
-                                    row.form_data,
-                                    instance.id,
-                                    loaded,
-                                )}
-                                <div class="flex flex-col gap-1 ps-8 pe-2 pb-1">
-                                    <SyncStatus
-                                        sync={pointsets.sync.get(row.id) ??
-                                            "synced"}
-                                    />
-                                    {#if lines}
-                                        <ul aria-label="Points per image">
-                                            {#each lines as line, i (i)}
-                                                <li
-                                                    class="flex gap-2 text-body-compact-01"
-                                                >
-                                                    <span
-                                                        class="min-w-0 flex-1 [overflow-wrap:anywhere]"
-                                                    >
-                                                        <span
-                                                            class="block text-text-primary"
-                                                            >{line.name}</span
-                                                        >
-                                                        {#if line.device}
-                                                            <span
-                                                                class="block text-label-01 text-text-secondary"
-                                                                >{line.device}</span
-                                                            >
-                                                        {/if}
-                                                    </span>
-                                                    <span
-                                                        class="tabular-nums {line.gap
-                                                            ? 'text-text-error'
-                                                            : 'text-text-secondary'}"
-                                                        >{line.points}</span
-                                                    >
-                                                </li>
-                                            {/each}
-                                        </ul>
-                                    {:else}
-                                        <p
-                                            class="text-body-compact-01 text-text-secondary"
-                                        >
-                                            No points yet
-                                        </p>
-                                    {/if}
-                                </div>
-                            {/if}
                         </LayerRow>
                     </li>
                 {/each}
