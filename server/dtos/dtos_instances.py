@@ -14,7 +14,7 @@ from eyened_orm.image_instance import ETDRSField, Laterality, Modality, Modality
 from eyened_orm.patient import SexEnum as Sex
 from pydantic import BaseModel, Field, field_serializer
 
-from .dtos_aux import TagMeta
+from .dtos_aux import DataSourceGET, TagMeta
 from .dtos_main import FormAnnotationGET, ModelMeta, ModelSegmentationGET, SegmentationGET
 
 # Type aliases matching TypeScript types
@@ -70,6 +70,7 @@ class StudyGET(BaseModel):
     patient: "PatientMeta"
     series: Optional[List["SeriesGET"]] = None
     tags: List[TagMeta]
+    data_sources: List[DataSourceGET] = []
 
     @field_serializer('date')
     def serialize_date(self, value: date) -> str:

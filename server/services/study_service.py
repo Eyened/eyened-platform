@@ -14,7 +14,7 @@ from eyened_orm.authz.ownership import require_owner, require_owner_or_project_a
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 
-from ..config import DataSource, get_data_sources
+from ..config import sources_for_project
 from ..db import get_db
 from .access_scope import get_access_scope
 from .acting_user import ActingUser
@@ -231,19 +231,6 @@ class StudyService:
             raise NotFoundError(f"Study {study_id} not found")
         return study
 
-    @staticmethod
-    def _sources_for(study: Study) -> list[DataSource]:
-        project = study.Patient.Project.ProjectName
-        return [s for s in get_data_sources() if project in s.projects]
-
-    def list_data_sources(self, study_id: int) -> list[DataSource]:
-        """The configured data sources that apply to a study the actor can see.
-
-        Raises:
-            NotFoundError: If the study does not exist or is out of scope.
-        """
-        return self._sources_for(self._visible_study(study_id))
-
     def fetch_data_source(self, study_id: int, name: str) -> bytes:
         """Fetch a study's data from the named source; return the upstream body.
 
@@ -256,7 +243,7 @@ class StudyService:
             UpstreamError: If the upstream fails or times out.
         """
         study = self._visible_study(study_id)
-        source = next((s for s in self._sources_for(study) if s.name == name), None)
+        source = next((s for s in sources_for_project(study.Patient.Project.ProjectName) if s.name == name), None)
         if source is None:
             raise NotFoundError(f"Data source {name} not found")
         values = {

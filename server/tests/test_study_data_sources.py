@@ -10,8 +10,12 @@ from datetime import date
 import httpxyz
 import pytest
 
+from eyened_orm import Study
+
+import server.config as config
 import server.services.study_service as study_service
 from eyened_orm.utils.factories import make_patient, make_project, make_study, scope_for
+from server.dtos.dto_converter import DTOConverter
 from server.config import DATA_SOURCES_PATH, DataSource, load_data_sources
 
 REGISTRY = DataSource(
@@ -25,7 +29,7 @@ BODY = b'{"table": [["a", 1]]}'
 
 @pytest.fixture()
 def sources(monkeypatch):
-    monkeypatch.setattr(study_service, "get_data_sources", lambda: (REGISTRY,))
+    monkeypatch.setattr(config, "get_data_sources", lambda: (REGISTRY,))
 
 
 @pytest.fixture()
@@ -70,13 +74,25 @@ def test_the_default_config_has_no_sources():
     assert load_data_sources(DATA_SOURCES_PATH) == ()
 
 
-def test_a_matching_study_lists_and_proxies_the_source(client, sources, upstream, studies):
+def test_a_study_in_a_configured_project_lists_its_sources(session, sources, studies):
+    study = session.get(Study, studies["Alpha"]["study"])
+
+    dto = DTOConverter.study_to_get(study)
+
+    assert [d.model_dump() for d in dto.data_sources] == [{"name": "Registry", "collapse": True}]
+
+
+def test_a_study_in_another_project_lists_no_sources(session, sources, studies):
+    study = session.get(Study, studies["Other"]["study"])
+
+    assert DTOConverter.study_to_get(study).data_sources == []
+
+
+def test_a_matching_study_proxies_the_source(client, sources, upstream, studies):
     study_id = studies["Alpha"]["study"]
 
-    listed = client.get(f"/studies/{study_id}/data-sources")
     fetched = client.get(f"/studies/{study_id}/data-sources/Registry")
 
-    assert listed.json() == [{"name": "Registry", "collapse": True}]
     assert fetched.status_code == 200
     assert fetched.content == BODY
     assert fetched.headers["content-type"] == "application/json"
@@ -89,7 +105,6 @@ def test_a_matching_study_lists_and_proxies_the_source(client, sources, upstream
 def test_a_non_matching_project_gets_no_source(client, sources, upstream, studies):
     study_id = studies["Other"]["study"]
 
-    assert client.get(f"/studies/{study_id}/data-sources").json() == []
     assert client.get(f"/studies/{study_id}/data-sources/Registry").status_code == 404
     assert upstream.urls == []
 
@@ -101,7 +116,6 @@ def test_an_invisible_study_is_404_and_never_reaches_upstream(
     set_scope(scope_for(studies["Other"]["project"]))
     study_id = studies["Alpha"]["study"]
 
-    assert client.get(f"/studies/{study_id}/data-sources").status_code == 404
     assert client.get(f"/studies/{study_id}/data-sources/Registry").status_code == 404
     assert upstream.urls == []
 

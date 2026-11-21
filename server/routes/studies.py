@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Response
 
 from ..dtos.dto_converter import DTOConverter
-from ..dtos.dtos_aux import DataSourceGET, ObjectTagPATCH, ObjectTagPOST, TagMeta
+from ..dtos.dtos_aux import ObjectTagPATCH, ObjectTagPOST, TagMeta
 from ..services.study_service import StudyService, get_study_service
 from .auth import CurrentUser, get_current_user
 
@@ -54,19 +54,6 @@ def patch_study_tag(
         body.comment,
     )
     return DTOConverter.link_to_tag_metadata(link)
-
-
-@router.get("/studies/{study_id}/data-sources", response_model=list[DataSourceGET])
-def list_study_data_sources(
-    study_id: int,
-    service: StudyService = Depends(get_study_service),
-    current_user: CurrentUser = Depends(get_current_user),
-) -> list[DataSourceGET]:
-    """External data sources configured for this study's project."""
-    return [
-        DataSourceGET(name=s.name, collapse=s.collapse)
-        for s in service.list_data_sources(study_id)
-    ]
 
 
 @router.get("/studies/{study_id}/data-sources/{name}")

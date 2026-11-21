@@ -274,6 +274,11 @@ def get_data_sources() -> tuple[DataSource, ...]:
     return load_data_sources(DATA_SOURCES_PATH)
 
 
+def sources_for_project(project_name: str) -> list[DataSource]:
+    """The configured data sources that apply to a project, in config order."""
+    return [s for s in get_data_sources() if project_name in s.projects]
+
+
 def get_redis_connection():
     """Redis client for RQ (same connection used for enqueue and job status)."""
     from redis import Redis
