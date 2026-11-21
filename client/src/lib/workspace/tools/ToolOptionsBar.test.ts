@@ -334,6 +334,42 @@ describe("ToolOptionsBar", () => {
         expect(screen.getByText("Point 1 / 3")).toBeInTheDocument();
         await expectNoAxeViolations(container);
     });
+
+    it("Dilate / Erode, Questionable and Keep grid size are checkboxes that turn the option on", async () => {
+        const ws = workspaceWith(1);
+        drawViewport(ws, EDITABLE);
+        ws.arm("brush");
+        render(ToolOptionsBar, { context: workspaceContext(ws) });
+        await fireEvent.click(
+            screen.getByRole("checkbox", { name: "Dilate / Erode" }),
+        );
+        await fireEvent.click(
+            screen.getByRole("checkbox", { name: "Questionable" }),
+        );
+        expect([ws.dilateErode, ws.questionable]).toEqual([true, true]);
+        cleanup();
+
+        const grid = workspaceWith(1);
+        grid.attachViewport(0, {
+            zoomPercent: 100,
+            zoomBy: vi.fn(),
+            reset: vi.fn(),
+            layers: {
+                etdrsTarget: { name: "Your grid 7", reason: null },
+                viewerContext: {
+                    keyboardCursor: { on: false },
+                    returnFocus: vi.fn(),
+                },
+            } as never,
+        });
+        grid.arm("etdrs");
+        render(ToolOptionsBar, { context: workspaceContext(grid) });
+        const before = grid.keepGridSize;
+        await fireEvent.click(
+            screen.getByRole("checkbox", { name: "Keep grid size" }),
+        );
+        expect(grid.keepGridSize).toBe(!before);
+    });
 });
 
 describe("ToolOptionsBar when short", () => {
