@@ -56,17 +56,6 @@ import {
     type ToolMode,
 } from "./tools/registry";
 
-/** The Layers section each tool opens when armed; the ETDRS circle opens none. */
-const OPENS: Partial<Record<ToolId, LayerSectionId>> = {
-    brush: "segmentations",
-    eraser: "segmentations",
-    polygon: "segmentations",
-    enhance: "segmentations",
-    distance: "distance",
-    etdrs: "etdrs",
-    point: "pointsets",
-};
-
 export interface WorkspaceOptions {
     /** Receives the URL state after every change; the loader passes workspaceUrl's writer. */
     writeUrl?: (state: WorkspaceUrlState) => void;
@@ -151,7 +140,7 @@ export class Workspace {
     etdrsSlot: 0 | 1 = $state(0);
     /** Place ETDRS: a moved fovea takes the disc edge along. This session only. */
     keepGridSize = $state(false);
-    /** The open Layers sections, kept here so arming a Draw tool can open Segmentations; stored per browser. */
+    /** The open Layers sections; stored per browser. */
     layerSections: Record<LayerSectionId, boolean> =
         $state.raw(readLayerSections());
     arrange: ArrangeOrder = $state("opened");
@@ -384,9 +373,6 @@ export class Workspace {
         }
         // One point tool at a time: P and G drop an armed form point field.
         if (id === "point" || id === "etdrs") pointArming.disarm();
-        // Arming opens the tool's section, as if by hand; it never closes one.
-        const section = OPENS[id];
-        if (section) this.setLayerSection(section, true);
         if (tool.group !== "Draw") this.resetDrawToggles();
         this.armedTool = id;
         this.lastPick = { ...this.lastPick, [tool.group]: id };

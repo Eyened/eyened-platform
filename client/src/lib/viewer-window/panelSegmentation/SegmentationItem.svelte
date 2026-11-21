@@ -1,6 +1,6 @@
 <!--
 @component
-One segmentation row in Layers: eye (right-click shows only this), Mask with reference, colour, the name (sets or unsets the current row), the type badge and Delete.
+One segmentation row in Layers: colour, the name (sets or unsets the current row) and the type letter; Mask with reference, eye (right-click shows only this) and Delete at the right.
 Under it: the current row's save state, this slice's area, then the row's details.
 -->
 <script lang="ts">
@@ -10,6 +10,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
     import { Tag } from "$lib/components/ui/tag/index.js";
     import { tagSegmentation, untagSegmentation } from "$lib/data/helpers";
     import Tagger from "$lib/tags/Tagger.svelte";
+    import LayerRow from "$lib/layers/LayerRow.svelte";
     import type { SegmentationGET } from "../../../types/openapi_types";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import SliceArea from "$lib/layers/SliceArea.svelte";
@@ -130,33 +131,35 @@ Under it: the current row's save state, this slice's area, then the row's detail
     }
 </script>
 
-<div
-    class="segmentation"
-    role="group"
-    aria-label="{feature.name} segmentation [{segmentation.id}]"
-    class:loading={segmentationItem.loading}
-    class:current={isActive}
-    class:visible
-    class:empty-non-editable={!isEditable && isEmptyForCurrentSlice}
-    class:empty-editable={isEditable && isEmptyForCurrentSlice}
+<LayerRow
+    label="{feature.name} segmentation [{segmentation.id}]"
+    name={feature.name}
+    selected={isActive}
+    {visible}
+    onselect={toggleActive}
+    class={segmentationItem.loading
+        ? "opacity-50"
+        : !isEditable && isEmptyForCurrentSlice
+          ? "opacity-60"
+          : isEditable && isEmptyForCurrentSlice && !isActive
+            ? "bg-layer-hover-01"
+            : ""}
     onpointerenter={pointerEnter}
     onpointerleave={pointerLeave}
 >
-    <div class="flex items-start gap-1 py-1 ps-7 pe-2">
-        <IconButton
-            size="icon-xs"
-            label={visible ? "Hide" : "Show"}
-            onclick={() =>
-                segmentationContext.toggleShowSegmentation(segmentation)}
-            oncontextmenu={showOnly}
-        >
-            {#if visible}<View />{:else}<ViewOff />{/if}
-        </IconButton>
+    {#snippet swatch()}
+        {#if !isMulti}<FeatureColorPicker {segmentation} />{/if}
+    {/snippet}
+    {#snippet tags()}
+        <Tag>{representationLetter(dataRepresentation)}</Tag>
+    {/snippet}
+    {#snippet icons()}
         {#if hasReferenceMask}
             <IconButton
                 size="icon-xs"
                 label="Mask with reference"
                 aria-pressed={maskingApplied}
+                data-sticky={maskingApplied}
                 class="aria-pressed:bg-background-selected"
                 onclick={() =>
                     mainViewerContext.toggleMasking(segmentationItem)}
@@ -164,16 +167,16 @@ Under it: the current row's save state, this slice's area, then the row's detail
                 <Intersect />
             </IconButton>
         {/if}
-        {#if !isMulti}
-            <FeatureColorPicker {segmentation} />
-        {/if}
-        <button
-            type="button"
-            class="name text-body-compact-01"
-            aria-pressed={isActive}
-            onclick={toggleActive}>{feature.name}</button
+        <IconButton
+            size="icon-xs"
+            label={visible ? "Hide" : "Show"}
+            data-sticky={!visible}
+            onclick={() =>
+                segmentationContext.toggleShowSegmentation(segmentation)}
+            oncontextmenu={showOnly}
         >
-        <Tag>{representationLetter(dataRepresentation)}</Tag>
+            {#if visible}<View />{:else}<ViewOff />{/if}
+        </IconButton>
         {#if isEditable}
             <IconButton
                 size="icon-xs"
@@ -183,7 +186,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
                 <TrashCan />
             </IconButton>
         {/if}
-    </div>
+    {/snippet}
     <div class="details">
         {#if isActive && isEditable && segmentationState}
             <SyncStatus sync={segmentationState.syncState} />
@@ -274,58 +277,15 @@ Under it: the current row's save state, this slice's area, then the row's detail
             {/if}
         {/if}
     </div>
-</div>
+</LayerRow>
 
 <style>
-    .segmentation {
-        display: flex;
-        flex-direction: column;
-        border-inline-start: 3px solid transparent;
-    }
-    .segmentation.visible {
-        border-inline-start-color: var(--color-border-strong-01);
-    }
-    .segmentation.current {
-        border-inline-start-color: var(--color-border-interactive);
-        background: var(--color-layer-selected-01);
-    }
-    .segmentation.loading {
-        opacity: 0.5;
-    }
-    .segmentation.empty-non-editable {
-        opacity: 0.6;
-    }
-    .segmentation.empty-editable:not(.current) {
-        background: var(--color-layer-hover-01);
-    }
-    /* The name wraps; no ellipsis, no tooltip. */
-    .name {
-        min-height: 1.5rem;
-        padding-inline: 0.25rem;
-        border: 0;
-        background: transparent;
-        color: var(--color-text-primary);
-        text-align: start;
-        cursor: pointer;
-    }
-    .name {
-        flex: 1;
-        min-width: 0;
-        overflow-wrap: anywhere;
-    }
-    .name:hover {
-        background: var(--color-layer-hover-01);
-    }
-    .name:focus-visible {
-        outline: 2px solid var(--color-focus);
-        outline-offset: -2px;
-    }
     .details {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
         gap: 0.25rem;
-        /* Starts under the eye, as the row line's ps-7 does. */
+        /* Starts under the colour or name, as the row line's ps-7 does. */
         padding-inline: 1.75rem 0.5rem;
     }
     .details:empty {

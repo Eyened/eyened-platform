@@ -107,7 +107,7 @@ describe("SegmentationsSection", () => {
         await expectNoAxeViolations(view.container);
     });
 
-    it("while shown and open the viewport's segmentation tools are active, and Area hides the area lines", async () => {
+    it("while shown, open or collapsed, the viewport's segmentation tools are active, and Area hides the area lines", async () => {
         seed();
         // The BinaryMask constructor only reads the image's size and webgl shaders, so a minimal fake image will do.
         const fakeImage = {
@@ -137,7 +137,7 @@ describe("SegmentationsSection", () => {
         await view.rerender({ shown: true });
         expect(viewerContext.activePanels.has("Segmentation")).toBe(true);
         await view.rerender({ open: false });
-        expect(viewerContext.activePanels.has("Segmentation")).toBe(false);
+        expect(viewerContext.activePanels.has("Segmentation")).toBe(true);
         view.unmount();
     });
 

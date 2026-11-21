@@ -21,8 +21,8 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import type { FormAnnotationGET } from "../../types/openapi_types";
     import { AI_GRID, aiGrid, type GridLayers } from "./gridLayers.svelte";
-    import CommitNumberInput from "./CommitNumberInput.svelte";
     import GridDeleteModal from "./GridDeleteModal.svelte";
+    import LayerRow from "./LayerRow.svelte";
     import LayerSection from "./LayerSection.svelte";
 
     let {
@@ -97,40 +97,27 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
             >
         {/snippet}
         {#if count > 0}
-            <div class="px-4 py-2">
-                <CommitNumberInput
-                    labelText="Radius fraction"
-                    value={workspace.etdrsFraction}
-                    step={0.01}
-                    min={0.01}
-                    max={1}
-                    oncommit={(v) => (workspace.etdrsFraction = v)}
-                />
-            </div>
             <ul>
                 {#if ai}
                     <li>
-                        <div
-                            class="flex items-start gap-1 border-s-3 py-1 ps-7 pe-2 {aiShown
-                                ? 'border-border-strong-01'
-                                : 'border-transparent'}"
-                            role="group"
-                            aria-label="AI grid"
+                        <LayerRow
+                            label="AI grid"
+                            name="AI grid"
+                            visible={aiShown}
                         >
-                            <IconButton
-                                size="icon-xs"
-                                label={aiShown ? "Hide" : "Show"}
-                                onclick={() =>
-                                    grids.setShown(AI_GRID, !aiShown)}
-                            >
-                                {#if aiShown}<View />{:else}<ViewOff />{/if}
-                            </IconButton>
-                            <span
-                                class="min-h-6 flex-1 px-1 text-body-compact-01 text-text-primary"
-                                >AI grid</span
-                            >
-                            <Tag>AI</Tag>
-                        </div>
+                            {#snippet tags()}<Tag>AI</Tag>{/snippet}
+                            {#snippet icons()}
+                                <IconButton
+                                    size="icon-xs"
+                                    label={aiShown ? "Hide" : "Show"}
+                                    data-sticky={!aiShown}
+                                    onclick={() =>
+                                        grids.setShown(AI_GRID, !aiShown)}
+                                >
+                                    {#if aiShown}<View />{:else}<ViewOff />{/if}
+                                </IconButton>
+                            {/snippet}
+                        </LayerRow>
                     </li>
                 {/if}
                 {#each own as grid (grid.id)}

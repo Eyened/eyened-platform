@@ -3,7 +3,7 @@
 
     export type NumberInputProps = Omit<
         HTMLInputAttributes,
-        "type" | "value" | "files"
+        "type" | "value" | "files" | "size"
     > & {
         labelText: string;
         hideLabel?: boolean;
@@ -11,6 +11,8 @@
         /** The raw text: "" when empty, never coerced to 0 (Carbon allowEmpty). */
         value?: string;
         ref?: HTMLInputElement | null;
+        /** Carbon sizes: md 40 px, sm 32 px. */
+        size?: "sm" | "md";
         class?: string;
     };
 </script>
@@ -28,6 +30,7 @@
         id = uid,
         value = $bindable(""),
         ref = $bindable(null),
+        size = "md",
         class: className,
         ...restProps
     }: NumberInputProps = $props();
@@ -46,6 +49,6 @@
         type="number"
         {value}
         oninput={(e) => (value = e.currentTarget.value)}
-        class="number-input-no-steppers min-w-37.5"
+        class="number-input-no-steppers min-w-37.5 {size === 'sm' ? 'h-8' : ''}"
     />
 </Field.Field>

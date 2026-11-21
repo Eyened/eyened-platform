@@ -1,6 +1,6 @@
 <!--
 @component
-The Layers panel body: the selected viewport's name, then the sections that apply to its image.
+The Layers panel body: Layers and Display tabs, the selected viewport's name, then the sections of the shown tab that apply to its image.
 -->
 <script lang="ts">
     import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
@@ -13,7 +13,8 @@ The Layers panel body: the selected viewport's name, then the sections that appl
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import { getContext } from "svelte";
     import LayersContexts from "./LayersContexts.svelte";
-    import { layerSections, type LayerSectionId } from "./layerSections";
+    import * as Tabs from "$lib/components/ui/tabs/index.js";
+    import { layerSections, tabOf, type LayerSectionId } from "./layerSections";
 
     let {
         subtitle,
@@ -57,23 +58,55 @@ The Layers panel body: the selected viewport's name, then the sections that appl
             : workspace.loaded && !workspace.slots[workspace.selected]?.imageId,
     );
 
-    // Kept on the workspace, not per viewport, so a section stays open when the selection moves and a Draw tool can open Segmentations.
+    type Tab = "layers" | "display";
+    let tab: Tab = $state("layers");
+    const bySection = $derived({
+        layers: sections.filter((id) => tabOf(id) === "layers"),
+        display: sections.filter((id) => tabOf(id) === "display"),
+    });
+    // A task or an image with no view settings leaves only the Layers tab.
+    const current = $derived<Tab>(
+        bySection.display.length > 0 ? tab : "layers",
+    );
+
+    // Kept on the workspace, not per viewport, so a section stays open when the selection moves.
     function toggle(id: LayerSectionId) {
         workspace.setLayerSection(id, !workspace.layerSections[id]);
     }
 </script>
 
-<p class="px-4 pb-2 text-helper-text-01 text-text-secondary">{subtitle}</p>
-{#if noLayers}
-    <p class="px-4 text-body-compact-01 text-text-secondary">No layers</p>
-{:else if target && sections.length > 0}
-    {#key target}
-        <LayersContexts
-            {target}
-            {sections}
-            {shown}
-            open={workspace.layerSections}
-            ontoggle={toggle}
-        />
-    {/key}
-{/if}
+{#snippet body(id: Tab)}
+    {#if target && bySection[id].length > 0}
+        {#key target}
+            <LayersContexts
+                {target}
+                sections={bySection[id]}
+                {shown}
+                open={workspace.layerSections}
+                ontoggle={toggle}
+            />
+        {/key}
+    {/if}
+{/snippet}
+
+<Tabs.Root bind:value={() => current, (v) => (tab = v as Tab)}>
+    <Tabs.List aria-label="Layers panel" class="px-4">
+        <Tabs.Trigger value="layers">Layers</Tabs.Trigger>
+        {#if bySection.display.length > 0}
+            <Tabs.Trigger value="display">Display</Tabs.Trigger>
+        {/if}
+    </Tabs.List>
+    <p class="px-4 pt-2 pb-2 text-helper-text-01 text-text-secondary">
+        {subtitle}
+    </p>
+    {#if noLayers}
+        <p class="px-4 text-body-compact-01 text-text-secondary">No layers</p>
+    {/if}
+    <!-- The {#if} unmounts the hidden tab's sections, so the pipette follows the shown tab. -->
+    <Tabs.Content value="layers">
+        {#if current === "layers"}{@render body("layers")}{/if}
+    </Tabs.Content>
+    <Tabs.Content value="display">
+        {#if current === "display"}{@render body("display")}{/if}
+    </Tabs.Content>
+</Tabs.Root>

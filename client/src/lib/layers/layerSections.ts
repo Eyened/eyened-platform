@@ -58,3 +58,10 @@ export function layerSections(input: LayerSectionsInput): LayerSectionId[] {
         return applies[id] && !(hiddenBy && input.hide.includes(hiddenBy));
     });
 }
+
+/** The Layers panel tab a section sits in: objects in Layers, view settings in Display. */
+export function tabOf(id: LayerSectionId): "layers" | "display" {
+    return id === "blend" || id === "projection" || id === "localizer"
+        ? "display"
+        : "layers";
+}

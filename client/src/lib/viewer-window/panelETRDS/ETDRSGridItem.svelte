@@ -1,17 +1,16 @@
 <!--
 @component
-One ETDRS grid on this image in Layers: eye, the creator's name (sets or unsets the current grid), "This task" and Delete on your own grids.
+One ETDRS grid on this image in Layers: the creator's name (sets or unsets the current grid) and "This task"; eye and Delete on your own grids at the right.
 The current grid shows its fovea and disc edge as text; Place ETDRS (G) places them.
 -->
 <script lang="ts">
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
-    import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+    import LayerRow from "$lib/layers/LayerRow.svelte";
     import { isThisTask } from "$lib/layers/gridLayers.svelte";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { Position2D } from "$lib/types";
-    import { mergeProps } from "bits-ui";
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
     import View from "carbon-icons-svelte/lib/View.svelte";
     import ViewOff from "carbon-icons-svelte/lib/ViewOff.svelte";
@@ -59,50 +58,35 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
     }
 </script>
 
-<div
-    class="border-s-3 {current
-        ? 'border-border-interactive bg-layer-selected-01'
-        : shown
-          ? 'border-border-strong-01'
-          : 'border-transparent'}"
-    role="group"
-    aria-label="ETDRS grid, {creator} [{formAnnotation.id}]"
+<LayerRow
+    label="ETDRS grid, {creator} [{formAnnotation.id}]"
+    name={creator}
+    nameLabel="ETDRS grid, {creator}"
+    tooltip="ETDRS grid, {creator} [{formAnnotation.id}]"
+    selected={current}
+    visible={shown}
+    onselect={ontogglecurrent}
 >
-    <div class="flex items-start gap-1 py-1 ps-7 pe-2">
+    {#snippet tags()}
+        {#if thisTask}<Tag>This task</Tag>{/if}
+    {/snippet}
+    {#snippet icons()}
         <IconButton
             size="icon-xs"
             label={shown ? "Hide" : "Show"}
+            data-sticky={!shown}
             onclick={ontoggleshown}
         >
             {#if shown}<View />{:else}<ViewOff />{/if}
         </IconButton>
-        <Tooltip.Provider delayDuration={100}>
-            <Tooltip.Root>
-                <Tooltip.Trigger>
-                    {#snippet child({ props })}
-                        <button
-                            {...mergeProps(props, { onclick: ontogglecurrent })}
-                            type="button"
-                            class="min-h-6 min-w-0 flex-1 px-1 text-start text-body-compact-01 [overflow-wrap:anywhere] text-text-primary hover:bg-layer-hover-01 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-                            aria-label="ETDRS grid, {creator}"
-                            aria-pressed={current}>{creator}</button
-                        >
-                    {/snippet}
-                </Tooltip.Trigger>
-                <Tooltip.Content
-                    >ETDRS grid [{formAnnotation.id}]</Tooltip.Content
-                >
-            </Tooltip.Root>
-        </Tooltip.Provider>
-        {#if thisTask}<Tag>This task</Tag>{/if}
         {#if canEdit}
             <IconButton size="icon-xs" label="Delete" onclick={ondelete}>
                 <TrashCan />
             </IconButton>
         {/if}
-    </div>
+    {/snippet}
     {#if current}
-        <!-- Starts under the eye, as a segmentation row's details do. -->
+        <!-- Starts under the name, as a segmentation row's details do. -->
         <div class="flex flex-col items-start gap-1 ps-7 pe-2 pb-1">
             {#each landmarks as landmark (landmark.label)}
                 <p
@@ -114,4 +98,4 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
             {/each}
         </div>
     {/if}
-</div>
+</LayerRow>

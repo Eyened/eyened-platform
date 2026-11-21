@@ -18,12 +18,14 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
         | "circleSize"
         | "etdrsSlot"
         | "keepGridSize"
+        | "radiusFraction"
         | "delete"
         | "pointStep";
 </script>
 
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
+    import CommitNumberInput from "$lib/layers/CommitNumberInput.svelte";
     import ScalePopover from "$lib/layers/ScalePopover.svelte";
     import {
         CIRCLE_SIZES,
@@ -261,6 +263,23 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
             done();
         }}>Keep grid size</Button
     >
+{:else if id === "radiusFraction"}
+    <!-- One fraction for the viewer: fovea to disc edge × fraction = 3 mm. -->
+    <div class="flex items-center gap-2">
+        <span class="text-label-01 text-text-secondary" aria-hidden="true"
+            >Radius fraction</span
+        >
+        <CommitNumberInput
+            labelText="Radius fraction"
+            hideLabel
+            size="sm"
+            value={workspace.etdrsFraction}
+            step={0.01}
+            min={0.01}
+            max={1}
+            oncommit={(v) => (workspace.etdrsFraction = v)}
+        />
+    </div>
 {:else if id === "delete"}
     <!-- aria-disabled, not disabled, so focus stays on the button once nothing is left to delete. -->
     <Button

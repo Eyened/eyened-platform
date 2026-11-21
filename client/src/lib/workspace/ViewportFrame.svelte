@@ -259,7 +259,9 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                     {/snippet}
                 </Tooltip.Trigger>
                 {#if shownTitle}
-                    <Tooltip.Content>{tooltipText}</Tooltip.Content>
+                    <Tooltip.Content data-viewport-title
+                        >{tooltipText}</Tooltip.Content
+                    >
                 {/if}
             </Tooltip.Root>
         </Tooltip.Provider>
