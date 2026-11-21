@@ -201,6 +201,17 @@ database.
   layer keeps its crossed eye. Long names keep to one line, with the full name in a tooltip.
 - **The ETDRS radius fraction is in the Place ETDRS and ETDRS circle options bar**, no longer
   in ETDRS grids. Arming a tool no longer opens its Layers section.
+- **Layers has one selection per viewport, and a Selected pane under the list.** Clicking a
+  row selects it; the pane shows its options, everyday ones open and rare ones folded, with
+  Duplicate, Import and Delete in its header. Drag, arrow keys or click-to-place resize the
+  pane; the height is kept per browser. Each row shows only color, name and tags.
+- **Tools act on the selection and say what they need.** With a grid selected, Brush says
+  "Select a segmentation to draw" and paints nothing; Place ETDRS and Point say the same for
+  grids and pointsets.
+- **Scale and registration no longer follow the selection.** The scale comes from the Scale
+  picker (or the stored resolution, or the only grid shown); the grid that gives it is tagged
+  Scale. Display › Registration · OD / OS picks the registration Blend and the shown points
+  use; it is tagged In use.
 
 ## v2026.09.0
 
