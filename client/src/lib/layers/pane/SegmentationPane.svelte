@@ -73,6 +73,11 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
             ? undefined
             : toHex(mainViewerContext.getFeatureColor(item.segmentation)),
     );
+    const hasMask = $derived(
+        segmentation.annotation_type === "grader_segmentation" &&
+            !!segmentation.reference_segmentation_id,
+    );
+    const appearance = $derived(!isMulti || rep === "Probability" || hasMask);
 
     function quickDuplicate() {
         duplicate(
@@ -138,31 +143,47 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
         {/if}
     {/snippet}
 </PaneHeader>
-<div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-2">
-    {#if !isMulti}
-        <div class="flex items-center gap-2">
-            <span class="text-label-01 text-text-secondary">Color</span>
-            <FeatureColorPicker {segmentation} />
-        </div>
-    {/if}
-    {#if rep === "Probability"}
-        <ThresholdSlider {segmentation} segmentationItem={item} />
-    {/if}
-    {#if segmentation.annotation_type === "grader_segmentation" && segmentation.reference_segmentation_id}
-        <Field.Field orientation="horizontal" class="w-auto">
-            <Toggle
-                id="{id}-mask"
-                bind:checked={
-                    () => mainViewerContext.isMaskingApplied(segmentation),
-                    () => mainViewerContext.toggleMasking(item)
-                }
-            />
-            <Field.Label
-                for="{id}-mask"
-                class="text-body-compact-01 text-text-primary"
-                >Mask with reference</Field.Label
+<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-3">
+    {#if appearance}
+        <section aria-labelledby="{id}-appearance" class="flex flex-col gap-4">
+            <h4
+                id="{id}-appearance"
+                class="text-heading-compact-01 text-text-primary"
             >
-        </Field.Field>
+                Appearance
+            </h4>
+            {#if !isMulti}
+                <div class="flex flex-col items-start gap-2">
+                    <span class="text-label-01 text-text-secondary">Color</span>
+                    <FeatureColorPicker {segmentation} />
+                </div>
+            {/if}
+            {#if rep === "Probability"}
+                <ThresholdSlider {segmentation} segmentationItem={item} />
+            {/if}
+            {#if hasMask}
+                <Field.Field orientation="vertical" class="w-auto">
+                    <Field.Label
+                        for="{id}-mask"
+                        class="text-label-01 text-text-secondary"
+                        >Mask with reference</Field.Label
+                    >
+                    <div class="flex items-center gap-2">
+                        <Toggle
+                            id="{id}-mask"
+                            stateText
+                            bind:checked={
+                                () =>
+                                    mainViewerContext.isMaskingApplied(
+                                        segmentation,
+                                    ),
+                                () => mainViewerContext.toggleMasking(item)
+                            }
+                        />
+                    </div>
+                </Field.Field>
+            {/if}
+        </section>
     {/if}
     {#if isMulti}
         <div role="group" aria-labelledby="{id}-classes">
