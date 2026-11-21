@@ -102,7 +102,7 @@ The Layers panel body: Layers and Display tabs, the selected viewport's name, th
     {#if noLayers}
         <p class="px-4 text-body-compact-01 text-text-secondary">No layers</p>
     {/if}
-    <!-- The {#if} unmounts the hidden tab's sections, so the pipette and keys follow the shown tab. -->
+    <!-- The {#if} unmounts the hidden tab's sections, so the pipette follows the shown tab. -->
     <Tabs.Content value="layers">
         {#if current === "layers"}{@render body("layers")}{/if}
     </Tabs.Content>

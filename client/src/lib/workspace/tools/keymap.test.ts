@@ -200,6 +200,22 @@ describe("Keymap", () => {
         expect(viewer.transform).toEqual(viewer.getInitTransform());
     });
 
+    it("Esc acts at once while only the viewport's title tooltip is open", () => {
+        const viewer = viewerOf("colour");
+        viewer.zoom(10, 10, 3);
+        const title = document.createElement("div");
+        title.dataset.slot = "tooltip-content";
+        title.dataset.state = "delayed-open";
+        title.dataset.viewportTitle = "";
+        document.body.append(title);
+        try {
+            press(viewer, { key: "Escape", code: "Escape" });
+            expect(viewer.transform).toEqual(viewer.getInitTransform());
+        } finally {
+            title.remove();
+        }
+    });
+
     it("Esc drops a half-drawn distance line first; the next Esc fits the view and clears the image's lines, not another image's or from a strip tile", () => {
         const workspace = new Workspace();
         const viewer = viewerOf("colour", { workspace, imageId: "a" });
