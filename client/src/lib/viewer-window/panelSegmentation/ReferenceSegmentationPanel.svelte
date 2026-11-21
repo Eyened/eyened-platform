@@ -11,7 +11,10 @@
     import { getContext } from "svelte";
     import type { SegmentationGET } from "../../../types/openapi_types";
     import type { Segmentation } from "./segmentationContext.svelte";
-    import { orderSegmentationsByCreator } from "./segmentationUtils";
+    import {
+        authorName,
+        orderSegmentationsByCreator,
+    } from "./segmentationUtils";
 
     interface Props {
         segmentation: SegmentationGET;
@@ -35,9 +38,7 @@
         if (referenceId === null) return "";
         const reference = segmentations.get(referenceId);
         if (!reference) return `[${referenceId}]`;
-        const author =
-            reference.creator.id === me ? "Mine" : reference.creator.name;
-        return `${reference.feature.name} · ${author} · ${referenceId}`;
+        return `${reference.feature.name} · ${authorName(reference, me)} · ${referenceId}`;
     });
     // Grader Binary and Questionable rows on this plane, the grader's own first, never the row itself.
     const rows = $derived(

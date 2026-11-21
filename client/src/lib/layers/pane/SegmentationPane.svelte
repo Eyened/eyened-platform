@@ -26,7 +26,10 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     import MultiFeatureSelector from "$lib/viewer-window/panelSegmentation/MultiFeatureSelector.svelte";
     import ReferenceSegmentationPanel from "$lib/viewer-window/panelSegmentation/ReferenceSegmentationPanel.svelte";
     import type { Segmentation } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
-    import { groupTitle } from "$lib/viewer-window/panelSegmentation/segmentationUtils";
+    import {
+        authorName,
+        groupTitle,
+    } from "$lib/viewer-window/panelSegmentation/segmentationUtils";
     import ThresholdSlider from "$lib/viewer-window/panelSegmentation/ThresholdSlider.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
@@ -78,6 +81,17 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
             !!segmentation.reference_segmentation_id,
     );
     const appearance = $derived(!isMulti || rep === "Probability" || hasMask);
+    // The reference's feature and author, as Reference image shows it, for the folded title.
+    const referenceSummary = $derived.by(() => {
+        if (segmentation.annotation_type !== "grader_segmentation")
+            return undefined;
+        const referenceId = segmentation.reference_segmentation_id ?? null;
+        if (referenceId === null) return "None";
+        const reference = segmentations.get(referenceId);
+        return reference
+            ? `${reference.feature.name} · ${authorName(reference, me)}`
+            : `[${referenceId}]`;
+    });
 
     function quickDuplicate() {
         duplicate(
@@ -203,7 +217,12 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     <Accordion.Root bind:value={rare} class="-mx-4">
         {#if segmentation.annotation_type === "grader_segmentation"}
             <Accordion.Item value="tags">
-                <Accordion.Trigger level={4}>Tags</Accordion.Trigger>
+                <Accordion.Trigger
+                    level={4}
+                    summary={segmentation.tags.length
+                        ? String(segmentation.tags.length)
+                        : undefined}>Tags</Accordion.Trigger
+                >
                 <Accordion.Content>
                     <!-- No comment editing: the segmentation tag API keeps no comment. -->
                     <Tagger
@@ -220,7 +239,9 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
                 </Accordion.Content>
             </Accordion.Item>
             <Accordion.Item value="reference">
-                <Accordion.Trigger level={4}>Reference image</Accordion.Trigger>
+                <Accordion.Trigger level={4} summary={referenceSummary}
+                    >Reference image</Accordion.Trigger
+                >
                 <Accordion.Content>
                     <ReferenceSegmentationPanel
                         {segmentation}
