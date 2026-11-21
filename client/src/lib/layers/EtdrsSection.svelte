@@ -24,16 +24,23 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
     import GridDeleteModal from "./GridDeleteModal.svelte";
     import LayerRow from "./LayerRow.svelte";
     import LayerSection from "./LayerSection.svelte";
+    import type { Scale } from "./imageScale";
 
     let {
         grids,
         open,
         ontoggle,
+        scale,
     }: {
         grids: GridLayers;
         open: boolean;
         ontoggle: () => void;
+        scale: Scale | null;
     } = $props();
+
+    const scaleKey = $derived(
+        scale?.pick.kind === "grid" ? scale.pick.key : undefined,
+    );
 
     const uid = $props.id();
     const taskContext = getContext<TaskContext | undefined>("taskContext");
@@ -107,7 +114,10 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
                             name="AI grid"
                             visible={aiShown}
                         >
-                            {#snippet tags()}<Tag>AI</Tag>{/snippet}
+                            {#snippet tags()}
+                                <Tag>AI</Tag>
+                                {#if scaleKey === AI_GRID}<Tag>Scale</Tag>{/if}
+                            {/snippet}
                             {#snippet icons()}
                                 <IconButton
                                     size="icon-xs"
@@ -128,6 +138,7 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
                             formAnnotation={grid}
                             shown={grids.isShown(grid.id)}
                             current={grids.currentId === grid.id}
+                            scale={scaleKey === grid.id}
                             ontoggleshown={() =>
                                 grids.setShown(
                                     grid.id,

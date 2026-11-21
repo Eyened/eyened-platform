@@ -21,6 +21,7 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
         formAnnotation,
         shown,
         current,
+        scale,
         ontoggleshown,
         ontogglecurrent,
         ondelete,
@@ -28,6 +29,8 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
         formAnnotation: FormAnnotationGET;
         shown: boolean;
         current: boolean;
+        /** This grid gives the image's scale. */
+        scale: boolean;
         ontoggleshown: () => void;
         ontogglecurrent: () => void;
         ondelete: () => void;
@@ -69,6 +72,7 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
 >
     {#snippet tags()}
         {#if thisTask}<Tag>This task</Tag>{/if}
+        {#if scale}<Tag>Scale</Tag>{/if}
     {/snippet}
     {#snippet icons()}
         <IconButton

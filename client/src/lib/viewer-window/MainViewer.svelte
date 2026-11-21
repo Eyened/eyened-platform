@@ -149,7 +149,6 @@
         return scaleOf({
             stored: image.resolution,
             grids: grids.scaleGrids(),
-            currentId: grids.currentId,
             shown: grids.shownKeys(),
             pick: workspace.scalePicks.get(image.image_id),
             fraction: workspace.etdrsFraction,

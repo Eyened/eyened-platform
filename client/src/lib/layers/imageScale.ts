@@ -64,11 +64,10 @@ function fromPick(
     }
 }
 
-/** The image's scale: the grader's pick, else the stored resolution, the current grid, the only grid shown; null when none gives one. */
+/** The image's scale: the grader's pick, else the stored resolution, else the only grid shown; null when none gives one. Selecting a grid never changes it. */
 export function scaleOf(input: {
     stored: { x: number; y: number };
     grids: readonly ScaleGrid[];
-    currentId: number | undefined;
     shown: readonly GridKey[];
     pick: ScalePick | undefined;
     fraction: number;
@@ -80,9 +79,6 @@ export function scaleOf(input: {
     const only = input.shown.length === 1 ? input.shown[0] : undefined;
     return (
         from({ kind: "stored" }) ??
-        (input.currentId !== undefined
-            ? from({ kind: "grid", key: input.currentId })
-            : null) ??
         (only !== undefined ? from({ kind: "grid", key: only }) : null)
     );
 }
