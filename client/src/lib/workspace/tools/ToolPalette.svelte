@@ -123,7 +123,7 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
         aria-pressed={tool.kind === "modal"
             ? workspace.armedTool === tool.id
             : undefined}
-        class="aria-pressed:bg-background-selected"
+        class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
         data-stop={tool.id}
         tabindex={tab(tool.id)}
         onclick={() => workspace.toggleTool(tool.id)}
@@ -235,7 +235,7 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
         shortcut="M"
         aria-keyshortcuts="M"
         aria-pressed={workspace.magnifier.on}
-        class="aria-pressed:bg-button-primary aria-pressed:text-text-on-color aria-pressed:hover:bg-button-primary-hover"
+        class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
         data-stop="magnifier"
         tabindex={tab("magnifier")}
         onclick={() => workspace.setMagnifier({ on: !workspace.magnifier.on })}

@@ -266,6 +266,18 @@
     }
 }
 
+/* The selected Layers row's look for an armed tool or an on toggle: the selected fill and a 3 px border-interactive bar at the start.
+   A background image, not a shadow, so Button's focus ring still shows. */
+@utility selected-look {
+    background-color: var(--color-layer-selected-01);
+    background-image: linear-gradient(
+        var(--color-border-interactive),
+        var(--color-border-interactive)
+    );
+    background-size: 3px 100%;
+    background-repeat: no-repeat;
+}
+
 /* Base styles. Unlayered, so an unconverted component's outline-none cannot hide the ring. */
 html {
     color-scheme: dark;

@@ -75,7 +75,8 @@ A ⋯ disclosure: the button shows or hides a list that can hold buttons, slider
         {label}
         {size}
         {tabindex}
-        class={active ? "bg-background-selected" : undefined}
+        data-armed={active || undefined}
+        class="data-armed:selected-look data-armed:hover:bg-layer-selected-hover-01"
         aria-expanded={open}
         aria-controls="{uid}-menu"
         onclick={toggle}
