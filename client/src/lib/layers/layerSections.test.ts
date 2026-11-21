@@ -16,6 +16,7 @@ describe("layerSections", () => {
             "segmentations",
             "etdrs",
             "pointsets",
+            "registration",
             "blend",
             "distance",
         ]);
@@ -38,7 +39,7 @@ describe("layerSections", () => {
         ).toEqual(["etdrs", "distance"]);
         expect(
             layerSections({ ...flat, hide: ["ETDRS", "Measure", "Form"] }),
-        ).toEqual(["segmentations", "pointsets", "blend"]);
+        ).toEqual(["segmentations", "pointsets", "registration", "blend"]);
     });
 
     it("adds En-face projection after Distance lines; layout.hide Segmentation hides it too", () => {
@@ -46,6 +47,7 @@ describe("layerSections", () => {
             "segmentations",
             "etdrs",
             "pointsets",
+            "registration",
             "blend",
             "distance",
             "projection",
@@ -56,7 +58,7 @@ describe("layerSections", () => {
                 projection: true,
                 hide: ["Segmentation"],
             }),
-        ).toEqual(["etdrs", "pointsets", "blend", "distance"]);
+        ).toEqual(["etdrs", "pointsets", "registration", "blend", "distance"]);
     });
 
     it("adds Localizer lines last, which no layout.hide name hides", () => {
@@ -81,6 +83,7 @@ describe("layerSections", () => {
         expect(layerSections(input)).toEqual([
             "segmentations",
             "pointsets",
+            "registration",
             "blend",
             "distance",
         ]);

@@ -1,4 +1,5 @@
-import { formAnnotations } from "$lib/data";
+import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
+import { formAnnotations, formSchemasByName, instances } from "$lib/data";
 import {
     annotationMatchesEye,
     groupKey,
@@ -18,6 +19,11 @@ export function eyeKey(instance: {
         instance.patient.id,
         (instance.laterality ?? null) as EyeLaterality,
     );
+}
+
+/** " · OD" for a right eye, " · OS" for a left one, nothing when the eye is unknown. */
+export function eyeSuffix(laterality: string | null | undefined): string {
+    return laterality === "R" ? " · OD" : laterality === "L" ? " · OS" : "";
 }
 
 /** The point lists in a registration's form data, keyed by public ID. */
@@ -76,6 +82,36 @@ export function registrationRows(
         if (here) rows.push(a);
     }
     return rows.sort((x, y) => x.id - y.id);
+}
+
+/** The registration form schema's id; undefined until the schemas load. */
+export function registrationSchemaId(): number | undefined {
+    return formSchemasByName.get(
+        BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
+    )?.id;
+}
+
+/** The image's eye's registrations to list, reading the stores; none while the registration schema is missing. */
+export function eyeRegistrationRows(
+    instance: {
+        id: string;
+        patient: { id: number };
+        laterality?: string | null;
+    },
+    inUseId: number | undefined,
+): FormAnnotationGET[] {
+    const schemaId = registrationSchemaId();
+    return schemaId === undefined
+        ? []
+        : registrationRows(formAnnotations.values(), {
+              schemaId,
+              instanceId: instance.id,
+              patientId: instance.patient.id,
+              laterality: (instance.laterality ?? null) as EyeLaterality,
+              currentId: inUseId,
+              imageLaterality: (id) =>
+                  (instances.get(id)?.laterality ?? null) as EyeLaterality,
+          });
 }
 
 export type ImageLine = {
@@ -174,7 +210,7 @@ export function pointBinding(input: {
     };
 }
 
-/** Window-wide: each eye's current registration, and each registration's last point save. */
+/** Window-wide: each eye's registration in use (Display › Registration), and each registration's last point save. */
 export class PointsetState {
     private readonly currentIds = new SvelteMap<string, number>();
     readonly sync = new SvelteMap<number, SyncState>();
@@ -183,7 +219,7 @@ export class PointsetState {
         return this.currentIds.get(eye);
     }
 
-    /** The eye's current registration; null when unset or deleted. */
+    /** The eye's registration in use; null when unset or deleted. */
     current(eye: string): FormAnnotationGET | null {
         const id = this.currentIds.get(eye);
         return id === undefined ? null : (formAnnotations.get(id) ?? null);

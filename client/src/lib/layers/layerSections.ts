@@ -3,6 +3,7 @@ export type LayerSectionId =
     | "segmentations"
     | "etdrs"
     | "pointsets"
+    | "registration"
     | "blend"
     | "distance"
     | "projection"
@@ -13,6 +14,7 @@ const HIDDEN_BY: Record<LayerSectionId, string | null> = {
     segmentations: "Segmentation",
     etdrs: "ETDRS",
     pointsets: "Registration",
+    registration: "Registration",
     blend: "Registration",
     distance: "Measure",
     // The projection shows segmentation content, so blinding segmentations hides it too.
@@ -24,6 +26,7 @@ const ORDER: readonly LayerSectionId[] = [
     "segmentations",
     "etdrs",
     "pointsets",
+    "registration",
     "blend",
     "distance",
     "projection",
@@ -48,6 +51,7 @@ export function layerSections(input: LayerSectionsInput): LayerSectionId[] {
         segmentations: true,
         etdrs: input.is2D && input.hasEtdrsSchema,
         pointsets: input.is2D && input.hasRegistrationSchema,
+        registration: input.is2D && input.hasRegistrationSchema,
         blend: input.is2D && input.hasRegistrationSchema,
         distance: true,
         projection: input.projection,
@@ -61,7 +65,10 @@ export function layerSections(input: LayerSectionsInput): LayerSectionId[] {
 
 /** The Layers panel tab a section sits in: objects in Layers, view settings in Display. */
 export function tabOf(id: LayerSectionId): "layers" | "display" {
-    return id === "blend" || id === "projection" || id === "localizer"
+    return id === "registration" ||
+        id === "blend" ||
+        id === "projection" ||
+        id === "localizer"
         ? "display"
         : "layers";
 }

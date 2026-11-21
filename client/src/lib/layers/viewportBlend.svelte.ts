@@ -16,7 +16,7 @@ import {
     type TitleSuffix,
 } from "$lib/workspace/imageMeta";
 import { registeredImageSize } from "./blendStyles";
-import { eyeKey, pairCount } from "./pointsets";
+import { eyeKey, eyeSuffix, pairCount } from "./pointsets";
 import { defaultTicks, nextStop, seriesLayerWeights } from "./seriesBlend";
 
 export type BlendMode = "off" | "overlay" | "checker" | "flicker" | "series";
@@ -77,7 +77,7 @@ export class ViewportBlend {
 
     // Deriveds that read constructor parameters use `.by`: a plain `$derived(expr)` initializer runs before them (TS2729).
 
-    /** The eye's current registration; pair modes blend with its images. */
+    /** The eye's registration in use; pair modes blend with its images. */
     registration = $derived.by(() =>
         this.win.pointsets.current(eyeKey(this.image.instance)),
     );
@@ -185,7 +185,7 @@ export class ViewportBlend {
     viewportLine = $derived.by((): string | null => {
         if (this.mode === "off" || this.mode === "series") return null;
         if (!this.registration)
-            return "Make a registration current in Pointsets.";
+            return `No registration in use. Pick one in Registration${eyeSuffix(this.image.instance.laterality)}.`;
         if (!this.other) return null;
         const missing = MIN_PAIRS - this.pairs(this.other);
         return missing > 0

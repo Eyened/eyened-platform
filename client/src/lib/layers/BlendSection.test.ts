@@ -106,13 +106,15 @@ describe("BlendSection, pair modes", () => {
         blend.setMode("overlay");
         expect(
             await screen.findByText(
-                "Make a registration current in Pointsets.",
+                "No registration in use. Pick one in Registration · OD.",
             ),
         ).toBeInTheDocument();
         blend.setMode("series");
         await vi.waitFor(() =>
             expect(
-                screen.queryByText("Make a registration current in Pointsets."),
+                screen.queryByText(
+                    "No registration in use. Pick one in Registration · OD.",
+                ),
             ).toBeNull(),
         );
         win.pointsets.setCurrent(EYE, 12);
@@ -122,6 +124,9 @@ describe("BlendSection, pair modes", () => {
                 name: "FAF · 2024-03-12 Heidelberg Spectralis",
             }),
         ).toBeChecked();
+        expect(
+            screen.getByText("Pairs through: Registration [12]"),
+        ).toBeInTheDocument();
         await expectNoAxeViolations(container);
     });
 

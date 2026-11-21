@@ -11,6 +11,7 @@ Provides the selected viewport's viewer and segmentation contexts to the section
     import EtdrsSection from "./EtdrsSection.svelte";
     import LocalizerSection from "./LocalizerSection.svelte";
     import PointsetsSection from "./PointsetsSection.svelte";
+    import RegistrationSection from "./RegistrationSection.svelte";
     import ProjectionSection from "./ProjectionSection.svelte";
     import SegmentationsSection from "./SegmentationsSection.svelte";
 
@@ -53,6 +54,12 @@ Provides the selected viewport's viewer and segmentation contexts to the section
     <PointsetsSection
         open={open.pointsets}
         ontoggle={() => ontoggle("pointsets")}
+    />
+{/if}
+{#if sections.includes("registration")}
+    <RegistrationSection
+        open={open.registration}
+        ontoggle={() => ontoggle("registration")}
     />
 {/if}
 {#if sections.includes("blend")}

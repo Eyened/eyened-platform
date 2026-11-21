@@ -107,6 +107,11 @@ describe("PointsetsSection", () => {
         expect(selection.pointsetId()).toBe(12);
         expect(win.pointsets.currentId(EYE)).toBe(13);
         expect(
+            within(
+                screen.getByRole("group", { name: "Registration [13]" }),
+            ).getByText("In use · OD"),
+        ).toBeInTheDocument();
+        expect(
             screen.getByRole("button", { name: "Registration [12]" }),
         ).toHaveAttribute("aria-pressed", "true");
         expect(screen.getByText("This CF · 2022-05-10")).toBeInTheDocument();

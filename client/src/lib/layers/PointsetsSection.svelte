@@ -9,18 +9,11 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
-    import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
-    import {
-        createFormAnnotation,
-        formAnnotations,
-        formSchemasByName,
-        instances,
-    } from "$lib/data";
+    import { createFormAnnotation } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import type { EyeLaterality } from "$lib/viewer-window/panelRegistration/groupOpenImages";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
@@ -29,7 +22,13 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
     import { imageName } from "$lib/workspace/imageMeta";
     import LayerRow from "./LayerRow.svelte";
     import LayerSection from "./LayerSection.svelte";
-    import { eyeKey, imageLines, registrationRows } from "./pointsets";
+    import {
+        eyeKey,
+        eyeRegistrationRows,
+        eyeSuffix,
+        imageLines,
+        registrationSchemaId,
+    } from "./pointsets";
     import RegistrationDeleteModal from "./RegistrationDeleteModal.svelte";
     import SyncStatus from "./SyncStatus.svelte";
 
@@ -46,25 +45,8 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
     const eye = eyeKey(instance);
     let section: HTMLElement | undefined = $state();
 
-    const schemaId = $derived(
-        formSchemasByName.get(
-            BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
-        )?.id,
-    );
     const inUseId = $derived(pointsets.currentId(eye));
-    const rows = $derived(
-        schemaId === undefined
-            ? []
-            : registrationRows(formAnnotations.values(), {
-                  schemaId,
-                  instanceId: instance.id,
-                  patientId: instance.patient.id,
-                  laterality: (instance.laterality ?? null) as EyeLaterality,
-                  currentId: inUseId,
-                  imageLaterality: (id) =>
-                      (instances.get(id)?.laterality ?? null) as EyeLaterality,
-              }),
-    );
+    const rows = $derived(eyeRegistrationRows(instance, inUseId));
 
     /** This eye's loaded 2D images, in strip order. */
     const loaded = $derived(
@@ -87,6 +69,7 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
 
     let createError = $state(false);
     async function create() {
+        const schemaId = registrationSchemaId();
         if (schemaId === undefined) return;
         createError = false;
         if (!open) ontoggle();
@@ -152,6 +135,11 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
                                 )}
                         >
                             {#snippet tags()}
+                                {#if row.id === inUseId}<Tag
+                                        >In use{eyeSuffix(
+                                            instance.laterality,
+                                        )}</Tag
+                                    >{/if}
                                 <Tag
                                     >{row.creator.id === globalContext.user.id
                                         ? "Mine"
