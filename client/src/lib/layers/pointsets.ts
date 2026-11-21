@@ -145,18 +145,32 @@ export function imageLines(
     return [thisId, ...loadedHere, ...unloaded].map(line);
 }
 
-/** The registration a viewport's point tool shows: the eye's current one on a 2D image; editable only while P is armed and it is yours. */
+/** What P binds in a viewport. */
+export interface PointTarget {
+    /** The registration this viewport shows and P binds; null when none. */
+    id: number | null;
+    /** P may move its points. */
+    canEdit: boolean;
+    /** Why P can't place here; null when it can, or when P does not apply. */
+    reason: string | null;
+}
+
+/** P binds the selected pointset while armed; otherwise the viewport shows the eye's registration in use, read-only. */
 export function pointBinding(input: {
     armed: boolean;
     hidden: boolean;
     is2D: boolean;
-    current: FormAnnotationGET | null;
+    selected: FormAnnotationGET | null;
+    inUse: FormAnnotationGET | null;
     canEdit: (annotation: FormAnnotationGET) => boolean;
-}): { id: number; canEdit: boolean } | null {
-    if (input.hidden || !input.is2D || !input.current) return null;
+}): PointTarget {
+    if (input.hidden || !input.is2D)
+        return { id: null, canEdit: false, reason: null };
+    const editing = input.armed ? input.selected : null;
     return {
-        id: input.current.id,
-        canEdit: input.armed && input.canEdit(input.current),
+        id: (editing ?? input.inUse)?.id ?? null,
+        canEdit: editing !== null && input.canEdit(editing),
+        reason: input.selected ? null : "Select a pointset to add points",
     };
 }
 

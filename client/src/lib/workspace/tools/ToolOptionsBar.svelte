@@ -20,7 +20,7 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
     );
     const viewport = $derived(workspace.selectedViewport);
     const layers = $derived(viewport?.layers ?? null);
-    // P names its registration; without one, the hint says what to do first.
+    // P names its pointset; without one selected, the reason says what to do first.
     const point = $derived(
         tool?.id === "point" ? (layers?.pointTarget ?? null) : null,
     );
@@ -33,7 +33,8 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
         tool?.id === "etdrs" ? (layers?.etdrsTarget ?? null) : null,
     );
     const reason = $derived(
-        draw?.reason ??
+        point?.reason ??
+            draw?.reason ??
             etdrs?.reason ??
             (tool?.id === "circle" && layers && !layers.scale
                 ? "Set the image resolution, or show a grid in ETDRS grids."
@@ -48,10 +49,13 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
     );
     const hint = $derived.by(() => {
         // Point's reasons it can't act stay visible; the keyboard cursor's keys replace any other hint.
-        if (tool?.id === "point" && !point)
-            return "Make a registration current in Pointsets.";
         // ASSUMPTION: the spec says only "read-only" for a colleague's registration.
-        if (tool?.id === "point" && !point?.canEdit)
+        if (
+            tool?.id === "point" &&
+            point?.id != null &&
+            !point.reason &&
+            !point.canEdit
+        )
             return "Another grader's points can't be moved";
         if (layers?.viewerContext.keyboardCursor.on)
             return KEYBOARD_CURSOR_HINT;
@@ -96,7 +100,7 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
                     "delete",
                 ];
             case "point":
-                if (!point) return [];
+                if (point?.id == null) return [];
                 return point.canEdit ? ["pointStep", "delete"] : ["pointStep"];
             default:
                 return [];
@@ -192,7 +196,7 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
             title={etdrs.name}>{etdrs.name}</span
         >
     {/if}
-    {#if point}
+    {#if point && point.id !== null && !point.reason}
         <span class="text-body-compact-01 text-text-primary"
             >Registration {point.id}{point.canEdit ? "" : " · read-only"}</span
         >

@@ -87,27 +87,55 @@ describe("imageLines", () => {
 });
 
 describe("pointBinding", () => {
-    it("binds the eye's current registration on 2D images, editable only while P is armed and it is yours", () => {
-        const current = reg(12, {});
-        const yours = () => true;
-        const base = {
-            armed: true,
-            hidden: false,
-            is2D: true,
-            current,
-            canEdit: yours,
-        };
-        expect(pointBinding(base)).toEqual({ id: 12, canEdit: true });
-        expect(pointBinding({ ...base, armed: false })).toEqual({
-            id: 12,
+    const mine = { id: 7, creator: { id: 1 } } as never;
+    const theirs = { id: 8, creator: { id: 2 } } as never;
+    const canEdit = (a: { creator: { id: number } }) => a.creator.id === 1;
+    const base = {
+        armed: true,
+        hidden: false,
+        is2D: true,
+        canEdit,
+    } as const;
+
+    it("P binds the selected pointset; with none selected it shows the one in use and says to select one", () => {
+        expect(
+            pointBinding({ ...base, selected: mine, inUse: theirs }),
+        ).toEqual({ id: 7, canEdit: true, reason: null });
+        expect(
+            pointBinding({ ...base, selected: null, inUse: theirs }),
+        ).toEqual({
+            id: 8,
             canEdit: false,
+            reason: "Select a pointset to add points",
         });
-        expect(pointBinding({ ...base, canEdit: () => false })).toEqual({
-            id: 12,
-            canEdit: false,
-        });
-        expect(pointBinding({ ...base, is2D: false })).toBeNull();
-        expect(pointBinding({ ...base, hidden: true })).toBeNull();
-        expect(pointBinding({ ...base, current: null })).toBeNull();
+    });
+
+    it("with P not armed, the viewport shows the registration in use, read-only; a colleague's selected pointset is read-only", () => {
+        expect(
+            pointBinding({
+                ...base,
+                armed: false,
+                selected: mine,
+                inUse: theirs,
+            }),
+        ).toEqual({ id: 8, canEdit: false, reason: null });
+        expect(
+            pointBinding({ ...base, selected: theirs, inUse: null }),
+        ).toEqual({ id: 8, canEdit: false, reason: null });
+    });
+
+    it("hidden by the task or on a 3D image, nothing shows and nothing is asked", () => {
+        const none = { id: null, canEdit: false, reason: null };
+        expect(
+            pointBinding({
+                ...base,
+                hidden: true,
+                selected: mine,
+                inUse: mine,
+            }),
+        ).toEqual(none);
+        expect(
+            pointBinding({ ...base, is2D: false, selected: mine, inUse: mine }),
+        ).toEqual(none);
     });
 });

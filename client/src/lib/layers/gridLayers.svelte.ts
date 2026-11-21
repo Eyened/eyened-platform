@@ -48,7 +48,7 @@ export interface GridTarget {
     reason: string | null;
 }
 
-/** Place ETDRS writes the viewport's current grid only if it is yours and on this image. */
+/** Place ETDRS writes the viewport's selected grid only if it is yours and on this image. */
 export function gridBinding(input: {
     grid: FormAnnotationGET | undefined;
     instanceId: string | number;
@@ -59,7 +59,7 @@ export function gridBinding(input: {
     if (!grid)
         return {
             name: null,
-            reason: "No current grid. Choose one in ETDRS grids.",
+            reason: "Select an ETDRS grid to place",
         };
     const name =
         grid.creator.id === input.userId

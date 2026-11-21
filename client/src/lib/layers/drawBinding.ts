@@ -3,12 +3,12 @@ import type { ToolId } from "$lib/workspace/tools/registry";
 
 /** What the options bar names for a viewport, and why a Draw tool can't write there; a null reason means it can. */
 export interface DrawTarget {
-    /** Null when the viewport has no current segmentation. */
+    /** Null when the viewport has no segmentation selected. */
     name: { segmentation: string; feature: string | null } | null;
     reason: string | null;
 }
 
-/** The viewport's current segmentation for the armed tool; a Draw tool writes only into it. */
+/** The viewport's selected segmentation for the armed tool; a Draw tool writes only into it. */
 export function drawBinding(input: {
     segmentation: Segmentation | null;
     activeIndices: number | number[];
@@ -19,7 +19,7 @@ export function drawBinding(input: {
     if (!s)
         return {
             name: null,
-            reason: "No current segmentation. Choose one in Segmentations.",
+            reason: "Select a segmentation to draw",
         };
     const name = {
         segmentation: s.feature.name,

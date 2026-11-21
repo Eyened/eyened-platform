@@ -1,3 +1,4 @@
+import type { PointTarget } from "$lib/layers/pointsets";
 import {
     cleanup,
     fireEvent,
@@ -126,7 +127,7 @@ describe("ToolOptionsBar", () => {
     });
 
     it("names the registration P places into, read-only for a colleague's, or asks for one", () => {
-        const show = (pointTarget: { id: number; canEdit: boolean } | null) => {
+        const show = (pointTarget: PointTarget) => {
             const ws = workspaceWith(1);
             ws.attachViewport(0, {
                 zoomPercent: 100,
@@ -140,12 +141,16 @@ describe("ToolOptionsBar", () => {
             ws.arm("point");
             return render(ToolOptionsBar, { context: workspaceContext(ws) });
         };
-        show(null);
-        expect(
-            screen.getByText("Make a registration current in Pointsets."),
-        ).toBeInTheDocument();
+        show({
+            id: null,
+            canEdit: false,
+            reason: "Select a pointset to add points",
+        });
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "Select a pointset to add points",
+        );
         cleanup();
-        show({ id: 640, canEdit: false });
+        show({ id: 640, canEdit: false, reason: null });
         expect(
             screen.getByText("Registration 640 · read-only"),
         ).toBeInTheDocument();
@@ -158,16 +163,19 @@ describe("ToolOptionsBar", () => {
             zoomBy: vi.fn(),
             reset: vi.fn(),
             layers: {
-                pointTarget: null,
+                pointTarget: {
+                    id: null,
+                    canEdit: false,
+                    reason: "Select a pointset to add points",
+                },
                 viewerContext: { keyboardCursor: { on: true } },
             } as never,
         });
         ws.arm("point");
         render(ToolOptionsBar, { context: workspaceContext(ws) });
-        expect(
-            screen.getByText("Make a registration current in Pointsets."),
-        ).toBeInTheDocument();
-        expect(screen.queryByText(/^Keyboard cursor/)).toBeNull();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "Select a pointset to add points",
+        );
     });
 
     it("names the selected viewport's target; Undo at an empty history keeps focus", async () => {
@@ -287,7 +295,7 @@ describe("ToolOptionsBar", () => {
         const tool = new PointTool({ sparse: true });
         tool.points = [{ x: 1, y: 1 }, null, { x: 3, y: 3 }];
         const { container } = armWith("point", {
-            pointTarget: { id: 4, canEdit: true },
+            pointTarget: { id: 4, canEdit: true, reason: null },
             pointTool: tool,
         });
         expect(screen.getByText("Registration 4")).toBeInTheDocument();

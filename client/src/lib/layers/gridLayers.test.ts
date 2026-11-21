@@ -57,7 +57,7 @@ describe("gridBinding", () => {
             });
         expect(bind()).toEqual({
             name: null,
-            reason: "No current grid. Choose one in ETDRS grids.",
+            reason: "Select an ETDRS grid to place",
         });
         expect(bind(grid(9, 7, "inst-1"))).toEqual({
             name: "Grader 7's grid 9",

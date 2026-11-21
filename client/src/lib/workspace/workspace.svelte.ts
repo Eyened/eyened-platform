@@ -4,6 +4,7 @@ import type { DrawTarget } from "$lib/layers/drawBinding";
 import type { GridLayers, GridTarget } from "$lib/layers/gridLayers.svelte";
 import type { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import type { Scale, ScalePick } from "$lib/layers/imageScale";
+import type { PointTarget } from "$lib/layers/pointsets";
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import {
     CIRCLE_SIZES,
@@ -88,8 +89,8 @@ export interface LayersTarget {
     readonly projectionSources: EnfaceOverlaySourceResolved[];
     /** This viewport's localizer lines: the mode and the B-scan positions it draws. */
     readonly localizer: LocalizerLines;
-    /** The registration P works on in this viewport; null when there is none. */
-    readonly pointTarget: { id: number; canEdit: boolean } | null;
+    /** The registration this viewport shows and P binds, and why P can't place. */
+    readonly pointTarget: PointTarget;
     /** The current segmentation a Draw tool writes into here, or why it can't. */
     readonly drawTarget: DrawTarget;
     /** The grid Place ETDRS writes here, or why it can't. */

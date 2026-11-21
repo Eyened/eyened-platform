@@ -49,7 +49,7 @@ function attach(
             distance: ctx.distance,
             projectionSources: [],
             localizer: new LocalizerLines(() => []),
-            pointTarget: null,
+            pointTarget: { id: null, canEdit: false, reason: null },
             drawTarget: { name: null, reason: null },
             etdrsTarget: { name: null, reason: null },
             etdrsTool: undefined,
