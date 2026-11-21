@@ -11,30 +11,9 @@ vi.mock("./patientStudies", () => ({
     loadPatientStudies,
 }));
 
-vi.mock("$lib/extensions", () => ({
-    default: {
-        viewer: {
-            panel_info: {
-                additional_data_sources: [
-                    {
-                        name: "External grades",
-                        url: "/external",
-                        conditions: [],
-                    },
-                ],
-            },
-        },
-    },
+vi.mock("$lib/browser/dataSources", () => ({
+    loadDataSource: vi.fn(async () => ({ Scores: [] })),
 }));
-
-vi.mock("$lib/browser/dataSources", async (importOriginal) => {
-    const actual =
-        await importOriginal<typeof import("$lib/browser/dataSources")>();
-    return {
-        ...actual,
-        loadDataSource: vi.fn(async () => ({ Scores: [] })),
-    };
-});
 
 const { default: PanelVisits } = await import("./PanelVisits.svelte");
 
@@ -42,10 +21,11 @@ function study(id: number, date: string): StudyGET {
     return {
         id,
         date,
-        project: { name: "RS" },
+        project: { name: "Alpha" },
         patient: { id: 1, identifier: "P1" },
         series: [],
         tags: [],
+        data_sources: [{ name: "External grades", collapse: false }],
     } as unknown as StudyGET;
 }
 

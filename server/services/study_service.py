@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from eyened_orm import StudyTagLink
+from eyened_orm import Study, StudyTagLink
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.study_repository import StudyRepository
 from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 
+from ..config import sources_for_project
 from ..db import get_db
 from .access_scope import get_access_scope
 from .acting_user import ActingUser
@@ -18,7 +21,7 @@ from .exceptions import BadRequestError, NotFoundError
 
 
 class StudyService:
-    """Business logic for tagging studies."""
+    """Business logic for tagging studies and reading their external data sources."""
 
     def __init__(
         self,
@@ -215,6 +218,36 @@ class StudyService:
                 )
         link.Tag = tag
         return link
+
+    def _visible_study(self, study_id: int) -> Study:
+        study = self.repository.get_by_id(study_id)
+        if study is None:
+            raise NotFoundError(f"Study {study_id} not found")
+        return study
+
+    def data_source_url(self, study_id: int, name: str) -> str:
+        """The upstream URL of the named source for this study.
+
+        The URL is built from the study's own fields, never from the request,
+        so access to the study is access to its data.
+
+        Raises:
+            NotFoundError: If the study is missing or out of scope, or the
+                source does not apply to it.
+        """
+        study = self._visible_study(study_id)
+        source = next((s for s in sources_for_project(study.Patient.Project.ProjectName) if s.name == name), None)
+        if source is None:
+            raise NotFoundError(f"Data source {name} not found")
+        values = {
+            "project": study.Patient.Project.ProjectName,
+            "patient": study.Patient.PatientIdentifier,
+            "date": study.StudyDate.isoformat(),
+        }
+        # "", "." and ".." survive quoting but change the upstream path.
+        if any(v in ("", ".", "..") for v in values.values()):
+            raise NotFoundError(f"Data source {name} has no data for this study")
+        return source.url.format(**{k: quote(v, safe="") for k, v in values.items()})
 
 
 def get_study_service(

@@ -9,14 +9,8 @@ vi.mock("../panelVisits/patientStudies", () => ({
     loadPatientStudies,
 }));
 
-vi.mock("$lib/extensions", () => ({
-    default: {
-        viewer: {
-            panel_info: {
-                additional_data_sources: [],
-            },
-        },
-    },
+vi.mock("$lib/browser/dataSources", () => ({
+    loadDataSource: vi.fn(),
 }));
 
 const { default: PanelInfo } = await import("./panelInfo.svelte");
@@ -45,8 +39,9 @@ describe("PanelInfo", () => {
                 {
                     id: 10,
                     date: "2024-06-01",
-                    project: { name: "RS" },
+                    project: { name: "Alpha" },
                     patient: { id: 1, identifier: "P1" },
+                    data_sources: [],
                 },
             ],
             truncated: false,

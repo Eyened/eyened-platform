@@ -12,7 +12,8 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session, object_session
 from sqlalchemy.orm.exc import DetachedInstanceError
 
-from .dtos_aux import CreatorGET, CreatorMeta, TagGET, TagMeta
+from ..config import sources_for_project
+from .dtos_aux import CreatorGET, CreatorMeta, DataSourceGET, TagGET, TagMeta
 from .dtos_instances import (
     DeviceMeta,
     ImageGET,
@@ -182,6 +183,10 @@ class DTOConverter:
             project=project_meta,
             patient=patient,
             tags=[],
+            data_sources=[
+                DataSourceGET(name=s.name, collapse=s.collapse)
+                for s in sources_for_project(project_meta.name)
+            ],
         )
 
         if include_series:
