@@ -1,3 +1,4 @@
+import { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import { toggleInSet, type Color } from "$lib/utils";
 import {
     getImageUiPref,
@@ -36,6 +37,7 @@ export class MainViewerContext implements Overlay {
     public highlightedFeatureIndex = $state<number | undefined>(undefined);
     public highlightedSegmentationItem: SegmentationItem | undefined =
         $state(undefined);
+    public readonly selection = new LayerSelection();
     public readonly segmentationContext: SegmentationContext;
 
     constructor(
@@ -49,6 +51,7 @@ export class MainViewerContext implements Overlay {
             axis,
             viewerWindowContext,
             image,
+            this.selection,
         );
         for (const key of this.loadSkipMaskingKeys()) {
             this.skipMasking.add(key);

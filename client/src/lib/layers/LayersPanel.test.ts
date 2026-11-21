@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from "@testing-library/svelte";
 import { tick } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
@@ -18,6 +25,12 @@ vi.mock(
     "$lib/viewer-window/panelSegmentation/NewSegmentationRegion.svelte",
     () => ({ default: () => {} }),
 );
+vi.mock("$lib/data/api", async (original) => ({
+    ...(await original<typeof import("$lib/data/api")>()),
+    deleteSegmentation: vi.fn(async (id: number) => {
+        segmentations.delete(id);
+    }),
+}));
 
 const { default: LayersPanel } = await import("./LayersPanel.svelte");
 
@@ -43,12 +56,13 @@ function attach(
         layers: {
             viewerContext: ctx.viewerContext as never,
             mainViewerContext: ctx.mainViewerContext as never,
+            selection: ctx.selection,
             grids: ctx.grids,
             scale: null,
             distance: ctx.distance,
             projectionSources: [],
             localizer: new LocalizerLines(() => []),
-            pointTarget: null,
+            pointTarget: { id: null, canEdit: false, reason: null },
             drawTarget: { name: null, reason: null },
             etdrsTarget: { name: null, reason: null },
             etdrsTool: undefined,
@@ -150,14 +164,15 @@ describe("LayersPanel", () => {
 
         ws.select(1);
         await tick();
-        expect(screen.queryByText(/^Line 1/)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Line 1" })).toBeNull();
         ws.select(0);
 
         expect(
             await screen.findByRole("button", { name: "ETDRS grid, Grader 5" }),
         ).toHaveAttribute("aria-pressed", "true");
-        expect(screen.getByText(/^Line 1 ·/)).toBeInTheDocument();
-        expect(a.grids.isShown(11)).toBe(true);
+        expect(
+            screen.getByRole("button", { name: "Line 1" }),
+        ).toBeInTheDocument();
     });
 
     it("Layers holds the object types and Display the view settings; no Display tab when nothing goes there", async () => {
@@ -190,5 +205,98 @@ describe("LayersPanel", () => {
         expect(
             screen.queryByRole("button", { name: /^Distance lines/ }),
         ).toBeNull();
+    });
+
+    it("the pane says what to do with nothing selected; a row click names the item in the pane's region", async () => {
+        segmentations.set(
+            1,
+            graderSegmentation(1, ME, "Drusen v2", {
+                image_id: "inst-a",
+            } as never),
+        );
+        const ws = workspaceWith(1);
+        attach(ws, 0, "inst-a");
+        renderPanel(ws);
+        expect(
+            screen.getByText("Select a layer to see its options."),
+        ).toBeInTheDocument();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Drusen v2" }),
+        );
+        expect(
+            screen.getByRole("region", { name: "Drusen v2" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText("Select a layer to see its options."),
+        ).toBeNull();
+    });
+
+    it("a selected grid's pane shows its creator, fovea and disc edge", async () => {
+        const name = BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID;
+        formSchemasByName.set(name, { id: 3, name } as never);
+        formAnnotations.set(11, {
+            id: 11,
+            form_schema_id: 3,
+            image_id: "inst-a",
+            annotation_type: "grader_form",
+            sub_task_id: null,
+            creator: { id: ME, name: `Grader ${ME}` },
+            form_data: {
+                fovea: { x: 512, y: 498 },
+                disc_edge: { x: 801, y: 470 },
+            },
+        } as never);
+        const ws = workspaceWith(1);
+        attach(ws, 0, "inst-a");
+        renderPanel(ws);
+        await fireEvent.click(
+            screen.getByRole("button", { name: "ETDRS grids 1" }),
+        );
+        await fireEvent.click(
+            screen.getByRole("button", { name: `ETDRS grid, Grader ${ME}` }),
+        );
+        const pane = screen.getByRole("region", {
+            name: `ETDRS grid, Grader ${ME}`,
+        });
+        expect(within(pane).getByText("512, 498")).toBeInTheDocument();
+        expect(within(pane).getByText("801, 470")).toBeInTheDocument();
+    });
+
+    it("Delete in the pane removes the selected segmentation, empties the pane and moves focus to the next row", async () => {
+        for (const [id, name] of [
+            [1, "Drusen v2"],
+            [2, "Geographic atrophy"],
+        ] as const)
+            segmentations.set(
+                id,
+                graderSegmentation(id, ME, name, {
+                    image_id: "inst-a",
+                } as never),
+            );
+        const ws = workspaceWith(1);
+        const a = attach(ws, 0, "inst-a");
+        renderPanel(ws);
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Drusen v2" }),
+        );
+        const pane = screen.getByRole("region", { name: "Drusen v2" });
+        await fireEvent.click(
+            within(pane).getByRole("button", { name: "Delete" }),
+        );
+        const dialog = await screen.findByRole("dialog");
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Delete" }),
+        );
+        await waitFor(() => expect(a.selection.value).toBeNull());
+        await waitFor(
+            () =>
+                expect(
+                    screen.getByRole("button", { name: "Geographic atrophy" }),
+                ).toHaveFocus(),
+            { timeout: 3000 },
+        );
+        expect(
+            screen.getByText("Select a layer to see its options."),
+        ).toBeInTheDocument();
     });
 });

@@ -24,6 +24,8 @@ vi.mock("$lib/webgl/imageEncoder", () => ({
 }));
 
 import { getSegmentationData } from "$lib/data/helpers";
+import { segmentations } from "$lib/data/stores.svelte";
+import { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import { viewerOf, type ImageKind } from "$lib/viewer/testViewer";
 import type { EventName } from "$lib/viewer/viewer-utils";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -58,6 +60,7 @@ function setup(toolId: DrawId, editable = true, kind: ImageKind = "colour") {
         0,
         { viewState: workspace } as never,
         viewerContext.image as never,
+        new LayerSelection(),
     );
     const draw = vi.spyOn(segmentationContext, "draw").mockResolvedValue();
     vi.spyOn(segmentationContext, "getCtx").mockReturnValue(fake2d as never);
@@ -132,6 +135,7 @@ describe("bindDrawTool", () => {
     afterEach(() => {
         vi.unstubAllGlobals();
         localStorage.clear();
+        segmentations.clear();
     });
 
     it("writes a Brush stroke only in a viewport that can take it", () => {
@@ -181,7 +185,11 @@ describe("bindDrawTool", () => {
             drawEnhance: vi.fn(),
         });
         const item = {
-            segmentation: { image_projection_matrix: null },
+            segmentation: {
+                id: 901,
+                annotation_type: "grader_segmentation",
+                image_projection_matrix: null,
+            },
             getSegmentationState: () => ({
                 mask,
                 loaded: Promise.resolve(),
@@ -190,6 +198,7 @@ describe("bindDrawTool", () => {
             draw: vi.fn().mockResolvedValue(undefined),
             undo: vi.fn().mockResolvedValue(undefined),
         };
+        segmentations.set(901, { id: 901 } as never);
         segmentationContext.segmentationItem = item as never;
         send(viewerContext, "pointerdown");
         send(viewerContext, "keydown", ESC);
@@ -241,8 +250,13 @@ describe("bindDrawTool", () => {
                 0,
                 new Uint8Array([1, 2, 3, 4]),
             );
+            segmentations.set(901, { id: 901 } as never);
             segmentationContext.segmentationItem = {
-                segmentation: { image_projection_matrix: null },
+                segmentation: {
+                    id: 901,
+                    annotation_type: "grader_segmentation",
+                    image_projection_matrix: null,
+                },
                 getSegmentationState: () => state,
                 draw: () => state.draw(null as never, {} as never),
                 undo: () => state.undo(),
@@ -304,8 +318,13 @@ describe("bindDrawTool", () => {
                 } as never,
                 0,
             );
+            segmentations.set(901, { id: 901 } as never);
             segmentationContext.segmentationItem = {
-                segmentation: { image_projection_matrix: null },
+                segmentation: {
+                    id: 901,
+                    annotation_type: "grader_segmentation",
+                    image_projection_matrix: null,
+                },
                 getSegmentationState: () => state,
                 draw: () => state.draw(null as never, {} as never),
                 undo: () => state.undo(),

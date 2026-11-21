@@ -2,7 +2,9 @@ import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { pointArming } from "$lib/forms/pointArming.svelte";
 import type { DrawTarget } from "$lib/layers/drawBinding";
 import type { GridLayers, GridTarget } from "$lib/layers/gridLayers.svelte";
+import type { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import type { Scale, ScalePick } from "$lib/layers/imageScale";
+import type { PointTarget } from "$lib/layers/pointsets";
 import type { EnfaceOverlaySourceResolved } from "$lib/registration/resolveEnfaceOverlaySources";
 import {
     CIRCLE_SIZES,
@@ -44,7 +46,9 @@ import {
 import { clampSize, PAINT_DEFAULTS, sizeKey, type PaintPrefs } from "./paint";
 import type { LayerSectionId } from "$lib/layers/layerSections";
 import {
+    readLayerArea,
     readLayerSections,
+    writeLayerArea,
     writeLayerSections,
     writeMagnifier,
     writePaint,
@@ -75,6 +79,8 @@ export interface WorkspaceOptions {
 export interface LayersTarget {
     readonly viewerContext: ViewerContext;
     readonly mainViewerContext: MainViewerContext;
+    /** This viewport's selection: what the Selected pane shows and tools edit. */
+    readonly selection: LayerSelection;
     /** ETDRS grids state, kept while Layers remounts its sections. */
     readonly grids: GridLayers;
     /** The image's scale for Distance and the ETDRS circle; null when nothing gives one. */
@@ -85,8 +91,8 @@ export interface LayersTarget {
     readonly projectionSources: EnfaceOverlaySourceResolved[];
     /** This viewport's localizer lines: the mode and the B-scan positions it draws. */
     readonly localizer: LocalizerLines;
-    /** The registration P works on in this viewport; null when there is none. */
-    readonly pointTarget: { id: number; canEdit: boolean } | null;
+    /** The registration this viewport shows and P binds, and why P can't place. */
+    readonly pointTarget: PointTarget;
     /** The current segmentation a Draw tool writes into here, or why it can't. */
     readonly drawTarget: DrawTarget;
     /** The grid Place ETDRS writes here, or why it can't. */
@@ -143,6 +149,8 @@ export class Workspace {
     /** The open Layers sections; stored per browser. */
     layerSections: Record<LayerSectionId, boolean> =
         $state.raw(readLayerSections());
+    /** Area on Segmentations rows and in the Selected pane; stored per browser. */
+    layerArea = $state(readLayerArea());
     arrange: ArrangeOrder = $state("opened");
     preset: Preset = $state.raw(getPreset(DEFAULT_PRESET_ID)!);
     page = $state(1);
@@ -419,6 +427,11 @@ export class Workspace {
         if (this.layerSections[id] === open) return;
         this.layerSections = { ...this.layerSections, [id]: open };
         writeLayerSections(this.layerSections);
+    }
+
+    setLayerArea(on: boolean): void {
+        this.layerArea = on;
+        writeLayerArea(on);
     }
 
     /** A viewport's viewer registers its handle; the returned function removes it. */

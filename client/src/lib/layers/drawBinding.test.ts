@@ -48,9 +48,7 @@ describe("drawBinding", () => {
                 toolId: toolId as never,
                 canEdit: mine,
             }).reason;
-        expect(reason(null)).toBe(
-            "No current segmentation. Choose one in Segmentations.",
-        );
+        expect(reason(null)).toBe("Select a segmentation to draw");
         expect(
             reason(segmentation({ annotation_type: "model_segmentation" })),
         ).toBe(

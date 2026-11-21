@@ -70,7 +70,7 @@ describe("ScalePopover", () => {
         ).toEqual(["grid:11", "grid:ai", "grid:12", "typed"]);
         expect(
             screen.getByRole("radio", {
-                name: "Your grid 11 (current) · 35.29 µm/px",
+                name: "Your grid 11 · 35.29 µm/px",
             }),
         ).toBeInTheDocument();
         expect(

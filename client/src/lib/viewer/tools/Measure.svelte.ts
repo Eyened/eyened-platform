@@ -1,4 +1,5 @@
 import type { Position2D } from "$lib/types";
+import type { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import type { RenderTarget } from "$lib/webgl/types";
 import {
     lengthText,
@@ -23,6 +24,7 @@ export class MeasureTool implements Overlay {
         private readonly store: DistanceLines,
         private readonly scale: () => Scale | null,
         private readonly armed: () => boolean,
+        private readonly selection: LayerSelection,
     ) {}
 
     private findHit(cursor: Position2D, viewerContext: ViewerContext) {
@@ -54,7 +56,11 @@ export class MeasureTool implements Overlay {
                 : undefined;
         if (hover) {
             this.dragging = hover.point;
-            this.store.current = hover.line;
+            this.selection.select({
+                kind: "line",
+                line: hover.line,
+                lines: this.store,
+            });
             return;
         }
         const line = new Line(
@@ -63,6 +69,7 @@ export class MeasureTool implements Overlay {
             viewerContext.index,
         );
         this.store.add(line);
+        this.selection.select({ kind: "line", line, lines: this.store });
         this.store.drawing = line;
     }
 
@@ -125,9 +132,9 @@ export class MeasureTool implements Overlay {
         const l = Math.sqrt(dx * dx + dy * dy) / radius;
         const nx = -dy / l;
         const ny = dx / l;
-        // The current line, and the one a Layers row points at, stand out.
+        // The selected line, and the one a Layers row points at, stand out.
         const selected =
-            line === this.store.current || line === this.store.highlighted;
+            line === this.selection.line() || line === this.store.highlighted;
         ctx.strokeStyle = selected ? selectedColour : colour;
         ctx.fillStyle = selected ? selectedColour : colour;
         ctx.lineWidth = selected ? 2 : 1;

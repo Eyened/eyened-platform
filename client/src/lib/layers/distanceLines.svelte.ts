@@ -20,10 +20,9 @@ export class Line {
     }
 }
 
-/** An image's distance lines for the session, and the current one: the last drawn or clicked. */
+/** An image's distance lines for the session; each viewport selects among them. */
 export class DistanceLines {
     lines: Line[] = $state([]);
-    current: Line | undefined = $state();
     /** The line a Distance lines row points at while it is hovered or focused. */
     highlighted: Line | undefined = $state();
     /** The line between its first click and its second; Esc drops it first. */
@@ -31,19 +30,16 @@ export class DistanceLines {
 
     add(line: Line): void {
         this.lines = [...this.lines, line];
-        this.current = line;
     }
 
     remove(line: Line): void {
         this.lines = this.lines.filter((l) => l !== line);
-        if (this.current === line) this.current = undefined;
         if (this.highlighted === line) this.highlighted = undefined;
         if (this.drawing === line) this.drawing = undefined;
     }
 
     clear(): void {
         this.lines = [];
-        this.current = undefined;
         this.highlighted = undefined;
         this.drawing = undefined;
     }

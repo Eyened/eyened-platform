@@ -84,12 +84,16 @@ The Layers panel body: Layers and Display tabs, the selected viewport's name, th
                 {shown}
                 open={workspace.layerSections}
                 ontoggle={toggle}
+                withPane={id === "layers"}
             />
         {/key}
     {/if}
 {/snippet}
 
-<Tabs.Root bind:value={() => current, (v) => (tab = v as Tab)}>
+<Tabs.Root
+    bind:value={() => current, (v) => (tab = v as Tab)}
+    class="flex min-h-0 flex-1 flex-col"
+>
     <Tabs.List aria-label="Layers panel" class="px-4">
         <Tabs.Trigger value="layers">Layers</Tabs.Trigger>
         {#if bySection.display.length > 0}
@@ -103,7 +107,7 @@ The Layers panel body: Layers and Display tabs, the selected viewport's name, th
         <p class="px-4 text-body-compact-01 text-text-secondary">No layers</p>
     {/if}
     <!-- The {#if} unmounts the hidden tab's sections, so the pipette follows the shown tab. -->
-    <Tabs.Content value="layers">
+    <Tabs.Content value="layers" class="flex min-h-0 flex-1 flex-col">
         {#if current === "layers"}{@render body("layers")}{/if}
     </Tabs.Content>
     <Tabs.Content value="display">

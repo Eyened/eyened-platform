@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SegmentationGET } from "../../../types/openapi_types";
+import { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import { SegmentationContext } from "./segmentationContext.svelte";
 import { Workspace } from "$lib/workspace/workspace.svelte";
 
@@ -16,6 +17,7 @@ function context(viewerWindowContext: unknown = {}) {
         0,
         viewerWindowContext as never,
         image as never,
+        new LayerSelection(),
     );
 }
 

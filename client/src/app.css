@@ -220,8 +220,8 @@
     }
 }
 
-/* Carbon Layer: inside a dialog, a ConditionBuilder popover, a tag popover or a filter popover, surfaces and fields use the 02 set. */
-@custom-variant in-dialog (&:where([data-slot="dialog-content"] *, [data-slot="condition-popover"] *, [data-slot="tag-popover"] *, [data-slot="filter-popover"] *, [data-slot="tool-options"] *));
+/* Carbon Layer: inside a dialog, a ConditionBuilder popover, a tag popover, a filter popover, the viewer options bar or the Layers Selected pane, surfaces and fields use the 02 set. */
+@custom-variant in-dialog (&:where([data-slot="dialog-content"] *, [data-slot="condition-popover"] *, [data-slot="tag-popover"] *, [data-slot="filter-popover"] *, [data-slot="tool-options"] *, [data-slot="selected-pane"] *));
 /* Data table size: rows and cells follow the table's data-size. */
 @custom-variant table-xl (&:where([data-size="xl"] *));
 @custom-variant table-lg (&:where([data-size="lg"] *));

@@ -12,6 +12,7 @@ import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
 import { expectNoAxeViolations } from "$lib/workspace/testUtils";
 import type { FormAnnotationGET } from "../../types/openapi_types";
 import { AI_GRID } from "./gridLayers.svelte";
+import type { Scale } from "./imageScale";
 import { layersContexts, ME } from "./testContexts";
 
 vi.mock("$lib/data/api", async (original) => ({
@@ -72,7 +73,11 @@ function pointTool(addOverlay: ReturnType<typeof vi.fn>) {
 function renderSection(
     over: Parameters<typeof layersContexts>[1] = {},
     subTaskId?: number,
-    props: { open?: boolean; ontoggle?: () => void } = {},
+    props: {
+        open?: boolean;
+        ontoggle?: () => void;
+        scale?: Scale | null;
+    } = {},
 ) {
     formSchemasByName.set(SCHEMA_NAME, { id: 3, name: SCHEMA_NAME } as never);
     const ctx = layersContexts("inst-1", over);
@@ -84,6 +89,7 @@ function renderSection(
             grids: ctx.grids,
             open: true,
             ontoggle: vi.fn(),
+            scale: null,
             ...props,
         },
         context,
@@ -123,23 +129,47 @@ describe("EtdrsSection", () => {
         await expectNoAxeViolations(container);
     });
 
-    it("the name sets the current grid and shows it with its points as text; the section mounts no tool; pressing it again unsets it", async () => {
+    it("tags the grid that gives the scale", () => {
         formAnnotations.set(11, grid(11, ME));
-        const { grids, viewerContext } = renderSection();
+        formAnnotations.set(12, grid(12, 9));
+        renderSection({}, undefined, {
+            scale: {
+                x: 10,
+                y: 10,
+                source: "from grid 12",
+                pick: { kind: "grid", key: 12 },
+            },
+        });
+        expect(
+            within(
+                screen.getByRole("group", {
+                    name: "ETDRS grid, Grader 9 [12]",
+                }),
+            ).getByText("Scale"),
+        ).toBeInTheDocument();
+        expect(
+            within(
+                screen.getByRole("group", {
+                    name: `ETDRS grid, Grader ${ME} [11]`,
+                }),
+            ).queryByText("Scale"),
+        ).toBeNull();
+    });
+
+    it("the name sets and unsets the current grid; the section mounts no tool", async () => {
+        formAnnotations.set(11, grid(11, ME));
+        const { viewerContext, grids } = renderSection();
         const name = () =>
             screen.getByRole("button", { name: "ETDRS grid, Grader 5" });
         await fireEvent.click(name());
+        expect(grids.isShown(11)).toBe(false);
         expect(name()).toHaveAttribute("aria-pressed", "true");
-        expect(grids.isShown(11)).toBe(true);
-        expect(screen.getByText("Fovea 512, 498")).toBeInTheDocument();
-        expect(screen.getByText("Disc edge 801, 470")).toBeInTheDocument();
         // Only the grid overlay mounts, so a click with Pan or Distance armed places nothing.
         expect(
             pointTool(vi.mocked(viewerContext.addOverlay)).tool,
         ).toBeUndefined();
         await fireEvent.click(name());
         expect(name()).toHaveAttribute("aria-pressed", "false");
-        expect(screen.queryByText(/^Fovea/)).toBeNull();
     });
 
     it("New opens a closed section, hides every grid, creates one in this task, makes it current and arms Place ETDRS at Fovea", async () => {
@@ -192,7 +222,7 @@ describe("EtdrsSection", () => {
         formAnnotations.set(12, grid(12, 9));
         const { grids } = renderSection();
         grids.setCurrent(11);
-        expect(grids.isShown(11)).toBe(true);
+        grids.setShown(11, true);
         expect(
             within(
                 screen.getByRole("group", {

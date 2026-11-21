@@ -24,16 +24,24 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
     import GridDeleteModal from "./GridDeleteModal.svelte";
     import LayerRow from "./LayerRow.svelte";
     import LayerSection from "./LayerSection.svelte";
+    import type { Scale } from "./imageScale";
+    import { focusAfterDelete } from "./focusAfterDelete";
 
     let {
         grids,
         open,
         ontoggle,
+        scale,
     }: {
         grids: GridLayers;
         open: boolean;
         ontoggle: () => void;
+        scale: Scale | null;
     } = $props();
+
+    const scaleKey = $derived(
+        scale?.pick.kind === "grid" ? scale.pick.key : undefined,
+    );
 
     const uid = $props.id();
     const taskContext = getContext<TaskContext | undefined>("taskContext");
@@ -44,7 +52,12 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
 
     let deleting: FormAnnotationGET | null = $state(null);
     let deleteOpen = $state(false);
-    function askDelete(grid: FormAnnotationGET) {
+    let fallback = () => {};
+    function askDelete(grid: FormAnnotationGET, event: MouseEvent) {
+        fallback = focusAfterDelete(
+            (event.currentTarget as Element).closest("[data-layer-row]"),
+            section ?? null,
+        );
         deleting = grid;
         deleteOpen = true;
     }
@@ -73,6 +86,8 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
             form_data: {},
         });
         grids.setCurrent(grid.id);
+        // New shows the grid it makes; selecting a grid otherwise leaves it hidden or shown.
+        grids.setShown(grid.id, true);
         // The next step is placing the fovea.
         workspace.etdrsSlot = 0;
         workspace.arm("etdrs");
@@ -86,14 +101,11 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
     }
 </script>
 
-<div bind:this={section}>
+<div bind:this={section} data-layer-section="etdrs">
     <LayerSection title="ETDRS grids" {count} {open} {ontoggle}>
         {#snippet action()}
-            <Button
-                variant="ghost"
-                size="sm"
-                aria-label="New ETDRS grid"
-                onclick={create}>New</Button
+            <IconButton size="icon-xs" label="New ETDRS grid" onclick={create}
+                ><Add /></IconButton
             >
         {/snippet}
         {#if count > 0}
@@ -105,7 +117,10 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
                             name="AI grid"
                             visible={aiShown}
                         >
-                            {#snippet tags()}<Tag>AI</Tag>{/snippet}
+                            {#snippet tags()}
+                                <Tag>AI</Tag>
+                                {#if scaleKey === AI_GRID}<Tag>Scale</Tag>{/if}
+                            {/snippet}
                             {#snippet icons()}
                                 <IconButton
                                     size="icon-xs"
@@ -126,6 +141,7 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
                             formAnnotation={grid}
                             shown={grids.isShown(grid.id)}
                             current={grids.currentId === grid.id}
+                            scale={scaleKey === grid.id}
                             ontoggleshown={() =>
                                 grids.setShown(
                                     grid.id,
@@ -137,7 +153,7 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
                                         ? undefined
                                         : grid.id,
                                 )}
-                            ondelete={() => askDelete(grid)}
+                            ondelete={(e) => askDelete(grid, e)}
                         />
                     </li>
                 {/each}
@@ -185,5 +201,5 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
     grid={deleting}
     {grids}
     bind:open={deleteOpen}
-    onfallback={() => section?.querySelector<HTMLElement>("button")?.focus()}
+    onfallback={() => fallback()}
 />

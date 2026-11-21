@@ -3,15 +3,15 @@ import {
     fireEvent,
     render,
     screen,
+    waitFor,
     within,
 } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
 import { formAnnotations, formSchemasByName } from "$lib/data/stores.svelte";
 import { expectNoAxeViolations } from "$lib/workspace/testUtils";
-import type { FormAnnotationGET } from "../../types/openapi_types";
 import { eyeKey } from "./pointsets";
-import { fakeImage, layersContexts, ME } from "./testContexts";
+import { fakeImage, layersContexts, ME, reg } from "./testContexts";
 
 vi.mock("$lib/data/api", async (original) => ({
     ...(await original<typeof import("$lib/data/api")>()),
@@ -35,27 +35,6 @@ afterEach(() => {
     formAnnotations.clear();
     formSchemasByName.delete(SCHEMA_NAME);
 });
-
-/** A synthetic registration of patient 1's right eye. */
-function reg(
-    id: number,
-    creatorId: number,
-    form_data: Record<string, unknown>,
-    over: Partial<FormAnnotationGET> = {},
-) {
-    const a = {
-        id,
-        form_schema_id: 4,
-        patient_id: 1,
-        laterality: "R",
-        image_id: "elsewhere",
-        creator: { id: creatorId, name: `Grader ${creatorId}` },
-        form_data,
-        ...over,
-    } as unknown as FormAnnotationGET;
-    formAnnotations.set(id, a);
-    return a;
-}
 
 function renderSection(
     instanceId = "inst-1",
@@ -95,47 +74,27 @@ describe("PointsetsSection", () => {
         await expectNoAxeViolations(container);
     });
 
-    it("sets the eye's current registration for every viewport of that eye and shows its points and save state", async () => {
+    it("a row selects the pointset here and leaves the eye's registration in use alone", async () => {
         reg(12, 9, { "inst-1": [pt, pt, pt], "inst-2": [pt, pt, null] });
-        const first = renderSection();
+        reg(13, ME, { "inst-1": [pt] });
+        const { win, selection } = renderSection();
+        win.pointsets.setCurrent(EYE, 13);
         await fireEvent.click(
             screen.getByRole("button", { name: "Registration [12]" }),
         );
+        expect(selection.pointsetId()).toBe(12);
+        expect(win.pointsets.currentId(EYE)).toBe(13);
         expect(
-            screen.getByRole("button", { name: "Registration [12]" }),
-        ).toHaveAttribute("aria-pressed", "true");
-        expect(screen.getByText("This CF · 2022-05-10")).toBeInTheDocument();
-        expect(screen.getByText("2 · no 3")).toBeInTheDocument();
-        first.win.pointsets.sync.set(12, "error");
-        expect(await screen.findByText("Couldn't save")).toBeInTheDocument();
-        cleanup();
-        // Another viewport of the same eye.
-        renderSection("inst-2", { images: [], win: first.win });
+            within(
+                screen.getByRole("group", { name: "Registration [13]" }),
+            ).getByText("In use · OD"),
+        ).toBeInTheDocument();
         expect(
             screen.getByRole("button", { name: "Registration [12]" }),
         ).toHaveAttribute("aria-pressed", "true");
     });
 
-    it("numbers a retake of this image by the window's strip order: this image is the first, the other line reads #2", async () => {
-        reg(12, 9, { "inst-1": [pt], "inst-2": [pt] });
-        renderSection("inst-1", {
-            images: [
-                fakeImage("inst-2", {
-                    modality: "ColorFundus",
-                    date: "2022-05-10",
-                    device: { manufacturer: "Topcon", model: "Maestro2" },
-                }),
-            ],
-        });
-        await fireEvent.click(
-            screen.getByRole("button", { name: "Registration [12]" }),
-        );
-        expect(screen.getByText("This CF · 2022-05-10")).toBeInTheDocument();
-        expect(screen.getByText("CF · 2022-05-10 #2")).toBeInTheDocument();
-        expect(screen.getAllByText("Topcon Maestro2")).toHaveLength(2);
-    });
-
-    it("New creates on this image, makes it current and arms P; a failed New says so and arms nothing", async () => {
+    it("New creates on this image, selects it, puts it in use when the eye has none and arms P; a failed New says so and arms nothing", async () => {
         vi.mocked(createFormAnnotation).mockImplementationOnce(async (body) => {
             return reg(
                 20,
@@ -144,7 +103,7 @@ describe("PointsetsSection", () => {
                 { image_id: (body as { image_id: string }).image_id },
             );
         });
-        const { win, workspace } = renderSection();
+        const { win, workspace, selection } = renderSection();
         // With no rows, the header's New and the empty state's button share the name; the header comes first.
         const newButton = () =>
             screen.getAllByRole("button", { name: "New registration" })[0]!;
@@ -157,6 +116,7 @@ describe("PointsetsSection", () => {
             }),
         );
         expect(win.pointsets.currentId(EYE)).toBe(20);
+        expect(selection.pointsetId()).toBe(20);
         expect(workspace.arm).toHaveBeenCalledWith("point");
 
         vi.mocked(createFormAnnotation).mockRejectedValueOnce(
@@ -168,6 +128,20 @@ describe("PointsetsSection", () => {
             await screen.findByText("Couldn't create a registration"),
         ).toBeInTheDocument();
         expect(workspace.arm).not.toHaveBeenCalled();
+    });
+
+    it("New leaves the eye's registration in use when it has one", async () => {
+        reg(12, 9, { "inst-1": [pt] });
+        vi.mocked(createFormAnnotation).mockImplementationOnce(async () =>
+            reg(21, ME, {}, { image_id: "inst-1" }),
+        );
+        const { win, selection } = renderSection();
+        win.pointsets.setCurrent(EYE, 12);
+        await fireEvent.click(
+            screen.getByRole("button", { name: "New registration" }),
+        );
+        await waitFor(() => expect(selection.pointsetId()).toBe(21));
+        expect(win.pointsets.currentId(EYE)).toBe(12);
     });
 
     it("Delete asks first, then removes the registration", async () => {

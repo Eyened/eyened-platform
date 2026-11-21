@@ -14,6 +14,7 @@ An APG window splitter between two viewport tracks: drag it, or click to pick it
         valueMin,
         valueMax,
         style,
+        thickness = 8,
         ondragstart,
         ondrag,
         ondragend,
@@ -29,6 +30,8 @@ An APG window splitter between two viewport tracks: drag it, or click to pick it
         valueMin: number;
         valueMax: number;
         style: string;
+        /** The hit area across the line, in px; the line itself stays 2 px. */
+        thickness?: number;
         ondragstart: () => void;
         ondrag: (deltaPx: number) => void;
         ondragend: () => void;
@@ -133,7 +136,7 @@ An APG window splitter between two viewport tracks: drag it, or click to pick it
     class="splitter"
     class:col={axis === "col"}
     class:picked={pickedUp}
-    {style}
+    style="--thickness: {thickness}px; {style}"
     {onpointerdown}
     {onpointermove}
     {onpointerup}
@@ -163,21 +166,21 @@ An APG window splitter between two viewport tracks: drag it, or click to pick it
         z-index: 2;
         touch-action: none;
         outline: none;
-        height: 8px;
+        height: var(--thickness);
         cursor: row-resize;
     }
     .splitter.col {
         height: auto;
-        width: 8px;
+        width: var(--thickness);
         cursor: col-resize;
     }
     .splitter::after {
         content: "";
         position: absolute;
-        inset: 3px 0;
+        inset: calc((var(--thickness) - 2px) / 2) 0;
     }
     .splitter.col::after {
-        inset: 0 3px;
+        inset: 0 calc((var(--thickness) - 2px) / 2);
     }
     .splitter:hover::after,
     .splitter.picked::after {

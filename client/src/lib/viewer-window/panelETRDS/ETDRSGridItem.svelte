@@ -1,7 +1,6 @@
 <!--
 @component
 One ETDRS grid on this image in Layers: the creator's name (sets or unsets the current grid) and "This task"; eye and Delete on your own grids at the right.
-The current grid shows its fovea and disc edge as text; Place ETDRS (G) places them.
 -->
 <script lang="ts">
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
@@ -10,7 +9,6 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
     import { isThisTask } from "$lib/layers/gridLayers.svelte";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import type { Position2D } from "$lib/types";
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
     import View from "carbon-icons-svelte/lib/View.svelte";
     import ViewOff from "carbon-icons-svelte/lib/ViewOff.svelte";
@@ -21,6 +19,7 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
         formAnnotation,
         shown,
         current,
+        scale,
         ontoggleshown,
         ontogglecurrent,
         ondelete,
@@ -28,9 +27,11 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
         formAnnotation: FormAnnotationGET;
         shown: boolean;
         current: boolean;
+        /** This grid gives the image's scale. */
+        scale: boolean;
         ontoggleshown: () => void;
         ontogglecurrent: () => void;
-        ondelete: () => void;
+        ondelete: (event: MouseEvent) => void;
     } = $props();
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
@@ -42,20 +43,6 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
     const thisTask = $derived(
         isThisTask(formAnnotation, taskContext?.subTask?.id),
     );
-    const landmarks = $derived.by(() => {
-        const data = (formAnnotation.form_data ?? {}) as Record<
-            string,
-            Position2D | undefined
-        >;
-        return [
-            { label: "Fovea", point: data.fovea },
-            { label: "Disc edge", point: data.disc_edge },
-        ];
-    });
-
-    function coords(p: Position2D | undefined) {
-        return p ? `${Math.round(p.x)}, ${Math.round(p.y)}` : "—";
-    }
 </script>
 
 <LayerRow
@@ -69,6 +56,7 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
 >
     {#snippet tags()}
         {#if thisTask}<Tag>This task</Tag>{/if}
+        {#if scale}<Tag>Scale</Tag>{/if}
     {/snippet}
     {#snippet icons()}
         <IconButton
@@ -85,17 +73,4 @@ The current grid shows its fovea and disc edge as text; Place ETDRS (G) places t
             </IconButton>
         {/if}
     {/snippet}
-    {#if current}
-        <!-- Starts under the name, as a segmentation row's details do. -->
-        <div class="flex flex-col items-start gap-1 ps-7 pe-2 pb-1">
-            {#each landmarks as landmark (landmark.label)}
-                <p
-                    class="px-1 text-body-compact-01 text-text-primary tabular-nums"
-                >
-                    {landmark.label}
-                    {coords(landmark.point)}
-                </p>
-            {/each}
-        </div>
-    {/if}
 </LayerRow>

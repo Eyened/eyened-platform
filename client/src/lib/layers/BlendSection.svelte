@@ -1,6 +1,6 @@
 <!--
 @component
-Layers › Blend for the selected viewport: how this viewport draws its image with another. Pair modes use the eye's current registration; Series uses every registered image of the eye.
+Layers › Blend for the selected viewport: how this viewport draws its image with another. Pair modes use the eye's registration in use (Display › Registration); Series uses every registered image of the eye.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
@@ -11,6 +11,7 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
     import { getThumbUrl } from "$lib/data-loading/utils";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
+    import { eyeSuffix } from "./pointsets";
     import BlendStyleFields from "./BlendStyleFields.svelte";
     import SeriesBody from "./SeriesBody.svelte";
     import LayerSection from "./LayerSection.svelte";
@@ -83,7 +84,9 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
         {#if blend.mode !== "off" && blend.mode !== "series"}
             {#if !blend.registration}
                 <p class="text-body-compact-01 text-text-secondary">
-                    Make a registration current in Pointsets.
+                    No registration in use. Pick one in Registration{eyeSuffix(
+                        image.instance.laterality,
+                    )}.
                 </p>
             {:else if !blend.other}
                 <!-- ASSUMPTION: the spec gives no text for a registration without another loaded image. -->
@@ -92,6 +95,9 @@ Layers › Blend for the selected viewport: how this viewport draws its image wi
                         .registration.id}].
                 </p>
             {:else}
+                <p class="text-body-compact-01 text-text-primary">
+                    Pairs through: Registration [{blend.registration.id}]
+                </p>
                 <fieldset class="flex min-w-0 flex-col">
                     <legend class="mb-2 text-label-01 text-text-secondary">
                         With · Registration [{blend.registration.id}]

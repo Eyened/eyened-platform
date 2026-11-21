@@ -2,6 +2,7 @@ import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
 import { segmentationPlaneSize } from "$lib/webgl/segmentationProjection";
 import { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 import type { AbstractImage } from "$lib/webgl/abstractImage";
+import type { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type {
     ModelSegmentationGET,
@@ -55,7 +56,15 @@ export class SegmentationContext {
     /** Multi-class overlay opacity for the selected class vs other visible classes. */
     public multiClassActiveAlpha = $state(1);
     public multiClassInactiveAlpha = $state(0.2);
-    public segmentationItem: SegmentationItem | undefined = $state(undefined);
+    /** The selected segmentation: the one Draw tools, undo and the pipette act on. Setting it selects it; clearing it ends only a segmentation selection. */
+    get segmentationItem(): SegmentationItem | undefined {
+        return this.selection.segmentationItem();
+    }
+    set segmentationItem(item: SegmentationItem | undefined) {
+        if (item) this.selection.select({ kind: "segmentation", item });
+        else if (this.selection.value?.kind === "segmentation")
+            this.selection.select(null);
+    }
     public scan_indices: number[] = $derived(
         this.segmentationItem?.savedScanIndices ?? [],
     );
@@ -85,6 +94,8 @@ export class SegmentationContext {
         public readonly axis: number,
         public readonly viewerWindowContext: ViewerWindowContext,
         public readonly image: AbstractImage,
+        /** The viewport's selection; this context reads and writes its segmentation. */
+        public readonly selection: LayerSelection,
     ) {}
 
     getSegmentationItem(segmentation: Segmentation): SegmentationItem {

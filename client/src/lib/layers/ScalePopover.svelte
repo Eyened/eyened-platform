@@ -74,10 +74,7 @@ The scale button for Distance and the ETDRS circle: the value and its source, an
                           : `${annotation?.creator.name}'s grid ${grid.key}`;
                 return {
                     key: grid.key,
-                    name:
-                        grid.key === layers.grids.currentId
-                            ? `${name} (current)`
-                            : name,
+                    name,
                     value: gridScale(grid, workspace.etdrsFraction),
                     rank: mine ? 0 : grid.key === AI_GRID ? 1 : 2,
                 };

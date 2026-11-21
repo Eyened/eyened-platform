@@ -9,9 +9,13 @@ import { vi } from "vitest";
 import { DistanceLines } from "./distanceLines.svelte";
 import { BlendStyles } from "./blendStyles";
 import { GridLayers } from "./gridLayers.svelte";
+import { LayerSelection } from "./layerSelection.svelte";
 import { PointsetState } from "./pointsets";
 import { twinNumbers, type ImageMeta } from "$lib/workspace/imageMeta";
+import { readLayerArea, writeLayerArea } from "$lib/workspace/workspacePrefs";
+import { formAnnotations } from "$lib/data/stores.svelte";
 import type {
+    FormAnnotationGET,
     ModelSegmentationGET,
     SegmentationGET,
 } from "../../types/openapi_types";
@@ -56,6 +60,27 @@ export function modelSegmentation(
         feature: { id: 200 + id, name },
         tags: [],
     } as unknown as ModelSegmentationGET;
+}
+
+/** A synthetic registration of patient 1's right eye, put in the store. */
+export function reg(
+    id: number,
+    creatorId: number,
+    form_data: Record<string, unknown>,
+    over: Partial<FormAnnotationGET> = {},
+) {
+    const a = {
+        id,
+        form_schema_id: 4,
+        patient_id: 1,
+        laterality: "R",
+        image_id: "elsewhere",
+        creator: { id: creatorId, name: `Grader ${creatorId}` },
+        form_data,
+        ...over,
+    } as unknown as FormAnnotationGET;
+    formAnnotations.set(id, a);
+    return a;
 }
 
 /** A synthetic loaded 2D image of patient 1. */
@@ -170,14 +195,17 @@ export function layersContexts(
             return items.get(key);
         },
     };
+    const selection = new LayerSelection();
     const segmentationContext = new SegmentationContext(
         instanceId,
         0,
         {} as never,
         image as never,
+        selection,
     );
     const mainViewerContext = {
         segmentationContext,
+        selection,
         alpha: 1,
         saveOpacity: vi.fn(),
         getFeatureColor: () => [255, 0, 0],
@@ -217,6 +245,7 @@ export function layersContexts(
         win.images.set(loaded.image_id, loaded);
     // Reactive like the real Workspace, so a section re-renders after it writes the fraction.
     const fraction = fromStore(writable(0.85));
+    const area = fromStore(writable(readLayerArea()));
     const workspace = {
         catalogue: [image.image_id, ...others.map((i) => i.image_id)],
         arm: vi.fn(),
@@ -228,6 +257,13 @@ export function layersContexts(
             fraction.current = value;
         },
         etdrsSlot: 0,
+        get layerArea() {
+            return area.current;
+        },
+        setLayerArea(on: boolean) {
+            area.current = on;
+            writeLayerArea(on);
+        },
         scalePicks: new SvelteMap<string, unknown>(),
     };
     const viewerContext = {
@@ -251,6 +287,7 @@ export function layersContexts(
                 return workspace.etdrsFraction;
             },
         },
+        selection,
     );
     const distance = new DistanceLines();
     const context = new Map<string, unknown>([
@@ -268,6 +305,7 @@ export function layersContexts(
         globalContext,
         grids,
         distance,
+        selection,
         win,
         workspace,
     };

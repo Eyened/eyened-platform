@@ -1,3 +1,4 @@
+import type { PointTarget } from "$lib/layers/pointsets";
 import {
     cleanup,
     fireEvent,
@@ -14,6 +15,7 @@ import {
 import type { DrawTarget } from "$lib/layers/drawBinding";
 import type { Workspace } from "../workspace.svelte";
 import { DistanceLines, Line } from "$lib/layers/distanceLines.svelte";
+import { LayerSelection } from "$lib/layers/layerSelection.svelte";
 import type { Scale } from "$lib/layers/imageScale";
 import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
 import type { ToolId } from "./registry";
@@ -73,6 +75,7 @@ function armWith(tool: ToolId, layers: object) {
                 returnFocus: vi.fn(),
                 keyboardCursor: { on: false },
             },
+            selection: new LayerSelection(),
             ...layers,
         } as never,
     });
@@ -124,7 +127,7 @@ describe("ToolOptionsBar", () => {
     });
 
     it("names the registration P places into, read-only for a colleague's, or asks for one", () => {
-        const show = (pointTarget: { id: number; canEdit: boolean } | null) => {
+        const show = (pointTarget: PointTarget) => {
             const ws = workspaceWith(1);
             ws.attachViewport(0, {
                 zoomPercent: 100,
@@ -138,12 +141,16 @@ describe("ToolOptionsBar", () => {
             ws.arm("point");
             return render(ToolOptionsBar, { context: workspaceContext(ws) });
         };
-        show(null);
-        expect(
-            screen.getByText("Make a registration current in Pointsets."),
-        ).toBeInTheDocument();
+        show({
+            id: null,
+            canEdit: false,
+            reason: "Select a pointset to add points",
+        });
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "Select a pointset to add points",
+        );
         cleanup();
-        show({ id: 640, canEdit: false });
+        show({ id: 640, canEdit: false, reason: null });
         expect(
             screen.getByText("Registration 640 · read-only"),
         ).toBeInTheDocument();
@@ -156,16 +163,19 @@ describe("ToolOptionsBar", () => {
             zoomBy: vi.fn(),
             reset: vi.fn(),
             layers: {
-                pointTarget: null,
+                pointTarget: {
+                    id: null,
+                    canEdit: false,
+                    reason: "Select a pointset to add points",
+                },
                 viewerContext: { keyboardCursor: { on: true } },
             } as never,
         });
         ws.arm("point");
         render(ToolOptionsBar, { context: workspaceContext(ws) });
-        expect(
-            screen.getByText("Make a registration current in Pointsets."),
-        ).toBeInTheDocument();
-        expect(screen.queryByText(/^Keyboard cursor/)).toBeNull();
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "Select a pointset to add points",
+        );
     });
 
     it("names the selected viewport's target; Undo at an empty history keeps focus", async () => {
@@ -224,17 +234,18 @@ describe("ToolOptionsBar", () => {
         expect(screen.queryByRole("radio", { name: "C1" })).toBeNull();
     });
 
-    it("Distance's Delete removes the current line and is off when there is none", async () => {
+    it("Distance's Delete removes the selected line and is off when there is none", async () => {
         const distance = new DistanceLines();
-        distance.add(new Line({ x: 0, y: 0 }, { x: 1, y: 1 }, 0));
-        distance.add(new Line({ x: 0, y: 0 }, { x: 2, y: 2 }, 0));
-        armWith("distance", { scale: null, distance });
+        const line = new Line({ x: 0, y: 0 }, { x: 3, y: 4 }, 0);
+        distance.add(line);
+        distance.add(new Line({ x: 0, y: 0 }, { x: 6, y: 8 }, 0));
+        const selection = new LayerSelection();
+        selection.select({ kind: "line", line, lines: distance });
+        armWith("distance", { distance, selection, scale: null });
         const remove = screen.getByRole("button", { name: "Delete" });
         await fireEvent.click(remove);
-        expect(distance.lines.map((l) => l.end.x)).toEqual([1]);
+        expect(distance.lines.map((l) => l.end.x)).toEqual([6]);
         expect(remove).toHaveAttribute("aria-disabled", "true");
-        await fireEvent.click(remove);
-        expect(distance.lines).toHaveLength(1);
     });
 
     it("Place ETDRS names the grid, or says why it can't write it in place of the options", () => {
@@ -284,7 +295,7 @@ describe("ToolOptionsBar", () => {
         const tool = new PointTool({ sparse: true });
         tool.points = [{ x: 1, y: 1 }, null, { x: 3, y: 3 }];
         const { container } = armWith("point", {
-            pointTarget: { id: 4, canEdit: true },
+            pointTarget: { id: 4, canEdit: true, reason: null },
             pointTool: tool,
         });
         expect(screen.getByText("Registration 4")).toBeInTheDocument();

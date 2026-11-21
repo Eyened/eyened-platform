@@ -21,7 +21,6 @@ const scale = (over: Partial<Parameters<typeof scaleOf>[0]>) =>
     scaleOf({
         stored: NONE,
         grids: GRIDS,
-        currentId: undefined,
         shown: [],
         pick: undefined,
         fraction: 1,
@@ -30,23 +29,16 @@ const scale = (over: Partial<Parameters<typeof scaleOf>[0]>) =>
 const value = (s: ReturnType<typeof scaleOf>) => s && [s.x, s.source];
 
 describe("scaleOf", () => {
-    it("takes the stored resolution, else the current grid, else the only grid shown, else none", () => {
-        expect(value(scale({ stored: STORED, currentId: 1 }))).toEqual([
-            11.2,
-            "stored",
-        ]);
-        expect(value(scale({ currentId: 1, shown: [1, 2] }))).toEqual([
-            30,
-            "from grid 1",
-        ]);
+    it("takes the stored resolution, else the only grid shown, else none", () => {
+        expect(value(scale({ stored: STORED }))).toEqual([11.2, "stored"]);
         expect(value(scale({ shown: [2] }))).toEqual([15, "from grid 2"]);
         expect(value(scale({ shown: [AI_GRID] }))).toEqual([10, "AI grid"]);
         expect(scale({ shown: [1, 2] })).toBeNull();
     });
 
     it("skips a grid missing a point or with both points on one spot, so a scale is never Infinity", () => {
-        expect(scale({ currentId: 3, shown: [3] })).toBeNull();
-        expect(scale({ currentId: 4, shown: [4] })).toBeNull();
+        expect(scale({ shown: [3] })).toBeNull();
+        expect(scale({ shown: [4] })).toBeNull();
     });
 
     it("a pick overrides the default and sticks: a picked grid missing a point gives no scale, not the default", () => {

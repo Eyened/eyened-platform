@@ -188,7 +188,7 @@ describe("ViewportBlend", () => {
         expect(blend.mode).toBe("overlay");
         expect(blend.layers(viewer())).toBeNull();
         expect(blend.viewportLine).toBe(
-            "Make a registration current in Pointsets.",
+            "No registration in use. Pick one in Registration · OD.",
         );
     });
 

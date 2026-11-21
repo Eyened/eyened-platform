@@ -22,12 +22,10 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
         type Segmentation,
     } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
     import { groupByCreator } from "$lib/viewer-window/panelSegmentation/segmentationUtils";
-    import {
-        readLayerArea,
-        writeLayerArea,
-    } from "$lib/workspace/workspacePrefs";
+    import type { Workspace } from "$lib/workspace/workspace.svelte";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
     import { getContext, untrack } from "svelte";
+    import { focusAfterDelete } from "./focusAfterDelete";
     import LayerSection from "./LayerSection.svelte";
     import SegmentationDeleteModal from "./SegmentationDeleteModal.svelte";
 
@@ -76,11 +74,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     });
     const count = $derived(groups.reduce((n, g) => n + g.rows.length, 0));
 
-    let showArea = $state(readLayerArea());
-    function setArea(on: boolean) {
-        showArea = on;
-        writeLayerArea(on);
-    }
+    const workspace = getContext<Workspace>("workspace");
     const percent = $derived(Math.round(mainViewerContext.alpha * 100));
 
     // The pipette acts while the Layers tab is on screen, even with this section collapsed.
@@ -114,13 +108,18 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     $effect(() => {
         if (segmentationContext.failed) untrack(() => !open && ontoggle());
     });
-    function askDelete(segmentation: Segmentation) {
+    let fallback = () => {};
+    function askDelete(segmentation: Segmentation, event: MouseEvent) {
+        fallback = focusAfterDelete(
+            (event.currentTarget as Element).closest("[data-layer-row]"),
+            header ?? null,
+        );
         deleting = segmentation;
         deleteOpen = true;
     }
 </script>
 
-<div bind:this={header}>
+<div bind:this={header} data-layer-section="segmentations">
     <LayerSection title="Segmentations" {count} {open} {ontoggle}>
         {#snippet action()}
             <!-- Stays mounted so the progress text is announced. -->
@@ -166,7 +165,10 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
                 <Field.Field orientation="horizontal" class="w-auto">
                     <Toggle
                         id="{uid}-area"
-                        bind:checked={() => showArea, setArea}
+                        bind:checked={
+                            () => workspace.layerArea,
+                            (on) => workspace.setLayerArea(on)
+                        }
                     />
                     <Field.Label
                         for="{uid}-area"
@@ -189,7 +191,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
                             <li>
                                 <SegmentationItem
                                     {segmentation}
-                                    {showArea}
+                                    showArea={workspace.layerArea}
                                     ondelete={askDelete}
                                 />
                             </li>
@@ -222,7 +224,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     segmentation={deleting}
     {segmentationContext}
     bind:open={deleteOpen}
-    onfallback={() => header?.querySelector<HTMLElement>("button")?.focus()}
+    onfallback={() => fallback()}
 />
 {#if segmentationContext.createDialog}
     {#key segmentationContext.createDialog}

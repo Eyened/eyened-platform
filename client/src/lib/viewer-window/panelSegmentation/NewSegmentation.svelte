@@ -5,6 +5,7 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { ComboBox } from "$lib/components/ui/combo-box/index.js";
     import * as Popover from "$lib/components/ui/popover/index.js";
     import { features } from "$lib/data";
@@ -12,6 +13,7 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import Add from "carbon-icons-svelte/lib/Add.svelte";
     import { getContext } from "svelte";
     import { createQuestionableSegmentation } from "./createSegmentationHelpers";
 
@@ -86,11 +88,8 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
 <Popover.Root bind:open>
     <Popover.Trigger bind:ref={trigger}>
         {#snippet child({ props })}
-            <Button
-                {...props}
-                variant="ghost"
-                size="sm"
-                aria-label="New segmentation">New</Button
+            <IconButton {...props} size="icon-xs" label="New segmentation"
+                ><Add /></IconButton
             >
         {/snippet}
     </Popover.Trigger>

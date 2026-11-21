@@ -1,11 +1,16 @@
-import { formAnnotations } from "$lib/data";
+import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
+import { formAnnotations, formSchemasByName, instances } from "$lib/data";
 import {
     annotationMatchesEye,
     groupKey,
     type EyeLaterality,
 } from "$lib/viewer-window/panelRegistration/groupOpenImages";
 import type { SyncState } from "$lib/webgl/segmentationState.svelte";
-import type { ImageName } from "$lib/workspace/imageMeta";
+import {
+    imageName,
+    type ImageMeta,
+    type ImageName,
+} from "$lib/workspace/imageMeta";
 import { SvelteMap } from "svelte/reactivity";
 import type { FormAnnotationGET } from "../../types/openapi_types";
 
@@ -18,6 +23,11 @@ export function eyeKey(instance: {
         instance.patient.id,
         (instance.laterality ?? null) as EyeLaterality,
     );
+}
+
+/** " · OD" for a right eye, " · OS" for a left one, nothing when the eye is unknown. */
+export function eyeSuffix(laterality: string | null | undefined): string {
+    return laterality === "R" ? " · OD" : laterality === "L" ? " · OS" : "";
 }
 
 /** The point lists in a registration's form data, keyed by public ID. */
@@ -76,6 +86,61 @@ export function registrationRows(
         if (here) rows.push(a);
     }
     return rows.sort((x, y) => x.id - y.id);
+}
+
+/** The registration form schema's id; undefined until the schemas load. */
+export function registrationSchemaId(): number | undefined {
+    return formSchemasByName.get(
+        BUILTIN_VIEWER_FORM_SCHEMA_NAMES.POINTSET_REGISTRATION,
+    )?.id;
+}
+
+/** The image's eye's registrations to list, reading the stores; none while the registration schema is missing. */
+export function eyeRegistrationRows(
+    instance: {
+        id: string;
+        patient: { id: number };
+        laterality?: string | null;
+    },
+    inUseId: number | undefined,
+): FormAnnotationGET[] {
+    const schemaId = registrationSchemaId();
+    return schemaId === undefined
+        ? []
+        : registrationRows(formAnnotations.values(), {
+              schemaId,
+              instanceId: instance.id,
+              patientId: instance.patient.id,
+              laterality: (instance.laterality ?? null) as EyeLaterality,
+              currentId: inUseId,
+              imageLaterality: (id) =>
+                  (instances.get(id)?.laterality ?? null) as EyeLaterality,
+          });
+}
+
+/** This eye's loaded 2D images, in strip order. */
+export function loadedEyeImages(
+    catalogue: readonly string[],
+    win: {
+        images: ReadonlyMap<string, { is2D: boolean; instance: ImageMeta }>;
+        twins: ReadonlyMap<string, string>;
+    },
+    eye: string,
+): ({ id: string } & ImageName)[] {
+    return catalogue.flatMap((imageId) => {
+        const image = win.images.get(imageId);
+        return image?.is2D && eyeKey(image.instance) === eye
+            ? [
+                  {
+                      id: image.instance.id,
+                      ...imageName(
+                          image.instance,
+                          win.twins.get(imageId) ?? "",
+                      ),
+                  },
+              ]
+            : [];
+    });
 }
 
 export type ImageLine = {
@@ -145,31 +210,47 @@ export function imageLines(
     return [thisId, ...loadedHere, ...unloaded].map(line);
 }
 
-/** The registration a viewport's point tool shows: the eye's current one on a 2D image; editable only while P is armed and it is yours. */
+/** What P binds in a viewport. */
+export interface PointTarget {
+    /** The registration this viewport shows and P binds; null when none. */
+    id: number | null;
+    /** P may move its points. */
+    canEdit: boolean;
+    /** Why P can't place here; null when it can, or when P does not apply. */
+    reason: string | null;
+}
+
+/** P binds the selected pointset while armed; otherwise the viewport shows the eye's registration in use, read-only. */
 export function pointBinding(input: {
     armed: boolean;
     hidden: boolean;
     is2D: boolean;
-    current: FormAnnotationGET | null;
+    selected: FormAnnotationGET | null;
+    inUse: FormAnnotationGET | null;
     canEdit: (annotation: FormAnnotationGET) => boolean;
-}): { id: number; canEdit: boolean } | null {
-    if (input.hidden || !input.is2D || !input.current) return null;
+}): PointTarget {
+    if (input.hidden || !input.is2D)
+        return { id: null, canEdit: false, reason: null };
+    const editing = input.armed ? input.selected : null;
     return {
-        id: input.current.id,
-        canEdit: input.armed && input.canEdit(input.current),
+        id: (editing ?? input.inUse)?.id ?? null,
+        canEdit: editing !== null && input.canEdit(editing),
+        reason: input.selected ? null : "Select a pointset to add points",
     };
 }
 
-/** Window-wide: each eye's current registration, and each registration's last point save. */
+/** Window-wide: each eye's registration in use (Display › Registration), and each registration's last point save. */
 export class PointsetState {
     private readonly currentIds = new SvelteMap<string, number>();
     readonly sync = new SvelteMap<number, SyncState>();
 
+    /** The id of the eye's registration in use; undefined when unset or deleted. */
     currentId(eye: string): number | undefined {
-        return this.currentIds.get(eye);
+        const id = this.currentIds.get(eye);
+        return id !== undefined && formAnnotations.has(id) ? id : undefined;
     }
 
-    /** The eye's current registration; null when unset or deleted. */
+    /** The eye's registration in use; null when unset or deleted. */
     current(eye: string): FormAnnotationGET | null {
         const id = this.currentIds.get(eye);
         return id === undefined ? null : (formAnnotations.get(id) ?? null);

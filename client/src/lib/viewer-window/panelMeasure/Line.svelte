@@ -1,6 +1,6 @@
 <!--
 @component
-One distance line in Layers: "Line n · length" and its two points, with Delete at the right. The current line is marked; hover or focus inside the row highlights the line.
+One distance line in Layers: "Line n" with its length and two points, with Delete at the right. The selected line is marked; hover or focus inside the row highlights the line.
 -->
 <script lang="ts">
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
@@ -13,6 +13,7 @@ One distance line in Layers: "Line n · length" and its two points, with Delete 
         n,
         length,
         current,
+        onselect,
         onhighlight,
         ondelete,
     }: {
@@ -21,8 +22,9 @@ One distance line in Layers: "Line n · length" and its two points, with Delete 
         n: number;
         length: string;
         current: boolean;
+        onselect: () => void;
         onhighlight: (on: boolean) => void;
-        ondelete: () => void;
+        ondelete: (event: MouseEvent) => void;
     } = $props();
 
     const point = (p: { x: number; y: number }) =>
@@ -31,27 +33,22 @@ One distance line in Layers: "Line n · length" and its two points, with Delete 
 
 <LayerRow
     label="Line {n}"
-    name="Line {n} · {length}"
+    name="Line {n}"
     selected={current}
-    aria-current={current ? "true" : undefined}
+    {onselect}
     onpointerenter={() => onhighlight(true)}
     onpointerleave={() => onhighlight(false)}
     onfocusin={() => onhighlight(true)}
     onfocusout={() => onhighlight(false)}
 >
     {#snippet icons()}
-        <IconButton
-            size="icon-xs"
-            label="Delete line {n}"
-            data-delete-line
-            onclick={ondelete}
-        >
+        <IconButton size="icon-xs" label="Delete line {n}" onclick={ondelete}>
             <TrashCan />
         </IconButton>
     {/snippet}
     <p
         class="ps-8 pe-2 pb-1 text-helper-text-01 text-text-secondary tabular-nums"
     >
-        {point(line.start)} – {point(line.end)}
+        {length} · {point(line.start)} – {point(line.end)}
     </p>
 </LayerRow>

@@ -107,12 +107,14 @@
                 return workspace.etdrsFraction;
             },
         },
+        mainViewerContext.selection,
     );
     // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
     const distance = workspace.distanceLinesFor(image.image_id);
     const layers: LayersTarget = {
         viewerContext,
         mainViewerContext,
+        selection: mainViewerContext.selection,
         grids,
         distance,
         localizer,
@@ -147,7 +149,6 @@
         return scaleOf({
             stored: image.resolution,
             grids: grids.scaleGrids(),
-            currentId: grids.currentId,
             shown: grids.shownKeys(),
             pick: workspace.scalePicks.get(image.image_id),
             fraction: workspace.etdrsFraction,
@@ -161,6 +162,7 @@
                 distance,
                 () => scale,
                 () => workspace.armedTool === "distance",
+                mainViewerContext.selection,
             ),
         ),
     );
@@ -287,14 +289,19 @@
         };
     });
 
-    // The eye's current registration: its points show here, and P places them while armed.
+    const selectedPointset = $derived.by(() => {
+        const id = mainViewerContext.selection.pointsetId();
+        return id === undefined ? null : (formAnnotations.get(id) ?? null);
+    });
+    // The eye's registration in use shows here; while P is armed with a pointset selected, P shows and places that one.
     // An armed form point field takes the clicks, so the registration stays read-only then.
     const pointTarget = $derived(
         pointBinding({
             armed: workspace.armedTool === "point" && !pointArming.session,
             hidden: registrationHidden,
             is2D: image.is2D,
-            current: viewerWindowContext.pointsets.current(
+            selected: selectedPointset,
+            inUse: viewerWindowContext.pointsets.current(
                 eyeKey(image.instance),
             ),
             canEdit: (annotation) => globalContext.canEdit(annotation),
@@ -332,8 +339,8 @@
         );
     });
     // Primitives: a drag rewrites the registration, which must not remount the tool mid-drag.
-    const pointId = $derived(pointTarget?.id);
-    const pointEditable = $derived(pointTarget?.canEdit ?? false);
+    const pointId = $derived(pointTarget.id ?? undefined);
+    const pointEditable = $derived(pointTarget.canEdit);
     let pointTool = $state.raw<ReturnType<typeof bindRegistrationPointTool>>();
     $effect(() => {
         const id = pointId;
