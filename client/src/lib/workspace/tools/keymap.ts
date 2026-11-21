@@ -68,6 +68,13 @@ export class Keymap implements ViewerEventListener {
         }
         if (event.ctrlKey || event.metaKey || event.altKey) return;
         if (event.key === "Escape") {
+            // An open tooltip takes Esc first (bits-ui closes it on the document); only the next Esc acts here.
+            if (
+                document.querySelector(
+                    '[data-slot="tooltip-content"]:not([data-state="closed"])',
+                )
+            )
+                return;
             // A strip tile only fits its view; a viewport's Esc also acts on its image's distance lines.
             const lines = viewerContext.isStripTile
                 ? undefined

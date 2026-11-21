@@ -185,6 +185,21 @@ describe("Keymap", () => {
         expect(viewer.transform).toEqual(viewer.getInitTransform());
     });
 
+    it("Esc while a tooltip is open leaves the view for the tooltip to close", () => {
+        const viewer = viewerOf("colour");
+        viewer.zoom(10, 10, 3);
+        const zoomed = { ...viewer.transform };
+        const tooltip = document.createElement("div");
+        tooltip.dataset.slot = "tooltip-content";
+        tooltip.dataset.state = "delayed-open";
+        document.body.append(tooltip);
+        press(viewer, { key: "Escape", code: "Escape" });
+        expect(viewer.transform).toEqual(zoomed);
+        tooltip.remove();
+        press(viewer, { key: "Escape", code: "Escape" });
+        expect(viewer.transform).toEqual(viewer.getInitTransform());
+    });
+
     it("Esc drops a half-drawn distance line first; the next Esc fits the view and clears the image's lines, not another image's or from a strip tile", () => {
         const workspace = new Workspace();
         const viewer = viewerOf("colour", { workspace, imageId: "a" });
