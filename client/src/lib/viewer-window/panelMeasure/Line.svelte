@@ -24,7 +24,7 @@ One distance line in Layers: "Line n" with its length and two points, with Delet
         current: boolean;
         onselect: () => void;
         onhighlight: (on: boolean) => void;
-        ondelete: () => void;
+        ondelete: (event: MouseEvent) => void;
     } = $props();
 
     const point = (p: { x: number; y: number }) =>
@@ -42,12 +42,7 @@ One distance line in Layers: "Line n" with its length and two points, with Delet
     onfocusout={() => onhighlight(false)}
 >
     {#snippet icons()}
-        <IconButton
-            size="icon-xs"
-            label="Delete line {n}"
-            data-delete-line
-            onclick={ondelete}
-        >
+        <IconButton size="icon-xs" label="Delete line {n}" onclick={ondelete}>
             <TrashCan />
         </IconButton>
     {/snippet}

@@ -25,6 +25,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
     import { getContext, untrack } from "svelte";
+    import { focusAfterDelete } from "./focusAfterDelete";
     import LayerSection from "./LayerSection.svelte";
     import SegmentationDeleteModal from "./SegmentationDeleteModal.svelte";
 
@@ -107,13 +108,18 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     $effect(() => {
         if (segmentationContext.failed) untrack(() => !open && ontoggle());
     });
-    function askDelete(segmentation: Segmentation) {
+    let fallback = () => {};
+    function askDelete(segmentation: Segmentation, event: MouseEvent) {
+        fallback = focusAfterDelete(
+            (event.currentTarget as Element).closest("[data-layer-row]"),
+            header ?? null,
+        );
         deleting = segmentation;
         deleteOpen = true;
     }
 </script>
 
-<div bind:this={header}>
+<div bind:this={header} data-layer-section="segmentations">
     <LayerSection title="Segmentations" {count} {open} {ontoggle}>
         {#snippet action()}
             <!-- Stays mounted so the progress text is announced. -->
@@ -218,7 +224,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     segmentation={deleting}
     {segmentationContext}
     bind:open={deleteOpen}
-    onfallback={() => header?.querySelector<HTMLElement>("button")?.focus()}
+    onfallback={() => fallback()}
 />
 {#if segmentationContext.createDialog}
     {#key segmentationContext.createDialog}

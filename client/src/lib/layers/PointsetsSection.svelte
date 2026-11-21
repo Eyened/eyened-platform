@@ -21,6 +21,7 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
     import type { FormAnnotationGET } from "../../types/openapi_types";
     import LayerRow from "./LayerRow.svelte";
     import LayerSection from "./LayerSection.svelte";
+    import { focusAfterDelete } from "./focusAfterDelete";
     import {
         eyeKey,
         eyeRegistrationRows,
@@ -80,9 +81,10 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
 
     let deleting: FormAnnotationGET | null = $state(null);
     let deleteOpen = $state(false);
+    let fallback = () => {};
 </script>
 
-<div bind:this={section}>
+<div bind:this={section} data-layer-section="pointsets">
     <LayerSection title="Pointsets" count={rows.length} {open} {ontoggle}>
         {#snippet action()}
             {#if canCreate}
@@ -136,7 +138,13 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
                                     <IconButton
                                         size="icon-xs"
                                         label="Delete"
-                                        onclick={() => {
+                                        onclick={(e) => {
+                                            fallback = focusAfterDelete(
+                                                (
+                                                    e.currentTarget as Element
+                                                ).closest("[data-layer-row]"),
+                                                section ?? null,
+                                            );
                                             deleting = row;
                                             deleteOpen = true;
                                         }}
@@ -171,5 +179,5 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
 <RegistrationDeleteModal
     registration={deleting}
     bind:open={deleteOpen}
-    onfallback={() => section?.querySelector<HTMLElement>("button")?.focus()}
+    onfallback={() => fallback()}
 />

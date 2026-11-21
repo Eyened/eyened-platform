@@ -3,6 +3,7 @@ import {
     fireEvent,
     render,
     screen,
+    waitFor,
     within,
 } from "@testing-library/svelte";
 import { tick } from "svelte";
@@ -24,6 +25,12 @@ vi.mock(
     "$lib/viewer-window/panelSegmentation/NewSegmentationRegion.svelte",
     () => ({ default: () => {} }),
 );
+vi.mock("$lib/data/api", async (original) => ({
+    ...(await original<typeof import("$lib/data/api")>()),
+    deleteSegmentation: vi.fn(async (id: number) => {
+        segmentations.delete(id);
+    }),
+}));
 
 const { default: LayersPanel } = await import("./LayersPanel.svelte");
 
@@ -253,5 +260,43 @@ describe("LayersPanel", () => {
         });
         expect(within(pane).getByText("512, 498")).toBeInTheDocument();
         expect(within(pane).getByText("801, 470")).toBeInTheDocument();
+    });
+
+    it("Delete in the pane removes the selected segmentation, empties the pane and moves focus to the next row", async () => {
+        for (const [id, name] of [
+            [1, "Drusen v2"],
+            [2, "Geographic atrophy"],
+        ] as const)
+            segmentations.set(
+                id,
+                graderSegmentation(id, ME, name, {
+                    image_id: "inst-a",
+                } as never),
+            );
+        const ws = workspaceWith(1);
+        const a = attach(ws, 0, "inst-a");
+        renderPanel(ws);
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Drusen v2" }),
+        );
+        const pane = screen.getByRole("region", { name: "Drusen v2" });
+        await fireEvent.click(
+            within(pane).getByRole("button", { name: "Delete" }),
+        );
+        const dialog = await screen.findByRole("dialog");
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Delete" }),
+        );
+        await waitFor(() => expect(a.selection.value).toBeNull());
+        await waitFor(
+            () =>
+                expect(
+                    screen.getByRole("button", { name: "Geographic atrophy" }),
+                ).toHaveFocus(),
+            { timeout: 3000 },
+        );
+        expect(
+            screen.getByText("Select a layer to see its options."),
+        ).toBeInTheDocument();
     });
 });

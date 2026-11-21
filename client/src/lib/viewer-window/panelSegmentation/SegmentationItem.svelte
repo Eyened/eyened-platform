@@ -32,7 +32,7 @@ One segmentation row in Layers: color, the name (selects it) and the type letter
         /** Show this slice's area under the row. */
         showArea: boolean;
         /** Delete asks first; the section owns the modal, because a delete unmounts the row. */
-        ondelete: (segmentation: Segmentation) => void;
+        ondelete: (segmentation: Segmentation, event: MouseEvent) => void;
     }
 
     let { segmentation, showArea, ondelete }: Props = $props();
@@ -121,7 +121,7 @@ One segmentation row in Layers: color, the name (selects it) and the type letter
             <IconButton
                 size="icon-xs"
                 label="Delete"
-                onclick={() => ondelete(segmentation)}
+                onclick={(e) => ondelete(segmentation, e)}
             >
                 <TrashCan />
             </IconButton>

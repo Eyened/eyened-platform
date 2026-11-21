@@ -58,7 +58,7 @@ describe("DistanceSection", () => {
         expect(distance.lines).toHaveLength(2);
         await vi.waitFor(() =>
             expect(
-                screen.getByRole("button", { name: "Delete line 1" }),
+                screen.getByRole("button", { name: "Line 1" }),
             ).toHaveFocus(),
         );
         // Focus now sits in Line 1's row, so Line 1 is the highlighted one.

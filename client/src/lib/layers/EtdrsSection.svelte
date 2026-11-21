@@ -25,6 +25,7 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
     import LayerRow from "./LayerRow.svelte";
     import LayerSection from "./LayerSection.svelte";
     import type { Scale } from "./imageScale";
+    import { focusAfterDelete } from "./focusAfterDelete";
 
     let {
         grids,
@@ -51,7 +52,12 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
 
     let deleting: FormAnnotationGET | null = $state(null);
     let deleteOpen = $state(false);
-    function askDelete(grid: FormAnnotationGET) {
+    let fallback = () => {};
+    function askDelete(grid: FormAnnotationGET, event: MouseEvent) {
+        fallback = focusAfterDelete(
+            (event.currentTarget as Element).closest("[data-layer-row]"),
+            section ?? null,
+        );
         deleting = grid;
         deleteOpen = true;
     }
@@ -95,7 +101,7 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
     }
 </script>
 
-<div bind:this={section}>
+<div bind:this={section} data-layer-section="etdrs">
     <LayerSection title="ETDRS grids" {count} {open} {ontoggle}>
         {#snippet action()}
             <Button
@@ -150,7 +156,7 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
                                         ? undefined
                                         : grid.id,
                                 )}
-                            ondelete={() => askDelete(grid)}
+                            ondelete={(e) => askDelete(grid, e)}
                         />
                     </li>
                 {/each}
@@ -198,5 +204,5 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
     grid={deleting}
     {grids}
     bind:open={deleteOpen}
-    onfallback={() => section?.querySelector<HTMLElement>("button")?.focus()}
+    onfallback={() => fallback()}
 />

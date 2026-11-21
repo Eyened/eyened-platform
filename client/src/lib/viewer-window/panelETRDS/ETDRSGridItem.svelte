@@ -31,7 +31,7 @@ One ETDRS grid on this image in Layers: the creator's name (sets or unsets the c
         scale: boolean;
         ontoggleshown: () => void;
         ontogglecurrent: () => void;
-        ondelete: () => void;
+        ondelete: (event: MouseEvent) => void;
     } = $props();
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");

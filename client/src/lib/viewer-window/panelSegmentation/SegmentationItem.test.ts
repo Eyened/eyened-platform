@@ -54,7 +54,7 @@ describe("SegmentationItem", () => {
     it("Delete hands the segmentation to the section, and the row passes axe", async () => {
         const { ondelete, drusen, view } = renderRow();
         await fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-        expect(ondelete).toHaveBeenCalledWith(drusen);
+        expect(ondelete).toHaveBeenCalledWith(drusen, expect.any(MouseEvent));
         await expectNoAxeViolations(view.container);
     });
 });

@@ -6,7 +6,7 @@ Layers › Distance lines for the selected viewport: one row per line on this im
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import LineRow from "$lib/viewer-window/panelMeasure/Line.svelte";
-    import { getContext, tick } from "svelte";
+    import { getContext } from "svelte";
     import {
         lengthText,
         type DistanceLines,
@@ -14,6 +14,7 @@ Layers › Distance lines for the selected viewport: one row per line on this im
     } from "./distanceLines.svelte";
     import type { Scale } from "./imageScale";
     import LayerSection from "./LayerSection.svelte";
+    import { focusAfterDelete } from "./focusAfterDelete";
 
     let {
         distance,
@@ -35,21 +36,17 @@ Layers › Distance lines for the selected viewport: one row per line on this im
         distance.lines.filter((line) => line.index === viewerContext.index),
     );
 
-    // The pressed Delete goes with its row, so focus moves to the next line's Delete, else the previous one, else the header.
-    async function remove(line: Line, i: number) {
+    function remove(line: Line, event: MouseEvent) {
+        const focus = focusAfterDelete(
+            (event.currentTarget as Element).closest("[data-layer-row]"),
+            section ?? null,
+        );
         distance.remove(line);
-        await tick();
-        const deletes =
-            section?.querySelectorAll<HTMLElement>("[data-delete-line]") ?? [];
-        (
-            deletes[i] ??
-            deletes[i - 1] ??
-            section?.querySelector<HTMLElement>("button")
-        )?.focus();
+        focus();
     }
 </script>
 
-<div bind:this={section}>
+<div bind:this={section} data-layer-section="distance">
     <LayerSection title="Distance lines" count={lines.length} {open} {ontoggle}>
         <ul>
             {#each lines as line, i (line)}
@@ -67,7 +64,7 @@ Layers › Distance lines for the selected viewport: one row per line on this im
                             )}
                         onhighlight={(on) =>
                             (distance.highlighted = on ? line : undefined)}
-                        ondelete={() => remove(line, i)}
+                        ondelete={(e) => remove(line, e)}
                     />
                 </li>
             {/each}
