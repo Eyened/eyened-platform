@@ -251,6 +251,35 @@ describe("ToolOptionsBar", () => {
         expect(screen.queryByRole("radio", { name: "Fovea" })).toBeNull();
     });
 
+    it("Place ETDRS and the circle set the radius fraction on commit; it stays beside Place ETDRS's reason", async () => {
+        const { unmount } = armWith("etdrs", {
+            etdrsTarget: { name: "Your grid 7", reason: null },
+        });
+        const field = screen.getByLabelText("Radius fraction");
+        await fireEvent.input(field, { target: { value: "0.9" } });
+        await fireEvent.change(field);
+        expect(field).toHaveValue(0.9);
+        for (const bad of ["", "1.5"]) {
+            await fireEvent.input(field, { target: { value: bad } });
+            await fireEvent.keyDown(field, { key: "Enter" });
+            expect(field).toHaveValue(0.9);
+        }
+        unmount();
+
+        armWith("etdrs", {
+            etdrsTarget: {
+                name: "Your grid 7",
+                reason: "This grid is on another image.",
+            },
+        });
+        expect(screen.getByLabelText("Radius fraction")).toBeInTheDocument();
+        expect(screen.queryByRole("radio", { name: "Fovea" })).toBeNull();
+        cleanup();
+
+        armWith("circle", { scale: STORED });
+        expect(screen.getByLabelText("Radius fraction")).toBeInTheDocument();
+    });
+
     it("Point steps through the registration's points: Point – / 3, then Point 1 / 3", async () => {
         const tool = new PointTool({ sparse: true });
         tool.points = [{ x: 1, y: 1 }, null, { x: 3, y: 3 }];
@@ -330,7 +359,7 @@ describe("ToolOptionsBar when short", () => {
         );
     });
 
-    it("the scale and Fovea | Disc edge never fold: Place ETDRS folds Delete, then Keep grid size; the circle folds its sizes", async () => {
+    it("the scale and Fovea | Disc edge never fold: Place ETDRS folds Delete, then Radius fraction, then Keep grid size; the circle folds its sizes", async () => {
         const renderTool = (px: number, tool: ToolId, layers: object) => {
             barWidth(px);
             const ws = workspaceWith(1);

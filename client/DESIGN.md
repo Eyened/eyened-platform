@@ -83,7 +83,7 @@ shadcn's colour names do not exist.
 | `content-switcher-selected`                                              | `rgba(141,141,141,0.24)`                                  | Selected content switcher option                  |
 | `tag-background-gray` / `tag-color-gray` / `tag-hover-gray`              | `#525252` / `#f4f4f4` / `#636363`                         | Tags; tag close button hover                      |
 
-A field inside a dialog uses `field-02`, `field-hover-02`, `border-strong-02` automatically (`in-dialog:` variant in `app.css`, Carbon's Layer). A tag popover's and a filter popover's fields use the 02 set too (`[data-slot="tag-popover"]`, `[data-slot="filter-popover"]`), and a tile on a study block is one layer up (`in-study:`, Carbon's Layer).
+A field inside a dialog uses `field-02`, `field-hover-02`, `border-strong-02` automatically (`in-dialog:` variant in `app.css`, Carbon's Layer). A tag popover's, a filter popover's and the viewer options bar's fields use the 02 set too (`[data-slot="tag-popover"]`, `[data-slot="filter-popover"]`, `[data-slot="tool-options"]`), and a tile on a study block is one layer up (`in-study:`, Carbon's Layer).
 
 ## Typography
 

@@ -87,9 +87,14 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
             case "distance":
                 return ["scale", "delete"];
             case "circle":
-                return ["circleSize", "scale"];
+                return ["circleSize", "scale", "radiusFraction"];
             case "etdrs":
-                return ["etdrsSlot", "keepGridSize", "delete"];
+                return [
+                    "etdrsSlot",
+                    "keepGridSize",
+                    "radiusFraction",
+                    "delete",
+                ];
             case "point":
                 if (!point) return [];
                 return point.canEdit ? ["pointStep", "delete"] : ["pointStep"];
@@ -97,12 +102,14 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
                 return [];
         }
     }
-    // A reason replaces the options; the circle keeps its scale so it can be set here. Size shows nothing without an image, so it is left out.
+    // A reason replaces the options, but the circle keeps its scale and Place ETDRS its fraction, so they can be set here. Size shows nothing without an image, so it is left out.
     const options = $derived<OptionId[]>(
         reason
             ? tool?.id === "circle"
                 ? ["scale"]
-                : []
+                : tool?.id === "etdrs"
+                  ? ["radiusFraction"]
+                  : []
             : optionsFor(tool?.id).filter(
                   (id) => id !== "size" || layers?.viewerContext.image,
               ),

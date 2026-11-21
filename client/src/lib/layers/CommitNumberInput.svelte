@@ -7,6 +7,8 @@ A number field that applies a positive, in-range value on Enter, blur or a step,
 
     let {
         labelText,
+        hideLabel = false,
+        size = "md",
         value,
         step,
         min,
@@ -14,6 +16,8 @@ A number field that applies a positive, in-range value on Enter, blur or a step,
         oncommit,
     }: {
         labelText: string;
+        hideLabel?: boolean;
+        size?: "sm" | "md";
         value: number;
         step: number;
         min?: number;
@@ -36,6 +40,8 @@ A number field that applies a positive, in-range value on Enter, blur or a step,
 
 <NumberInput
     {labelText}
+    {hideLabel}
+    {size}
     value={String(value)}
     step={String(step)}
     min={min === undefined ? undefined : String(min)}

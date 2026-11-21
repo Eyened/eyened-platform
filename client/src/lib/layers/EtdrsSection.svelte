@@ -21,7 +21,6 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import type { FormAnnotationGET } from "../../types/openapi_types";
     import { AI_GRID, aiGrid, type GridLayers } from "./gridLayers.svelte";
-    import CommitNumberInput from "./CommitNumberInput.svelte";
     import GridDeleteModal from "./GridDeleteModal.svelte";
     import LayerSection from "./LayerSection.svelte";
 
@@ -97,16 +96,6 @@ The section places nothing: a row sets the current grid; New also arms Place ETD
             >
         {/snippet}
         {#if count > 0}
-            <div class="px-4 py-2">
-                <CommitNumberInput
-                    labelText="Radius fraction"
-                    value={workspace.etdrsFraction}
-                    step={0.01}
-                    min={0.01}
-                    max={1}
-                    oncommit={(v) => (workspace.etdrsFraction = v)}
-                />
-            </div>
             <ul>
                 {#if ai}
                     <li>
