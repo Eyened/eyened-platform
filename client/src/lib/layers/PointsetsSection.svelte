@@ -26,6 +26,7 @@ The name sets the eye's current registration for every viewport of that eye; P p
     import { getContext } from "svelte";
     import type { FormAnnotationGET } from "../../types/openapi_types";
     import { imageName } from "$lib/workspace/imageMeta";
+    import LayerRow from "./LayerRow.svelte";
     import LayerSection from "./LayerSection.svelte";
     import { eyeKey, imageLines, registrationRows } from "./pointsets";
     import RegistrationDeleteModal from "./RegistrationDeleteModal.svelte";
@@ -134,29 +135,24 @@ The name sets the eye's current registration for every viewport of that eye; P p
                 {#each rows as row (row.id)}
                     {@const current = row.id === currentId}
                     <li>
-                        <div
-                            class="border-s-3 {current
-                                ? 'border-border-interactive bg-layer-selected-01'
-                                : 'border-transparent'}"
-                            role="group"
-                            aria-label="Registration [{row.id}]"
+                        <LayerRow
+                            label="Registration [{row.id}]"
+                            name="Registration [{row.id}]"
+                            selected={current}
+                            onselect={() =>
+                                pointsets.setCurrent(
+                                    eye,
+                                    current ? undefined : row.id,
+                                )}
                         >
-                            <div class="flex items-start gap-1 py-1 ps-7 pe-2">
-                                <button
-                                    type="button"
-                                    class="min-h-6 min-w-0 flex-1 px-1 text-start text-body-compact-01 [overflow-wrap:anywhere] text-text-primary hover:bg-layer-hover-01 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-                                    aria-pressed={current}
-                                    onclick={() =>
-                                        pointsets.setCurrent(
-                                            eye,
-                                            current ? undefined : row.id,
-                                        )}>Registration [{row.id}]</button
-                                >
+                            {#snippet tags()}
                                 <Tag
                                     >{row.creator.id === globalContext.user.id
                                         ? "Mine"
                                         : row.creator.name}</Tag
                                 >
+                            {/snippet}
+                            {#snippet icons()}
                                 {#if globalContext.canEdit(row)}
                                     <IconButton
                                         size="icon-xs"
@@ -169,7 +165,7 @@ The name sets the eye's current registration for every viewport of that eye; P p
                                         <TrashCan />
                                     </IconButton>
                                 {/if}
-                            </div>
+                            {/snippet}
                             {#if current}
                                 {@const lines = imageLines(
                                     row.form_data,
@@ -219,7 +215,7 @@ The name sets the eye's current registration for every viewport of that eye; P p
                                     {/if}
                                 </div>
                             {/if}
-                        </div>
+                        </LayerRow>
                     </li>
                 {/each}
             </ul>

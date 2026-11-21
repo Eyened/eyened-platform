@@ -1,9 +1,10 @@
 <!--
 @component
-One distance line in Layers: "Line n · length", its two points, and Delete. The current line is marked; hover or focus inside the row highlights the line.
+One distance line in Layers: "Line n · length" and its two points, with Delete at the right. The current line is marked; hover or focus inside the row highlights the line.
 -->
 <script lang="ts">
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import LayerRow from "$lib/layers/LayerRow.svelte";
     import type { Line } from "$lib/layers/distanceLines.svelte";
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
 
@@ -28,32 +29,29 @@ One distance line in Layers: "Line n · length", its two points, and Delete. The
         `(${p.x.toFixed(0)}, ${p.y.toFixed(0)})`;
 </script>
 
-<div
-    class="flex items-start gap-1 border-s-3 py-1 ps-7 pe-2 focus-within:bg-layer-hover-01 hover:bg-layer-hover-01 {current
-        ? 'border-border-interactive bg-layer-selected-01'
-        : 'border-transparent'}"
-    role="group"
-    aria-label="Line {n}"
+<LayerRow
+    label="Line {n}"
+    name="Line {n} · {length}"
+    selected={current}
     aria-current={current ? "true" : undefined}
     onpointerenter={() => onhighlight(true)}
     onpointerleave={() => onhighlight(false)}
     onfocusin={() => onhighlight(true)}
     onfocusout={() => onhighlight(false)}
 >
-    <div class="min-w-0 flex-1 px-1">
-        <p class="text-body-compact-01 text-text-primary tabular-nums">
-            Line {n} · {length}
-        </p>
-        <p class="text-helper-text-01 text-text-secondary tabular-nums">
-            {point(line.start)} – {point(line.end)}
-        </p>
-    </div>
-    <IconButton
-        size="icon-xs"
-        label="Delete line {n}"
-        data-delete-line
-        onclick={ondelete}
+    {#snippet icons()}
+        <IconButton
+            size="icon-xs"
+            label="Delete line {n}"
+            data-delete-line
+            onclick={ondelete}
+        >
+            <TrashCan />
+        </IconButton>
+    {/snippet}
+    <p
+        class="ps-8 pe-2 pb-1 text-helper-text-01 text-text-secondary tabular-nums"
     >
-        <TrashCan />
-    </IconButton>
-</div>
+        {point(line.start)} – {point(line.end)}
+    </p>
+</LayerRow>
