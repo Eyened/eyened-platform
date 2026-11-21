@@ -75,10 +75,17 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
         e.preventDefault();
         input.focus();
     }
+
+    let trigger: HTMLElement | null = $state(null);
+    // Safari doesn't focus a clicked button, so bits-ui would return focus to the body; send it to New.
+    function onCloseAutoFocus(e: Event) {
+        e.preventDefault();
+        trigger?.focus();
+    }
 </script>
 
 <Popover.Root bind:open>
-    <Popover.Trigger>
+    <Popover.Trigger bind:ref={trigger}>
         {#snippet child({ props })}
             <IconButton
                 {...props}
@@ -92,6 +99,7 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
         bind:ref={content}
         align="end"
         {onOpenAutoFocus}
+        {onCloseAutoFocus}
         class="flex flex-col gap-2"
     >
         <ComboBox

@@ -235,8 +235,6 @@ describe("SegmentationsSection", () => {
 
     it("closing the popover returns focus to New", async () => {
         renderSection();
-        // A real click focuses the button; bits-ui returns focus to what had it.
-        screen.getByRole("button", { name: "New segmentation" }).focus();
         await fireEvent.click(
             screen.getByRole("button", { name: "New segmentation" }),
         );
