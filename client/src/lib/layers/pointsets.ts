@@ -244,8 +244,10 @@ export class PointsetState {
     private readonly currentIds = new SvelteMap<string, number>();
     readonly sync = new SvelteMap<number, SyncState>();
 
+    /** The id of the eye's registration in use; undefined when unset or deleted. */
     currentId(eye: string): number | undefined {
-        return this.currentIds.get(eye);
+        const id = this.currentIds.get(eye);
+        return id !== undefined && formAnnotations.has(id) ? id : undefined;
     }
 
     /** The eye's registration in use; null when unset or deleted. */
