@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { entry, NO_URL, workspaceWith } from "./testUtils";
 import { Workspace } from "./workspace.svelte";
 import { pointArming } from "$lib/forms/pointArming.svelte";
-import { readLayerSections } from "./workspacePrefs";
 
 const ids = (ws: Workspace) => ws.slots.map((s) => s.imageId);
 
@@ -134,41 +133,5 @@ describe("Draw toggles", () => {
         ws.toggleTool("brush");
         expect(ws.armedTool).toBeNull();
         expect([ws.questionable, ws.dilateErode]).toEqual([false, false]);
-    });
-});
-
-describe("Layers sections", () => {
-    it("arming a Draw tool opens a closed Segmentations section and stores it; no tool closes it", () => {
-        localStorage.clear();
-        const ws = new Workspace();
-        ws.setLayerSection("segmentations", false);
-        ws.arm("zoom");
-        expect(ws.layerSections.segmentations).toBe(false);
-        ws.arm("polygon");
-        expect(ws.layerSections.segmentations).toBe(true);
-        expect(readLayerSections().segmentations).toBe(true);
-        ws.arm("zoom");
-        expect(ws.layerSections.segmentations).toBe(true);
-        localStorage.clear();
-    });
-
-    it("D opens Distance lines, G ETDRS grids and P Pointsets; C opens nothing", () => {
-        localStorage.clear();
-        const ws = new Workspace();
-        for (const id of ["distance", "etdrs", "pointsets"] as const)
-            ws.setLayerSection(id, false);
-        ws.arm("circle");
-        expect(ws.layerSections).toMatchObject({
-            distance: false,
-            etdrs: false,
-            pointsets: false,
-        });
-        ws.arm("distance");
-        expect(ws.layerSections.distance).toBe(true);
-        ws.arm("etdrs");
-        expect(ws.layerSections.etdrs).toBe(true);
-        ws.arm("point");
-        expect(ws.layerSections.pointsets).toBe(true);
-        localStorage.clear();
     });
 });

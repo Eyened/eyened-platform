@@ -69,7 +69,7 @@ The Layers panel body: Layers and Display tabs, the selected viewport's name, th
         bySection.display.length > 0 ? tab : "layers",
     );
 
-    // Kept on the workspace, not per viewport, so a section stays open when the selection moves and a Draw tool can open Segmentations.
+    // Kept on the workspace, not per viewport, so a section stays open when the selection moves.
     function toggle(id: LayerSectionId) {
         workspace.setLayerSection(id, !workspace.layerSections[id]);
     }
