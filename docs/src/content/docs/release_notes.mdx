@@ -193,6 +193,14 @@ database.
 - **The viewer says when it can't run.** Without WebGL 2 it shows a message instead of a blank
   page. When the browser drops the graphics context, it shows "The viewer stopped" with a Reload
   page button; before, that message never appeared.
+- **The right column shows Layers or Grading, one at a time.** The grade route opens on
+  Grading, `/view` on Layers; the shown panel's icon folds the column. Layers has two tabs:
+  Layers (segmentations, ETDRS grids, pointsets, distance lines) and Display (Blend, En-face
+  projection, Localizer lines).
+- **Layers rows show colour and name; eye and Delete appear on hover or focus.** A hidden
+  layer keeps its crossed eye. Long names keep to one line, with the full name in a tooltip.
+- **The ETDRS radius fraction is in the Place ETDRS and ETDRS circle options bar**, no longer
+  in ETDRS grids. Arming a tool no longer opens its Layers section.
 
 ## v2026.09.0
 
