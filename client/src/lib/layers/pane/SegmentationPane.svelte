@@ -13,6 +13,7 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import SliceArea from "$lib/layers/SliceArea.svelte";
     import SyncStatus from "$lib/layers/SyncStatus.svelte";
+    import { toHex } from "$lib/utils";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import Tagger from "$lib/tags/Tagger.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
@@ -25,6 +26,7 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     import MultiFeatureSelector from "$lib/viewer-window/panelSegmentation/MultiFeatureSelector.svelte";
     import ReferenceSegmentationPanel from "$lib/viewer-window/panelSegmentation/ReferenceSegmentationPanel.svelte";
     import type { Segmentation } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
+    import { groupTitle } from "$lib/viewer-window/panelSegmentation/segmentationUtils";
     import ThresholdSlider from "$lib/viewer-window/panelSegmentation/ThresholdSlider.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
@@ -63,6 +65,14 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     const sliceState = $derived(item.getSegmentationState(viewerContext.index));
     let duplicateOpen = $state(false);
     let rare: string[] = $state([]);
+    const me = globalContext.user.id;
+    // Read once at mount, as the row's picker does, so the derived read below never assigns a colour.
+    mainViewerContext.getFeatureColor(item.segmentation);
+    const swatch = $derived(
+        isMulti
+            ? undefined
+            : toHex(mainViewerContext.getFeatureColor(item.segmentation)),
+    );
 
     function quickDuplicate() {
         duplicate(
@@ -83,7 +93,8 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
 <PaneHeader
     {id}
     name={segmentation.feature.name}
-    type="Segmentation · {rep}"
+    type="Segmentation · {groupTitle(segmentation, me)}"
+    {swatch}
     {remove}
 >
     {#snippet status()}

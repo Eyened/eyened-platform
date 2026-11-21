@@ -19,7 +19,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
         getSegmentationKey,
         type Segmentation,
     } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
-    import { groupByCreator } from "$lib/viewer-window/panelSegmentation/segmentationUtils";
+    import { segmentationGroups } from "$lib/viewer-window/panelSegmentation/segmentationUtils";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import { getContext, untrack } from "svelte";
     import { focusAfterDelete } from "./focusAfterDelete";
@@ -45,29 +45,13 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     const { segmentationContext } = mainViewerContext;
     const me = globalContext.user.id;
 
-    type Group = { key: string; title: string; rows: Segmentation[] };
-    const groups: Group[] = $derived.by(() => {
-        const byCreator = groupByCreator(
+    const groups = $derived(
+        segmentationGroups(
+            segmentationContext.modelSegmentations,
             segmentationContext.graderSegmentations,
-        );
-        const result: Group[] = [];
-        if (segmentationContext.modelSegmentations.length > 0)
-            result.push({
-                key: "ai",
-                title: "AI",
-                rows: segmentationContext.modelSegmentations,
-            });
-        const mine = byCreator.get(me);
-        if (mine) result.push({ key: String(me), title: "Mine", rows: mine });
-        for (const [creatorId, rows] of byCreator)
-            if (creatorId !== me)
-                result.push({
-                    key: String(creatorId),
-                    title: rows[0].creator.name,
-                    rows,
-                });
-        return result;
-    });
+            me,
+        ),
+    );
     const count = $derived(groups.reduce((n, g) => n + g.rows.length, 0));
 
     const workspace = getContext<Workspace>("workspace");
