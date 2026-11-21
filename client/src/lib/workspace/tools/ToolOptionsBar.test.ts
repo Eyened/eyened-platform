@@ -6,9 +6,10 @@ import {
     screen,
     within,
 } from "@testing-library/svelte";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     expectNoAxeViolations,
+    mockWidth,
     workspaceContext,
     workspaceWith,
 } from "../testUtils";
@@ -373,6 +374,8 @@ describe("ToolOptionsBar", () => {
 });
 
 describe("ToolOptionsBar when short", () => {
+    // Wide, as in the app: below 42rem the bar wraps instead of folding.
+    beforeEach(() => mockWidth({ md: true, xlg: false }));
     afterEach(() => vi.restoreAllMocks());
 
     /** The options in the bar's row (History's included), not those in More. */

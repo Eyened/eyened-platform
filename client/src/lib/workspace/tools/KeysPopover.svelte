@@ -20,10 +20,9 @@ Keys at the end of the options bar: a popover with a table of keys and what they
     } = $props();
 
     const uid = $props.id();
-    let open = $state(false);
 </script>
 
-<Popover.Root bind:open>
+<Popover.Root>
     <Popover.Trigger>
         {#snippet child({ props })}
             {#if iconOnly}
