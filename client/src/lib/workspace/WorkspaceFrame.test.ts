@@ -4,6 +4,7 @@ import {
     render,
     screen,
     waitFor,
+    within,
 } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -97,9 +98,10 @@ describe("WorkspaceFrame", () => {
         expect(
             screen.getByRole("region", { name: "Images" }),
         ).toBeInTheDocument();
-        expect(
-            screen.getByRole("button", { name: "Show Layers" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Layers" })).toHaveAttribute(
+            "aria-pressed",
+            "false",
+        );
         await expectNoAxeViolations(container);
     });
 
@@ -117,20 +119,20 @@ describe("WorkspaceFrame", () => {
         mockWidth({ md: true, xlg: false });
         renderFrame(workspaceWith(3));
         await fireEvent.click(screen.getByRole("button", { name: "Info" }));
-        await fireEvent.click(
-            screen.getByRole("button", { name: "Show Layers" }),
+        await fireEvent.click(screen.getByRole("button", { name: "Layers" }));
+        expect(screen.getByRole("button", { name: "Layers" })).toHaveAttribute(
+            "aria-pressed",
+            "true",
         );
-        expect(
-            screen.getByRole("button", { name: "Hide Layers" }),
-        ).toBeInTheDocument();
         cleanup();
         renderFrame(workspaceWith(3));
         expect(
             screen.getByRole("region", { name: "Info" }),
         ).toBeInTheDocument();
-        expect(
-            screen.getByRole("button", { name: "Hide Layers" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Layers" })).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
     });
 
     it("below md starts with the right column closed even when stored open, and has no icon columns", () => {
@@ -140,14 +142,12 @@ describe("WorkspaceFrame", () => {
         expect(
             screen.queryByRole("navigation", { name: "Tools and panels" }),
         ).toBeNull();
-        expect(
-            screen.queryByRole("button", { name: "Show Layers" }),
-        ).toBeNull();
+        expect(screen.queryByRole("button", { name: "Layers" })).toBeNull();
         expect(screen.queryByRole("region", { name: "Layers" })).toBeNull();
         expect(screen.getByRole("main")).not.toHaveAttribute("inert");
     });
 
-    it("below md the header button opens Layers and Grading over inert regions; Esc returns focus; nothing is stored", async () => {
+    it("below md the header button opens the right panel over inert regions; Esc returns focus; nothing is stored", async () => {
         mockWidth({ md: false, xlg: false });
         const { container } = renderFrame(workspaceWith(3), taskHeader());
         const button = screen.getByRole("button", {
@@ -155,23 +155,26 @@ describe("WorkspaceFrame", () => {
         });
         await fireEvent.click(button);
         expect(
-            screen.getByRole("region", { name: "Layers" }),
-        ).toBeInTheDocument();
-        expect(
             screen.getByRole("region", { name: "Grading" }),
         ).toBeInTheDocument();
         await waitFor(() =>
             expect(
-                screen.getByRole("heading", { name: "Layers" }),
+                screen.getByRole("heading", { name: "Grading" }),
             ).toHaveFocus(),
         );
         for (const el of underOverlay(container))
             expect(el).toHaveAttribute("inert");
         expect(button).toHaveAccessibleName("Hide Layers and Grading");
-        await fireEvent.keyDown(
-            screen.getByRole("heading", { name: "Layers" }),
-            { key: "Escape" },
-        );
+        const panels = screen.getByRole("group", { name: "Panels" });
+        const toLayers = within(panels).getByRole("button", {
+            name: "Layers",
+        });
+        await fireEvent.click(toLayers);
+        expect(
+            screen.getByRole("region", { name: "Layers" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Grading" })).toBeNull();
+        await fireEvent.keyDown(toLayers, { key: "Escape" });
         await waitFor(() => expect(button).toHaveFocus());
         for (const el of underOverlay(container))
             expect(el).not.toHaveAttribute("inert");
@@ -277,7 +280,7 @@ describe("WorkspaceFrame", () => {
         width.resize({ md: true, xlg: false });
         await waitFor(() =>
             expect(
-                screen.getByRole("button", { name: "Show Layers" }),
+                screen.getByRole("button", { name: "Layers" }),
             ).toHaveFocus(),
         );
         expect(screen.getByRole("main")).not.toHaveAttribute("inert");
@@ -322,6 +325,46 @@ describe("WorkspaceFrame", () => {
         await fireEvent.keyDown(document.body, { key: "F1" });
         await fireEvent.keyDown(help, { key: "Escape" });
         await waitFor(() => expect(menu).toHaveFocus());
+    });
+});
+
+describe("Right panels", () => {
+    it("/view opens on Layers; Forms swaps it in; the shown panel's icon folds the column", async () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(3));
+        const layers = screen.getByRole("button", { name: "Layers" });
+        const forms = screen.getByRole("button", { name: "Forms" });
+        expect(layers).toHaveAttribute("aria-pressed", "true");
+        expect(
+            screen.getByRole("region", { name: "Layers" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Forms" })).toBeNull();
+
+        await fireEvent.click(forms);
+        expect(forms).toHaveAttribute("aria-pressed", "true");
+        expect(layers).toHaveAttribute("aria-pressed", "false");
+        expect(
+            screen.getByRole("region", { name: "Forms" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Layers" })).toBeNull();
+
+        await fireEvent.click(forms);
+        expect(forms).toHaveAttribute("aria-pressed", "false");
+        expect(screen.queryByRole("region", { name: "Forms" })).toBeNull();
+        expect(localStorage.getItem("eyened:viewer:rightOpen")).toBe("false");
+    });
+
+    it("the grade route opens on Grading", () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(3), taskHeader());
+        expect(screen.getByRole("button", { name: "Grading" })).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
+        expect(
+            screen.getByRole("region", { name: "Grading" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Layers" })).toBeNull();
     });
 });
 

@@ -2,6 +2,7 @@
 @component
 The viewer's region grid: header, left icon column and panel, tool options bar, canvas, pager and right column.
 Below md there are no icon columns: a menu button opens the left column's content and a header button the right column's, both over the canvas.
+The right column shows one panel at a time, Layers or Grading (Forms without a task); the route picks the first.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
@@ -76,7 +77,9 @@ Below md there are no icon columns: a menu button opens the left column's conten
     let rightChoice: boolean | undefined = $state(readRightOpen());
     // The user's choice beats the below-xlg default.
     const rightOpen = $derived(rightChoice ?? xlg.current);
-    let expanded = $state({ layers: true, forms: true });
+    type RightPanel = "layers" | "forms";
+    // The grade route opens on Grading, /view on Layers; never stored.
+    let panel: RightPanel = $state(untrack(() => (task ? "forms" : "layers")));
 
     // Narrow state: one overlay at a time, never stored.
     let overlay: "menu" | "right" | null = $state(null);
@@ -114,6 +117,12 @@ Below md there are no icon columns: a menu button opens the left column's conten
         { id: "info", label: "Info", Icon: Information },
         { id: "help", label: "Help", Icon: Help },
     ] as const;
+    const RIGHT_PANELS = [
+        { id: "layers", Icon: Layers },
+        { id: "forms", Icon: Document },
+    ] as const;
+    const panelName = (id: RightPanel) =>
+        id === "layers" ? "Layers" : formsName;
     /** IconButton's tooltip trigger replaces any id, so buttons are found by what they control. */
     const byControls = (id: string) =>
         document.querySelector<HTMLElement>(`[aria-controls="${id}"]`);
@@ -136,22 +145,16 @@ Below md there are no icon columns: a menu button opens the left column's conten
         if (left) void focusPanel(left);
     }
 
-    const shown = (section: "layers" | "forms") =>
-        rightOpen && expanded[section];
-
-    function toggleSection(section: "layers" | "forms", e: MouseEvent) {
-        opener = e.currentTarget as HTMLElement;
-        if (shown(section)) {
-            expanded = { ...expanded, [section]: false };
-            if (!expanded.layers && !expanded.forms) {
-                setRight(false);
-                expanded = { layers: true, forms: true };
-            }
+    /** Another panel's icon swaps it in; the shown panel's icon folds the column. Below md only the swap applies. */
+    function toggleRight(id: RightPanel, e: MouseEvent) {
+        // Below md the opener stays the header button, so Esc returns focus there and not into the closed overlay.
+        if (!narrow) opener = e.currentTarget as HTMLElement;
+        if (!narrow && rightOpen && panel === id) {
+            setRight(false);
             return;
         }
-        if (!rightOpen) expanded = { layers: false, forms: false };
-        expanded = { ...expanded, [section]: true };
-        setRight(true);
+        panel = id;
+        if (!narrow) setRight(true);
     }
 
     /** Below md: the menu or the right column, opened from its header button. */
@@ -162,7 +165,7 @@ Below md there are no icon columns: a menu button opens the left column's conten
         if (overlay === null) return;
         await tick();
         if (next === "right")
-            document.getElementById(`${uid}-layers-title`)?.focus();
+            document.getElementById(`${uid}-${panel}-title`)?.focus();
         else
             document
                 .getElementById(`${uid}-left`)
@@ -281,7 +284,7 @@ Below md there are no icon columns: a menu button opens the left column's conten
             byControls(nowNarrow ? `${uid}-left` : `${uid}-${tab}`)?.focus();
         else if (inRight)
             byControls(
-                nowNarrow ? `${uid}-right-panels` : `${uid}-layers`,
+                nowNarrow ? `${uid}-right-panels` : `${uid}-${panel}`,
             )?.focus();
     }
 
@@ -331,6 +334,21 @@ Below md there are no icon columns: a menu button opens the left column's conten
     >
         {#if overlay === "right"}<Close />{:else}<RightPanelOpen />{/if}
     </IconButton>
+{/snippet}
+
+{#snippet panelSwitch()}
+    {#each RIGHT_PANELS as item (item.id)}
+        <!-- Selected: layer-selected plus a 3 px border-interactive bar on the panel side, like the side nav's current item. -->
+        <IconButton
+            label={panelName(item.id)}
+            aria-pressed={rightShown && panel === item.id}
+            aria-controls="{uid}-{item.id}"
+            class="relative aria-pressed:bg-layer-selected-01 aria-pressed:before:absolute aria-pressed:before:inset-y-0 aria-pressed:before:start-0 aria-pressed:before:w-0.75 aria-pressed:before:bg-border-interactive"
+            onclick={(e) => toggleRight(item.id, e)}
+        >
+            <item.Icon />
+        </IconButton>
+    {/each}
 {/snippet}
 
 <svelte:window onkeydown={onwindowkeydown} />
@@ -460,28 +478,22 @@ Below md there are no icon columns: a menu button opens the left column's conten
     <div class="pager" inert={overlayOpen}><Pager /></div>
     <aside class="right" aria-label="Layers and {formsName.toLowerCase()}">
         {#if !narrow}
-            <div class="right-rail">
-                <IconButton
-                    label="{shown('layers') ? 'Hide' : 'Show'} Layers"
-                    aria-controls="{uid}-layers"
-                    onclick={(e) => toggleSection("layers", e)}
-                >
-                    <Layers />
-                </IconButton>
-                <IconButton
-                    label="{shown('forms') ? 'Hide' : 'Show'} {formsName}"
-                    aria-controls="{uid}-forms"
-                    onclick={(e) => toggleSection("forms", e)}
-                >
-                    <Document />
-                </IconButton>
-            </div>
+            <div class="right-rail">{@render panelSwitch()}</div>
         {/if}
         <div id="{uid}-right-panels" class="right-panels" hidden={!rightShown}>
+            {#if narrow}
+                <div
+                    role="group"
+                    aria-label="Panels"
+                    class="flex border-b border-border-subtle-01 px-2"
+                >
+                    {@render panelSwitch()}
+                </div>
+            {/if}
             <section
                 id="{uid}-layers"
                 aria-labelledby="{uid}-layers-title"
-                hidden={!narrow && !expanded.layers}
+                hidden={panel !== "layers"}
             >
                 <h2
                     id="{uid}-layers-title"
@@ -492,16 +504,17 @@ Below md there are no icon columns: a menu button opens the left column's conten
                 </h2>
                 <LayersPanel
                     subtitle={layersSubtitle}
-                    shown={rightShown && (narrow || expanded.layers)}
+                    shown={rightShown && panel === "layers"}
                 />
             </section>
             <section
                 id="{uid}-forms"
                 aria-labelledby="{uid}-forms-title"
-                hidden={!narrow && !expanded.forms}
+                hidden={panel !== "forms"}
             >
                 <h2
                     id="{uid}-forms-title"
+                    tabindex="-1"
                     class="px-4 pt-3 pb-2 text-heading-compact-01 text-text-primary"
                 >
                     {formsName}
