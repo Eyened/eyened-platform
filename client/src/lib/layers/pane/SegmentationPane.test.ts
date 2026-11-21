@@ -96,6 +96,12 @@ describe("SegmentationPane", () => {
         expect(
             screen.getByRole("button", { name: "Import…" }),
         ).toBeInTheDocument();
+        for (const name of ["Reference image", "Connected components"]) {
+            expect(screen.getByRole("button", { name })).toHaveAttribute(
+                "aria-expanded",
+                "false",
+            );
+        }
         await fireEvent.click(
             screen.getByRole("button", { name: "Reference image" }),
         );

@@ -3,13 +3,13 @@
 The Selected pane for an ETDRS grid: creator, fovea and disc edge as text, and "This task". Place ETDRS (G) places the points.
 -->
 <script lang="ts">
-    import * as StructuredList from "$lib/components/ui/structured-list/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
     import { formAnnotations } from "$lib/data";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { Position2D } from "$lib/types";
     import { getContext, type Snippet } from "svelte";
     import { isThisTask } from "../gridLayers.svelte";
+    import PaneFields from "./PaneFields.svelte";
     import PaneHeader from "./PaneHeader.svelte";
 
     let {
@@ -25,7 +25,7 @@ The Selected pane for an ETDRS grid: creator, fovea and disc edge as text, and "
     );
     const coords = (p: Position2D | undefined) =>
         p ? `${Math.round(p.x)}, ${Math.round(p.y)}` : "—";
-    const rows = $derived([
+    const rows = $derived<[string, string][]>([
         ["Creator", grid.creator.name],
         ["Fovea", coords(data.fovea)],
         ["Disc edge", coords(data.disc_edge)],
@@ -45,16 +45,5 @@ The Selected pane for an ETDRS grid: creator, fovea and disc edge as text, and "
     {/snippet}
 </PaneHeader>
 <div class="min-h-0 flex-1 overflow-y-auto py-2">
-    <StructuredList.Root condensed>
-        <StructuredList.Body>
-            {#each rows as [label, value] (label)}
-                <StructuredList.Row>
-                    <StructuredList.Cell>{label}</StructuredList.Cell>
-                    <StructuredList.Cell class="tabular-nums"
-                        >{value}</StructuredList.Cell
-                    >
-                </StructuredList.Row>
-            {/each}
-        </StructuredList.Body>
-    </StructuredList.Root>
+    <PaneFields {rows} />
 </div>

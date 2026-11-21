@@ -211,7 +211,6 @@ export function writeLayerSections(
     }
 }
 
-/** The Magnifier's last settings; a missing or unknown field takes its default. */
 /** The Selected pane height the user set, in px; null keeps the fit-content default. */
 export function readPaneHeight(): number | null {
     try {
@@ -232,6 +231,7 @@ export function writePaneHeight(px: number | null): void {
     }
 }
 
+/** The Magnifier's last settings; a missing or unknown field takes its default. */
 export function readMagnifier(): MagnifierPrefs {
     try {
         const raw = localStorage.getItem(MAGNIFIER_KEY);

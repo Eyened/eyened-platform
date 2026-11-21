@@ -1,6 +1,6 @@
 <!--
 @component
-The classes of a current MultiClass or MultiLabel row: eye, colour and number, the class you draw (MultiClass) or the labels (MultiLabel), the name, and this slice's area while Area is on.
+The classes of the MultiClass or MultiLabel segmentation in the Selected pane: eye, colour and number, the class you draw (MultiClass) or the labels (MultiLabel), the name, and this slice's area while Area is on.
 MultiClass rows also get the viewport's two class opacity sliders, which are not saved.
 -->
 <script lang="ts">

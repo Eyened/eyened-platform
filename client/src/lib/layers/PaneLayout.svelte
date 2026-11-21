@@ -58,7 +58,8 @@ The Layers tab's list above the Selected pane, with a splitter between them. The
             before = saved;
             start = shown;
         }}
-        ondrag={(delta) => (saved = Math.round(start - delta))}
+        ondrag={(delta) =>
+            (saved = paneHeight(Math.round(start - delta), tabHeight))}
         ondragend={() => writePaneHeight(saved)}
         oncancel={() => (saved = before)}
         onstep={(direction) => keep(shown - direction * PANE_STEP_PX)}
