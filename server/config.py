@@ -4,11 +4,13 @@ from datetime import date
 from functools import lru_cache
 from json import JSONDecodeError
 from pathlib import Path
+from string import Formatter
+from urllib.parse import urlsplit
 
 import httpxyz
 import yaml
 from eyened_orm.utils.pretty_settings import pretty_settings
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict, BaseSettings
 
 
@@ -222,6 +224,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 DATA_SOURCES_PATH = Path(__file__).parent / "data_sources.yaml"
+DATA_SOURCE_PLACEHOLDERS = frozenset({"project", "patient", "date"})
 
 
 class DataSource(BaseModel):
@@ -233,10 +236,32 @@ class DataSource(BaseModel):
     projects: list[str]
     collapse: bool = False
 
+    @field_validator("url")
+    @classmethod
+    def _check_url(cls, url: str) -> str:
+        if urlsplit(url).scheme not in ("http", "https"):
+            raise ValueError("url must use http or https")
+        for _, field, _, _ in Formatter().parse(url):
+            if field is not None and field not in DATA_SOURCE_PLACEHOLDERS:
+                raise ValueError(
+                    f"unknown placeholder {{{field}}}; allowed: "
+                    + ", ".join(f"{{{p}}}" for p in sorted(DATA_SOURCE_PLACEHOLDERS))
+                )
+        return url
+
 
 class DataSourcesFile(BaseModel):
     model_config = ConfigDict(extra="forbid")
     sources: list[DataSource] = []
+
+    @model_validator(mode="after")
+    def _check_unique_names(self):
+        seen: set[str] = set()
+        for source in self.sources:
+            if source.name in seen:
+                raise ValueError(f"Duplicate data source name: {source.name}")
+            seen.add(source.name)
+        return self
 
 
 def load_data_sources(path: Path) -> tuple[DataSource, ...]:

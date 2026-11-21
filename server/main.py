@@ -27,7 +27,7 @@ from server.routes import (
     patients,
     admin,
 )
-from server.config import get_redis_connection, settings
+from server.config import get_data_sources, get_redis_connection, settings
 from server.services.exceptions import register_exception_handlers
 
 logger = logging.getLogger(__name__)
@@ -143,6 +143,9 @@ async def lifespan(app: FastAPI):
     anyio.to_thread.current_default_thread_limiter().total_tokens = (
         settings.threadpool_limit
     )
+
+    # Fail startup on a missing or invalid data sources file.
+    get_data_sources()
 
     yield
     # after shutdown

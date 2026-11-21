@@ -7,4 +7,8 @@
 #          {project}, {patient} and {date} (YYYY-MM-DD).
 #     projects: Project names the source applies to.
 #     collapse: Start the panel closed (default false).
+#
+# Responses must be in the named tables format: a JSON object of table title
+# to rows, e.g. {"Blood pressure": [[120, 80, "2019-03-01"]]}. A later
+# `format:` key per source may select another format; named tables is the default.
 sources: []
