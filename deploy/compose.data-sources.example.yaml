@@ -14,4 +14,4 @@
 services:
   server:
     volumes:
-      - ./data_sources.yaml:/app/server/data_sources.yaml:ro
+      - ./data_sources.yaml:/app/server/data_sources.yaml:ro,z

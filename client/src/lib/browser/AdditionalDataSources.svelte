@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { untrack } from "svelte";
     import { DataSourceError, loadDataSource } from "$lib/browser/dataSources";
     import * as Accordion from "$lib/components/ui/accordion/index.js";
     import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
@@ -9,8 +10,10 @@
     let { study }: { study: StudyGET } = $props();
 
     // One accordion item per source; the server's `collapse` sets whether it starts closed.
-    let open = $derived(
-        study.data_sources.filter((s) => !s.collapse).map((s) => s.name),
+    let open = $state(
+        untrack(() =>
+            study.data_sources.filter((s) => !s.collapse).map((s) => s.name),
+        ),
     );
 </script>
 

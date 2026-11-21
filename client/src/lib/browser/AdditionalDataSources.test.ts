@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudyGET } from "../../types/openapi_types";
 
@@ -55,6 +55,29 @@ describe("AdditionalDataSources", () => {
         expect(fetchApi).toHaveBeenCalledWith(
             "/studies/7/data-sources/Registry",
         );
+    });
+
+    it("keeps the panels the user opened or closed when the study object is replaced", async () => {
+        fetchApi.mockResolvedValue(json({ "Table A": [["x", 1]] }));
+        const sources = [
+            { name: "Registry", collapse: false },
+            { name: "Folded", collapse: true },
+        ];
+        const { rerender } = render(AdditionalDataSources, {
+            props: { study: study(12, sources) },
+        });
+        const expanded = (name: string) =>
+            screen.getByRole("button", { name }).getAttribute("aria-expanded");
+
+        await fireEvent.click(screen.getByRole("button", { name: "Registry" }));
+        await fireEvent.click(screen.getByRole("button", { name: "Folded" }));
+        expect(expanded("Registry")).toBe("false");
+        expect(expanded("Folded")).toBe("true");
+
+        await rerender({ study: study(12, sources) });
+
+        expect(expanded("Registry")).toBe("false");
+        expect(expanded("Folded")).toBe("true");
     });
 
     it("shows nothing when the study has no sources", () => {
