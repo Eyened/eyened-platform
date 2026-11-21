@@ -9,6 +9,7 @@ the token source; change this file in the same commit as any value there.
 
 - Every screen is dark: Carbon Gray 100.
 - Components are shadcn-svelte (bits-ui) restyled to Carbon; callers keep shadcn's props.
+- The viewer meets WCAG 2.2 AA, which includes ADR 0006's WCAG 2.1 AA text contrast.
 
 ## Colors
 
