@@ -25,6 +25,7 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
 
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
+    import { Checkbox } from "$lib/components/ui/checkbox/index.js";
     import CommitNumberInput from "$lib/layers/CommitNumberInput.svelte";
     import ScalePopover from "$lib/layers/ScalePopover.svelte";
     import {
@@ -36,8 +37,6 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { Slider } from "$lib/components/ui/slider/index.js";
     import { ToggleGroup } from "$lib/components/ui/toggle-group/index.js";
-    import ErodeDilate from "$lib/viewer-window/icons/ErodeDilate.svelte";
-    import Questionable from "$lib/viewer-window/icons/Questionable.svelte";
     import Redo from "carbon-icons-svelte/lib/Redo.svelte";
     import Undo from "carbon-icons-svelte/lib/Undo.svelte";
     import ZoomIn from "carbon-icons-svelte/lib/ZoomIn.svelte";
@@ -48,6 +47,7 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
 
     let { id, viewport }: { id: OptionId; viewport: ViewportHandle | null } =
         $props();
+    const uid = $props.id();
 
     const ZOOM_STEP = 1.25;
     // The size slider runs in even steps on a log scale, since bits-ui snaps to its step grid.
@@ -151,26 +151,35 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
             { value: "remove", text: cut, label: cut, tooltip: `${cut}  X` },
         ]}
     />
-{:else if id === "dilateErode" || id === "questionable"}
+{:else if id === "dilateErode" || id === "questionable" || id === "keepGridSize"}
+    {@const name =
+        id === "dilateErode"
+            ? "Dilate / Erode"
+            : id === "questionable"
+              ? "Questionable"
+              : "Keep grid size"}
     {@const on =
-        id === "dilateErode" ? workspace.dilateErode : workspace.questionable}
-    <IconButton
-        size="icon-xs"
-        label={id === "dilateErode" ? "Dilate / Erode" : "Questionable"}
-        aria-pressed={on}
-        class="aria-pressed:bg-background-selected"
-        onclick={() => {
-            if (id === "dilateErode") workspace.dilateErode = !on;
-            else workspace.questionable = !on;
-            done();
-        }}
-    >
-        <!-- Questionable is a filled glyph; Dilate / Erode is an outline. -->
-        <span class="size-4 [&>svg]:size-4">
-            {#if id === "dilateErode"}<ErodeDilate />{:else}<Questionable
-                />{/if}
-        </span>
-    </IconButton>
+        id === "dilateErode"
+            ? workspace.dilateErode
+            : id === "questionable"
+              ? workspace.questionable
+              : workspace.keepGridSize}
+    <div class="flex items-center gap-2">
+        <Checkbox
+            id="{uid}-{id}"
+            checked={on}
+            onCheckedChange={(next) => {
+                const value = next === true;
+                if (id === "dilateErode") workspace.dilateErode = value;
+                else if (id === "questionable") workspace.questionable = value;
+                else workspace.keepGridSize = value;
+                done();
+            }}
+        />
+        <label for="{uid}-{id}" class="text-body-compact-01 text-text-primary"
+            >{name}</label
+        >
+    </div>
 {:else if id === "hardness" || id === "pressure"}
     {@const name = id === "hardness" ? "Hardness" : "Pressure"}
     {@const percent = Math.round(workspace.paint[id] * 100)}
@@ -252,17 +261,6 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
             },
         ]}
     />
-{:else if id === "keepGridSize"}
-    <Button
-        variant="ghost"
-        size="sm"
-        aria-pressed={workspace.keepGridSize}
-        class="border border-border-strong-01 text-text-secondary aria-pressed:bg-content-switcher-selected aria-pressed:text-text-primary aria-pressed:shadow-content-switcher-selected"
-        onclick={() => {
-            workspace.keepGridSize = !workspace.keepGridSize;
-            done();
-        }}>Keep grid size</Button
-    >
 {:else if id === "radiusFraction"}
     <!-- One fraction for the viewer: fovea to disc edge × fraction = 3 mm. -->
     <div class="flex items-center gap-2">

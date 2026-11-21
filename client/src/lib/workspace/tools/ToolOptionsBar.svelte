@@ -1,20 +1,25 @@
 <!--
 @component
-The tool options bar: the armed tool's name, its target or why it can't act there, its options, then a one-line hint for keys without a button. When the bar is short the hint drops first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first.
+The tool options bar: the armed tool's icon and name, its target or why it can't act there, its options, then Keys, which lists the keys without a button. When the bar is short the keyboard cursor's keys cut first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first; Keys never folds.
 -->
 <script lang="ts">
     import { getContext, tick, untrack } from "svelte";
+    import { MediaQuery } from "svelte/reactivity";
+    import WarningAltFilled from "carbon-icons-svelte/lib/WarningAltFilled.svelte";
     import OverflowMenu from "../OverflowMenu.svelte";
+    import KeysPopover from "./KeysPopover.svelte";
     import type { Workspace } from "../workspace.svelte";
     import {
-        KEYBOARD_CURSOR_HINT,
-        NO_TOOL_HINT,
+        KEYBOARD_CURSOR_KEYS,
+        NO_TOOL_KEYS,
         toolById,
         type ToolId,
     } from "./registry";
     import ToolOption, { type OptionId } from "./ToolOption.svelte";
 
     const workspace = getContext<Workspace>("workspace");
+    // Below 42rem there is no rail beside the bar: no tool cell, and the bar may wrap.
+    const md = new MediaQuery("min-width: 42rem");
     const tool = $derived(
         workspace.armedTool ? toolById(workspace.armedTool) : null,
     );
@@ -47,21 +52,21 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
                   .join(" › ")
             : "",
     );
-    const hint = $derived.by(() => {
-        // Point's reasons it can't act stay visible; the keyboard cursor's keys replace any other hint.
-        // ASSUMPTION: the spec says only "read-only" for a colleague's registration.
-        if (
-            tool?.id === "point" &&
-            point?.id != null &&
-            !point.reason &&
-            !point.canEdit
-        )
-            return "Another grader's points can't be moved";
-        if (layers?.viewerContext.keyboardCursor.on)
-            return KEYBOARD_CURSOR_HINT;
-        if (!tool) return NO_TOOL_HINT;
-        return tool.hint;
-    });
+    const hasTarget = $derived(
+        !!draw?.name ||
+            !!etdrs?.name ||
+            (point !== null && point.id !== null && !point.reason),
+    );
+    const cursorOn = $derived(layers?.viewerContext.keyboardCursor.on ?? false);
+    // The armed tool's keys, or the keyboard cursor's while it is on, then those that work without a tool.
+    const keyLists = $derived([
+        ...(cursorOn
+            ? [{ title: "Keyboard cursor", rows: KEYBOARD_CURSOR_KEYS }]
+            : tool && tool.keys.length > 0
+              ? [{ title: tool.name, rows: tool.keys }]
+              : []),
+        { title: "Without a tool", rows: NO_TOOL_KEYS },
+    ]);
 
     /** Each tool's options, left to right. */
     function optionsFor(id: ToolId | undefined): OptionId[] {
@@ -121,8 +126,6 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
     const isHistory = (id: OptionId) => id === "undo" || id === "redo";
 
     let bar: HTMLElement | undefined = $state();
-    let hintElement: HTMLElement | undefined = $state();
-    let hintFits = $state(true);
 
     // A popover can't open from inside ⋯ (it closes ⋯), and Fovea | Disc edge is Place ETDRS's main control, so these never fold.
     const PINNED: OptionId[] = ["scale", "etdrsSlot"];
@@ -133,7 +136,7 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
     const shown = $derived(options.filter((id) => !folded.includes(id)));
 
     let fitting = 0;
-    /** Starts with nothing folded, then moves the last option in the row into ⋯ until the row fits; the hint shows whole or not at all. */
+    /** Starts with nothing folded, then moves the last option in the row into ⋯ until the row fits. */
     async function fit() {
         const el = bar;
         if (!el) return;
@@ -146,9 +149,6 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
             folds += 1;
             await tick();
         }
-        if (run !== fitting) return;
-        if (hintElement)
-            hintFits = hintElement.scrollWidth <= hintElement.clientWidth;
     }
 
     // Fits again when the bar resizes or what it shows changes.
@@ -157,7 +157,7 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
         void draw?.name;
         void etdrs?.name;
         void layers?.scale;
-        void hint;
+        void cursorOn;
         if (!bar) return;
         untrack(() => void fit());
         const observer = new ResizeObserver(() => void fit());
@@ -166,46 +166,98 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
     });
 </script>
 
+{#snippet divider()}
+    <span
+        aria-hidden="true"
+        class="my-2.5 w-px shrink-0 self-stretch bg-border-subtle-01"
+    ></span>
+{/snippet}
+
 <div
     bind:this={bar}
     data-slot="tool-options"
-    class="flex h-full min-w-0 items-center gap-3 ps-4 pe-2 whitespace-nowrap"
+    class="flex h-full min-w-0 items-center gap-3 pe-2 whitespace-nowrap"
+    class:ps-4={!md.current}
+    class:flex-wrap={!md.current}
 >
+    {#if md.current}
+        <!-- The armed tool's icon under the rail, in its armed look; the name follows as text. -->
+        <span
+            aria-hidden="true"
+            class="flex w-12 shrink-0 justify-center self-stretch border-e border-border-subtle-01"
+        >
+            {#if tool}<span
+                    class="flex w-10 items-center justify-center selected-look"
+                    ><tool.icon /></span
+                >{/if}
+        </span>
+    {/if}
     {#if tool}
         <span class="shrink-0 text-heading-compact-01 text-text-primary"
             >{tool.name}</span
         >
-    {/if}
-    {#if draw?.name}
-        <!-- The segmentation name cuts with …; the class stays whole. -->
-        <span
-            class="min-w-8 truncate text-body-compact-01 text-text-primary"
-            title={fullName}>{draw.name.segmentation}</span
+    {:else}
+        <span class="shrink-0 text-body-compact-01 text-text-secondary"
+            >No tool armed · pick one in Tools</span
         >
-        {#if draw.name.feature}
-            <span aria-hidden="true" class="-ms-2 text-text-secondary">›</span>
+    {/if}
+    {#if hasTarget}
+        {@render divider()}
+        {#if draw?.name}
+            <!-- The segmentation name cuts with …; the class stays whole. -->
+            <span class="flex min-w-0 items-center gap-2">
+                {#if draw.color}
+                    <span
+                        aria-hidden="true"
+                        class="size-3 shrink-0 rounded-full"
+                        style:background-color={draw.color}
+                    ></span>
+                {/if}
+                <span
+                    class="min-w-8 truncate text-body-compact-01 text-text-primary"
+                    title={fullName}>{draw.name.segmentation}</span
+                >
+                {#if draw.name.feature}
+                    <span aria-hidden="true" class="text-text-secondary">›</span
+                    >
+                    <span
+                        class="shrink-0 text-body-compact-01 text-text-primary"
+                        title={fullName}>{draw.name.feature}</span
+                    >
+                {/if}
+            </span>
+        {:else if etdrs?.name}
             <span
-                class="-ms-2 shrink-0 text-body-compact-01 text-text-primary"
-                title={fullName}>{draw.name.feature}</span
+                class="min-w-8 truncate text-body-compact-01 text-text-primary"
+                title={etdrs.name}>{etdrs.name}</span
+            >
+        {:else if point && point.id !== null}
+            <span class="text-body-compact-01 text-text-primary"
+                >Registration {point.id}{point.canEdit
+                    ? ""
+                    : " · read-only"}</span
             >
         {/if}
     {/if}
-    {#if etdrs?.name}
+    {#if cursorOn}
+        <!-- Cuts first when the bar is short. -->
         <span
-            class="min-w-8 truncate text-body-compact-01 text-text-primary"
-            title={etdrs.name}>{etdrs.name}</span
+            class="min-w-0 shrink-[100] truncate text-helper-text-01 text-text-secondary"
+            >arrows move · Space clicks · Esc leaves</span
         >
     {/if}
-    {#if point && point.id !== null && !point.reason}
-        <span class="text-body-compact-01 text-text-primary"
-            >Registration {point.id}{point.canEdit ? "" : " · read-only"}</span
-        >
+    {#if reason || shown.length > 0 || folded.length > 0}
+        {@render divider()}
     {/if}
     <!-- Always mounted, so screen readers announce a new reason. -->
     <span
         role="status"
-        class="min-w-0 py-1 text-body-compact-01 whitespace-normal text-text-primary"
-        class:sr-only={!reason}>{reason ?? ""}</span
+        class="flex min-w-0 items-center gap-2 py-1 text-body-compact-01 whitespace-normal text-text-primary"
+        class:sr-only={!reason}
+        >{#if reason}<WarningAltFilled
+                aria-hidden="true"
+                class="shrink-0 text-support-warning"
+            />{/if}{reason ?? ""}</span
     >
     {#each shown.filter((id) => !isHistory(id)) as id (id)}
         <span data-option={id} class="flex shrink-0 items-center"
@@ -235,10 +287,7 @@ The tool options bar: the armed tool's name, its target or why it can't act ther
             {/each}
         </OverflowMenu>
     {/if}
-    <span
-        bind:this={hintElement}
-        class="min-w-0 flex-1 overflow-hidden text-helper-text-01 text-text-secondary"
-        class:invisible={!hintFits}
-        aria-hidden={!hintFits}>{hint}</span
-    >
+    <div class="ms-auto flex shrink-0">
+        <KeysPopover lists={keyLists} iconOnly={!md.current} />
+    </div>
 </div>

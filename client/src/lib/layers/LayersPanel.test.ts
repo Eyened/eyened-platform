@@ -63,7 +63,7 @@ function attach(
             projectionSources: [],
             localizer: new LocalizerLines(() => []),
             pointTarget: { id: null, canEdit: false, reason: null },
-            drawTarget: { name: null, reason: null },
+            drawTarget: { name: null, color: null, reason: null },
             etdrsTarget: { name: null, reason: null },
             etdrsTool: undefined,
             pointTool: undefined,

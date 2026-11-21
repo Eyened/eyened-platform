@@ -19,6 +19,7 @@
         closeOnClick = true,
         shortcut,
         tooltip,
+        description,
         ...restProps
     }: Omit<HTMLButtonAttributes, "aria-label" | "children"> & {
         label: string;
@@ -29,7 +30,10 @@
         shortcut?: string;
         /** Tooltip text when it differs from the name, e.g. "Copied" feedback. */
         tooltip?: string;
+        /** A second tooltip line, e.g. what a tool does; also the button's accessible description. */
+        description?: string;
     } = $props();
+    const uid = $props.id();
 </script>
 
 <Tooltip.Provider delayDuration={100}>
@@ -44,6 +48,9 @@
                     {variant}
                     {size}
                     aria-label={label}
+                    aria-describedby={description
+                        ? `${uid}-description`
+                        : (props["aria-describedby"] as string | undefined)}
                 >
                     {@render children()}
                 </Button>
@@ -52,7 +59,12 @@
         <Tooltip.Content size="icon"
             >{tooltip ?? label}{#if shortcut}<kbd class="ms-4 font-sans"
                     >{shortcut}</kbd
+                >{/if}{#if description}<span
+                    class="block pb-1 text-helper-text-01">{description}</span
                 >{/if}</Tooltip.Content
         >
     </Tooltip.Root>
+    <!-- The description on focus, before the tooltip opens; hidden elements still describe. -->
+    {#if description}<span id="{uid}-description" hidden>{description}</span
+        >{/if}
 </Tooltip.Provider>

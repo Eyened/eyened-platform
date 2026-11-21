@@ -121,6 +121,24 @@ describe("ToolPalette", () => {
         expect(zoom).toHaveAttribute("aria-pressed", "false");
     });
 
+    it("a tool's tooltip and accessible description say what it does, on the rail and on a job slot", () => {
+        const ws = workspaceWith(1);
+        const flat = renderPalette(ws, ALL_TOOLS_FLAT);
+        expect(
+            screen.getByRole("button", { name: "Brush" }),
+        ).toHaveAccessibleDescription("Paints into the selected segmentation");
+        expect(
+            screen.getByRole("button", { name: "Magnifier" }),
+        ).toHaveAccessibleDescription(
+            "Shows the area under the pointer magnified in a floating panel",
+        );
+        flat.unmount();
+        renderPalette(ws, ALL_TOOLS_FLAT - 1);
+        expect(
+            screen.getByRole("button", { name: "Brush" }),
+        ).toHaveAccessibleDescription("Paints into the selected segmentation");
+    });
+
     it("in Browse, ⋯ lists the left-out tools by job and shows the one armed from it", async () => {
         const ws = workspaceWith(1);
         ws.toolMode = "browse";

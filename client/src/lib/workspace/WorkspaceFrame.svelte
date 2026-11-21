@@ -539,9 +539,10 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 --right
             );
         grid-template-rows: 48px minmax(32px, auto) minmax(0, 1fr) auto;
+        /* The options bar spans the rail and the left panel, so the armed tool's icon sits under the tool column. */
         grid-template-areas:
             "header header header header"
-            "rail left tools right"
+            "tools tools tools right"
             "rail left canvas right"
             "rail left pager right";
     }
