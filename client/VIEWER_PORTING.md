@@ -5,7 +5,7 @@ Committed in sub-project 1 of the viewer S2 stack; deleted when the stack merges
 ## Principles and standards
 
 1. Show what the moment needs. 2. Eyes stay on the image. 3. Safe to try.
-   IHE BIR (deviations in `DESIGN.md`) and WCAG 2.2 AA. Carbon owns the look and the feedback; Spectrum 2 contributes structure patterns only.
+   IHE BIR (deviations in `DESIGN.md`) and WCAG 2.2 AA. Carbon owns the look and the feedback; the structure is ours, with S2, NN/g and TradingView cited as prior art.
 
 ## Checklist: ledger rows per sub-project
 
