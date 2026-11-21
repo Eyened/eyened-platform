@@ -22,6 +22,7 @@ const LOCALIZER_KEY = "eyened:viewer:localizer";
 const TOOL_MODE_KEY = "eyened:viewer:toolMode";
 const LAYER_AREA_KEY = "eyened:viewer:layerArea";
 const LAYER_SECTIONS_KEY = "eyened:viewer:layerSections";
+const PANE_HEIGHT_KEY = "eyened:viewer:paneHeight";
 const MAGNIFIER_KEY = "eyened:viewer:magnifier";
 const PAINT_KEY = "eyened:viewer:paint";
 
@@ -211,6 +212,26 @@ export function writeLayerSections(
 }
 
 /** The Magnifier's last settings; a missing or unknown field takes its default. */
+/** The Selected pane height the user set, in px; null keeps the fit-content default. */
+export function readPaneHeight(): number | null {
+    try {
+        const raw = localStorage.getItem(PANE_HEIGHT_KEY);
+        const px = raw === null ? NaN : Number(raw);
+        return Number.isFinite(px) && px > 0 ? px : null;
+    } catch {
+        return null;
+    }
+}
+
+export function writePaneHeight(px: number | null): void {
+    try {
+        if (px === null) localStorage.removeItem(PANE_HEIGHT_KEY);
+        else localStorage.setItem(PANE_HEIGHT_KEY, String(Math.round(px)));
+    } catch {
+        // Private mode or quota: the height lasts this session only.
+    }
+}
+
 export function readMagnifier(): MagnifierPrefs {
     try {
         const raw = localStorage.getItem(MAGNIFIER_KEY);

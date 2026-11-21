@@ -600,6 +600,18 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         flex: 1;
         min-width: 0;
         overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    /* The shown panel fills the column; Layers shares its height between list and pane, and below 21rem the column scrolls (WCAG 1.4.10). */
+    .right-panels > section:not([hidden]) {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
+    }
+    .right-panels > section[id$="-layers"]:not([hidden]) {
+        min-height: 21rem;
     }
     .narrow .right {
         border-inline-start: 0;

@@ -193,4 +193,28 @@ describe("LayersPanel", () => {
             screen.queryByRole("button", { name: /^Distance lines/ }),
         ).toBeNull();
     });
+
+    it("the pane says what to do with nothing selected; a row click names the item in the pane's region", async () => {
+        segmentations.set(
+            1,
+            graderSegmentation(1, ME, "Drusen v2", {
+                image_id: "inst-a",
+            } as never),
+        );
+        const ws = workspaceWith(1);
+        attach(ws, 0, "inst-a");
+        renderPanel(ws);
+        expect(
+            screen.getByText("Select a layer to see its options."),
+        ).toBeInTheDocument();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Drusen v2" }),
+        );
+        expect(
+            screen.getByRole("region", { name: "Drusen v2" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText("Select a layer to see its options."),
+        ).toBeNull();
+    });
 });
