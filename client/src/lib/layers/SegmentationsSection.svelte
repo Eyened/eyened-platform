@@ -83,9 +83,9 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     }
     const percent = $derived(Math.round(mainViewerContext.alpha * 100));
 
-    // The pipette acts only while this section is on screen.
+    // The pipette acts while the Layers tab is on screen, even with this section collapsed.
     $effect(() => {
-        if (!shown || !open) return;
+        if (!shown) return;
         viewerContext.activePanels.add("Segmentation");
         return () => viewerContext.activePanels.delete("Segmentation");
     });

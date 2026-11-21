@@ -10,6 +10,7 @@ import {
 import { Line } from "./distanceLines.svelte";
 import { workspaceWith } from "$lib/workspace/testUtils";
 import type { Workspace } from "$lib/workspace/workspace.svelte";
+import type { PhotoLocator } from "$lib/registration/photoLocators";
 import { LocalizerLines } from "./localizerLines.svelte";
 import { graderSegmentation, layersContexts, ME } from "./testContexts";
 
@@ -28,7 +29,12 @@ afterEach(() => {
     localStorage.clear();
 });
 
-function attach(ws: Workspace, position: number, instanceId: string) {
+function attach(
+    ws: Workspace,
+    position: number,
+    instanceId: string,
+    extra: object = {},
+) {
     const ctx = layersContexts(instanceId);
     ws.attachViewport(position, {
         zoomPercent: 100,
@@ -48,6 +54,7 @@ function attach(ws: Workspace, position: number, instanceId: string) {
             etdrsTool: undefined,
             pointTool: undefined,
             blend: {} as never,
+            ...extra,
         },
     });
     return ctx;
@@ -114,7 +121,7 @@ describe("LayersPanel", () => {
         expect(screen.queryByText("No layers")).toBeNull();
     });
 
-    it("keeps a viewport's grids, current grid, radius fraction and lines while another is selected", async () => {
+    it("keeps a viewport's grids, current grid and lines while another is selected", async () => {
         const name = BUILTIN_VIEWER_FORM_SCHEMA_NAMES.ETDRS_GRID;
         formSchemasByName.set(name, { id: 3, name } as never);
         formAnnotations.set(11, {
@@ -140,9 +147,6 @@ describe("LayersPanel", () => {
         await fireEvent.click(
             screen.getByRole("button", { name: "ETDRS grid, Grader 5" }),
         );
-        const fraction = screen.getByLabelText("Radius fraction");
-        await fireEvent.input(fraction, { target: { value: "0.9" } });
-        await fireEvent.change(fraction);
 
         ws.select(1);
         await tick();
@@ -152,8 +156,39 @@ describe("LayersPanel", () => {
         expect(
             await screen.findByRole("button", { name: "ETDRS grid, Grader 5" }),
         ).toHaveAttribute("aria-pressed", "true");
-        expect(screen.getByLabelText("Radius fraction")).toHaveValue(0.9);
         expect(screen.getByText(/^Line 1 ·/)).toBeInTheDocument();
         expect(a.grids.isShown(11)).toBe(true);
+    });
+
+    it("Layers holds the object types and Display the view settings; no Display tab when nothing goes there", async () => {
+        const ws = workspaceWith(2);
+        attach(ws, 0, "inst-a");
+        attach(ws, 1, "inst-b", {
+            localizer: new LocalizerLines(() => [
+                { octImageId: "oct-1" } as PhotoLocator,
+            ]),
+        });
+        renderPanel(ws);
+        expect(screen.getByRole("tab", { name: "Layers" })).toHaveAttribute(
+            "aria-selected",
+            "true",
+        );
+        expect(screen.queryByRole("tab", { name: "Display" })).toBeNull();
+
+        ws.select(1);
+        const display = await screen.findByRole("tab", { name: "Display" });
+        expect(
+            screen.getByRole("button", { name: /^Distance lines/ }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Localizer lines" }),
+        ).toBeNull();
+        await fireEvent.click(display);
+        expect(
+            await screen.findByRole("button", { name: "Localizer lines" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: /^Distance lines/ }),
+        ).toBeNull();
     });
 });
