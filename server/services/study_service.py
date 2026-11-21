@@ -259,11 +259,15 @@ class StudyService:
         source = next((s for s in self._sources_for(study) if s.name == name), None)
         if source is None:
             raise NotFoundError(f"Data source {name} not found")
-        url = source.url.format(
-            project=quote(study.Patient.Project.ProjectName, safe=""),
-            patient=quote(study.Patient.PatientIdentifier, safe=""),
-            date=quote(study.StudyDate.isoformat(), safe=""),
-        )
+        values = {
+            "project": study.Patient.Project.ProjectName,
+            "patient": study.Patient.PatientIdentifier,
+            "date": study.StudyDate.isoformat(),
+        }
+        # "", "." and ".." survive quoting but change the upstream path.
+        if any(v in ("", ".", "..") for v in values.values()):
+            raise NotFoundError(f"Data source {name} has no data for this study")
+        url = source.url.format(**{k: quote(v, safe="") for k, v in values.items()})
         # The URL is not logged: it holds a patient identifier.
         try:
             with httpxyz.Client(timeout=DATA_SOURCE_TIMEOUT) as client:

@@ -123,6 +123,20 @@ def test_an_unknown_source_is_404(client, sources, upstream, studies):
     assert upstream.urls == []
 
 
+@pytest.mark.parametrize("identifier", ["", ".", ".."], ids=["empty", "dot", "dotdot"])
+def test_a_path_changing_identifier_is_404_and_never_reaches_upstream(
+    client, session, sources, upstream, identifier
+):
+    project = make_project(session, "Alpha")
+    study = make_study(session, make_patient(session, project, identifier), date(2020, 1, 2))
+    session.commit()
+
+    response = client.get(f"/studies/{study.StudyID}/data-sources/Registry")
+
+    assert response.status_code == 404
+    assert upstream.urls == []
+
+
 @pytest.mark.parametrize(
     ("respond", "status"),
     [
