@@ -104,9 +104,13 @@ describe("PointsetsSection", () => {
             );
         });
         const { win, workspace, selection } = renderSection();
-        // With no rows, the header's New and the empty state's button share the name; the header comes first.
+        expect(
+            screen.getByText(
+                "Use + to place matching points on this image and another of this eye.",
+            ),
+        ).toBeInTheDocument();
         const newButton = () =>
-            screen.getAllByRole("button", { name: "New registration" })[0]!;
+            screen.getByRole("button", { name: "New registration" });
         await fireEvent.click(newButton());
         expect(createFormAnnotation).toHaveBeenLastCalledWith(
             expect.objectContaining({
@@ -168,5 +172,8 @@ describe("PointsetsSection", () => {
         expect(
             screen.queryByRole("button", { name: /New registration/ }),
         ).toBeNull();
+        expect(
+            screen.getByText("Open another image of this eye to add one."),
+        ).toBeInTheDocument();
     });
 });

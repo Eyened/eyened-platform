@@ -3,8 +3,6 @@
 Layers › Segmentations for the selected viewport: opacity and Area, and rows grouped AI, Mine, then other graders.
 -->
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button/index.js";
-    import * as Empty from "$lib/components/ui/empty/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
     import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
@@ -23,7 +21,6 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
     } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
     import { groupByCreator } from "$lib/viewer-window/panelSegmentation/segmentationUtils";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
-    import Add from "carbon-icons-svelte/lib/Add.svelte";
     import { getContext, untrack } from "svelte";
     import { focusAfterDelete } from "./focusAfterDelete";
     import LayerSection from "./LayerSection.svelte";
@@ -47,7 +44,6 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
         getContext<MainViewerContext>("mainViewerContext");
     const { segmentationContext } = mainViewerContext;
     const me = globalContext.user.id;
-    let newOpen = $state(false);
 
     type Group = { key: string; title: string; rows: Segmentation[] };
     const groups: Group[] = $derived.by(() => {
@@ -120,7 +116,13 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
 </script>
 
 <div bind:this={header} data-layer-section="segmentations">
-    <LayerSection title="Segmentations" {count} {open} {ontoggle}>
+    <LayerSection
+        title="Segmentations"
+        {count}
+        {open}
+        {ontoggle}
+        empty="Use + to draw on this image."
+    >
         {#snippet action()}
             <!-- Stays mounted so the progress text is announced. -->
             <div role="status">
@@ -131,12 +133,12 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
                         description={segmentationContext.busy}
                     />
                 {:else}
-                    <NewSegmentation bind:open={newOpen} />
+                    <NewSegmentation />
                 {/if}
             </div>
         {/snippet}
         {#if segmentationContext.failed}
-            <div class="px-4 py-2">
+            <div class="py-2 ps-8 pe-4">
                 <InlineNotification
                     title={segmentationContext.failed}
                     subtitle="Try again."
@@ -145,7 +147,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
             </div>
         {/if}
         {#if count > 0}
-            <div class="flex items-center gap-3 px-4 py-2">
+            <div class="flex items-center gap-3 py-2 ps-8 pe-4">
                 <span class="text-label-01 text-text-secondary">Opacity</span>
                 <Slider
                     class="min-w-0 flex-1"
@@ -161,7 +163,7 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
                     >{percent}%</span
                 >
             </div>
-            <div class="px-4 pb-2">
+            <div class="ps-8 pe-4 pb-2">
                 <Field.Field orientation="horizontal" class="w-auto">
                     <Toggle
                         id="{uid}-area"
@@ -199,23 +201,6 @@ Layers › Segmentations for the selected viewport: opacity and Area, and rows g
                     </ul>
                 </LayerSection>
             {/each}
-        {:else}
-            <Empty.Root class="px-4 py-6">
-                <Empty.Header>
-                    <!-- ASSUMPTION: the spec asks for one description line but gives no text. -->
-                    <Empty.Title>No segmentations</Empty.Title>
-                    <Empty.Description
-                        >Create one to draw on this image.</Empty.Description
-                    >
-                </Empty.Header>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={segmentationContext.busy !== null}
-                    onclick={() => (newOpen = true)}
-                    >New segmentation <Add /></Button
-                >
-            </Empty.Root>
         {/if}
     </LayerSection>
 </div>

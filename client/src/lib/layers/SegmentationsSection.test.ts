@@ -165,15 +165,14 @@ describe("SegmentationsSection", () => {
         );
     });
 
-    it("an image without segmentations shows the next step; it opens New with focus in the feature combo box", async () => {
+    it("an image without segmentations says to use +, which opens New with focus in the feature combo box", async () => {
         renderSection();
-        const empty = screen
-            .getByText("No segmentations")
-            .closest('[data-slot="empty"]') as HTMLElement;
+        expect(
+            screen.getByText("Use + to draw on this image."),
+        ).toBeInTheDocument();
         expect(screen.queryByRole("switch", { name: "Area" })).toBeNull();
-        // The header's New has the same name; this is the empty state's button.
         await fireEvent.click(
-            within(empty).getByRole("button", { name: "New segmentation" }),
+            screen.getByRole("button", { name: "New segmentation" }),
         );
         const search = await screen.findByRole("combobox", {
             name: "Feature",
@@ -195,11 +194,8 @@ describe("SegmentationsSection", () => {
         } as never);
         features.set(3, { id: 3, name: "Drusen" } as never);
         renderSection();
-        const empty = screen
-            .getByText("No segmentations")
-            .closest('[data-slot="empty"]') as HTMLElement;
         await fireEvent.click(
-            within(empty).getByRole("button", { name: "New segmentation" }),
+            screen.getByRole("button", { name: "New segmentation" }),
         );
         await fireEvent.click(
             await screen.findByRole("button", { name: "Advanced…" }),
@@ -237,13 +233,10 @@ describe("SegmentationsSection", () => {
         expect(screen.queryByRole("option", { name: "Drusen" })).toBeNull();
     });
 
-    it("closing the popover opened from the empty state returns focus to the header New", async () => {
+    it("closing the popover returns focus to New", async () => {
         renderSection();
-        const empty = screen
-            .getByText("No segmentations")
-            .closest('[data-slot="empty"]') as HTMLElement;
         await fireEvent.click(
-            within(empty).getByRole("button", { name: "New segmentation" }),
+            screen.getByRole("button", { name: "New segmentation" }),
         );
         const search = await screen.findByRole("combobox", {
             name: "Feature",
@@ -257,20 +250,15 @@ describe("SegmentationsSection", () => {
                 }),
             ).toBeNull(),
         );
-        const header = screen
-            .getAllByRole("button", { name: "New segmentation" })
-            .find((b) => !empty.contains(b));
+        const header = screen.getByRole("button", { name: "New segmentation" });
         await vi.waitFor(() => expect(header).toHaveFocus());
     });
 
-    it("picking a feature from the empty state leaves focus on the header New", async () => {
+    it("picking a feature leaves focus on New", async () => {
         features.set(5, { id: 5, name: "Drusen" } as never);
         renderSection();
-        const empty = screen
-            .getByText("No segmentations")
-            .closest('[data-slot="empty"]') as HTMLElement;
         await fireEvent.click(
-            within(empty).getByRole("button", { name: "New segmentation" }),
+            screen.getByRole("button", { name: "New segmentation" }),
         );
         const search = await screen.findByRole("combobox", {
             name: "Feature",
@@ -283,9 +271,7 @@ describe("SegmentationsSection", () => {
         // New is replaced by the progress while the save runs, so look the button up again.
         await vi.waitFor(() =>
             expect(
-                screen
-                    .getAllByRole("button", { name: "New segmentation" })
-                    .find((b) => !empty.contains(b)),
+                screen.getByRole("button", { name: "New segmentation" }),
             ).toHaveFocus(),
         );
     });

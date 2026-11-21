@@ -85,6 +85,7 @@ One segmentation row in Layers: color, the name (selects it) and the type letter
 </script>
 
 <LayerRow
+    depth={2}
     label="{feature.name} segmentation [{segmentation.id}]"
     name={feature.name}
     selected={isActive}
@@ -145,8 +146,8 @@ One segmentation row in Layers: color, the name (selects it) and the type letter
         flex-direction: column;
         align-items: flex-start;
         gap: 0.25rem;
-        /* Starts under the colour or name, as the row line's ps-7 does. */
-        padding-inline: 1.75rem 0.5rem;
+        /* Starts under the colour or name, as the row line does. */
+        padding-inline: var(--row-indent) 0.5rem;
     }
     .details:empty {
         display: none;

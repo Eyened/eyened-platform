@@ -4,8 +4,6 @@ Layers › Pointsets for the selected viewport: this eye's registrations with po
 A row selects the pointset P edits in this viewport; the eye's registration in use is set in Display › Registration.
 -->
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button/index.js";
-    import * as Empty from "$lib/components/ui/empty/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
@@ -85,18 +83,27 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
 </script>
 
 <div bind:this={section} data-layer-section="pointsets">
-    <LayerSection title="Pointsets" count={rows.length} {open} {ontoggle}>
+    <LayerSection
+        title="Pointsets"
+        count={rows.length}
+        {open}
+        {ontoggle}
+        empty={canCreate
+            ? "Use + to place matching points on this image and another of this eye."
+            : "Open another image of this eye to add one."}
+    >
         {#snippet action()}
             {#if canCreate}
                 <IconButton
                     size="icon-xs"
+                    variant="secondary"
                     label="New registration"
                     onclick={create}><Add /></IconButton
                 >
             {/if}
         {/snippet}
         {#if createError}
-            <div class="px-4 py-2">
+            <div class="py-2 ps-8 pe-4">
                 <InlineNotification
                     title="Couldn't create a registration"
                     subtitle="Try again."
@@ -156,22 +163,6 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
                     </li>
                 {/each}
             </ul>
-        {:else}
-            <Empty.Root class="px-4 py-6">
-                <Empty.Header>
-                    <!-- ASSUMPTION: the spec asks for a title and a description but gives no text. -->
-                    <Empty.Title>No registrations</Empty.Title>
-                    <Empty.Description
-                        >Create one to place matching points on this image and
-                        another of this eye.</Empty.Description
-                    >
-                </Empty.Header>
-                {#if canCreate}
-                    <Button variant="ghost" size="sm" onclick={create}
-                        >New registration <Add /></Button
-                    >
-                {/if}
-            </Empty.Root>
         {/if}
     </LayerSection>
 </div>

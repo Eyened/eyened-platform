@@ -47,7 +47,13 @@ Layers › Distance lines for the selected viewport: one row per line on this im
 </script>
 
 <div bind:this={section} data-layer-section="distance">
-    <LayerSection title="Distance lines" count={lines.length} {open} {ontoggle}>
+    <LayerSection
+        title="Distance lines"
+        count={lines.length}
+        {open}
+        {ontoggle}
+        empty="Use the Distance tool to draw one."
+    >
         <ul>
             {#each lines as line, i (line)}
                 <li>

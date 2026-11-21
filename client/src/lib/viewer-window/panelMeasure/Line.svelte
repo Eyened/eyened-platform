@@ -47,7 +47,7 @@ One distance line in Layers: "Line n" with its length and two points, with Delet
         </IconButton>
     {/snippet}
     <p
-        class="ps-8 pe-2 pb-1 text-helper-text-01 text-text-secondary tabular-nums"
+        class="ps-(--row-indent) pe-2 pb-1 text-helper-text-01 text-text-secondary tabular-nums"
     >
         {length} · {point(line.start)} – {point(line.end)}
     </p>

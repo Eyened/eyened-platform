@@ -48,7 +48,9 @@ A grid on a registered image, read-only in Layers: the creator's name with the i
             {#if shown}<View />{:else}<ViewOff />{/if}
         </IconButton>
     {/snippet}
-    <p class="ps-8 pe-2 pb-1 text-helper-text-01 text-text-secondary">
+    <p
+        class="ps-(--row-indent) pe-2 pb-1 text-helper-text-01 text-text-secondary"
+    >
         [{formAnnotation.image_id}] [{formAnnotation.id}]
     </p>
 </LayerRow>

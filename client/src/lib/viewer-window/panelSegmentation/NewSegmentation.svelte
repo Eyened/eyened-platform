@@ -1,7 +1,6 @@
 <!--
 @component
 New on the Segmentations header: a popover with the Feature combo box, where focus starts, then Advanced… and Region box….
-`open` is bindable so the empty state's button opens the same popover.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
@@ -17,7 +16,7 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
     import { getContext } from "svelte";
     import { createQuestionableSegmentation } from "./createSegmentationHelpers";
 
-    let { open = $bindable(false) }: { open?: boolean } = $props();
+    let open = $state(false);
 
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
@@ -27,7 +26,6 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
     const segmentationContext = mainViewerContext.segmentationContext;
     const { image, axis } = viewerContext;
     let content: HTMLElement | null = $state(null);
-    let trigger: HTMLElement | null = $state(null);
 
     let text = $state("");
     const items = $derived.by(() => {
@@ -78,7 +76,8 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
         input.focus();
     }
 
-    // The empty state's button can open this popover and then unmount, so focus always goes to the header button.
+    let trigger: HTMLElement | null = $state(null);
+    // Safari doesn't focus a clicked button, so bits-ui would return focus to the body; send it to New.
     function onCloseAutoFocus(e: Event) {
         e.preventDefault();
         trigger?.focus();
@@ -88,8 +87,11 @@ New on the Segmentations header: a popover with the Feature combo box, where foc
 <Popover.Root bind:open>
     <Popover.Trigger bind:ref={trigger}>
         {#snippet child({ props })}
-            <IconButton {...props} size="icon-xs" label="New segmentation"
-                ><Add /></IconButton
+            <IconButton
+                {...props}
+                size="icon-xs"
+                variant="secondary"
+                label="New segmentation"><Add /></IconButton
             >
         {/snippet}
     </Popover.Trigger>
