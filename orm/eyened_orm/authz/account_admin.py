@@ -24,7 +24,7 @@ from ..creator import Creator
 from ..repositories.creator_repository import CreatorRepository
 from ..utils.db_users import build_user, check_new_password, hash_password
 from .actor import Actor
-from .errors import AdminEntityExists, AdminEntityNotFound
+from .errors import AdminEntityExists, AdminEntityNotFound, AdminIdentifierTaken
 
 __all__ = ["AccountAdministration"]
 
@@ -210,6 +210,35 @@ class AccountAdministration:
             # the same rule init-admin follows.
             changes={"username": creator.CreatorName, "password_changed": True},
         )
+
+    def link_email(self, *, creator_id: int, email: str) -> bool:
+        """Link ``email`` to the account; its first SSO login with it pins the account to ``sub``.
+
+        Returns False when the account already holds the link, writing nothing.
+
+        Raises:
+            AdminIdentifierTaken: if another account holds the link.
+        """
+        creator = self._creator_by_id(creator_id)
+        identifier = f"oidc:email:{email}"
+        if creator.EmployeeIdentifier == identifier:
+            return False
+        if self._creators.get_by_employee_identifier(identifier) is not None:
+            raise AdminIdentifierTaken("Email already linked to another account")
+        old = creator.EmployeeIdentifier
+        creator.EmployeeIdentifier = identifier
+        self._creators.save(creator)
+        self._audit.write(
+            actor=self._actor,
+            action="UPDATE",
+            entity="Creator",
+            entity_id=creator.CreatorID,
+            changes={
+                "username": creator.CreatorName,
+                "employee_identifier": {"old": old, "new": identifier},
+            },
+        )
+        return True
 
     def set_password_by_name(self, *, username: str, password: str) -> None:
         """`set_password`, keyed by name."""

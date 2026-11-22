@@ -58,6 +58,8 @@ class TokenLoginRequest(BaseModel):
     username: str
     password: str
     api_client: bool = False
+    # ASSUMPTION: a caller that omits it keeps today's long session.
+    remember_me: bool = True
 
 
 class UserResponse(BaseModel):
@@ -117,17 +119,57 @@ def create_access_token(user_id: int, username: str) -> str:
     )
 
 
-def create_refresh_token(user_id: int) -> str:
-    """Create a JWT refresh token."""
+def create_refresh_token(
+    user_id: int, remember: bool = True, auth_time: int | None = None
+) -> str:
+    """Create a JWT refresh token; ``remember`` picks its lifetime and is carried in it.
+
+    ``auth_time`` is the login time in epoch seconds; omitted, the login is now.
+    """
+    now = datetime.now(timezone.utc)
+    if auth_time is None:
+        auth_time = int(now.timestamp())
+    if remember:
+        lifetime = timedelta(days=settings.refresh_token_expire_days)
+    else:
+        lifetime = timedelta(minutes=settings.refresh_token_short_expire_minutes)
     payload = {
         "sub": str(user_id),  # Convert to string
         "type": "refresh",
-        "exp": datetime.now(timezone.utc)
-        + timedelta(days=settings.refresh_token_expire_days),
-        "iat": datetime.now(timezone.utc),
+        "remember": remember,
+        "auth_time": auth_time,
+        "exp": now + lifetime,
+        "iat": now,
     }
     return jwt.encode(
         payload, settings.secret_key_value, algorithm=settings.jwt_algorithm
+    )
+
+
+def _set_session_cookies(
+    response: Response, access_token: str, refresh_token: str, remember: bool
+) -> None:
+    """Set the access and refresh cookies, the same for every way of logging in.
+
+    Unremembered, both are browser-session cookies: no lifetime of their own.
+    """
+    response.set_cookie(
+        key=settings.jwt_cookie_name,
+        value=access_token,
+        httponly=True,
+        max_age=settings.access_token_expire_minutes * 60 if remember else None,
+        secure=settings.cookie_secure,
+        samesite="strict",
+        path="/",
+    )
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=refresh_token,
+        httponly=True,
+        max_age=settings.refresh_token_expire_days * 24 * 60 * 60 if remember else None,
+        secure=settings.cookie_secure,
+        samesite="strict",
+        path="/",
     )
 
 
@@ -182,6 +224,15 @@ def _user_response(creator: Creator, auth_service: AuthService) -> UserResponse:
     return creator_to_response(creator, auth_service.starred_tag_ids(creator.CreatorID))
 
 
+def _refuse_if_password_login_disabled() -> None:
+    """Refuse before any user lookup, so the reply says nothing about the account."""
+    # ASSUMPTION: 403, not 404 or 405: the route exists but this server forbids its use.
+    if not settings.auth_password_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Password login is disabled."
+        )
+
+
 # API endpoints
 @router.post("/auth/login", response_model=UserResponse)
 def login(
@@ -190,11 +241,12 @@ def login(
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Login with username and password, return user info and set JWT cookies or return token."""
+    _refuse_if_password_login_disabled()
     creator = auth_service.authenticate(user_data.username, user_data.password)
 
     # Create both tokens
     access_token = create_access_token(creator.CreatorID, creator.CreatorName)
-    refresh_token = create_refresh_token(creator.CreatorID)
+    refresh_token = create_refresh_token(creator.CreatorID, user_data.remember_me)
 
     # If API client, return token in response body
     if user_data.api_client:
@@ -207,25 +259,7 @@ def login(
         }
 
     # Otherwise, set cookies (existing behavior)
-    response.set_cookie(
-        key=settings.jwt_cookie_name,
-        value=access_token,
-        httponly=True,
-        max_age=settings.access_token_expire_minutes * 60,
-        secure=settings.cookie_secure,
-        samesite="strict",
-        path="/",
-    )
-
-    response.set_cookie(
-        key=settings.refresh_cookie_name,
-        value=refresh_token,
-        httponly=True,
-        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
-        secure=settings.cookie_secure,
-        samesite="strict",
-        path="/",
-    )
+    _set_session_cookies(response, access_token, refresh_token, user_data.remember_me)
 
     return _user_response(creator, auth_service)
 
@@ -235,6 +269,7 @@ def get_token(
     user_data: UserLogin, auth_service: AuthService = Depends(get_auth_service)
 ):
     """Get access token for API clients."""
+    _refuse_if_password_login_disabled()
     creator = auth_service.authenticate(user_data.username, user_data.password)
 
     access_token = create_access_token(creator.CreatorID, creator.CreatorName)
@@ -283,6 +318,7 @@ def register_user(
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Register a new user."""
+    _refuse_if_password_login_disabled()
     new_user = auth_service.register(user_data.username, user_data.password)
     return _user_response(new_user, auth_service)
 
@@ -317,30 +353,21 @@ def refresh_token(
         # Create new access token
         new_access_token = create_access_token(creator.CreatorID, creator.CreatorName)
 
+        # The login's choice is copied forward. Tokens issued before the claim
+        # existed count as ticked, so nobody is logged out by the release.
+        remember = payload.get("remember", True)
+
+        # The session ends a fixed time after login, however often it is
+        # refreshed. Tokens issued before the claim existed count from iat.
+        auth_time = payload.get("auth_time", payload["iat"])
+        session_age = datetime.now(timezone.utc) - datetime.fromtimestamp(auth_time, timezone.utc)
+        if session_age > timedelta(days=settings.session_max_age_days):
+            raise HTTPException(status_code=401, detail="Session expired")
+
         # Create NEW refresh token (extends session for active users)
-        new_refresh_token = create_refresh_token(creator.CreatorID)
+        new_refresh_token = create_refresh_token(creator.CreatorID, remember, auth_time)
 
-        # Update access token cookie
-        response.set_cookie(
-            key=settings.jwt_cookie_name,
-            value=new_access_token,
-            httponly=True,
-            max_age=settings.access_token_expire_minutes * 60,
-            secure=settings.cookie_secure,
-            samesite="strict",
-            path="/",
-        )
-
-        # Update refresh token cookie (extends session)
-        response.set_cookie(
-            key=settings.refresh_cookie_name,
-            value=new_refresh_token,
-            httponly=True,
-            max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
-            secure=settings.cookie_secure,
-            samesite="strict",
-            path="/",
-        )
+        _set_session_cookies(response, new_access_token, new_refresh_token, remember)
 
         return _user_response(creator, auth_service)
 
@@ -496,6 +523,7 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
             key=public_key,
             algorithms=["RS256"],
             audience=settings.oidc.client_id,
+            issuer=_oidc_metadata().issuer,
         )
     except jwt.InvalidTokenError as err:
         logger.warning(f"Error while decoding ID Token: {err}")
@@ -513,19 +541,50 @@ async def validate_id_token(id_token: str, nonce_hash: str) -> dict[str, Any]:
         logger.warning("Nonce validation failed")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nonce validation failed")
 
-    # Validate additional claims
+    return claims
+
+
+def check_oidc_claims(claims: dict[str, Any]) -> None:
+    """Run the configured claim check and the institution allow list on the merged claims."""
     validations = [v for v in settings.oidc.additional_token_validations.split(",") if v.strip()]
     for validation in validations:
         claim_name, expected_claim_value = validation.split("=", 1)
         claim_value = claims.get(claim_name)
         if claim_name not in claims:
-            logger.error(f" OIDC additional validation claim '{claim_name}' not found in ID token")
+            logger.error(f"OIDC additional validation claim '{claim_name}' not found in the OIDC claims")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed")
-        elif claim_value != expected_claim_value:
-            logger.error(f"OIDC additional validation claim '{claim_name}' value mismatch, {expected_claim_value=} {claim_value=}")
+        elif claim_value != expected_claim_value and not (
+            isinstance(claim_value, list) and expected_claim_value in claim_value
+        ):
+            logger.error(f"OIDC additional validation claim '{claim_name}' value mismatch")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"ID token validation failed")
 
-    return claims
+    allowed = [org.strip() for org in settings.oidc.allowed_home_organizations.split(",") if org.strip()]
+    if allowed and claims.get("schac_home_organization") not in allowed:
+        logger.warning("Denied OIDC login, 'schac_home_organization' is not in the allow list")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your institution is not allowed to log in to EyeNED.",
+        )
+
+
+async def get_oidc_userinfo(access_token: str | None, sub: str) -> dict[str, Any]:
+    """The userinfo claims for a validated ID token's ``sub``."""
+    async with httpxyz.AsyncClient() as client:
+        response = await client.get(
+            _oidc_metadata().userinfo_endpoint,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    if not response.is_success:
+        logger.error(f"OIDC userinfo retrieval failed, endpoint returned status code {response.status_code}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Userinfo request failed")
+
+    userinfo = response.json()
+    # OIDC Core 5.3.2: the userinfo sub must exactly match the ID token's.
+    if userinfo.get("sub") != sub:
+        logger.warning("OIDC userinfo 'sub' does not match the ID token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Userinfo validation failed")
+    return userinfo
 
 
 def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
@@ -533,19 +592,19 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
     Find or create the creator matching the OIDC claims.
 
     Args:
-        id_claims (dict[str, str]): claims from OIDC ID token
+        id_claims (dict[str, str]): the ID token claims, with the userinfo claims merged under them
         session (Session): database session
     """
     creator = None
-    # Optional: make the list of additional claims configurable
-    additional_claims_to_check = ["email", "preferred_username"]
-    for claim_name in ["sub"] + additional_claims_to_check:
+    # The sub pin first, then an administrator's email link. OIDC Core 5.7:
+    # preferred_username is not a unique identifier, so it is never looked up.
+    for claim_name in ["sub", "email"]:
         if claim_name in id_claims:
             claim_value = id_claims[claim_name]
             lookup_key = f"oidc:{claim_name}:{claim_value}"
             creator = session.query(Creator).where(Creator.EmployeeIdentifier == lookup_key).first()
             if creator:
-                logger.debug(f"Found creator {creator.CreatorName} matching '{lookup_key}'")
+                logger.debug(f"Found CreatorID={creator.CreatorID} matching OIDC claim '{claim_name}'")
                 break
 
     if creator:
@@ -553,9 +612,7 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
             # Same revocation as the password path, a different front door.
             # Refused before the identifier-migration write below, so a
             # deactivated account's row is not touched on a denied login.
-            logger.warning(
-                f"Denied OIDC access to deactivated account '{creator.CreatorName}'"
-            )
+            logger.warning(f"Denied OIDC access to deactivated account CreatorID={creator.CreatorID}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="OIDC account not authorized",
@@ -567,19 +624,39 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
             # To make sure that the authentication stays consistent and secure we update the identifier in the
             # Eyened backend after a successful authentication if it isn't a 'Subject' claim.
             identifier = f"oidc:sub:{id_claims['sub']}"
-            logger.info(f"Replacing temporary OIDC authentication claim '{creator.EmployeeIdentifier}' with {identifier}")
+            logger.info(f"Replacing OIDC claim '{claim_name}' with claim 'sub' as identifier of CreatorID={creator.CreatorID}")
+            old_identifier = creator.EmployeeIdentifier
             creator.EmployeeIdentifier = identifier
             # flush only; the request boundary (get_db) commits.
             CreatorRepository(session, scope=AccessScope.trusted()).add(creator)
+            get_audit_service(session).record(
+                action="UPDATE",
+                entity="Creator",
+                trusted_path="auth:oidc-pin",
+                entity_id=creator.CreatorID,
+                changes={
+                    "username": creator.CreatorName,
+                    "employee_identifier": {"old": old_identifier, "new": identifier},
+                },
+            )
 
     else:
         # No existing account was found
         if settings.oidc.create_new_accounts:
-            username = id_claims.get("preferred_username")
+            # ASSUMPTION: the provider's email is institution-issued; no email_verified check.
+            username = id_claims.get("email")
             if not username:
+                logger.warning("Denied OIDC account creation, the 'email' claim is missing")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="OIDC token is missing the required preferred_username claim",
+                    detail="Your login did not include an email address, which EyeNED needs to create your account.",
+                )
+            # The account-name column holds 45 characters.
+            if len(username) > 45:
+                logger.warning("Denied OIDC account creation, the 'email' claim is longer than 45 characters")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Your email address is longer than 45 characters, so EyeNED can't create an account for it yet. Ask an administrator for help.",
                 )
             identifier = f"oidc:sub:{id_claims['sub']}"
             try:
@@ -597,9 +674,9 @@ def check_oidc_login(id_claims: dict[str, str], session: Session) -> Creator:
                 entity_id=creator.CreatorID,
                 changes={"username": creator.CreatorName, "employee_identifier": identifier},
             )
-            logger.info(f"Created new account '{username}' for OIDC authenticated session, {identifier=}")
+            logger.info(f"Created new account CreatorID={creator.CreatorID} for OIDC authenticated session")
         else:
-            logger.warning(f"Denied access to authenticated OIDC session, no existing account found and not creating a new one. Received claims: {id_claims}")
+            logger.warning("Denied access to authenticated OIDC session, no existing account found and not creating a new one")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="OIDC account not authorized")
 
     return creator
@@ -657,34 +734,20 @@ async def oidc_authenticate(response: Response, auth: OIDCAuthenticationRequest,
         logger.warning(f"No OIDC nonce found in cookie")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nonce validation failed")
     claims = await validate_id_token(id_token, oidc_nonce)
+    claims = {**await get_oidc_userinfo(token_data.get("access_token"), claims["sub"]), **claims}
+    check_oidc_claims(claims)
 
     # Check claims with Creator database
     creator = check_oidc_login(claims, session)
-    logger.info(f"OIDC authenticated session for {creator.CreatorName}")
+    logger.info(f"OIDC authenticated session for CreatorID={creator.CreatorID}")
 
     response.delete_cookie(key="oidc_csrf_token")
     response.delete_cookie(key="oidc_nonce")
 
     access_token = create_access_token(creator.CreatorID, creator.CreatorName)
-    refresh_token = create_refresh_token(creator.CreatorID)
+    # ASSUMPTION: SSO has no "Keep me logged in" box, so it always counts as ticked.
+    refresh_token = create_refresh_token(creator.CreatorID, remember=True)
 
-    response.set_cookie(
-        key=settings.jwt_cookie_name,
-        value=access_token,
-        httponly=True,
-        max_age=settings.access_token_expire_minutes * 60,
-        secure=settings.cookie_secure,
-        samesite="strict",
-        path="/",
-    )
-    response.set_cookie(
-        key=settings.refresh_cookie_name,
-        value=refresh_token,
-        httponly=True,
-        max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
-        secure=settings.cookie_secure,
-        samesite="strict",
-        path="/",
-    )
+    _set_session_cookies(response, access_token, refresh_token, remember=True)
 
     return _user_response(creator, auth_service)

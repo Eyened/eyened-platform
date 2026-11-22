@@ -529,11 +529,9 @@ def test_a_project_admin_can_delete_another_users_segmentation(
 # which ``AccessScope.require``'s fail-closed guard turns into a 404 for every
 # non-owner except an administrator.
 #
-# ``update_tag`` has no check at all. A tag *definition* is application-wide
-# data, not an annotation -- applying a tag is the annotation, and those links
-# are guarded above -- so renaming a shared label is unrestricted (§4.3). The
-# two "can update" cases below are the positive pin on that decision: put the
-# ownership overlay back on this path and they fail.
+# ``update_tag`` needs Grader or above in some project, but no ownership. The
+# "can update" cases below pin that: put the ownership overlay back on this
+# path and they fail.
 #
 # The refused actors below hold project_admin in ``owned["project"]``, a real
 # membership, so a refusal can only be coming from ownership -- an actor with
@@ -542,11 +540,11 @@ def test_a_project_admin_can_delete_another_users_segmentation(
 
 
 def test_the_owner_can_update_their_tag(client_scoped, owned, tag_pair):
-    """No role floor exists on a Tag: read_only is enough to rename one."""
+    """A Grader renames their own tag."""
     client, set_scope = client_scoped
     set_scope(
         scope_for(
-            owned["project"], role=ProjectRole.read_only, actor_id=owned["actor"]
+            owned["project"], role=ProjectRole.grader, actor_id=owned["actor"]
         )
     )
     resp = client.patch(f"/tags/{tag_pair['own']}", json={"name": "renamed"})
@@ -555,8 +553,7 @@ def test_the_owner_can_update_their_tag(client_scoped, owned, tag_pair):
 
 
 def test_a_project_admin_can_update_another_users_tag(client_scoped, owned, tag_pair):
-    """Renaming a shared label is unrestricted -- a tag definition is
-    application-wide data, so authorship does not bind on this path."""
+    """Authorship does not bind on the rename path."""
     client, set_scope = client_scoped
     set_scope(
         scope_for(
@@ -570,8 +567,7 @@ def test_a_project_admin_can_update_another_users_tag(client_scoped, owned, tag_
 
 def test_an_administrator_can_update_another_users_tag(client_scoped, owned, tag_pair):
     """Bound to ownership instead, a label whose author is deactivated would be
-    un-renameable by everyone -- administrators are not a special case here
-    because there is no check on this path to except them from."""
+    un-renameable by everyone, administrators included."""
     client, set_scope = client_scoped
     set_scope(admin_scope(actor_id=owned["actor"]))
     resp = client.patch(f"/tags/{tag_pair['foreign']}", json={"name": "renamed"})

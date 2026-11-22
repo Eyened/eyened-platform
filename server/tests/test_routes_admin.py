@@ -6,7 +6,7 @@ from typing import get_args
 import pytest
 from sqlalchemy import select
 
-from eyened_orm import AuditLog, ProjectMember
+from eyened_orm import AuditLog, Creator, ProjectMember
 from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.repositories import ProjectMemberRepository
 from eyened_orm.utils.db_users import create_user
@@ -44,7 +44,7 @@ def seeded(session):
 
 _PASSWORD = "correct horse battery staple"
 
-# One gate in AdminService.__init__ covers all nine routes. The gate fires
+# One gate in AdminService.__init__ covers all ten routes. The gate fires
 # before any id is resolved, so the ids are arbitrary.
 ADMIN_ROUTES = [
     ("GET", "/admin/users", None),
@@ -56,6 +56,7 @@ ADMIN_ROUTES = [
     ("POST", "/admin/users", {"username": "erin", "password": _PASSWORD}),
     ("PUT", "/admin/users/1/active", {"active": False}),
     ("PUT", "/admin/users/1/password", {"password": _PASSWORD}),
+    ("PUT", "/admin/users/1/email-link", {"email": "j.doe@example.org"}),
 ]
 
 
@@ -237,8 +238,10 @@ def test_revoking_an_absent_membership_is_still_204(client, seeded):
          "no creator with id 999999"),
         ("PUT", "/admin/users/999999/password", {"password": _PASSWORD},
          "no creator with id 999999"),
+        ("PUT", "/admin/users/999999/email-link", {"email": "j.doe@example.org"},
+         "no creator with id 999999"),
     ],
-    ids=["grant-user", "revoke-project", "preview-task", "active", "password"],
+    ids=["grant-user", "revoke-project", "preview-task", "active", "password", "email-link"],
 )
 def test_an_unknown_id_is_404_naming_it(client, seeded, method, path, body, detail):
     """One case per service method and per resolver: each untranslated one is a 500."""
@@ -363,3 +366,43 @@ def test_a_set_password_is_204_and_the_new_one_logs_in(
     [_] = _creator_audit_rows(session)
     login = client.post("/auth/login", json={"username": "dave", "password": _PASSWORD})
     assert login.status_code == 200, login.text
+
+
+def test_linking_an_email_is_attributed_to_the_calling_admin(
+    client_scoped, session, seeded
+):
+    """4242 is not admin_scope's default actor, so a hardcoded id fails."""
+    client, set_scope = client_scoped
+    set_scope(admin_scope(actor_id=4242))
+
+    response = client.put(
+        f"/admin/users/{seeded['alice']}/email-link", json={"email": "j.doe@example.org"}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["employee_identifier"] == "oidc:email:j.doe@example.org"
+    [row] = _creator_audit_rows(session)
+    assert (row.Action, row.ActorID, row.TrustedPath, row.EntityID, row.Changes) == (
+        "UPDATE",
+        4242,
+        None,
+        str(seeded["alice"]),
+        {
+            "username": "alice",
+            "employee_identifier": {"old": "E-1", "new": "oidc:email:j.doe@example.org"},
+        },
+    )
+
+
+def test_an_email_linked_to_another_account_is_409(client, session, seeded):
+    first = client.put(
+        f"/admin/users/{seeded['alice']}/email-link", json={"email": "j.doe@example.org"}
+    )
+    second = client.put(
+        f"/admin/users/{seeded['dave']}/email-link", json={"email": "j.doe@example.org"}
+    )
+
+    assert first.status_code == 200  # control: the same email links once
+    assert second.status_code == 409
+    assert second.json()["detail"]["code"] == "email_link_taken"
+    assert session.get(Creator, seeded["dave"]).EmployeeIdentifier is None

@@ -68,23 +68,34 @@ class OIDCSettings(BaseSettings):
                                                                      "for the authentication flow")
     create_new_accounts: bool = Field(default=False, description="Whether or not to create new accounts for unknown "
                                                                  "users that authenticated through OIDC.")
-    additional_token_validations: str = Field(default="", description="A key-value list of static token claims that "
-                                                                      "must be available in received ID tokens, for "
-                                                                      "example `iss=12345,tid=67890`. Keys and values "
-                                                                      "are separated by `=`, key-value pairs by `,`.")
+    additional_token_validations: str = Field(default="", description="A key-value list of static claims that "
+                                                                      "the ID token or userinfo must hold, for "
+                                                                      "example `iss=12345,tid=67890`. A list claim "
+                                                                      "passes if it contains the value. Keys and "
+                                                                      "values are separated by `=`, key-value pairs "
+                                                                      "by `,`.")
+    # ASSUMPTION: the setting is EYENED_OIDC_ALLOWED_HOME_ORGANIZATIONS, and it applies
+    # to every SSO login, not only first logins.
+    allowed_home_organizations: str = Field(default="", description="A comma-separated list of "
+                                                                    "`schac_home_organization` values allowed to log "
+                                                                    "in through OIDC, for example "
+                                                                    "`erasmusmc.nl,uu.nl`. Empty admits every "
+                                                                    "institution.")
 
 
 @dataclass(frozen=True)
 class OIDCMetadata:
+    issuer: str
     authorization_endpoint: str
     token_endpoint: str
     jwks_uri: str
+    userinfo_endpoint: str
 
 
 @lru_cache
 def get_oidc_metadata(metadata_url: str) -> OIDCMetadata:
     """Fetch OIDC provider metadata and validate its required endpoints."""
-    return validate_oidc_metadata(_fetch_oidc_metadata(metadata_url))
+    return validate_oidc_metadata(_fetch_oidc_metadata(metadata_url), metadata_url)
 
 
 def _fetch_oidc_metadata(metadata_url: str) -> dict:
@@ -106,16 +117,23 @@ def _fetch_oidc_metadata(metadata_url: str) -> dict:
     return metadata
 
 
-def validate_oidc_metadata(metadata: dict) -> OIDCMetadata:
+def validate_oidc_metadata(metadata: dict, metadata_url: str) -> OIDCMetadata:
     """Validate the OIDC metadata fields used by the authentication flow."""
-    for key in ["authorization_endpoint", "token_endpoint", "jwks_uri"]:
+    for key in ["issuer", "authorization_endpoint", "token_endpoint", "jwks_uri", "userinfo_endpoint"]:
         if key not in metadata:
             raise ValueError(f"OIDC metadata URL response is missing required key '{key}'")
 
+    # OIDC Discovery 4.3: the issuer must be identical to the URL it was read from.
+    # Discovery 4 drops a trailing "/" on the issuer before adding the suffix.
+    if metadata["issuer"].rstrip("/") + "/.well-known/openid-configuration" != metadata_url:
+        raise ValueError("OIDC metadata issuer does not match the metadata URL")
+
     return OIDCMetadata(
+        issuer=metadata["issuer"],
         authorization_endpoint=metadata["authorization_endpoint"],
         token_endpoint=metadata["token_endpoint"],
         jwks_uri=metadata["jwks_uri"],
+        userinfo_endpoint=metadata["userinfo_endpoint"],
     )
 
 
@@ -138,6 +156,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+    # Refresh token lifetime when "Keep me logged in" is unticked.
+    refresh_token_short_expire_minutes: int = 60
+    # A refresh more than this long after login is refused (NIST AAL1).
+    session_max_age_days: int = 30
     jwt_cookie_name: str = "jwt_token"
     refresh_cookie_name: str = "refresh_token"
     # Enable only behind HTTPS; login fails over plain HTTP.

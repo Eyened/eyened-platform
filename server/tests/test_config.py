@@ -87,19 +87,28 @@ def test_oidc_metadata_url_returns_invalid_data(fake_oidc_metadata_client):
 
 
 def test_valid_oidc_metadata_is_returned_unchanged():
-    metadata = validate_oidc_metadata(OPENID_CONFIG)
+    metadata = validate_oidc_metadata(OPENID_CONFIG, METADATA_URL)
     assert metadata.authorization_endpoint == "https://example.com/api/authorize"
     assert metadata.token_endpoint == "https://example.com/api/token"
     assert metadata.jwks_uri == "https://example.com/api/jwks"
 
 
-@pytest.mark.parametrize("metadata_key", ["authorization_endpoint", "jwks_uri", "token_endpoint"])
+def test_an_issuer_with_a_trailing_slash_matches_its_metadata_url():
+    # OIDC Discovery 4: a trailing "/" on the issuer is removed before the well-known suffix is added.
+    metadata = validate_oidc_metadata({**OPENID_CONFIG, "issuer": "https://example.com/api/"}, METADATA_URL)
+    assert metadata.issuer == "https://example.com/api/"
+
+
+@pytest.mark.parametrize(
+    "metadata_key",
+    ["authorization_endpoint", "jwks_uri", "token_endpoint", "issuer", "userinfo_endpoint"],
+)
 def test_oidc_missing_required_metadata(metadata_key):
     response_data = OPENID_CONFIG.copy()
     del response_data[metadata_key]
 
     with pytest.raises(ValueError, match=f"OIDC metadata URL response is missing required key '{metadata_key}'"):
-        validate_oidc_metadata(response_data)
+        validate_oidc_metadata(response_data, METADATA_URL)
 
 
 def test_the_admin_settings_carry_the_env_prefix(monkeypatch):

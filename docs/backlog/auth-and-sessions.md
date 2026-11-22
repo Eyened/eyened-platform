@@ -7,18 +7,6 @@
 - **Fix:** add `check_new_username()` next to `check_new_password()` in `orm/eyened_orm/utils/db_users.py`; call it from admin create, register and the CLI, mapped to 4xx. Derive the max from `Creator.__table__.c.CreatorName.type.length`; reject leading/trailing whitespace rather than strip.
 - **Note:** OIDC needs its own decision: rejecting an IdP-supplied name locks that user out.
 
-### Cap the absolute session lifetime
-- **Status:** open
-- **Source:** RBAC admin P3b brainstorm, 2026-09-18
-- **Problem:** every `/auth/refresh` mints a fresh 7-day refresh token, so an active session never ends (NIST 800-63B-4 AAL1: SHOULD ≤ 30 days).
-- **Fix:** carry the original login time through refreshes and refuse to refresh past a cap.
-
-### Make "Keep me logged in" change the session lifetime
-- **Status:** open
-- **Source:** client Carbon PR 1 (`ui/carbon-1-login`) final review, 2026-10-09; ignored since `10b97913`
-- **Problem:** the login form sends `remember_me`, but `POST /auth/login` parses `TokenLoginRequest` (`server/routes/auth.py`), which has no such field, and always sets both cookies with a fixed `max_age` (refresh 7 days). Unticking does nothing; v1 gave 1 hour unticked and 30 days ticked.
-- **Fix:** add `remember_me` to `TokenLoginRequest`; when false, set both cookies without `max_age` and mint a short refresh token from a new setting. Carry the choice as a `remember` claim in the refresh JWT that `/auth/refresh` copies forward; a missing claim means `True`, so issued tokens keep working. One cookie helper for login, refresh and OIDC.
-- **Note:** decide the short lifetime (v1 parity: 60 min) and whether OIDC honours it (no deployment uses OIDC). Same claim forwarding as "Cap the absolute session lifetime"; fix both together.
 
 ### Fix or delete the `api_client` branch of `POST /auth/login`
 - **Status:** open
@@ -38,10 +26,3 @@
 - **Problem:** `check_oidc_login` / `oidc_authenticate` in `server/routes/auth.py` still take a `Session` (allow-listed in `server/tests/test_no_session_in_service_or_route_signatures.py`). No test asserts the `Set-Cookie` attributes (`HttpOnly`, `SameSite`, `Max-Age`, `Path`) of `login`, `oidc_authenticate` or `refresh`, so a refactor can weaken them silently.
 - **Fix:** add wire-contract tests on the response `Set-Cookie` headers first, then extract a `resolve_oidc()` into `AuthService` and delete the two allow-list entries.
 - **Note:** no deployment uses OIDC and there is no token-validation harness; build one for the extraction.
-
-### Read OIDC claims from the userinfo endpoint
-- **Status:** open
-- **Source:** SURFconext test-entity Playground check, 2026-10-29
-- **Problem:** `check_oidc_login` (`server/routes/auth.py`) reads claims only from the ID token. SURFconext puts only `sub` there; `email` comes from userinfo and no display name arrives at all. So email matching and auto-provisioning (`preferred_username`) never fire, and a SURFconext login only works for an account that already holds `oidc:sub:<sub>`.
-- **Fix:** add `userinfo_endpoint` to `OIDCMetadata` (`server/config.py`); in `oidc_authenticate`, call it with the token response's `access_token`, check its `sub` equals the ID token's, and merge its claims before `check_oidc_login`.
-- **Note:** the SURFconext test entity needs subject type Persistent; its claims list offers `nickname`, not `preferred_username`.

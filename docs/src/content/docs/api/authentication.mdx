@@ -16,12 +16,15 @@ Login with username and password.
 {
   "username": "string",
   "password": "string",
-  "api_client": false
+  "api_client": false,
+  "remember_me": true
 }
 ```
 
 - `api_client: false` (default) — sets JWT cookies; returns user info.
 - `api_client: true` — returns `access_token`, `refresh_token`, and user info in the JSON body (no cookies).
+- `remember_me: true` (default) — a 7-day refresh token, and cookies that outlive the browser.
+- `remember_me: false` — a 60-minute refresh token, and browser-session cookies.
 
 ### POST /api/auth/token
 

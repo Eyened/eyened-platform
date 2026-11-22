@@ -155,6 +155,23 @@ class AccessScope:
                 projects=under,
             )
 
+    def require_in_any_project(
+        self, floor: ProjectRole, *, entity: str, entity_id: int | None = None
+    ) -> None:
+        """Assert the actor holds ``floor`` in at least one project, or is an administrator.
+
+        For writes to global rows with no project of their own (features, tags).
+        403 because every logged-in Account can read those rows.
+        """
+        if self.is_admin or any(role >= floor for role in self.roles.values()):
+            return
+        raise PermissionDeniedError(
+            actor_id=self.actor_id,
+            entity=entity,
+            entity_id=entity_id,
+            projects=frozenset(),
+        )
+
     def require_admin(self, *, entity: str, entity_id: int | None = None) -> None:
         """Gate a platform-administrator action (source data, whole-database sweeps).
 

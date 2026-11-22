@@ -195,6 +195,87 @@ describe("user page", () => {
         );
     });
 
+    it("links an email and shows it on the page", async () => {
+        const address =
+            "johanna.van-der-heijden-oosterhout@student.erasmusmc.nl";
+        let user: unknown = alice;
+        const link = vi.fn(() => {
+            user = { ...alice, employee_identifier: `oidc:email:${address}` };
+            return json(user);
+        });
+        stubFetch({
+            "GET /api/admin/users": () => json([user]),
+            "GET /api/admin/users/3/memberships": () => json([alpha]),
+            "GET /api/admin/projects": () => json(projects),
+            "PUT /api/admin/users/3/email-link": link,
+        });
+        render(UserPage);
+        expect(await screen.findByText("Not linked")).toBeInTheDocument();
+
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Link email" }),
+        );
+        const dialog = await screen.findByRole("dialog", {
+            name: "Link email",
+        });
+        await fireEvent.input(within(dialog).getByLabelText("Email"), {
+            target: { value: address },
+        });
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Link email" }),
+        );
+
+        await vi.waitFor(() =>
+            expect(link).toHaveBeenCalledWith({ email: address }),
+        );
+        expect(await screen.findByText(address)).toBeInTheDocument();
+        expect(screen.queryByText("Not linked")).toBeNull();
+    });
+
+    it("shows a taken email on the field and keeps the modal open", async () => {
+        stubUser({
+            "PUT /api/admin/users/3/email-link": () =>
+                json(
+                    {
+                        detail: {
+                            code: "email_link_taken",
+                            message: "Email already linked",
+                        },
+                    },
+                    409,
+                ),
+        });
+        render(UserPage);
+
+        await fireEvent.click(
+            await screen.findByRole("button", { name: "Link email" }),
+        );
+        const dialog = await screen.findByRole("dialog", {
+            name: "Link email",
+        });
+        const field = within(dialog).getByLabelText("Email");
+        await fireEvent.input(field, {
+            target: { value: "a.jansen@erasmusmc.nl" },
+        });
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Link email" }),
+        );
+
+        expect(
+            await within(dialog).findByText(
+                "Another Account already has this email linked.",
+            ),
+        ).toBeInTheDocument();
+        expect(field).toHaveAccessibleDescription(
+            "Another Account already has this email linked.",
+        );
+        expect(
+            within(dialog).queryByText("Email could not be linked"),
+        ).toBeNull();
+        expect(screen.getByRole("dialog", { name: "Link email" })).toBe(dialog);
+        expect(field).toHaveValue("a.jansen@erasmusmc.nl");
+    });
+
     it("shows a refused password in the Set password modal", async () => {
         stubUser({
             "PUT /api/admin/users/3/password": () =>

@@ -1,8 +1,8 @@
 """Admin is decided in AdminService.__init__; there is no router-level gate."""
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from eyened_orm import Creator
 from eyened_orm.authz.roles import ProjectRole
@@ -85,6 +85,13 @@ class SetPasswordRequest(BaseModel):
     """The new password; it must pass the policy."""
 
     password: str = Field(min_length=1)
+
+
+class LinkEmailRequest(BaseModel):
+    """The email address the account's first SSO login will match."""
+
+    # ASSUMPTION: no email-format check; the provider's email claim is matched as given.
+    email: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 def _user_response(creator: Creator) -> AdminUserResponse:
@@ -225,3 +232,14 @@ def set_user_password(
 ) -> None:
     """Replace a user's password."""
     service.set_password(user_id, body.password)
+
+
+@router.put("/admin/users/{user_id}/email-link", response_model=AdminUserResponse)
+def link_user_email(
+    user_id: int,
+    body: LinkEmailRequest,
+    service: AdminService = Depends(get_admin_service),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Link an email address; the first SSO login with it lands in this account."""
+    return _user_response(service.link_email(user_id, body.email))

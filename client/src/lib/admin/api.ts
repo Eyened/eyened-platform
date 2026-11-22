@@ -100,3 +100,14 @@ export async function setPassword(
         "set password",
     );
 }
+
+export async function linkEmail(userId: number, email: string): Promise<void> {
+    await apiInvoke(
+        () =>
+            api.PUT("/admin/users/{user_id}/email-link", {
+                params: { path: { user_id: userId } },
+                body: { email },
+            }),
+        "link email",
+    );
+}
