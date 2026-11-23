@@ -1194,6 +1194,26 @@ export interface paths {
         patch: operations["patch_study_tag_studies__study_id__tags__tag_id__patch"];
         trace?: never;
     };
+    "/studies/{study_id}/data-sources/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Study Data Source
+         * @description This study's data from an external source, as named tables.
+         */
+        get: operations["get_study_data_source_studies__study_id__data_sources__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/patients/{patient_id}": {
         parameters: {
             query?: never;
@@ -1475,6 +1495,13 @@ export interface components {
          * @enum {string}
          */
         DataRepresentation: "Binary" | "DualBitMask" | "Probability" | "MultiLabel" | "MultiClass";
+        /** DataSourceGET */
+        DataSourceGET: {
+            /** Name */
+            name: string;
+            /** Collapse */
+            collapse: boolean;
+        };
         /**
          * Datatype
          * @enum {string}
@@ -2495,6 +2522,11 @@ export interface components {
             series?: components["schemas"]["SeriesGET"][] | null;
             /** Tags */
             tags: components["schemas"]["TagMeta"][];
+            /**
+             * Data Sources
+             * @default []
+             */
+            data_sources: components["schemas"]["DataSourceGET"][];
         };
         /** StudyMeta */
         StudyMeta: {
@@ -5857,6 +5889,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TagMeta"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_study_data_source_studies__study_id__data_sources__name__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                study_id: number;
+                name: string;
+            };
+            cookie?: {
+                jwt_token?: string;
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: (number | string | null)[][];
+                    };
                 };
             };
             /** @description Validation Error */

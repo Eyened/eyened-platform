@@ -165,6 +165,18 @@ database.
   built from it (e.g. CLI stdout) would report.
 - **`eorm create-user` writes an audit row.** It previously wrote none.
 
+**External data sources**
+
+- **External data sources are configured on the server and fetched by it.** The extra panels on
+  study blocks and in the viewer's visits panel now come from `deploy/data_sources.yaml`.
+  `client/src/lib/extensions.ts` is removed. See
+  [External data sources](/eyened-platform/deployment/production#external-data-sources).
+- **Migration:** move each `additional_data_sources` entry into `data_sources.yaml`. The
+  placeholders become `{project}`, `{patient}` and `{date}` (previously `${project.name}`,
+  `${patient.identifier}` and `${study.date}`), and `conditions` on `project.name` become
+  `projects: [...]`.
+- **The study-block form list (`list_forms`) is removed.**
+
 ## v2026.09.0
 
 Per-project access control is now enforced, tasks declare the projects they span, and the

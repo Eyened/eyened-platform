@@ -30,6 +30,15 @@ class ObjectTagPATCH(BaseModel):
     comment: Optional[str] = None
 
 
+class DataSourceGET(BaseModel):
+    name: str
+    collapse: bool
+
+
+# What an external data source returns: table titles mapped to rows of cells.
+NamedTables = dict[str, list[list[int | float | str | None]]]
+
+
 # Utility DTOs
 class Position2D(BaseModel):
     x: float

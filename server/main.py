@@ -27,7 +27,8 @@ from server.routes import (
     patients,
     admin,
 )
-from server.config import get_redis_connection, settings
+from server.config import get_data_sources, get_redis_connection, settings
+from server.services.data_source_client import data_source_client_lifespan
 from server.services.exceptions import register_exception_handlers
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,9 @@ async def lifespan(app: FastAPI):
     else:
         logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
         logging.getLogger("server").setLevel(logging.INFO)
+    # Their INFO lines contain the URL, which holds a patient identifier.
+    logging.getLogger("httpxyz").setLevel(logging.WARNING)
+    logging.getLogger("httpcorexyz").setLevel(logging.WARNING)
 
     # Audit events go to stdout as JSON; app/debug logs stay on stderr.
     configure_audit_logging()
@@ -144,7 +148,11 @@ async def lifespan(app: FastAPI):
         settings.threadpool_limit
     )
 
-    yield
+    # Fail startup on a missing or invalid data sources file.
+    get_data_sources()
+
+    async with data_source_client_lifespan():
+        yield
     # after shutdown
 
 

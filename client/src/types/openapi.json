@@ -5505,6 +5505,105 @@
         }
       }
     },
+    "/studies/{study_id}/data-sources/{name}": {
+      "get": {
+        "summary": "Get Study Data Source",
+        "description": "This study's data from an external source, as named tables.",
+        "operationId": "get_study_data_source_studies__study_id__data_sources__name__get",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "title": "Response Get Study Data Source Studies  Study Id  Data Sources  Name  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/patients/{patient_id}": {
       "get": {
         "summary": "Get Patient",
@@ -6571,6 +6670,24 @@
           "MultiClass"
         ],
         "title": "DataRepresentation"
+      },
+      "DataSourceGET": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "collapse": {
+            "type": "boolean",
+            "title": "Collapse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "collapse"
+        ],
+        "title": "DataSourceGET"
       },
       "Datatype": {
         "type": "string",
@@ -9697,6 +9814,14 @@
             },
             "type": "array",
             "title": "Tags"
+          },
+          "data_sources": {
+            "items": {
+              "$ref": "#/components/schemas/DataSourceGET"
+            },
+            "type": "array",
+            "title": "Data Sources",
+            "default": []
           }
         },
         "type": "object",

@@ -52,6 +52,8 @@ Exemptions, and what would remove them:
 - One route handler, ``oidc_authenticate``, holds ``session`` only to forward
   it to ``check_oidc_login``. The six password-path handlers take
   ``Depends(get_auth_service)`` instead (``_is_di_factory``).
+- ``get_study_data_source`` holds ``db`` only to commit early, so the
+  connection is not held while the upstream call is awaited.
 
 Blind spot: both scans key on the bare names ``session``/``db`` (parameter
 name for guard 1, call-receiver name for guard 2), so a local alias (e.g.
@@ -59,7 +61,9 @@ name for guard 1, call-receiver name for guard 2), so a local alias (e.g.
 point in scope arrives as a ``Depends(get_db)`` parameter, and guard 1's
 annotation check (``text.endswith("Session")``) still catches the
 parameter-rename variant -- but a future maintainer introducing such an alias
-would not be caught here.
+would not be caught here. Guard 2 also misses a method passed as a value
+rather than called, such as ``run_in_threadpool(db.commit)`` in
+``get_study_data_source``; that one is covered by its guard 1 exemption.
 """
 
 import ast
@@ -121,6 +125,12 @@ _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
     ("routes/auth.py", "oidc_authenticate"): (
         "forwards session to check_oidc_login only. What would remove it: the "
         "check_oidc_login extraction above"
+    ),
+    ("routes/studies.py", "get_study_data_source"): (
+        "commits the request's read-only transaction early so the DB connection "
+        "is back in the pool while the upstream call is awaited. What would "
+        "remove it: a dependency that does the scoped lookup and releases the "
+        "connection before the handler runs"
     ),
     # R1: import_api.py is slated for deprecation (see module docstring); only
     # import_single_image holds a Session, for ImportRun.apply().

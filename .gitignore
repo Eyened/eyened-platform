@@ -4,13 +4,10 @@
 notebooks/hrfav/**/*
 notebooks/schema.json
 node_modules/**/*
-extensions.ts
-client/src/lib/extensions.ts
 storage/**/*
 images/**/*
 cookies.txt
 .vscode/settings.json
-client/src/lib/extensions.ts
 TODO.md
 orm/migrations/transfer-config.yml
 orm/migrations/transfer-config.*.yml
@@ -20,7 +17,6 @@ orm/migrations/sql/
 segmentations.zarr/
 **/.ipynb_checkpoints/**
 .cursor/
-client/src/lib/extensions.ts
 venv
 trash
 scratch.txt
@@ -45,6 +41,8 @@ deploy/.env
 deploy/.env.*
 !deploy/.env.example
 deploy/compose.storage.yaml
+deploy/compose.data-sources.yaml
+deploy/data_sources.yaml
 deploy/backups
 deploy/snapshots/
 

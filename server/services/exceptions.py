@@ -71,6 +71,12 @@ class UnauthenticatedError(ServiceError):
     status_code = 401
 
 
+class UpstreamError(ServiceError):
+    """An external data source failed or timed out (maps to HTTP 502)."""
+
+    status_code = 502
+
+
 class OutOfDeclarationError(ConflictError):
     """An image's project is not among those its task declares."""
 
