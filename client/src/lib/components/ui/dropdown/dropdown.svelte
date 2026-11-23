@@ -88,13 +88,14 @@
                 : undefined}
             variant={type}
             class="{heights[size] ??
-                ''} aria-invalid:not-focus:outline-2 aria-invalid:not-focus:-outline-offset-2 aria-invalid:not-focus:outline-support-error"
+                ''} aria-invalid:pe-16 aria-invalid:not-focus:outline-2 aria-invalid:not-focus:-outline-offset-2 aria-invalid:not-focus:outline-support-error"
         >
             {selectedText}
             {#if invalid}
+                <!-- Placed like the chevron, beside it, so the truncated text can't wrap it away. -->
                 <ErrorFilled
                     aria-hidden="true"
-                    class="shrink-0 text-support-error"
+                    class="pointer-events-none absolute top-1/2 right-10 -translate-y-1/2 text-support-error"
                 />
             {/if}
         </Select.Trigger>
