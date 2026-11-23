@@ -18,8 +18,13 @@
     import { FeaturePipetteOverlay } from "./panelSegmentation/FeaturePipetteOverlay";
     import { pointArming } from "$lib/forms/pointArming.svelte";
     import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
+    import { MeasureTool } from "$lib/viewer/tools/Measure.svelte";
     import { createViewTool } from "$lib/viewer/tools/viewTools";
-    import type { Workspace } from "$lib/workspace/workspace.svelte";
+    import { GridLayers } from "$lib/layers/gridLayers.svelte";
+    import type {
+        LayersTarget,
+        Workspace,
+    } from "$lib/workspace/workspace.svelte";
     interface Props {
         image: AbstractImage;
     }
@@ -48,6 +53,13 @@
     );
     setContext("mainViewerContext", mainViewerContext);
     onDestroy(viewerContext.addOverlay(mainViewerContext));
+    // Layers' state for this viewport lives here, because Layers remounts its sections when the selection moves.
+    const layers: LayersTarget = {
+        viewerContext,
+        mainViewerContext,
+        grids: new GridLayers(viewerContext, viewerWindowContext.registration),
+        measure: new MeasureTool(viewerContext.image),
+    };
 
     if (image.is3D) {
         const enfaceManager = viewerWindowContext.enfaceProjectionManagers.get(
@@ -115,7 +127,7 @@
                 viewerContext.zoom(width / 2, height / 2, factor);
             },
             reset: () => viewerContext.initTransform(),
-            layers: { viewerContext, mainViewerContext },
+            layers,
         });
     });
 

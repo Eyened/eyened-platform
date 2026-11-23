@@ -19,6 +19,7 @@ import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
 import { toast } from "svelte-sonner";
+import { cased, casedText } from "../overlays/casing";
 
 const defaultStroke = "rgba(0, 255, 0, 1)";
 const fillStyle = "rgba(255, 255, 255, 0.6)";
@@ -483,7 +484,7 @@ export class PointTool implements Overlay {
                 }
             }
             if (label) {
-                context2D.fillText(label, p.x + r, p.y + r + 12);
+                casedText(context2D, label, p.x + r, p.y + r + 12);
             }
         }
 
@@ -522,7 +523,7 @@ export class PointTool implements Overlay {
         r: number,
     ) {
         if (this.pointStyle === "rect") {
-            ctx.strokeRect(p.x - r, p.y - r, 2 * r, 2 * r);
+            cased(ctx, () => ctx.strokeRect(p.x - r, p.y - r, 2 * r, 2 * r));
             return;
         }
         ctx.beginPath();
@@ -533,7 +534,7 @@ export class PointTool implements Overlay {
             ctx.moveTo(p.x, p.y - r);
             ctx.lineTo(p.x, p.y + r);
         }
-        ctx.stroke();
+        cased(ctx, () => ctx.stroke());
     }
 
     private fillMarker(

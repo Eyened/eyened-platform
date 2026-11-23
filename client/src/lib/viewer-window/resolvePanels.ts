@@ -3,17 +3,12 @@ import type { PanelName } from "$lib/viewer/viewer-utils";
 import type { FormSchemaGET } from "../../types/openapi_types";
 import type { QuickFormPanelConfig, TaskConfig } from "./taskConfigLayout";
 import PanelInfo from "./panelInfo/panelInfo.svelte";
-import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
 import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
-import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
 import PanelForm from "./panelForm/PanelForm.svelte";
 import PanelQuickForm from "./panelQuickForm/PanelQuickForm.svelte";
-import { ETDRS, Form, Info, Registration } from "./icons/icons";
-import Measure from "./icons/Measure.svelte";
+import { Form, Info, Registration } from "./icons/icons";
 import InfoPanelHelp from "./panelHelp/InfoPanelHelp.svelte";
-import EtdrsPanelHelp from "./panelHelp/EtdrsPanelHelp.svelte";
 import RegistrationPanelHelp from "./panelHelp/RegistrationPanelHelp.svelte";
-import MeasurePanelHelp from "./panelHelp/MeasurePanelHelp.svelte";
 import FormPanelHelp from "./panelHelp/FormPanelHelp.svelte";
 
 export type ResolvedPanel = {
@@ -53,16 +48,6 @@ export function buildDefaultPanels(
         { name: "Info", component: PanelInfo, Icon: Info, Help: InfoPanelHelp },
     ];
 
-    if (input.is2D && input.etdrsSchema) {
-        panels.push({
-            name: "ETDRS",
-            component: PanelETDRS,
-            Icon: ETDRS,
-            Help: EtdrsPanelHelp,
-            props: { etdrsSchema: input.etdrsSchema, active: false },
-        });
-    }
-
     if (input.is2D && input.registrationSchema) {
         panels.push({
             name: "Registration",
@@ -76,16 +61,12 @@ export function buildDefaultPanels(
         });
     }
 
-    panels.push(
-        {
-            name: "Measure",
-            component: PanelMeasure,
-            Icon: Measure,
-            Help: MeasurePanelHelp,
-            props: { active: false },
-        },
-        { name: "Form", component: PanelForm, Icon: Form, Help: FormPanelHelp },
-    );
+    panels.push({
+        name: "Form",
+        component: PanelForm,
+        Icon: Form,
+        Help: FormPanelHelp,
+    });
 
     return panels;
 }
