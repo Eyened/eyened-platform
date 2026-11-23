@@ -53,6 +53,25 @@ describe("LayoutPopover", () => {
             ).toBeNull(),
         );
     });
+
+    it("opens from an outside anchor, starts on the current preset and returns focus to the anchor", async () => {
+        const anchor = document.createElement("button");
+        anchor.id = "menu-anchor";
+        anchor.textContent = "Show menu";
+        document.body.append(anchor);
+        render(LayoutPopover, {
+            props: { anchor: "#menu-anchor", open: true },
+            context: workspaceContext(workspaceWith(20, { layout: "2x1" })),
+        });
+        expect(screen.queryByRole("button", { name: "Layout" })).toBeNull();
+        const current = await screen.findByRole("button", {
+            name: "2 side by side",
+        });
+        expect(current.tabIndex).toBe(0);
+        await fireEvent.keyDown(current, { key: "Escape" });
+        await waitFor(() => expect(anchor).toHaveFocus());
+        anchor.remove();
+    });
 });
 
 describe("LayoutPopover strip toggle", () => {

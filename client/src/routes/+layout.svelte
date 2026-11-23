@@ -34,12 +34,14 @@
         />
     </div>
 {/await}
-<!-- The viewer sets these so toasts sit at the canvas's bottom right, above the pager. -->
+<!-- The viewer sets these so toasts sit at the canvas's bottom right, above the pager.
+     Below 600 px svelte-sonner reads mobileOffset and puts 16 px on the sides. -->
 <Toaster
     offset={{
         right: "var(--viewer-toast-right, 24px)",
         bottom: "var(--viewer-toast-bottom, 24px)",
     }}
+    mobileOffset={{ bottom: "var(--viewer-toast-bottom, 16px)" }}
 />
 
 <style>
