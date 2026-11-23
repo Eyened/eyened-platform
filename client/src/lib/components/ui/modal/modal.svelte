@@ -19,6 +19,8 @@
         successDescription: string;
         errorTitle: string;
         danger?: boolean;
+        /** Focus starts on the secondary button, as in a danger modal, where a double Enter must not confirm. */
+        focusSecondary?: boolean;
         /** The primary stays disabled (aria-disabled), for example until a row is picked. */
         primaryButtonDisabled?: boolean;
         size?: "xs" | "sm" | "lg";
@@ -41,6 +43,7 @@
         successDescription,
         errorTitle,
         danger = false,
+        focusSecondary = false,
         primaryButtonDisabled = false,
         size = "sm",
         hasScrollingContent = false,
@@ -110,11 +113,13 @@
         interactOutsideBehavior="ignore"
         onOpenAutoFocus={(e) => {
             // Carbon: a danger modal focuses Cancel; others the element marked data-modal-primary-focus, else their first field.
-            const first = danger
-                ? cancel
-                : form?.querySelector<HTMLElement>(
-                      "[data-modal-primary-focus]",
-                  );
+            // focusSecondary (ours) focuses the secondary button, as a danger modal does.
+            const first =
+                danger || focusSecondary
+                    ? cancel
+                    : form?.querySelector<HTMLElement>(
+                          "[data-modal-primary-focus]",
+                      );
             if (first) {
                 e.preventDefault();
                 first.focus();

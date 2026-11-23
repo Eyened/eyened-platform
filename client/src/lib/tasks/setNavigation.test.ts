@@ -6,7 +6,11 @@ import { SetNavigation } from "./setNavigation.svelte";
 
 function setup(
     send: (value: number) => Promise<void>,
-    { index = 4, count = 10 } = {},
+    {
+        index = 4,
+        count = 10,
+        incomplete,
+    }: { index?: number; count?: number; incomplete?: () => string[] } = {},
 ) {
     const tracker = new SaveTracker();
     const revealed: RevealTarget[] = [];
@@ -48,6 +52,7 @@ function setup(
         navigate,
         handoff: () => ({ selected: 0, maximised: null }),
         focus: vi.fn(),
+        incomplete,
     });
     return { work, statusSend, navigate, navigation, revealed };
 }
@@ -156,5 +161,61 @@ describe("SetNavigation", () => {
         await settle();
         expect(s.navigate).not.toHaveBeenCalled();
         expect(s.revealed).toEqual([s.work.target]);
+    });
+});
+
+describe("Mark ready with forms that aren't complete", () => {
+    const LINES = [
+        "Image quality grading for OD · OCT · 2024-05-02: not graded",
+    ];
+
+    it("asks after the saves; Go back saves no status and stays", async () => {
+        vi.useFakeTimers();
+        const order: string[] = [];
+        const { work, statusSend, navigate, navigation } = setup(
+            async () => {
+                order.push("saved");
+            },
+            {
+                incomplete: () => {
+                    order.push("checked");
+                    return LINES;
+                },
+            },
+        );
+        work.edit(1);
+        const move = navigation.move("primary", { markReady: true });
+        await settle();
+        expect(order).toEqual(["saved", "checked"]);
+        expect(navigation.readyQuestion).toEqual(LINES);
+        navigation.answerReady(false);
+        await move;
+        expect(statusSend).not.toHaveBeenCalled();
+        expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it("Mark ready and next in the modal saves Ready and moves", async () => {
+        vi.useFakeTimers();
+        const { statusSend, navigate, navigation } = setup(async () => {}, {
+            incomplete: () => LINES,
+        });
+        const move = navigation.move("primary", { markReady: true });
+        await settle();
+        navigation.answerReady(true);
+        await move;
+        expect(statusSend).toHaveBeenCalledWith("Ready");
+        expect(navigate).toHaveBeenCalledWith(5);
+    });
+
+    it("a complete set and Go to next set ask nothing", async () => {
+        vi.useFakeTimers();
+        const incomplete = vi.fn(() => [] as string[]);
+        const { navigation } = setup(async () => {}, { incomplete });
+        await navigation.move("primary", { markReady: true });
+        expect(navigation.readyQuestion).toBeNull();
+        const other = setup(async () => {}, { incomplete: () => LINES });
+        await other.navigation.move("primary", { markReady: false });
+        expect(other.navigation.readyQuestion).toBeNull();
+        expect(other.navigate).toHaveBeenCalledWith(5);
     });
 });

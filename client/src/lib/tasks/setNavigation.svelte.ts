@@ -51,6 +51,8 @@ export interface SetNavigationDeps {
     /** The viewports the next set restores. */
     handoff: () => { selected: number; maximised: number | null };
     focus: (control: SetControl | "status") => void;
+    /** The forms "Mark ready" warns about, read after the saves; none means no question. */
+    incomplete?: () => string[];
 }
 
 /** ◀ ▶, "Mark ready and next", "Go to next set" and the last set's "Mark ready": saves first, one move at a time. */
@@ -63,9 +65,12 @@ export class SetNavigation {
     statusFailed = $state(false);
     /** The open "Leave set n without saving"; answerLeave answers it. */
     question: { markReady: boolean } | null = $state(null);
+    /** The open "n forms aren't complete"; answerReady answers it. */
+    readyQuestion: string[] | null = $state(null);
     /** A move is running, or the page load it started; Set status ▾ waits for it. */
     moving = $state(false);
     private answer: ((leave: boolean) => void) | null = null;
+    private readyAnswer: ((go: boolean) => void) | null = null;
 
     constructor(private readonly deps: SetNavigationDeps) {}
 
@@ -91,6 +96,9 @@ export class SetNavigation {
                 return;
             }
             if (markReady) {
+                // After the flush, so answers typed a moment ago count.
+                const lines = this.deps.incomplete?.() ?? [];
+                if (lines.length > 0 && !(await this.askReady(lines))) return;
                 // A failure shows on the combo button; the grader stays.
                 if (!(await this.saveStatus("Ready"))) return;
                 // Work that became unsaved during the status save keeps the grader here.
@@ -129,6 +137,18 @@ export class SetNavigation {
         this.question = null;
         this.answer?.(leave);
         this.answer = null;
+    }
+
+    /** Mark ready anyway, or Go back with nothing changed. */
+    answerReady(go: boolean): void {
+        this.readyQuestion = null;
+        this.readyAnswer?.(go);
+        this.readyAnswer = null;
+    }
+
+    private askReady(lines: string[]): Promise<boolean> {
+        this.readyQuestion = lines;
+        return new Promise((resolve) => (this.readyAnswer = resolve));
     }
 
     private ask(markReady: boolean): Promise<boolean> {
