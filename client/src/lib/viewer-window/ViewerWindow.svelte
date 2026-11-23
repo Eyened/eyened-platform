@@ -43,11 +43,11 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
     const navigation = taskContext ? new TaskNavigation(taskContext) : null;
-    // subTaskIndex is 0-based: TaskNavigation disables Previous at 0.
+    // subTaskIndex is 0-based; people read sets from 1.
     const task: TaskHeader | null = $derived(
         taskContext && navigation
             ? {
-                  label: `Set ${taskContext.subTaskIndex} of ${taskContext.task.num_tasks}`,
+                  label: `Set ${taskContext.subTaskIndex + 1} of ${taskContext.task.num_tasks}`,
                   prevDisabled: navigation.prevDisabled,
                   nextDisabled: navigation.nextDisabled,
                   prev: () => navigation.prev(),

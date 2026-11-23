@@ -280,7 +280,7 @@ export async function tagInstance(
 
 ### Subtask Operations
 
-**Example from `routes/tasks/[taskid]/grade/[setid]/+page.svelte`:**
+**Example from `routes/tasks/[taskid]/set/[n]/+page.svelte`:**
 
 ```typescript
 const loadPromise = (async () => {

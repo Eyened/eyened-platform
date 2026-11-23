@@ -87,7 +87,7 @@ describe("SubTaskRow", () => {
         const { onchange } = renderRow({ subtask: makeRow() });
 
         await fireEvent.click(
-            screen.getByRole("button", { name: "Claim set 2" }),
+            screen.getByRole("button", { name: "Claim set 3" }),
         );
         expect(updateSubTask).toHaveBeenCalledWith(11, { claim: true });
         expect(onchange).toHaveBeenCalled();
@@ -103,7 +103,7 @@ describe("SubTaskRow", () => {
         });
 
         await fireEvent.click(
-            screen.getByRole("button", { name: "Unclaim set 2" }),
+            screen.getByRole("button", { name: "Unclaim set 3" }),
         );
         expect(updateSubTask).toHaveBeenCalledWith(11, { claim: false });
     });
@@ -117,10 +117,10 @@ describe("SubTaskRow", () => {
         const { onerror, onchange } = renderRow({ subtask: makeRow() });
 
         await fireEvent.click(
-            screen.getByRole("button", { name: "Claim set 2" }),
+            screen.getByRole("button", { name: "Claim set 3" }),
         );
         expect(onerror).toHaveBeenCalledWith(
-            "Set 2 could not be claimed",
+            "Set 3 could not be claimed",
             "SubTask is already assigned",
         );
         expect(onchange).not.toHaveBeenCalled();

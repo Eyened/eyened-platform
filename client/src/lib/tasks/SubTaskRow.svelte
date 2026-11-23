@@ -43,6 +43,9 @@
         onchange,
     }: Props = $props();
 
+    // ASSUMPTION: the API always sends index; the schema only marks it optional.
+    const setNumber = $derived((row.index ?? 0) + 1);
+
     const globalContext = getContext<GlobalContext>("globalContext");
 
     const assigneeId = $derived(row.creator?.id ?? row.creator_id ?? null);
@@ -101,7 +104,7 @@
             onchange();
         } catch (e) {
             onerror(
-                `Set ${row.index} could not be ${claim ? "claimed" : "unclaimed"}`,
+                `Set ${setNumber} could not be ${claim ? "claimed" : "unclaimed"}`,
                 message(e),
             );
         } finally {
@@ -156,17 +159,17 @@
         />
     </Table.Cell>
     <Table.Cell class={joined}>
-        <!-- 0-based, as the grading viewer shows "Set {index}" -->
+        <!-- 1-based, as the grading viewer shows "Set {n}" -->
         <a
-            href={resolve("/tasks/[taskid]/grade/[setid]", {
+            href={resolve("/tasks/[taskid]/set/[n]", {
                 taskid: String(taskId),
-                setid: String(row.index),
+                n: String(setNumber),
             })}
             target="_blank"
-            aria-label="Set {row.index}, opens in a new tab"
+            aria-label="Set {setNumber}, opens in a new tab"
             class="inline-flex items-center gap-2 text-link-primary group-hover:text-link-secondary hover:underline"
         >
-            {row.index}
+            {setNumber}
             <Launch aria-hidden="true" />
         </a>
     </Table.Cell>
@@ -194,8 +197,8 @@
             <Button
                 variant="ghost"
                 aria-label={isUnassigned
-                    ? `Claim set ${row.index}`
-                    : `Unclaim set ${row.index}`}
+                    ? `Claim set ${setNumber}`
+                    : `Unclaim set ${setNumber}`}
                 aria-disabled={pending || undefined}
                 onclick={toggleClaim}
             >
@@ -208,7 +211,7 @@
         {/if}
         <Button
             variant="ghost"
-            aria-label="Edit comments for set {row.index}"
+            aria-label="Edit comments for set {setNumber}"
             onclick={(e) => onedit(row, e.currentTarget)}
         >
             Edit <Edit />
@@ -244,7 +247,7 @@
         initialConditions={pickerConditions}
         initialSelectedIds={currentImageIds}
         onConfirm={confirmImages}
-        modalLabel="Set {row.index}"
-        errorTitle="Images for set {row.index} could not be saved"
+        modalLabel="Set {setNumber}"
+        errorTitle="Images for set {setNumber} could not be saved"
     />
 {/if}

@@ -7,7 +7,7 @@ import type { TaskContext } from "./TaskContext.svelte";
 /**
  * Opens another set of the task with a full page load. Only the `layout` and `arrange` params carry over.
  *
- * @param index - The subtask index to navigate to
+ * @param index - The 0-based subtask index; the URL counts from 1
  */
 export function navigateSubtaskIndex(index: number): void {
     const { pathname, search } = window.location;
@@ -24,7 +24,7 @@ export function navigateSubtaskIndex(index: number): void {
         .join("&");
     window.location.href =
         pathname.substring(0, pathname.lastIndexOf("/") + 1) +
-        index +
+        (index + 1) +
         (query ? `?${query}` : "");
 }
 

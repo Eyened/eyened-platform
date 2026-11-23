@@ -165,7 +165,7 @@ describe("task subtasks page", () => {
                 unassigned: true,
             }),
         );
-        expect(setNumbers()).toEqual(["0"]);
+        expect(setNumbers()).toEqual(["1"]);
     });
 
     it("filters by creator from the query string", async () => {
@@ -269,7 +269,7 @@ describe("task subtasks page", () => {
 
         await waitFor(() =>
             expect(setNumbers()).toEqual(
-                Array.from({ length: 20 }, (_, i) => String(20 + i)),
+                Array.from({ length: 20 }, (_, i) => String(21 + i)),
             ),
         );
     });
@@ -296,11 +296,11 @@ describe("task subtasks page", () => {
         await fireEvent.click(
             screen.getByRole("button", { name: "Next page" }),
         );
-        await waitFor(() => expect(setNumbers()[0]).toBe("40"));
+        await waitFor(() => expect(setNumbers()[0]).toBe("41"));
 
         finishFirst();
         await new Promise((r) => setTimeout(r, 0));
-        expect(setNumbers()[0]).toBe("40");
+        expect(setNumbers()[0]).toBe("41");
     });
 
     it("does not navigate when a response lands after unmount", async () => {
@@ -377,6 +377,6 @@ describe("task subtasks page", () => {
     it("swallows assignee load errors", async () => {
         vi.mocked(fetchSubTaskAssignees).mockRejectedValue(new Error("nope"));
         await renderPage();
-        expect(setNumbers()).toEqual(["0"]);
+        expect(setNumbers()).toEqual(["1"]);
     });
 });
