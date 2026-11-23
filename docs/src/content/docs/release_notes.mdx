@@ -123,6 +123,15 @@ database.
 
 ### Changed behaviour
 
+**Study panels**
+
+- **Extra study tables come from server-side extensions.** The browser no longer
+  calls an outside service itself. A site mounts Python modules; each exports
+  `applies` and `fetch`. `GET /api/studies/{id}/data-sources` lists the ones
+  that apply, and `GET /api/studies/{id}/data-sources/{name}` runs `fetch`.
+  No data is **404**. A failure or a timeout is **502**. See
+  [External data sources](/eyened-platform/deployment/production#external-data-sources).
+
 **Authentication**
 
 - **A password policy applies wherever a password is set.** At least 15 characters

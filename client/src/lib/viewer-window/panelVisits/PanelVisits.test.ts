@@ -11,30 +11,17 @@ vi.mock("./patientStudies", () => ({
     loadPatientStudies,
 }));
 
-vi.mock("$lib/extensions", () => ({
-    default: {
-        viewer: {
-            panel_info: {
-                additional_data_sources: [
-                    {
-                        name: "External grades",
-                        url: "/external",
-                        conditions: [],
-                    },
-                ],
-            },
-        },
-    },
+vi.mock("$lib/browser/dataSources", () => ({
+    listDataSources: vi.fn(async () => [{ name: "External grades" }]),
+    loadDataSource: vi.fn(async () => ({
+        kind: "tables",
+        groups: { Scores: [] },
+    })),
+    isTablesContribution: (data: unknown) =>
+        typeof data === "object" &&
+        data !== null &&
+        (data as { kind?: unknown }).kind === "tables",
 }));
-
-vi.mock("$lib/browser/dataSources", async (importOriginal) => {
-    const actual =
-        await importOriginal<typeof import("$lib/browser/dataSources")>();
-    return {
-        ...actual,
-        loadDataSource: vi.fn(async () => ({ Scores: [] })),
-    };
-});
 
 const { default: PanelVisits } = await import("./PanelVisits.svelte");
 
@@ -42,7 +29,7 @@ function study(id: number, date: string): StudyGET {
     return {
         id,
         date,
-        project: { name: "RS" },
+        project: { name: "Alpha" },
         patient: { id: 1, identifier: "P1" },
         series: [],
         tags: [],

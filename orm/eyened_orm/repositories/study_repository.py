@@ -17,6 +17,14 @@ class StudyRepository:
         self._session = session
         self._scope = scope
 
+    @property
+    def session(self) -> Session:
+        """The request Session, for ``ExtensionContext.session`` only.
+
+        The service must not query through this property.
+        """
+        return self._session
+
     def project_ids(self, study_id: int) -> set[int]:
         """The project this study sits in, for a write check to be judged on.
 

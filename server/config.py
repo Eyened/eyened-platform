@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from datetime import date
 from functools import lru_cache
 from json import JSONDecodeError
-
 import httpxyz
 from eyened_orm.utils.pretty_settings import pretty_settings
 from pydantic import Field, SecretStr, model_validator

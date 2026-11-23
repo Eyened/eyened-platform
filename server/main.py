@@ -137,6 +137,10 @@ async def lifespan(app: FastAPI):
     # Audit events go to stdout as JSON; app/debug logs stay on stderr.
     configure_audit_logging()
 
+    from server.study_extension import get_extensions
+
+    get_extensions()
+
     # Sync handlers run here. anyio's default is 40, which would outnumber the
     # connection pool; Settings validates the two against each other, and this
     # is where the chosen number takes effect. Must run inside the loop.

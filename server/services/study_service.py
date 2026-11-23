@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import concurrent.futures
+import logging
+
 from fastapi import Depends
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from eyened_orm import StudyTagLink
+from eyened_orm import Study, StudyTagLink
 from eyened_orm.tag import TagType
 from eyened_orm.repositories.study_repository import StudyRepository
 from eyened_orm.authz.ownership import require_owner, require_owner_or_project_admin
@@ -11,14 +15,25 @@ from eyened_orm.authz.roles import ProjectRole
 from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
+from ..study_extension import (
+    ExtensionContext,
+    StudyExtension,
+    TablesContribution,
+    extension_context,
+    get_extensions,
+)
 from .access_scope import get_access_scope
 from .acting_user import ActingUser
 from .audit_service import AuditService, get_audit_service
-from .exceptions import BadRequestError, NotFoundError
+from .exceptions import BadRequestError, NotFoundError, UpstreamError
+
+logger = logging.getLogger(__name__)
+
+FETCH_TIMEOUT = 10
 
 
 class StudyService:
-    """Business logic for tagging studies."""
+    """Business logic for tagging studies and reading their external data sources."""
 
     def __init__(
         self,
@@ -215,6 +230,100 @@ class StudyService:
                 )
         link.Tag = tag
         return link
+
+    def _visible_study(self, study_id: int) -> Study:
+        study = self.repository.get_by_id(study_id)
+        if study is None:
+            raise NotFoundError(f"Study {study_id} not found")
+        return study
+
+    def _context(self, study: Study):
+        return extension_context(
+            study,
+            actor_id=self._actor.id,
+            actor_username=self._actor.username,
+            session=self.repository.session,
+        )
+
+    def _extensions_for(self, study: Study) -> list[StudyExtension]:
+        ctx = self._context(study)
+        matched: list[StudyExtension] = []
+        for extension in get_extensions():
+            try:
+                applies = extension.applies(ctx)
+            except Exception as exc:
+                logger.warning(
+                    "Data source %s applies failed: %s",
+                    extension.name,
+                    type(exc).__name__,
+                )
+                continue
+            if applies:
+                matched.append(extension)
+        return matched
+
+    def list_data_sources(self, study_id: int) -> list[StudyExtension]:
+        """The extensions that apply to a study the actor can see.
+
+        Raises:
+            NotFoundError: If the study does not exist or is out of scope.
+        """
+        return self._extensions_for(self._visible_study(study_id))
+
+    def resolve_data_source(
+        self, study_id: int, name: str
+    ) -> tuple[StudyExtension, ExtensionContext]:
+        """The extension and context for a visible study.
+
+        Raises:
+            NotFoundError: If the study is missing or out of scope, or the
+                extension does not apply.
+        """
+        study = self._visible_study(study_id)
+        ctx = self._context(study)
+        extension = next(
+            (e for e in get_extensions() if e.name == name and e.applies(ctx)),
+            None,
+        )
+        if extension is None:
+            raise NotFoundError(f"Data source {name} not found")
+        return extension, ctx
+
+    def fetch_data_source(
+        self, extension: StudyExtension, ctx: ExtensionContext
+    ) -> TablesContribution:
+        """Run the extension's fetch.
+
+        The caller ends the request's read transaction before this, so the
+        callback does not keep that connection checked out.
+
+        Raises:
+            NotFoundError: If fetch returns None.
+            UpstreamError: If fetch raises, times out, or returns a bad envelope.
+        """
+        name = extension.name
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            future = pool.submit(extension.fetch, ctx)
+            try:
+                result = future.result(timeout=FETCH_TIMEOUT)
+            except concurrent.futures.TimeoutError:
+                logger.warning("Data source %s timed out", name)
+                raise UpstreamError(f"Data source {name} unavailable") from None
+            except Exception as exc:
+                logger.warning("Data source %s failed: %s", name, type(exc).__name__)
+                raise UpstreamError(f"Data source {name} unavailable") from None
+        finally:
+            pool.shutdown(wait=False)
+        if result is None:
+            raise NotFoundError(f"Data source {name} has no data for this study")
+        try:
+            if isinstance(result, TablesContribution):
+                return result
+            return TablesContribution.model_validate(result)
+        except ValidationError:
+            logger.warning("Data source %s returned an invalid envelope", name)
+            raise UpstreamError(f"Data source {name} unavailable") from None
 
 
 def get_study_service(

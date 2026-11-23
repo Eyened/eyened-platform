@@ -1,6 +1,5 @@
 <script lang="ts">
     import AdditionalDataSources from "$lib/browser/AdditionalDataSources.svelte";
-    import extensions from "$lib/extensions";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import { getContext } from "svelte";
     import type { StudyGET } from "../../../types/openapi_types";
@@ -12,8 +11,6 @@
     const instance = viewerContext.image.instance;
     const patientIdentifier = instance.patient?.identifier ?? undefined;
     const currentStudyId = instance.study?.id;
-
-    const { additional_data_sources } = extensions.viewer.panel_info;
 
     let studies = $state<StudyGET[]>([]);
     let truncated = $state(false);
@@ -94,14 +91,7 @@
                     </button>
                     {#if open}
                         <div class="sources">
-                            <AdditionalDataSources
-                                context={{
-                                    study,
-                                    patient: study.patient,
-                                    project: study.project,
-                                }}
-                                {additional_data_sources}
-                            />
+                            <AdditionalDataSources studyId={study.id} />
                         </div>
                     {/if}
                 </li>

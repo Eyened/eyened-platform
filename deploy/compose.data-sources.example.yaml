@@ -1,0 +1,12 @@
+# Study panel extensions. Copy to compose.data-sources.yaml (gitignored),
+# append :compose.data-sources.yaml to COMPOSE_FILE, and put Python modules in
+# deploy/extensions/ (gitignored). Each module exports `extensions`, a sequence
+# of objects with name, applies(ctx), and fetch(ctx). See
+# docs/design/browser-extensions/spec.md.
+#
+# Restart the server after adding a module.
+
+services:
+  server:
+    volumes:
+      - ./extensions:/app/server/extensions:ro,z
