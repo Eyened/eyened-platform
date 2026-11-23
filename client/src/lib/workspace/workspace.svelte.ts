@@ -151,6 +151,8 @@ export class Workspace {
         $state.raw(readLayerSections());
     /** Area on Segmentations rows and in the Selected pane; stored per browser. */
     layerArea = $state(readLayerArea());
+    /** The Layers panel's tab; a reveal switches it to Layers. This session only. */
+    layersTab: "layers" | "display" = $state("layers");
     arrange: ArrangeOrder = $state("opened");
     preset: Preset = $state.raw(getPreset(DEFAULT_PRESET_ID)!);
     page = $state(1);
@@ -295,6 +297,14 @@ export class Workspace {
 
     setMaximised(position: number): void {
         this.maximised = position;
+    }
+
+    /** The last set's selected and maximised viewports, by position; the first one when this set has fewer. */
+    restoreViewports(selected: number, maximised: number | null): void {
+        const fit = (position: number) =>
+            position < this.slots.length ? position : 0;
+        this.selected = fit(selected);
+        this.maximised = maximised === null ? null : fit(maximised);
     }
 
     setTracks(axis: Axis, sizes: number[]): void {

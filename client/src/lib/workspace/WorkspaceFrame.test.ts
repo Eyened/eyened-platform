@@ -14,6 +14,7 @@ import {
     workspaceContext,
     workspaceWith,
 } from "./testUtils";
+import type { ResolvedPathname } from "$app/types";
 import type { Workspace } from "./workspace.svelte";
 import WorkspaceFrame from "./WorkspaceFrame.svelte";
 import type { TaskHeader } from "./WorkspaceHeader.svelte";
@@ -44,7 +45,9 @@ function taskHeader(): TaskHeader {
         nextDisabled: false,
         prev: vi.fn(),
         next: vi.fn(),
-        overview: vi.fn(),
+        overviewHref: "/tasks/7" as ResolvedPathname,
+        show: { title: true, nav: true, overview: true },
+        pending: null,
     };
 }
 
@@ -192,7 +195,9 @@ describe("WorkspaceFrame", () => {
         await fireEvent.click(menu);
         await waitFor(() =>
             expect(
-                screen.getByRole("button", { name: "Task overview" }),
+                screen.getByRole("link", {
+                    name: "Task overview, opens in a new tab",
+                }),
             ).toHaveFocus(),
         );
         expect(menu).toHaveAccessibleName("Hide menu");
@@ -223,10 +228,12 @@ describe("WorkspaceFrame", () => {
         expect(screen.queryByRole("region", { name: "Info" })).toBeNull();
         expect(localStorage.getItem("eyened:viewer:leftPanel")).toBeNull();
         await fireEvent.click(menu);
-        await fireEvent.click(
-            await screen.findByRole("button", { name: "Task overview" }),
-        );
-        expect(task.overview).toHaveBeenCalledTimes(1);
+        const overview = await screen.findByRole("link", {
+            name: "Task overview, opens in a new tab",
+        });
+        // jsdom can't open a tab; the menu still closes.
+        overview.addEventListener("click", (e) => e.preventDefault());
+        await fireEvent.click(overview);
         expect(screen.queryByRole("region", { name: "Images" })).toBeNull();
     });
 

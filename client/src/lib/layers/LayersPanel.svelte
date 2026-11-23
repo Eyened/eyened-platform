@@ -58,15 +58,14 @@ The Layers panel body: Layers and Display tabs, the selected viewport's name, th
             : workspace.loaded && !workspace.slots[workspace.selected]?.imageId,
     );
 
-    type Tab = "layers" | "display";
-    let tab: Tab = $state("layers");
+    type Tab = Workspace["layersTab"];
     const bySection = $derived({
         layers: sections.filter((id) => tabOf(id) === "layers"),
         display: sections.filter((id) => tabOf(id) === "display"),
     });
     // A task or an image with no view settings leaves only the Layers tab.
     const current = $derived<Tab>(
-        bySection.display.length > 0 ? tab : "layers",
+        bySection.display.length > 0 ? workspace.layersTab : "layers",
     );
 
     // Kept on the workspace, not per viewport, so a section stays open when the selection moves.
@@ -91,7 +90,7 @@ The Layers panel body: Layers and Display tabs, the selected viewport's name, th
 {/snippet}
 
 <Tabs.Root
-    bind:value={() => current, (v) => (tab = v as Tab)}
+    bind:value={() => current, (v) => (workspace.layersTab = v as Tab)}
     class="flex min-h-0 flex-1 flex-col"
 >
     <Tabs.List aria-label="Layers panel" class="px-4">

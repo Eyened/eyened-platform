@@ -58,3 +58,16 @@ export function parseTaskPanelConfig(
 
     return next;
 }
+
+/** What the viewer header shows for a task. With Status off and ◀ ▶ on, the primary button is only "Go to next set". */
+export function taskHeaderShows(config: TaskPanelConfig) {
+    const on = (key: keyof TaskPanelSections) =>
+        config.enabled && config.sections[key];
+    return {
+        title: on("title"),
+        nav: on("nav"),
+        overview: on("overview"),
+        status: on("status"),
+        goToNext: !on("status") && on("nav"),
+    };
+}

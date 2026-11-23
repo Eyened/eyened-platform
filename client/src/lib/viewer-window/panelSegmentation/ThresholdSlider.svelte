@@ -1,6 +1,6 @@
 <script lang="ts">
     import { SliderField } from "$lib/components/ui/slider/index.js";
-    import { updateSegmentation } from "$lib/data/api";
+    import { thresholdSaver } from "$lib/saving/thresholdSavers";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
     import { getContext } from "svelte";
@@ -16,14 +16,12 @@
 
     const canEdit = globalContext.canEdit(segmentation);
 
-    // Saves in order, so the last value set is the one stored.
-    let pendingUpdate = Promise.resolve();
-    async function save() {
+    // One request at a time; the newest value is the one stored.
+    function save() {
         if (!canEdit) return;
-        await pendingUpdate;
-        pendingUpdate = updateSegmentation(segmentation.id, {
-            threshold: segmentationItem.threshold,
-        });
+        thresholdSaver(segmentation, segmentationItem.image.image_id).edit(
+            segmentationItem.threshold,
+        );
     }
 </script>
 

@@ -8,17 +8,20 @@
     let {
         status,
         description,
+        live = true,
         class: className,
     }: {
         status: "active" | "finished";
         description?: string;
+        /** False inside a pane: only the header's save state is a live region. */
+        live?: boolean;
         class?: string;
     } = $props();
 </script>
 
 <div
     data-slot="inline-loading"
-    aria-live="assertive"
+    aria-live={live ? "assertive" : undefined}
     class={cn(
         "flex min-h-8 w-full items-center text-body-compact-01 text-text-secondary",
         className,

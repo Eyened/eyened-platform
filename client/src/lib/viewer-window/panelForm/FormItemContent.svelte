@@ -4,7 +4,6 @@
         formSchemas,
         instances,
         patients,
-        setFormAnnotationValue,
         studies,
         tagFormAnnotation,
         untagFormAnnotation,
@@ -16,9 +15,9 @@
         resolveRefs,
         type JSONSchema,
     } from "$lib/forms/schemaType";
+    import { formAnnotationSaver } from "$lib/saving/formAnnotationSavers";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-    import { onDestroy, onMount, setContext } from "svelte";
-    import { toast } from "svelte-sonner";
+    import { onMount, setContext } from "svelte";
     import * as Tooltip from "../../components/ui/tooltip";
     import Tagger from "../../tags/Tagger.svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
@@ -58,61 +57,37 @@
         return "N/A";
     }
 
-    // Keep value as independent $state (not derived from form.form_data) to:
-    // 1. Prevent reactivity loops when updating the store
-    // 2. Allow future throttling/debouncing of save operations
-    // Value initializes from form ONCE on mount, then becomes independent for editing
+    // Keep value as independent $state (not derived from form.form_data), so a store update
+    // from the saved reply doesn't loop back into the form. It starts from the form once, on mount.
     let value: any = $state(undefined);
-    let status = $state("loading");
-    let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+    let loaded = $state(false);
+    // One saver per annotation on the page; it outlives this window.
+    // ASSUMPTION: reveal focuses this window, which lives in this component's document.
+    let root: HTMLElement | null = $state(null);
+    const saver = formAnnotationSaver(form.id, "form", {
+        to: "focus",
+        focus: () => root?.ownerDocument.defaultView?.focus(),
+    });
+    const STATE_TEXT = {
+        synced: "Saved",
+        saving: "Saving…",
+        error: "Couldn't save",
+    } as const;
 
     onMount(() => {
-        // Initialize value from form data once
         value = form.form_data || getDefault(schema);
-        status = "loaded";
+        loaded = true;
     });
 
-    async function flushPendingSave() {
-        saveTimeout = null;
-        // JSON body cannot be undefined — persist null for an omitted root value.
-        try {
-            await setFormAnnotationValue(form.id, value ?? null);
-            status = "synced";
-        } catch (e) {
-            console.error("Failed to save form annotation", e);
-            status = "error";
-            toast.error("Failed to save form annotation");
-        }
-    }
+    // No flush on close: the saver lives for the page, so an edit made while the window closes still saves.
 
-    // Children (e.g. PointField) tear down first and may disarm→persist→onchange,
-    // which schedules a debounced save. Flush that pending write instead of
-    // cancelling it — otherwise edits within the debounce window are lost.
-    onDestroy(() => {
-        if (!saveTimeout) return;
-        clearTimeout(saveTimeout);
-        void flushPendingSave();
-    });
-
-    async function onchange(next: unknown) {
+    function onchange(next: unknown) {
         if (!canEdit) return;
         // Always apply `next`, including undefined/null/''/0/false. Callers use
-        // undefined to omit/clear (PointField Remove, bare-single Clear, SchemaForm
-        // trash). Treating undefined as "no change" left stale value in state and
-        // the truthy save guard then wrote the old points back as a "successful" save.
+        // undefined to omit/clear (PointField Remove, bare-single Clear, SchemaForm trash).
         value = next;
-
-        if (saveTimeout) {
-            clearTimeout(saveTimeout);
-        }
-
-        // Show "saving" status immediately for user feedback
-        status = "saving";
-
-        // Debounce: wait 500ms after last keystroke before saving.
-        saveTimeout = setTimeout(() => {
-            void flushPendingSave();
-        }, 500);
+        // JSON body cannot be undefined — persist null for an omitted root value.
+        saver.edit(next ?? null);
     }
 
     function readLocalStorageBoolean(key: string, defaultValue: boolean) {
@@ -141,7 +116,7 @@
 </script>
 
 <Tooltip.Provider>
-    <div class="header">
+    <div class="header" bind:this={root}>
         <span>[{form.id}]</span>
         <Tagger
             tagType="FormAnnotation"
@@ -152,7 +127,7 @@
                 updateTagFormAnnotation(form.id, tagId, comment)}
         />
         <span>{form.creator?.name}</span>
-        <span class={status}>{status}</span>
+        <span class={saver.state}>{STATE_TEXT[saver.state]}</span>
     </div>
     <div class="header">
         <table>
@@ -205,7 +180,7 @@
         </label>
     </div>
     <div class="main">
-        {#if status !== "loading"}
+        {#if loaded}
             <SchemaForm
                 {schema}
                 {value}
@@ -231,7 +206,6 @@
         flex-direction: column;
         overflow: auto;
     }
-    span.ready,
     span.synced {
         color: green;
     }

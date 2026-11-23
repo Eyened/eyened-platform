@@ -85,7 +85,7 @@ describe("SubtasksTable", () => {
         const onchange = renderTable([row({ id: 1, index: 0 })]);
 
         await fireEvent.click(
-            screen.getByRole("button", { name: "Edit comments for set 0" }),
+            screen.getByRole("button", { name: "Edit comments for set 1" }),
         );
         await fireEvent.input(
             await screen.findByRole("textbox", { name: "Comments" }),

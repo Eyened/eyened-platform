@@ -20,7 +20,7 @@ vi.mock("$lib/data", () => ({
 }));
 
 vi.mock("$app/state", () => ({
-    page: { url: new URL("http://localhost/tasks/1/grade/0") },
+    page: { url: new URL("http://localhost/tasks/1/set/1") },
 }));
 
 vi.mock("svelte-sonner", () => ({

@@ -2,7 +2,7 @@ import {
     SegmentationContext,
     type Segmentation,
 } from "$lib/viewer-window/panelSegmentation/segmentationContext.svelte";
-import type { SyncState } from "$lib/webgl/segmentationState.svelte";
+import type { SaveState } from "$lib/saving/saveTracker.svelte";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { fromStore, writable, type Writable } from "svelte/store";
 import { vi } from "vitest";
@@ -143,7 +143,7 @@ export function layersContexts(
         win?: TestWindow;
     } = {},
 ) {
-    const sync = new Map<number, Writable<SyncState>>();
+    const sync = new Map<number, Writable<SaveState>>();
     const getMask = over.getMask ?? (() => undefined);
     const items = new Map<string, unknown>();
     const image = {
@@ -167,21 +167,27 @@ export function layersContexts(
             const key = `${segmentation.annotation_type}_${segmentation.id}`;
             if (!items.has(key)) {
                 if (!sync.has(segmentation.id))
-                    sync.set(segmentation.id, writable<SyncState>("synced"));
+                    sync.set(segmentation.id, writable<SaveState>("synced"));
                 const syncState = sync.get(segmentation.id)!;
+                const saveState = fromStore(syncState);
                 items.set(key, {
                     segmentation,
+                    image,
+                    // The real item lists its B-scans' savers; one stands in for them.
+                    savers: [
+                        {
+                            get state() {
+                                return saveState.current;
+                            },
+                            flush: vi.fn(async () => {}),
+                        },
+                    ],
                     loading: false,
                     threshold: 0.5,
                     importOther: vi.fn(async () => {}),
                     savedScanIndices: [],
                     getSegmentationState: (index: number) => {
-                        // The real syncState is reactive state; this reads the test's store the same way.
-                        const state = fromStore(syncState);
                         return {
-                            get syncState() {
-                                return state.current;
-                            },
                             loaded: over.slice?.loaded ?? Promise.resolve(),
                             isEmptyForSlice:
                                 over.slice?.isEmptyForSlice ?? false,

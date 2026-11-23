@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { thresholdSavers } from "$lib/saving/thresholdSavers";
 import {
     graderSegmentation,
     layersContexts,
@@ -15,6 +16,7 @@ const { default: ThresholdSlider } = await import("./ThresholdSlider.svelte");
 
 afterEach(() => {
     cleanup();
+    thresholdSavers.clear();
     vi.mocked(updateSegmentation).mockClear();
 });
 

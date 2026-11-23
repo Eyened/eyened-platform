@@ -33,6 +33,17 @@ describe("Workspace.hydrate", () => {
 });
 
 describe("Workspace paging", () => {
+    it("restores the last set's viewports by position, the first one when this set has fewer", () => {
+        const four = workspaceWith(4);
+        four.slots = [0, 1, 2, 3].map((id) => ({ id, imageId: null }));
+        four.restoreViewports(2, 3);
+        expect([four.selected, four.maximised]).toEqual([2, 3]);
+        const two = workspaceWith(2);
+        two.slots = [0, 1].map((id) => ({ id, imageId: null }));
+        two.restoreViewports(2, 3);
+        expect([two.selected, two.maximised]).toEqual([0, 0]);
+    });
+
     it("refills every slot and keeps the selection across a page turn, and writes the URL", () => {
         const writeUrl = vi.fn();
         const ws = workspaceWith(6, { layout: "2x2" }, writeUrl);

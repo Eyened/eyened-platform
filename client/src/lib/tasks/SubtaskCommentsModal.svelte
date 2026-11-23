@@ -44,7 +44,7 @@
 <Modal
     bind:open
     modalHeading="Edit comments"
-    modalLabel={subtask ? `Set ${subtask.index}` : undefined}
+    modalLabel={subtask ? `Set ${(subtask.index ?? 0) + 1}` : undefined}
     primaryButtonText="Save"
     primaryButtonLoadingDescription="Saving…"
     successDescription="Saved"

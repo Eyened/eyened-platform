@@ -34,13 +34,16 @@ vi.mock("$lib/viewer/tools/PointTool.svelte", () => ({
 const { bindRegistrationPointTool } = await import(
     "./bindRegistrationPointTool"
 );
-const { setFormAnnotationValue } = await import("$lib/data");
+const { putFormAnnotationValue } = await import("$lib/data");
+const { formAnnotationSavers } = await import(
+    "$lib/saving/formAnnotationSavers"
+);
 
 vi.mock("$lib/data", async () => {
     const stores = await import("$lib/data/stores.svelte");
     return {
         formAnnotations: stores.formAnnotations,
-        setFormAnnotationValue: vi.fn(),
+        putFormAnnotationValue: vi.fn(async () => {}),
     };
 });
 
@@ -73,7 +76,9 @@ describe("bindRegistrationPointTool", () => {
             id: 21,
             form_data: { img: [{ x: 1, y: 2 }] },
         } as never);
-        vi.mocked(setFormAnnotationValue).mockReset();
+        vi.mocked(putFormAnnotationValue).mockReset();
+        vi.mocked(putFormAnnotationValue).mockResolvedValue(undefined);
+        formAnnotationSavers.clear();
     });
 
     it("loads points and persists edits", () => {
@@ -94,7 +99,7 @@ describe("bindRegistrationPointTool", () => {
         tool.opts.onChange([{ x: 3, y: 4 }]);
         tool.opts.onPersist([{ x: 3, y: 4 }]);
         expect(tool.opts.dragThresholdPx).toBe(0);
-        expect(setFormAnnotationValue).toHaveBeenCalledWith(
+        expect(putFormAnnotationValue).toHaveBeenCalledWith(
             21,
             expect.objectContaining({ img: [{ x: 3, y: 4 }] }),
         );
@@ -120,7 +125,7 @@ describe("bindRegistrationPointTool", () => {
         expect(tool.points).toEqual([{ x: 1, y: 2 }]);
         tool.opts.onPersist([{ x: 3, y: 4 }]);
         const written = vi
-            .mocked(setFormAnnotationValue)
+            .mocked(putFormAnnotationValue)
             .mock.calls.at(-1)?.[1];
         expect(written).toEqual({ img: [{ x: 3, y: 4 }] });
         expect(written).not.toHaveProperty("img_proj");
@@ -188,11 +193,11 @@ describe("bindRegistrationPointTool", () => {
         expect(toolSpies.tools.at(-1)?.opts.canEdit).toBe(false);
     });
 
-    it("reports a failed save as an error, and the next save clears it", async () => {
-        vi.mocked(setFormAnnotationValue)
-            .mockRejectedValueOnce(new Error("offline"))
-            .mockResolvedValueOnce(undefined);
-        const onSync = vi.fn();
+    it("a failed save shows on the registration's saver, and the next save clears it", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        vi.mocked(putFormAnnotationValue).mockRejectedValueOnce(
+            new Error("offline"),
+        );
         bindRegistrationPointTool({
             viewerContext: {
                 image: { image_id: "img", instance: { id: "img" } },
@@ -202,16 +207,12 @@ describe("bindRegistrationPointTool", () => {
             schema: schema as never,
             canEdit: true,
             pointMarker: { style: "cross", radius: 4, color: "red" },
-            onSync,
         });
         const tool = toolSpies.tools.at(-1)!;
+        const saver = formAnnotationSavers.get(21)!;
         tool.opts.onPersist([{ x: 3, y: 4 }]);
-        await vi.waitFor(() =>
-            expect(onSync).toHaveBeenLastCalledWith("error"),
-        );
+        await vi.waitFor(() => expect(saver.state).toBe("error"));
         tool.opts.onPersist([{ x: 5, y: 6 }]);
-        await vi.waitFor(() =>
-            expect(onSync).toHaveBeenLastCalledWith("synced"),
-        );
+        await vi.waitFor(() => expect(saver.state).toBe("synced"));
     });
 });

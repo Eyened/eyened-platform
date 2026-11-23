@@ -7,6 +7,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import * as Tabs from "$lib/components/ui/tabs/index.js";
     import LayersPanel from "$lib/layers/LayersPanel.svelte";
     import Close from "carbon-icons-svelte/lib/Close.svelte";
@@ -14,11 +15,16 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     import Help from "carbon-icons-svelte/lib/Help.svelte";
     import Image from "carbon-icons-svelte/lib/Image.svelte";
     import Information from "carbon-icons-svelte/lib/Information.svelte";
+    import Launch from "carbon-icons-svelte/lib/Launch.svelte";
     import Layers from "carbon-icons-svelte/lib/Layers.svelte";
     import Menu from "carbon-icons-svelte/lib/Menu.svelte";
     import RightPanelOpen from "carbon-icons-svelte/lib/RightPanelOpen.svelte";
     import { getContext, tick, untrack, type Snippet } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
+    import {
+        saveTracker,
+        type RevealTarget,
+    } from "$lib/saving/saveTracker.svelte";
     import { titleText, type ViewportTitle } from "./imageMeta";
     import ImagesListShell from "./ImagesListShell.svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
@@ -132,6 +138,52 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         writeRightOpen(open);
     }
 
+    /** Stay and the header's "couldn't save" bring the grader to the item: selected in a viewport showing its image, on its pane's Retry. */
+    async function revealItem(target: Extract<RevealTarget, { to: "layers" }>) {
+        const position = workspace.slots.findIndex(
+            (slot) => slot.imageId === target.imageId,
+        );
+        // ASSUMPTION: when no viewport shows the image, Layers opens without a selection change.
+        if (position !== -1) workspace.select(position);
+        const layers =
+            position !== -1 ? workspace.selectedViewport?.layers : undefined;
+        if (layers) {
+            const { item } = target;
+            layers.selection.select(
+                item.kind === "segmentation"
+                    ? {
+                          kind: "segmentation",
+                          item: layers.mainViewerContext.segmentationContext.getSegmentationItem(
+                              item.segmentation,
+                          ),
+                      }
+                    : item,
+            );
+        }
+        workspace.setLayerSection(target.section, true);
+        workspace.layersTab = "layers";
+        panel = "layers";
+        if (narrow) overlay = "right";
+        else setRight(true);
+        await tick();
+        // The pane's Retry; while the save still runs there is none, so the selected row's name.
+        // With no viewport on the image nothing is selected, so the Layers panel's heading.
+        (
+            document.querySelector<HTMLElement>("[data-save-retry]") ??
+            document.querySelector<HTMLElement>(
+                "[data-layers-list] [data-layer-row].selected button",
+            ) ??
+            document.getElementById(`${uid}-layers-title`)
+        )?.focus();
+    }
+    $effect(() => {
+        saveTracker.revealer = revealItem;
+        return () => {
+            if (saveTracker.revealer === revealItem)
+                saveTracker.revealer = null;
+        };
+    });
+
     /** Opening a left panel moves focus to its heading (overview §3). */
     async function focusPanel(panel: LeftPanel) {
         await tick();
@@ -169,7 +221,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         else
             document
                 .getElementById(`${uid}-left`)
-                ?.querySelector<HTMLElement>("button")
+                ?.querySelector<HTMLElement>("a, button")
                 ?.focus();
     }
 
@@ -220,11 +272,6 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     function openLayout() {
         overlay = null;
         layoutOpen = true;
-    }
-
-    function openOverview() {
-        overlay = null;
-        task?.overview();
     }
 
     async function chooseImage() {
@@ -400,12 +447,20 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 class="flex flex-col border-b border-border-subtle-01 py-2"
             >
                 {#if task}
+                    <!-- Opens another tab, so the set stays open; the menu closes. -->
                     <Button
                         variant="ghost"
                         size="sm"
                         class="justify-start"
-                        onclick={openOverview}>Task overview</Button
+                        href={task.overviewHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Task overview, opens in a new tab"
+                        onclick={() => (overlay = null)}
                     >
+                        Task overview
+                        <Launch aria-hidden="true" />
+                    </Button>
                 {/if}
                 <Button
                     variant="ghost"
@@ -464,6 +519,20 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 {emptyMessage}
             </p>
         {:else}
+            <!-- Always mounted, so screen readers announce the notice when it appears. -->
+            <div role="status">
+                {#if task?.notice}
+                    <!-- Carbon: an action's inline notification sits at the top of the content it is about. -->
+                    <div class="px-4 pt-2">
+                        <InlineNotification
+                            kind="success"
+                            title={task.notice.title}
+                            subtitle={task.notice.subtitle}
+                            role="none"
+                        />
+                    </div>
+                {/if}
+            </div>
             {#if workspace.strip}
                 <ThumbnailStrip {tile} {titleFor} />
             {/if}

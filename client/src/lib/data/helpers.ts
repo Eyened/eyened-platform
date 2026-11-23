@@ -281,7 +281,7 @@ export async function getSegmentationData(
 export async function updateSegmentationData(
     segmentationId: number,
     data: ArrayBuffer,
-    params?: { scan_nr?: number; sparse_axis?: number; keepalive?: boolean },
+    params?: { scan_nr?: number; sparse_axis?: number },
 ) {
     const urlParams = new URLSearchParams();
     const sparseAxis = params?.sparse_axis;
@@ -292,15 +292,11 @@ export async function updateSegmentationData(
         urlParams.append("scan_nr", params.scan_nr.toString());
     }
 
-    const keepalive = params?.keepalive ?? false;
     const response = await fetchApi(`/segmentations/${segmentationId}/data`, {
         method: "PUT",
         headers: { "Content-Type": "application/octet-stream" },
         body: data,
         query: urlParams,
-        keepalive,
-        // Avoid async token refresh during page unload; cookies still sent.
-        skipAuthRetry: keepalive,
     });
     if (!response.ok) {
         throw await apiErrorFromResponse(response);
@@ -350,25 +346,24 @@ export async function getFormAnnotationValue(annotationId: number) {
     return res.data as unknown;
 }
 
-/** The latest save per annotation, so an older save that resolves last can't roll the store back. */
-const latestSave = new Map<number, number>();
-
-export async function setFormAnnotationValue(
+/** Saves a form annotation's value on the server. */
+export async function putFormAnnotationValue(
     annotationId: number,
     form_data: unknown,
-) {
-    const save = (latestSave.get(annotationId) ?? 0) + 1;
-    latestSave.set(annotationId, save);
-    // Save to server first (server is source of truth)
+): Promise<void> {
     await apiInvoke(() =>
         api.PUT("/form-annotations/{form_annotation_id}/value", {
             params: { path: { form_annotation_id: annotationId } },
             body: form_data as any,
         }),
     );
-    if (latestSave.get(annotationId) !== save) return;
+}
 
-    // Then update local store so other components see the change
+/** Puts a saved value in the store, so other components see it. */
+export function storeFormAnnotationValue(
+    annotationId: number,
+    form_data: unknown,
+): void {
     const existing = formAnnotations.get(annotationId);
     if (existing) {
         formAnnotations.set(annotationId, {

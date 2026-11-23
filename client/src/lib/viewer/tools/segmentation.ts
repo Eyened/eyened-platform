@@ -17,8 +17,8 @@ export interface DrawToolDeps {
     viewerContext: ViewerContext;
     segmentationContext: SegmentationContext;
     view: PaintView;
-    /** Tells the grader a stroke could not be saved. */
-    report: (message: string) => void;
+    /** Tells the grader a stroke could not be drawn; null when a stroke worked. */
+    report: (message: string | null) => void;
 }
 
 export abstract class SegmentationTool implements Overlay {
@@ -37,7 +37,7 @@ export abstract class SegmentationTool implements Overlay {
     protected readonly viewerContext: ViewerContext;
     protected readonly segmentationContext: SegmentationContext;
     protected readonly view: PaintView;
-    protected readonly report: (message: string) => void;
+    protected readonly report: (message: string | null) => void;
 
     constructor(deps: DrawToolDeps) {
         this.viewerContext = deps.viewerContext;
@@ -190,13 +190,16 @@ export abstract class SegmentationTool implements Overlay {
             this.syncing = true;
             const ctx = this.segmentationContext.getCtx();
             this.executeDraw(ctx, viewerContext);
+            // Named now: the selection may change before the draw fails.
+            const name =
+                this.segmentationContext.segmentationItem?.segmentation.feature
+                    .name ?? "the segmentation";
             this.segmentationContext
                 .draw(ctx, this.mode, viewerContext.index)
+                .then(() => this.report(null))
                 .catch((error) => {
                     console.error(error);
-                    this.report(
-                        "Error drawing on segmentation. Check console for details.",
-                    );
+                    this.report(`Couldn't draw on ${name}`);
                 })
                 .finally(() => (this.syncing = false));
             this.currentPoints = undefined;

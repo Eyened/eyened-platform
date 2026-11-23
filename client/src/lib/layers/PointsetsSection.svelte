@@ -9,6 +9,7 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
     import { Tag } from "$lib/components/ui/tag/index.js";
     import { createFormAnnotation } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { formAnnotationSavers } from "$lib/saving/formAnnotationSavers";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
@@ -138,6 +139,10 @@ A row selects the pointset P edits in this viewport; the eye's registration in u
                                         ? "Mine"
                                         : row.creator.name}</Tag
                                 >
+                                <!-- A failed save marks the row until it saves; Retry sits in the pane. -->
+                                {#if formAnnotationSavers.get(row.id)?.state === "error"}<Tag
+                                        type="red">Couldn't save</Tag
+                                    >{/if}
                             {/snippet}
                             {#snippet icons()}
                                 {#if globalContext.canEdit(row)}

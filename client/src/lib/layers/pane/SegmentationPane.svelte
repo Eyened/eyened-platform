@@ -13,6 +13,8 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import SliceArea from "$lib/layers/SliceArea.svelte";
     import SyncStatus from "$lib/layers/SyncStatus.svelte";
+    import { worstState } from "$lib/saving/saveTracker.svelte";
+    import { segmentationSavers } from "$lib/saving/thresholdSavers";
     import { toHex } from "$lib/utils";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import Tagger from "$lib/tags/Tagger.svelte";
@@ -66,6 +68,12 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     const isMulti = $derived(rep === "MultiLabel" || rep === "MultiClass");
     const isEditable = $derived(globalContext.canEdit(segmentation));
     const sliceState = $derived(item.getSegmentationState(viewerContext.index));
+    // The worst of all its B-scans and its threshold, not only the shown B-scan; Retry sends them all.
+    const savers = $derived(segmentationSavers(item));
+    const saveState = $derived(worstState(savers));
+    function retry() {
+        for (const saver of savers) void saver.flush();
+    }
     let duplicateOpen = $state(false);
     let rare: string[] = $state([]);
     const me = globalContext.user.id;
@@ -117,8 +125,8 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     {remove}
 >
     {#snippet status()}
-        {#if isEditable && sliceState}
-            <SyncStatus sync={sliceState.syncState} />
+        {#if isEditable && savers.length > 0}
+            <SyncStatus sync={saveState} onretry={retry} />
         {/if}
     {/snippet}
     {#snippet actions()}

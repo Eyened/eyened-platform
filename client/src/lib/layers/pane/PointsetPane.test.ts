@@ -8,6 +8,10 @@ import {
 import { createRawSnippet } from "svelte";
 import { afterEach, describe, expect, it } from "vitest";
 import { formAnnotations } from "$lib/data/stores.svelte";
+import {
+    formAnnotationSaver,
+    formAnnotationSavers,
+} from "$lib/saving/formAnnotationSavers";
 import { fakeImage, layersContexts, ME, reg } from "../testContexts";
 import PointsetPane from "./PointsetPane.svelte";
 
@@ -16,6 +20,7 @@ const pt = { x: 1, y: 2 };
 afterEach(() => {
     cleanup();
     formAnnotations.clear();
+    formAnnotationSavers.clear();
 });
 
 function renderPane(images = [fakeImage("inst-2")]) {
@@ -28,13 +33,19 @@ function renderPane(images = [fakeImage("inst-2")]) {
 }
 
 describe("PointsetPane", () => {
-    it("the pane shows the pointset's save state and its points per image", async () => {
+    it("the pane shows the pointset's save state and its points per image; a failed save has Retry", async () => {
         reg(12, 9, { "inst-1": [pt, pt, pt], "inst-2": [pt, pt, null] });
-        const { win } = renderPane();
+        renderPane();
         expect(screen.getByText("This CF · 2022-05-10")).toBeInTheDocument();
         expect(screen.getByText("2 · no 3")).toBeInTheDocument();
-        win.pointsets.sync.set(12, "error");
+        formAnnotationSaver(12, "registration", {
+            to: "focus",
+            focus: () => {},
+        }).state = "error";
         expect(await screen.findByText("Couldn't save")).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Retry" }),
+        ).toBeInTheDocument();
     });
 
     it("Edit with arms Point", async () => {

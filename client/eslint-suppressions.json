@@ -244,11 +244,6 @@
       "count": 1
     }
   },
-  "src/lib/webgl/segmentationState.svelte.ts": {
-    "svelte/prefer-svelte-reactivity": {
-      "count": 2
-    }
-  },
   "src/lib/webgl/texture.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
