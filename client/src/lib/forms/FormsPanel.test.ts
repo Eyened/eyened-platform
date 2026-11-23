@@ -75,12 +75,16 @@ function form(id: number, over: Partial<FormAnnotationGET> = {}) {
     } as FormAnnotationGET;
 }
 
-function renderGrading(config: unknown = { form_schema_name: QUALITY.name }) {
+function renderGrading(
+    config: unknown = { form_schema_name: QUALITY.name },
+    // The patients of img-a and img-b.
+    patients: [number, number] = [1, 1],
+) {
     const ws = new Workspace();
     ws.hydrate([entry("img-a"), entry("img-b", { eyeRank: 1 })], NO_URL);
     const images = new SvelteMap([
-        ["img-a", image("img-a", "R")],
-        ["img-b", image("img-b", "L")],
+        ["img-a", image("img-a", "R", patients[0])],
+        ["img-b", image("img-b", "L", patients[1])],
     ]);
     return render(FormsPanel, {
         context: new Map<string, unknown>([
@@ -215,6 +219,103 @@ describe("FormsPanel in a task (Grading)", () => {
                 ),
             { timeout: 3000 },
         );
+    });
+});
+
+describe("FormsPanel in a task with two patients", () => {
+    function setup() {
+        formAnnotations.set(9101, form(9101));
+        formAnnotations.set(
+            9102,
+            form(9102, {
+                image_id: "img-b",
+                laterality: "L",
+                patient_id: 2,
+                form_data: {},
+            }),
+        );
+        formAnnotations.set(
+            9103,
+            form(9103, {
+                form_schema_id: 2,
+                patient_id: 2,
+                image_id: "img-b",
+                laterality: "L",
+                creator: { id: 8, name: "J. de Vries" },
+            } as never),
+        );
+        renderGrading(undefined, [1, 2]);
+    }
+    it("puts the task rows and the Other forms groups under a heading per patient, with its own count", () => {
+        setup();
+        const task = document.querySelector("[data-layer-section=task-form]")!;
+        const taskHeadings = within(task as HTMLElement)
+            .getAllByRole("heading", { level: 4 })
+            .map((h) => h.textContent?.replace(/\s+/g, " ").trim());
+        expect(taskHeadings).toEqual([
+            "P-0001 1 of 1 complete",
+            "P-0002 0 of 1 complete",
+        ]);
+        // The section's own count stays set-wide.
+        expect(screen.getByText("1 of 2 complete")).toBeInTheDocument();
+        const other = document.querySelector(
+            "[data-layer-section=other-forms]",
+        )!;
+        expect(
+            within(other as HTMLElement)
+                .getAllByRole("heading", { level: 4 })
+                .map((h) => h.textContent?.trim()),
+        ).toEqual(["P-0002"]);
+        expect(
+            within(other as HTMLElement)
+                .getAllByRole("heading", { level: 5 })
+                .map((h) => h.textContent?.replace(/\s+/g, " ").trim()),
+        ).toEqual(["OS · OCT · 2024-05-02 1"]);
+    });
+
+    it("a patient heading folds its rows", async () => {
+        setup();
+        const task = document.querySelector("[data-layer-section=task-form]")!;
+        const heading = within(task as HTMLElement).getByRole("button", {
+            name: /^P-0002/,
+        });
+        await fireEvent.click(heading);
+        expect(
+            within(task as HTMLElement).queryByRole("button", {
+                name: /^OS · OCT · 2024-05-02, /,
+            }),
+        ).toBeNull();
+        await fireEvent.click(heading);
+        expect(
+            within(task as HTMLElement).getByRole("button", {
+                name: /^OS · OCT · 2024-05-02, /,
+            }),
+        ).toBeInTheDocument();
+    });
+
+    it("Grade announces the patient with the target", async () => {
+        const { createFormAnnotation } = await import("$lib/data");
+        vi.mocked(createFormAnnotation).mockResolvedValue(form(9200));
+        renderGrading(undefined, [1, 2]);
+        await fireEvent.click(
+            screen.getByRole("button", {
+                name: "OS · OCT · 2024-05-02, not graded, grade",
+            }),
+        );
+        await waitFor(() =>
+            expect(screen.getByRole("status")).toHaveTextContent(
+                "Added Image quality grading for P-0002 · OS · OCT · 2024-05-02",
+            ),
+        );
+    });
+
+    it("with one patient the rows sit directly under the section", () => {
+        formAnnotations.set(9101, form(9101));
+        renderGrading();
+        const task = document.querySelector("[data-layer-section=task-form]")!;
+        expect(
+            within(task as HTMLElement).queryAllByRole("heading", { level: 4 }),
+        ).toEqual([]);
     });
 });
 

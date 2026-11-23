@@ -6,6 +6,7 @@ import type {
 } from "../../types/openapi_types";
 import {
     completion,
+    foldKeys,
     incompleteForms,
     matchForms,
     targetsFor,
@@ -252,5 +253,41 @@ describe("incompleteForms", () => {
             subTaskId: SET,
         });
         expect(incompleteForms(matched, schemas, ME, SET)).toEqual([]);
+    });
+
+    it("with two patients open, names the patient before the target", () => {
+        const matched = matchForms({
+            forms: [],
+            images: [
+                image("img-a", { identifier: "SYN-A" }),
+                image("img-b", {
+                    patient: 2,
+                    identifier: "SYN-B",
+                    laterality: "L",
+                }),
+            ],
+            schemas,
+            taskSchemaId: 1,
+            userId: ME,
+            subTaskId: SET,
+        });
+        expect(incompleteForms(matched, schemas, ME, SET)).toEqual([
+            "Image quality grading for SYN-A · OD · OCT · 2024-05-02: not graded",
+            "Image quality grading for SYN-B · OS · OCT · 2024-05-02: not graded",
+        ]);
+    });
+});
+
+describe("foldKeys", () => {
+    it("lists every fold that could hide a new form of the target", () => {
+        const [target] = targetsFor([image("img-a")], "ImageInstance");
+        expect(foldKeys(target)).toEqual([
+            "task",
+            "other",
+            "image:img-a",
+            "patient:1",
+            "task:patient:1",
+            "other:patient:1",
+        ]);
     });
 });

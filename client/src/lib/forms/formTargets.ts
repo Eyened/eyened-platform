@@ -53,7 +53,7 @@ export interface FormTarget {
     imageIds: string[];
     ctx: FormAnnotationContext;
     patientId: number;
-    /** The patient identifier, for /view's patient headings. */
+    /** The patient identifier, for the patient headings and texts. */
     patient: string;
 }
 
@@ -64,7 +64,20 @@ export function schemaName(schema: FormSchemaGET): string {
 
 /** The folds that would hide a new form of this target; a create clears them. */
 export function foldKeys(target: FormTarget): string[] {
-    return ["task", "other", target.key, `patient:${target.patientId}`];
+    const id = target.patientId;
+    return [
+        "task",
+        "other",
+        target.key,
+        `patient:${id}`,
+        `task:patient:${id}`,
+        `other:patient:${id}`,
+    ];
+}
+
+/** The target as the status messages and "isn't complete" lines name it: with the patient when several are open. */
+export function targetText(target: FormTarget, multiPatient: boolean): string {
+    return multiPatient ? `${target.patient} · ${target.name}` : target.name;
 }
 
 const SCOPE_ORDER: readonly FormEntityScope[] = [
@@ -180,6 +193,8 @@ export interface Matched {
     taskRows: TaskRow[] | null;
     /** Every other stored form of an open target, by scope and strip order. */
     other: FormGroup[];
+    /** The open images belong to more than one patient. */
+    multiPatient: boolean;
 }
 
 const newestFirst = (a: FormAnnotationGET, b: FormAnnotationGET) =>
@@ -253,7 +268,9 @@ export function matchForms(input: {
     const other = [...groups.values()].sort(
         (a, b) => rank(a) - rank(b) || place(a) - place(b),
     );
-    return { taskSchema, taskRows, other };
+    const multiPatient =
+        new Set(images.map((i) => i.instance.patient.id)).size > 1;
+    return { taskSchema, taskRows, other, multiPatient };
 }
 
 export type Completion = "complete" | "incomplete";
@@ -288,13 +305,18 @@ export function incompleteForms(
     subTaskId: number,
 ): string[] {
     const lines: string[] = [];
-    const { taskSchema } = matched;
+    const { taskSchema, multiPatient } = matched;
     for (const { target, form } of matched.taskRows ?? []) {
         if (!taskSchema) break;
         const name = schemaName(taskSchema);
-        if (!form) lines.push(`${name} for ${target.name}: not graded`);
+        if (!form)
+            lines.push(
+                `${name} for ${targetText(target, multiPatient)}: not graded`,
+            );
         else if (completion(form, taskSchema) === "incomplete")
-            lines.push(`${name} for ${target.name}: not complete`);
+            lines.push(
+                `${name} for ${targetText(target, multiPatient)}: not complete`,
+            );
     }
     for (const { target, forms } of matched.other) {
         for (const form of forms) {
@@ -308,7 +330,7 @@ export function incompleteForms(
                 completion(form, schema) === "incomplete"
             )
                 lines.push(
-                    `${schemaName(schema)} for ${target.name}: not complete`,
+                    `${schemaName(schema)} for ${targetText(target, multiPatient)}: not complete`,
                 );
         }
     }

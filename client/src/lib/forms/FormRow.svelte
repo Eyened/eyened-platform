@@ -44,7 +44,7 @@ The blue bar, tint and Document icon mark the form open in the window; the grey 
         open: boolean;
         /** The target holds the selected viewport's image. */
         current: boolean;
-        depth: 1 | 2;
+        depth: 1 | 2 | 3;
         /** Someone else's form: their name as a tag. */
         creator?: string;
         /** Other forms rows add the date, so two forms of one schema read apart. */

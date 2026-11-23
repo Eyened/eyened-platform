@@ -1,6 +1,6 @@
 <!--
 @component
-Grading (a task) or Forms (/view): the open images' forms by target. In a task, the task form's rows, then Other forms; on /view the groups, under a heading per patient when more than one is open.
+Grading (a task) or Forms (/view): the open images' forms by target. In a task, the task form's rows, then Other forms; on /view the groups. With more than one patient open, each part sits under a heading per patient.
 Rows open their form in the window; "Grade" and Copy make one and open it.
 -->
 <script lang="ts">
@@ -39,8 +39,10 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
         matchForms,
         openImages,
         schemaName,
+        targetText,
         type FormGroup,
         type FormTarget,
+        type TaskRow,
     } from "./formTargets";
     import { viewerFor } from "./formViewer";
     import { copyPayload, taskFormName } from "./taskForm";
@@ -80,19 +82,22 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     const otherCount = $derived(
         matched.other.reduce((n, g) => n + g.forms.length, 0),
     );
-    // /view: patients in strip order, each with its groups.
+    // Patients in strip order, each with its task rows and groups.
     const patients = $derived.by(() => {
         // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a local rebuilt on each derive, never mutated later
         const byPatient = new Map<
             number,
-            { name: string; groups: FormGroup[] }
+            { name: string; rows: TaskRow[]; groups: FormGroup[] }
         >();
         for (const { instance } of images)
             if (!byPatient.has(instance.patient.id))
                 byPatient.set(instance.patient.id, {
                     name: instance.patient.identifier,
+                    rows: [],
                     groups: [],
                 });
+        for (const row of matched.taskRows ?? [])
+            byPatient.get(row.target.patientId)?.rows.push(row);
         for (const group of matched.other)
             byPatient.get(group.target.patientId)?.groups.push(group);
         return [...byPatient.entries()];
@@ -137,7 +142,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
         const created = await creator.create({
             key: `grade:${target.key}`,
             schemaName: name,
-            message: `Added ${name} for ${target.name}`,
+            message: `Added ${name} for ${targetText(target, matched.multiPatient)}`,
             payload: buildFormAnnotationCreatePayload({
                 formSchemaId: taskSchema.id,
                 scope: target.scope,
@@ -155,7 +160,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
         const created = await creator.create({
             key: "add",
             schemaName: name,
-            message: `Added ${name} for ${target.name}`,
+            message: `Added ${name} for ${targetText(target, matched.multiPatient)}`,
             payload: buildFormAnnotationCreatePayload({
                 formSchemaId: schema.id,
                 scope: target.scope,
@@ -192,7 +197,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     }
 </script>
 
-{#snippet groups(list: FormGroup[], level: 3 | 4)}
+{#snippet groups(list: FormGroup[], level: 3 | 4 | 5)}
     <FormGroups
         groups={list}
         {level}
@@ -203,6 +208,30 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
         oncopy={copy}
         ondelete={askDelete}
     />
+{/snippet}
+
+{#snippet taskRowList(list: TaskRow[], schema: FormSchemaGET, depth: 1 | 2)}
+    <ul>
+        {#each list as { target, form } (target.key)}
+            <li>
+                <!-- Task rows hold only my forms, so a form can be deleted. -->
+                <FormRow
+                    name={target.name}
+                    {target}
+                    {form}
+                    completion={form ? completion(form, schema) : null}
+                    open={form !== null && openForm.id === form.id}
+                    current={selectedImageId !== null &&
+                        target.imageIds.includes(selectedImageId)}
+                    {depth}
+                    canDelete={form !== null}
+                    onopen={() => (form ? open(form, target) : grade(target))}
+                    oncopy={() => form && copy(form, target)}
+                    ondelete={(control) => form && askDelete(form, control)}
+                />
+            </li>
+        {/each}
+    </ul>
 {/snippet}
 
 {#snippet addForm()}
@@ -253,36 +282,33 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
                     open={!folded.has("task")}
                     ontoggle={() => toggle("task")}
                 >
-                    <ul>
-                        {#each rows as { target, form } (target.key)}
-                            <li>
-                                <!-- Task rows hold only my forms, so a form can be deleted. -->
-                                <FormRow
-                                    name={target.name}
-                                    {target}
-                                    {form}
-                                    completion={form
-                                        ? completion(form, schema)
-                                        : null}
-                                    open={form !== null &&
-                                        openForm.id === form.id}
-                                    current={selectedImageId !== null &&
-                                        target.imageIds.includes(
-                                            selectedImageId,
-                                        )}
-                                    depth={1}
-                                    canDelete={form !== null}
-                                    onopen={() =>
-                                        form
-                                            ? open(form, target)
-                                            : grade(target)}
-                                    oncopy={() => form && copy(form, target)}
-                                    ondelete={(control) =>
-                                        form && askDelete(form, control)}
-                                />
-                            </li>
+                    {#if matched.multiPatient}
+                        {#each patients as [patientId, patient] (patientId)}
+                            {#if patient.rows.length > 0}
+                                <LayerSection
+                                    title={patient.name}
+                                    count="{completeCount(
+                                        patient.rows,
+                                        schema,
+                                    )} of {patient.rows.length} complete"
+                                    level={4}
+                                    open={!folded.has(
+                                        `task:patient:${patientId}`,
+                                    )}
+                                    ontoggle={() =>
+                                        toggle(`task:patient:${patientId}`)}
+                                >
+                                    {@render taskRowList(
+                                        patient.rows,
+                                        schema,
+                                        2,
+                                    )}
+                                </LayerSection>
+                            {/if}
                         {/each}
-                    </ul>
+                    {:else}
+                        {@render taskRowList(rows, schema, 1)}
+                    {/if}
                 </LayerSection>
             </div>
         {/if}
@@ -294,10 +320,26 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
                 ontoggle={() => toggle("other")}
                 empty="No forms for these images yet."
             >
-                {@render groups(matched.other, 4)}
+                {#if matched.multiPatient}
+                    {#each patients as [patientId, patient] (patientId)}
+                        {#if patient.groups.length > 0}
+                            <LayerSection
+                                title={patient.name}
+                                level={4}
+                                open={!folded.has(`other:patient:${patientId}`)}
+                                ontoggle={() =>
+                                    toggle(`other:patient:${patientId}`)}
+                            >
+                                {@render groups(patient.groups, 5)}
+                            </LayerSection>
+                        {/if}
+                    {/each}
+                {:else}
+                    {@render groups(matched.other, 4)}
+                {/if}
             </LayerSection>
         </div>
-    {:else if patients.length > 1}
+    {:else if matched.multiPatient}
         {#each patients as [patientId, patient] (patientId)}
             <div data-layer-section="patient">
                 <LayerSection

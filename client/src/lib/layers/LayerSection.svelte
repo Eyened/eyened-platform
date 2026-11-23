@@ -1,6 +1,6 @@
 <!--
 @component
-A Layers section (level 3) or a group inside one (level 4): a 24 px disclosure button with a count or a short text (left out for settings sections), an optional action on the trailing edge, and the body while open.
+A Layers section (level 3), a group inside one (level 4) or a group inside that (level 5): a 24 px disclosure button with a count or a short text (left out for settings sections), an optional action on the trailing edge, and the body while open.
 A layer type or group (one with a count) draws a guide line down its open body under its chevron. With a count of 0 it shows `empty` as one hint line there. A closed body is not rendered, so its controls leave the Tab order.
 -->
 <script lang="ts">
@@ -21,7 +21,7 @@ A layer type or group (one with a count) draws a guide line down its open body u
         count?: number | string;
         open: boolean;
         ontoggle: () => void;
-        level?: 3 | 4;
+        level?: 3 | 4 | 5;
         /** One hint line under an open type with no rows. */
         empty?: string;
         action?: Snippet;
@@ -38,7 +38,9 @@ A layer type or group (one with a count) draws a guide line down its open body u
             class="flex min-h-6 w-full items-center gap-2 text-start text-text-primary {level ===
             3
                 ? 'ps-4 text-heading-compact-01'
-                : 'ps-8 text-body-compact-01'}"
+                : level === 4
+                  ? 'ps-8 text-body-compact-01'
+                  : 'ps-12 text-body-compact-01'}"
             aria-expanded={open}
             aria-controls={open ? `${uid}-body` : undefined}
             onclick={ontoggle}
@@ -59,7 +61,7 @@ A layer type or group (one with a count) draws a guide line down its open body u
     <div
         id="{uid}-body"
         class:guide={count !== undefined}
-        style:--guide={level === 3 ? "23px" : "39px"}
+        style:--guide={level === 3 ? "23px" : level === 4 ? "39px" : "55px"}
     >
         {@render children()}
         {#if count === 0 && empty}

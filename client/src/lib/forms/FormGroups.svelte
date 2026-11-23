@@ -30,7 +30,7 @@ A group's wrapper outlines its target's viewports while the pointer or focus is 
         ondelete,
     }: {
         groups: FormGroup[];
-        level: 3 | 4;
+        level: 3 | 4 | 5;
         folded: SvelteSet<string>;
         userId: number;
         selectedImageId: string | null;
@@ -77,7 +77,7 @@ A group's wrapper outlines its target's viewports while the pointer or focus is 
                                 open={openForm.id === form.id}
                                 current={selectedImageId !== null &&
                                     target.imageIds.includes(selectedImageId)}
-                                depth={2}
+                                depth={level === 5 ? 3 : 2}
                                 creator={form.creator.id === userId
                                     ? undefined
                                     : form.creator.name}
