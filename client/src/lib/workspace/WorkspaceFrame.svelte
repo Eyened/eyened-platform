@@ -232,7 +232,8 @@ Below md there are no icon columns: a menu button opens the left column's conten
             )?.focus();
     }
 
-    // ASSUMPTION: the root <Toaster> reads these (plan decision 16): bottom right of the canvas, above the pager.
+    // ASSUMPTION: the root <Toaster> reads these (plan decision 16): bottom right of the canvas, above the pager
+    // and the bottom-right viewport's 32 px view bar, with an 8 px gap.
     $effect(() => {
         const style = document.body.style;
         style.setProperty(
@@ -241,7 +242,7 @@ Below md there are no icon columns: a menu button opens the left column's conten
         );
         style.setProperty(
             "--viewer-toast-bottom",
-            `${workspace.showPager ? 48 : 16}px`,
+            `${workspace.showPager ? 72 : 40}px`,
         );
         return () => {
             style.removeProperty("--viewer-toast-right");

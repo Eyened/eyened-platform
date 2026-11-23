@@ -90,4 +90,4 @@
     });
 </script>
 
-<Viewer showInfo={false} tabbable={false} />
+<Viewer tabbable={false} />

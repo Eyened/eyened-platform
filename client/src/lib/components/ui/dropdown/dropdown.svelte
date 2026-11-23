@@ -2,9 +2,10 @@
     import { Label } from "$lib/components/ui/label/index.js";
     import * as Select from "$lib/components/ui/select/index.js";
 
-    // Carbon Dropdown (carbon-components-svelte prop names) over ui/select, size lg (48 px) or md (40 px);
+    // Carbon Dropdown (carbon-components-svelte prop names) over ui/select, size lg (48 px), md (40 px) or sm (32 px);
     // menu items match the field height and the menu shows 5.5 items (@carbon/styles 1.117.0 list-box).
-    // `onselect` fires only when the user picks a different item.
+    // An item's optional `hint` (a shortcut key) follows its text in the menu.
+    // `onselect` fires only when the user picks a different item; the optional `onclose` fires whenever the menu closes.
     const uid = $props.id(); // $props.id() is not allowed as a destructuring default
     let {
         items,
@@ -12,18 +13,25 @@
         labelText,
         type = "default",
         size = "lg",
+        hideLabel = false,
+        direction = "bottom",
         id = uid,
         onselect,
+        onclose,
     }: {
-        items: { id: string; text: string }[];
+        items: { id: string; text: string; hint?: string }[];
         selectedId?: string;
         labelText: string;
         type?: "default" | "inline";
-        size?: "md" | "lg";
+        size?: "sm" | "md" | "lg";
+        hideLabel?: boolean;
+        direction?: "top" | "bottom";
         id?: string;
         onselect?: (selectedId: string) => void;
+        onclose?: () => void;
     } = $props();
 
+    const heights = { sm: "h-8", md: "h-10", lg: undefined };
     const selectedText = $derived(
         items.find((i) => i.id === selectedId)?.text ?? "",
     );
@@ -37,12 +45,19 @@
     <Label
         id="{id}-label"
         for={id}
-        class={type === "inline" ? "text-body-compact-01" : undefined}
+        class={hideLabel
+            ? "sr-only"
+            : type === "inline"
+              ? "text-body-compact-01"
+              : undefined}
     >
         {labelText}
     </Label>
     <Select.Root
         type="single"
+        onOpenChange={(open) => {
+            if (!open) onclose?.();
+        }}
         items={items.map((i) => ({ value: i.id, label: i.text }))}
         bind:value={
             () => selectedId ?? "",
@@ -58,20 +73,31 @@
             {id}
             aria-labelledby="{id}-label {id}"
             variant={type}
-            class={size === "md" ? "h-10" : undefined}
+            class={heights[size]}
         >
             {selectedText}
         </Select.Trigger>
         <Select.Content
             variant={type}
-            class={size === "md" ? "max-h-55" : undefined}
+            side={direction}
+            class={size === "md"
+                ? "max-h-55"
+                : size === "sm"
+                  ? "max-h-44"
+                  : undefined}
         >
             {#each items as item (item.id)}
                 <Select.Item
                     value={item.id}
                     label={item.text}
-                    class={size === "md" ? "h-10" : undefined}
-                />
+                    class={heights[size]}
+                >
+                    {item.text}
+                    {#if item.hint}
+                        <span class="ms-2 text-text-secondary">{item.hint}</span
+                        >
+                    {/if}
+                </Select.Item>
             {/each}
         </Select.Content>
     </Select.Root>
