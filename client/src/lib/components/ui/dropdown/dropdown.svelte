@@ -1,7 +1,6 @@
 <script lang="ts">
     import { Label } from "$lib/components/ui/label/index.js";
     import * as Select from "$lib/components/ui/select/index.js";
-    import ErrorFilled from "carbon-icons-svelte/lib/ErrorFilled.svelte";
 
     // Carbon Dropdown (carbon-components-svelte prop names) over ui/select, size lg (48 px), md (40 px) or sm (32 px);
     // menu items match the field height and the menu shows 5.5 items (@carbon/styles 1.117.0 list-box).
@@ -19,9 +18,6 @@
         id = uid,
         onselect,
         onclose,
-        invalid = false,
-        invalidText,
-        hideInvalidText = false,
     }: {
         items: { id: string; text: string; hint?: string }[];
         selectedId?: string;
@@ -33,12 +29,6 @@
         id?: string;
         onselect?: (selectedId: string) => void;
         onclose?: () => void;
-        /** Carbon's invalid state: an error outline and icon on the field. */
-        invalid?: boolean;
-        /** Shown beside an inline Dropdown while invalid, and its description. */
-        invalidText?: string;
-        /** Keeps the invalid text for screen readers only, where the row has no room. */
-        hideInvalidText?: boolean;
     } = $props();
 
     const heights = { sm: "h-8", md: "h-10", lg: undefined };
@@ -82,22 +72,10 @@
         <Select.Trigger
             {id}
             aria-labelledby="{id}-label {id}"
-            aria-invalid={invalid || undefined}
-            aria-describedby={invalid && invalidText
-                ? `${id}-invalid`
-                : undefined}
             variant={type}
-            class="{heights[size] ??
-                ''} aria-invalid:pe-16 aria-invalid:not-focus:outline-2 aria-invalid:not-focus:-outline-offset-2 aria-invalid:not-focus:outline-support-error"
+            class={heights[size]}
         >
             {selectedText}
-            {#if invalid}
-                <!-- Placed like the chevron, beside it, so the truncated text can't wrap it away. -->
-                <ErrorFilled
-                    aria-hidden="true"
-                    class="pointer-events-none absolute top-1/2 right-10 -translate-y-1/2 text-support-error"
-                />
-            {/if}
         </Select.Trigger>
         <Select.Content
             variant={type}
@@ -123,14 +101,4 @@
             {/each}
         </Select.Content>
     </Select.Root>
-    {#if invalidText !== undefined}
-        <!-- Always mounted, so the text is announced when it appears. -->
-        <span
-            id="{id}-invalid"
-            role="alert"
-            class="text-helper-text-01 text-text-error {hideInvalidText
-                ? 'sr-only'
-                : ''}">{invalid ? invalidText : ""}</span
-        >
-    {/if}
 </div>

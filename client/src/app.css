@@ -101,6 +101,10 @@
     /* Carbon Tag specs: dark themes use step 70 for backgrounds and step 20 for text (red 70, red 20). */
     --color-tag-background-red: #a2191f;
     --color-tag-color-red: #ffd7d9;
+    --color-tag-background-blue: #0043ce;
+    --color-tag-color-blue: #d0e2ff;
+    --color-tag-background-green: #0e6027;
+    --color-tag-color-green: #a7f0ba;
 
     /* Type: @carbon/type 11.69.0, productive set */
     --font-*: initial;

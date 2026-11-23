@@ -1,5 +1,6 @@
 <script module lang="ts">
     import type { Snippet } from "svelte";
+    import type { ResolvedPathname } from "$app/types";
 
     /** Task-mode set navigation and status. */
     export interface TaskHeader {
@@ -12,8 +13,11 @@
         pending: "prev" | "next" | "primary" | null;
         prev(): void;
         next(): void;
-        overview(): void;
-        /** Status ▾ and the primary button, when the task shows them. */
+        /** The Task overview page; the header opens it in a new tab. */
+        overviewHref: ResolvedPathname;
+        /** The set's status, right after the set label. */
+        tag?: Snippet;
+        /** The set's move and its Set status menu; unset when there is nothing to show. */
         status?: Snippet;
         /** After "Mark ready" on the last set; shown at the top of the canvas. */
         notice?: { title: string; subtitle: string } | null;
@@ -21,7 +25,8 @@
 </script>
 
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button/index.js";
+    import { Separator } from "$lib/components/ui/separator/index.js";
+    import Launch from "carbon-icons-svelte/lib/Launch.svelte";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import ChevronLeft from "carbon-icons-svelte/lib/ChevronLeft.svelte";
     import ChevronRight from "carbon-icons-svelte/lib/ChevronRight.svelte";
@@ -62,6 +67,15 @@
     }
 </script>
 
+{#snippet divider()}
+    <!-- Divides the header's groups; decorative, so screen readers skip it. -->
+    <Separator
+        orientation="vertical"
+        decorative
+        class="mx-1 bg-border-subtle-01 data-[orientation=vertical]:h-6"
+    />
+{/snippet}
+
 <header
     class="flex h-12 min-w-0 items-center gap-1 border-b border-border-subtle-01 bg-background pe-2"
     style="grid-area: header"
@@ -89,6 +103,9 @@
         {/if}
     </div>
     {#if task}
+        {#if !narrow && (task.show.title || task.show.nav || task.show.overview || task.tag)}
+            {@render divider()}
+        {/if}
         {#if task.show.title}
             {#if narrow}
                 <!-- Below md "Set" is dropped from view to fit 320 px; ◀ ▶ still say "set". -->
@@ -105,6 +122,8 @@
                 >
             {/if}
         {/if}
+        <!-- Below md the set's status waits for the narrow footer. -->
+        {#if !narrow}{@render task.tag?.()}{/if}
         {#if task.show.nav}
             <IconButton
                 label="Previous set"
@@ -142,9 +161,19 @@
             </IconButton>
         {/if}
         {#if !narrow && task.show.overview}
-            <Button variant="ghost" size="sm" onclick={() => task.overview()}
-                >Task overview</Button
+            <!-- Carbon standalone Link with Launch: it opens another tab, so the set stays open. -->
+            <!-- eslint-disable svelte/no-navigation-without-resolve -- overviewHref is a ResolvedPathname from resolve() -->
+            <a
+                href={task.overviewHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Task overview, opens in a new tab"
+                class="inline-flex items-center gap-2 px-2 text-body-compact-01 whitespace-nowrap text-link-primary hover:text-link-primary-hover hover:underline"
             >
+                Task overview
+                <Launch aria-hidden="true" />
+            </a>
+            <!-- eslint-enable svelte/no-navigation-without-resolve -->
         {/if}
     {/if}
     <div class="min-w-0 flex-1"></div>
@@ -155,13 +184,17 @@
     </div>
     {#if task}
         <div class="contents" data-header-slot="mark-ready">
-            <!-- Below md, Status and the primary button wait for the narrow footer. -->
-            {#if !narrow}{@render task.status?.()}{/if}
+            <!-- Below md, the set's move and status wait for the narrow footer. -->
+            {#if !narrow && task.status}
+                {@render divider()}
+                {@render task.status()}
+            {/if}
         </div>
     {/if}
     {#if narrow}
         {@render end?.()}
     {:else}
+        {@render divider()}
         <!-- In a task, the task config sets the strip. -->
         <LayoutPopover stripToggle={task === null} />
     {/if}

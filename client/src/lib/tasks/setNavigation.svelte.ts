@@ -5,7 +5,7 @@ import { writeHandoff, type SetControl } from "./setHandoff";
 
 export const STATUS_ID = "set-status";
 
-/** Focus on the header's ◀, ▶, primary button or Status Dropdown, when it is there. */
+/** Focus on the header's ◀, ▶, primary button or Set status ▾, when it is there. */
 export function focusSetControl(control: SetControl | "status"): void {
     const element =
         control === "status"
@@ -59,12 +59,13 @@ export class SetNavigation {
     pending: SetControl | null = $state(null);
     /** Set by "Mark ready" on the last set. */
     lastReady = $state(false);
-    /** The last status save failed; the Dropdown shows it until a pick saves. */
+    /** The last status save failed; the combo button shows it until a pick saves. */
     statusFailed = $state(false);
     /** The open "Leave set n without saving"; answerLeave answers it. */
     question: { markReady: boolean } | null = $state(null);
+    /** A move is running, or the page load it started; Set status ▾ waits for it. */
+    moving = $state(false);
     private answer: ((leave: boolean) => void) | null = null;
-    private moving = false;
 
     constructor(private readonly deps: SetNavigationDeps) {}
 
@@ -90,7 +91,7 @@ export class SetNavigation {
                 return;
             }
             if (markReady) {
-                // A failure shows on the Dropdown; the grader stays.
+                // A failure shows on the combo button; the grader stays.
                 if (!(await this.saveStatus("Ready"))) return;
             }
             if (last) {

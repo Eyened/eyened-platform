@@ -28,7 +28,7 @@ Below xlg only its icon shows, with the words in a tooltip and in hidden text. T
     role="status"
     class="flex shrink-0 items-center {iconOnly
         ? 'w-10 justify-center'
-        : 'min-w-40'}"
+        : 'min-w-40 justify-end'}"
 >
     {#if text && state === "error"}
         {#if iconOnly}

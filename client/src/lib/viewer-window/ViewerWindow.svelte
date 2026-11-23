@@ -4,6 +4,7 @@ Plugs today's viewer into the workspace frame: sets the viewer-window context,
 loads registrations, renders MainViewer per viewport and StripViewer per strip tile, and hosts the Add images overlay.
 -->
 <script lang="ts">
+    import { resolve } from "$app/paths";
     import { instances, patients } from "$lib/data";
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
@@ -12,6 +13,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import LeaveSetModal from "$lib/tasks/LeaveSetModal.svelte";
     import SetStatusControl from "$lib/tasks/SetStatusControl.svelte";
+    import SetStatusTag from "$lib/tasks/SetStatusTag.svelte";
     import {
         parseTaskPanelConfig,
         taskHeaderShows,
@@ -65,6 +67,9 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     const navigation = taskContext ? new TaskNavigation(taskContext) : null;
     // subTaskIndex is 0-based; people read sets from 1.
     const setNumber = (taskContext?.subTaskIndex ?? 0) + 1;
+    const lastSet = taskContext
+        ? taskContext.subTaskIndex >= taskContext.task.num_tasks - 1
+        : false;
     // The set's status saves like any other edit, so ◀ ▶ wait for it.
     const statusSaver = taskContext
         ? new DebouncedSaver<SubTaskState>({
@@ -108,11 +113,15 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                       void setNavigation.move("prev", { markReady: false }),
                   next: () =>
                       void setNavigation.move("next", { markReady: false }),
-                  overview: () => {
-                      window.location.href = `/tasks/${taskContext.task.id}`;
-                  },
+                  overviewHref: resolve("/tasks/[taskid]", {
+                      taskid: String(taskContext.task.id),
+                  }),
+                  tag: shows.status ? statusTag : undefined,
+                  // With Status off the last set has no move, so nothing to show.
                   status:
-                      shows.status || shows.goToNext ? setStatus : undefined,
+                      shows.status || (shows.goToNext && !lastSet)
+                          ? setStatus
+                          : undefined,
                   notice: setNavigation.lastReady
                       ? {
                             title: `Set ${setNumber} marked ready`,
@@ -144,6 +153,12 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
             : null;
     }
 </script>
+
+{#snippet statusTag()}
+    {#if taskContext}
+        <SetStatusTag subTaskId={taskContext.subTask.id} />
+    {/if}
+{/snippet}
 
 {#snippet setStatus()}
     {#if taskContext && setNavigation && statusSaver && shows}

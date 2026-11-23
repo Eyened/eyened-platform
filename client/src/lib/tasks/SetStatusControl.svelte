@@ -1,11 +1,11 @@
 <!--
 @component
-The set's Status Dropdown and its primary button, in the header (and the narrow footer later).
-Ready is picked only once everything else saved; a pick that can't save goes back.
+The set's move and its "Set status" menu as one combo button, in the header (and the narrow footer later).
+Ready is picked only once everything else saved; a pick that can't save shows on the button and nothing stays queued.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
-    import { Dropdown } from "$lib/components/ui/dropdown/index.js";
+    import { ComboButton } from "$lib/components/ui/combo-button/index.js";
     import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
     import { subtasks } from "$lib/data/stores.svelte";
     import type { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
@@ -36,40 +36,41 @@ Ready is picked only once everything else saved; a pick that can't save goes bac
 
     const items = SUBTASK_STATES.map((id) => ({
         id,
-        text: SUBTASK_STATUS[id].label,
+        label: SUBTASK_STATUS[id].label,
+        description: SUBTASK_STATUS[id].description,
     }));
     const saved = $derived<SubTaskState>(
         subtasks.get(subTaskId)?.task_state ?? "NotStarted",
     );
-    // The Dropdown's pick; back to the saved value when it can't be saved.
-    let picked = $derived<string>(saved);
     const last = $derived(index >= count - 1);
-    // ASSUMPTION: words from xlg (82rem), as the header save state; below it the invalid text is for screen readers.
+    // ASSUMPTION: words from xlg (82rem), as the header save state; below it the failure text is for screen readers.
     const xlg = new MediaQuery("min-width: 82rem");
+    const invalidId = `${STATUS_ID}-invalid`;
+    let picking = $state(false);
+    // One pick at a time, and none once a move has started: its Ready or the page load would overtake it.
+    const menuDisabled = $derived(picking || navigation.moving);
 
-    async function pick(next: string) {
-        const state = next as SubTaskState;
-        // Ready means everything was saved, whichever control sets it. Focus stays on the Dropdown.
-        if (state === "Ready" && !(await flushWithin(saveTracker, 5000))) {
-            picked = saved;
-            return;
+    async function pick(id: string) {
+        if (menuDisabled) return;
+        const state = id as SubTaskState;
+        picking = true;
+        try {
+            // Ready means everything was saved, whichever control sets it. Focus stays on ▾.
+            if (state === "Ready" && !(await flushWithin(saveTracker, 5000)))
+                return;
+            // A15: a failed save shows on the button; nothing stays queued.
+            await navigation.saveStatus(state);
+        } finally {
+            picking = false;
         }
-        // A15: a failed save goes back and shows on the Dropdown; nothing stays queued.
-        if (!(await navigation.saveStatus(state))) picked = saved;
     }
 
-    const primary = $derived.by(() => {
+    // A Ready set only moves on; the last set has nowhere to move to.
+    const main = $derived.by(() => {
         if (!showStatus || saved === "Ready")
-            return last
-                ? null
-                : {
-                      text: "Go to next set",
-                      variant: "outline" as const,
-                      markReady: false,
-                  };
+            return last ? null : { label: "Go to next set", markReady: false };
         return {
-            text: last ? "Mark ready" : "Mark ready and next",
-            variant: "default" as const,
+            label: last ? "Mark ready" : "Mark ready and next",
             markReady: true,
         };
     });
@@ -77,28 +78,42 @@ Ready is picked only once everything else saved; a pick that can't save goes bac
 
     // aria-disabled keeps focus on the button while it is pending.
     function go() {
-        if (primary && !pending)
-            void navigation.move("primary", { markReady: primary.markReady });
+        if (main && !pending)
+            void navigation.move("primary", { markReady: main.markReady });
     }
 </script>
 
 {#if showStatus}
-    <Dropdown
-        id={STATUS_ID}
-        type="inline"
-        size="sm"
-        labelText="Status"
+    <ComboButton
+        label={main?.label}
+        onclick={go}
+        {pending}
+        data-set-control="primary"
+        triggerId={STATUS_ID}
+        triggerLabel="Set status: {SUBTASK_STATUS[saved].label}"
+        heading="Set status"
         {items}
-        bind:selectedId={() => picked, (v) => (picked = v ?? saved)}
+        selectedId={saved}
         onselect={pick}
+        {menuDisabled}
         invalid={navigation.statusFailed}
-        invalidText="Status couldn't save. Pick it again."
-        hideInvalidText={!xlg.current}
+        describedBy={invalidId}
     />
-{/if}
-{#if primary}
+    <!-- Always mounted, so the text is announced when it appears. -->
+    <span
+        id={invalidId}
+        role="alert"
+        class="text-helper-text-01 whitespace-nowrap text-text-error {xlg.current
+            ? ''
+            : 'sr-only'}"
+        >{navigation.statusFailed
+            ? "Status couldn't save. Pick it again."
+            : ""}</span
+    >
+{:else if main}
+    <!-- Status off: only "Go to next set", tertiary, no menu. -->
     <Button
-        variant={primary.variant}
+        variant="outline"
         size="sm"
         data-set-control="primary"
         aria-disabled={pending || undefined}
@@ -108,11 +123,11 @@ Ready is picked only once everything else saved; a pick that can't save goes bac
             <InlineLoading
                 class="text-inherit"
                 status="active"
-                description={primary.text}
+                description={main.label}
                 live={false}
             />
         {:else}
-            {primary.text}
+            {main.label}
         {/if}
     </Button>
 {/if}

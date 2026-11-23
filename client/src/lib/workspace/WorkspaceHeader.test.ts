@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 import { describe, expect, it, vi } from "vitest";
+import type { ResolvedPathname } from "$app/types";
 import {
     expectNoAxeViolations,
     mockWidth,
@@ -18,7 +19,7 @@ function taskHeader(over: Partial<TaskHeader> = {}): TaskHeader {
         nextDisabled: false,
         prev: vi.fn(),
         next: vi.fn(),
-        overview: vi.fn(),
+        overviewHref: "/tasks/7" as ResolvedPathname,
         ...over,
     };
 }
@@ -46,7 +47,7 @@ describe("WorkspaceHeader", () => {
         expect(screen.queryByText("Show menu")).toBeNull();
     });
 
-    it("in a task, labels the set and wires Previous, Next and Task overview", async () => {
+    it("in a task, labels the set and wires Previous and Next", async () => {
         const task = taskHeader();
         renderHeader(task);
         expect(screen.getByText("Set 2 of 5")).toBeInTheDocument();
@@ -54,12 +55,8 @@ describe("WorkspaceHeader", () => {
             screen.getByRole("button", { name: "Previous set" }),
         );
         await fireEvent.click(screen.getByRole("button", { name: "Next set" }));
-        await fireEvent.click(
-            screen.getByRole("button", { name: "Task overview" }),
-        );
         expect(task.prev).toHaveBeenCalledTimes(1);
         expect(task.next).toHaveBeenCalledTimes(1);
-        expect(task.overview).toHaveBeenCalledTimes(1);
     });
 
     it("disables Previous on the first set and Next on the last", () => {
@@ -74,8 +71,8 @@ describe("WorkspaceHeader", () => {
         const { container } = renderHeader(taskHeader(), true);
         expect(screen.queryByText("EyeNED")).toBeNull();
         expect(
-            screen.queryByRole("button", {
-                name: "Task overview",
+            screen.queryByRole("link", {
+                name: "Task overview, opens in a new tab",
                 hidden: true,
             }),
         ).toBeNull();

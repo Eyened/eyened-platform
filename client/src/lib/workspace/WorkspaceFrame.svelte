@@ -15,6 +15,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     import Help from "carbon-icons-svelte/lib/Help.svelte";
     import Image from "carbon-icons-svelte/lib/Image.svelte";
     import Information from "carbon-icons-svelte/lib/Information.svelte";
+    import Launch from "carbon-icons-svelte/lib/Launch.svelte";
     import Layers from "carbon-icons-svelte/lib/Layers.svelte";
     import Menu from "carbon-icons-svelte/lib/Menu.svelte";
     import RightPanelOpen from "carbon-icons-svelte/lib/RightPanelOpen.svelte";
@@ -220,7 +221,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         else
             document
                 .getElementById(`${uid}-left`)
-                ?.querySelector<HTMLElement>("button")
+                ?.querySelector<HTMLElement>("a, button")
                 ?.focus();
     }
 
@@ -271,11 +272,6 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     function openLayout() {
         overlay = null;
         layoutOpen = true;
-    }
-
-    function openOverview() {
-        overlay = null;
-        task?.overview();
     }
 
     async function chooseImage() {
@@ -451,12 +447,20 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 class="flex flex-col border-b border-border-subtle-01 py-2"
             >
                 {#if task}
+                    <!-- Opens another tab, so the set stays open; the menu closes. -->
                     <Button
                         variant="ghost"
                         size="sm"
                         class="justify-start"
-                        onclick={openOverview}>Task overview</Button
+                        href={task.overviewHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Task overview, opens in a new tab"
+                        onclick={() => (overlay = null)}
                     >
+                        Task overview
+                        <Launch aria-hidden="true" />
+                    </Button>
                 {/if}
                 <Button
                     variant="ghost"
