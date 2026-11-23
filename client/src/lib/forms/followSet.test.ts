@@ -65,10 +65,14 @@ describe("followSet", () => {
     });
 
     it("offers Grade for the selected viewport's target when I have no form for it", () => {
-        const arrival = followSet({ ...base, forms: [] });
+        const arrival = followSet({
+            ...base,
+            selectedImageId: "img-b",
+            forms: [],
+        });
         expect(arrival.kind).toBe("grade");
         if (arrival.kind === "grade")
-            expect(arrival.target.imageIds).toEqual(["img-a"]);
+            expect(arrival.target.imageIds).toEqual(["img-b"]);
     });
 
     it("has nothing to grade with no image in the selected viewport", () => {
