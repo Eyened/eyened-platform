@@ -16,6 +16,7 @@ import { entry, NO_URL } from "$lib/workspace/testUtils";
 import { Workspace } from "$lib/workspace/workspace.svelte";
 import type { FormAnnotationGET } from "../../types/openapi_types";
 import FormsPanel from "./FormsPanel.svelte";
+import { formWindow } from "./formWindow.svelte";
 
 vi.mock("$lib/data", async (original) => ({
     ...(await original<typeof import("$lib/data")>()),
@@ -128,6 +129,7 @@ function renderView() {
 }
 
 beforeEach(() => {
+    formWindow.dismissBlocked();
     vi.spyOn(window, "open").mockReturnValue(null);
     formSchemas.clear();
     formSchemasByName.clear();

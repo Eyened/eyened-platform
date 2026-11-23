@@ -68,6 +68,7 @@ class FormWindow {
     blocked: string | null = $state(null);
     private blockedControl: HTMLElement | null = null;
     private win: Window | null = null;
+    private listening: AbortController | null = null;
     private app: Record<string, unknown> | null = null;
 
     /** Call inside the click, before any await: finds or opens the window and shows "Opening…". Null when blocked. */
@@ -110,7 +111,16 @@ class FormWindow {
                 .querySelectorAll("[data-eyened-style]")
                 .forEach((node) => node.remove());
             copyStyles(win.document);
-            win.addEventListener("pagehide", () => this.gone(win));
+            // This page's listener leaves the pop-up when this page does.
+            this.listening?.abort();
+            const listening = new AbortController();
+            this.listening = listening;
+            win.addEventListener("pagehide", () => this.gone(win), {
+                signal: listening.signal,
+            });
+            window.addEventListener("pagehide", () => listening.abort(), {
+                once: true,
+            });
         }
         // Nothing is open until a form is shown again.
         this.clear();
@@ -157,9 +167,11 @@ class FormWindow {
         const doc = win.document;
         const focused = doc.hasFocus();
         doc.title = view.kind === "form" ? formLabel(view.form) : "Form window";
-        doc.body.replaceChildren();
+        // A fresh host, so a gone page's delegated listeners are not on the element this page mounts into.
+        const host = doc.createElement("div");
+        doc.body.replaceChildren(host);
         this.app = mount(FormWindowContent, {
-            target: doc.body,
+            target: host,
             props: { view },
             context: contexts,
         });

@@ -15,6 +15,7 @@ const { mount, unmount } = await import("svelte");
 /** A pop-up with a real document; the test fires its listeners by hand. */
 function fakeWindow() {
     const listeners = new Map<string, () => void>();
+    const signals = new Map<string, AbortSignal | undefined>();
     const win = {
         closed: false,
         document: document.implementation.createHTMLDocument(""),
@@ -22,9 +23,18 @@ function fakeWindow() {
         close: vi.fn(() => {
             win.closed = true;
         }),
-        addEventListener: (type: string, fn: () => void) =>
-            listeners.set(type, fn),
-        fire: (type: string) => listeners.get(type)?.(),
+        addEventListener: (
+            type: string,
+            fn: () => void,
+            options?: { signal?: AbortSignal },
+        ) => {
+            listeners.set(type, fn);
+            signals.set(type, options?.signal);
+        },
+        // An aborted signal removes the listener, as in a browser.
+        fire: (type: string) => {
+            if (!signals.get(type)?.aborted) listeners.get(type)?.();
+        },
     };
     return win;
 }
@@ -63,6 +73,16 @@ describe("formWindow", () => {
         formWindow.open(form(3), { ...opts, source: "study:42:1" });
         expect(formWindow.blocked).toBeNull();
         expect(formWindow.formId).toBe(3);
+    });
+
+    it("once this page is gone, the pop-up's closing no longer reaches this page's window state", () => {
+        current = fakeWindow();
+        vi.spyOn(window, "open").mockReturnValue(current as never);
+        formWindow.open(form(3), opts);
+        window.dispatchEvent(new Event("pagehide"));
+        formWindow.formId = 7;
+        current.fire("pagehide");
+        expect(formWindow.formId).toBe(7);
     });
 
     it("another form reuses the named pop-up: one window.open per click, the old form unmounted, its point session ended; the same form only comes to the front", () => {
