@@ -40,7 +40,6 @@
     }}
 >
     <p>
-        Some of your work in set {setNumber} isn't saved.{#if markReady}
-            Set {setNumber} won't be marked ready.{/if}
+        Some of your work in set {setNumber} isn't saved.{#if markReady}{` Set ${setNumber} won't be marked ready.`}{/if}
     </p>
 </Modal>
