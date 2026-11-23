@@ -59,3 +59,16 @@ export function orderSegmentationsByCreator(
 
     return result;
 }
+
+const LETTERS: Record<string, string> = {
+    Binary: "B",
+    DualBitMask: "Q",
+    Probability: "P",
+    MultiClass: "MC",
+    MultiLabel: "ML",
+};
+
+/** The short type shown on a row's badge and in the pickers. */
+export function representationLetter(representation: string): string {
+    return LETTERS[representation] ?? representation;
+}

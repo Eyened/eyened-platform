@@ -12,7 +12,7 @@
     import { tagPopoverClass } from "./popover";
 
     // Read-only Carbon tags, all wrapping, then Edit tags: a popover listing each tag with its comment
-    // (Edit comment, Remove) and a combo box to add one. Each action keeps the popover open with Inline
+    // (Edit comment when `onUpdate` is given, Remove) and a combo box to add one. Each action keeps the popover open with Inline
     // loading on its button; a failure shows an inline error notification there.
     let {
         tagType,
@@ -25,7 +25,7 @@
         tags?: TagMeta[];
         tag: (id: number) => Promise<unknown>;
         untag: (id: number) => Promise<unknown>;
-        onUpdate: (id: number, comment?: string) => Promise<unknown>;
+        onUpdate?: (id: number, comment?: string) => Promise<unknown>;
     } = $props();
 
     let open = $state(false);
@@ -69,7 +69,7 @@
         const saved = await run(
             `comment-${t.id}`,
             "Could not save the comment",
-            () => onUpdate(t.id, comment.trim() || undefined),
+            () => onUpdate!(t.id, comment.trim() || undefined),
         );
         if (saved) editing = null;
     }
@@ -153,14 +153,16 @@
                                     )}
                                 </p>
                                 <div class="flex">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        aria-label="Edit comment on {t.name}"
-                                        onclick={() => startEdit(t)}
-                                    >
-                                        Edit comment
-                                    </Button>
+                                    {#if onUpdate}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            aria-label="Edit comment on {t.name}"
+                                            onclick={() => startEdit(t)}
+                                        >
+                                            Edit comment
+                                        </Button>
+                                    {/if}
                                     <Button
                                         variant="ghost"
                                         size="sm"

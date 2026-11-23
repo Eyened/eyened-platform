@@ -19,28 +19,31 @@ beforeAll(() => {
 });
 
 describe("Viewer", () => {
-    it("gives a press that closes an open popover to no tool", async () => {
-        const viewerContext = viewerOf("colour");
-        const pointerdown = vi.fn();
-        viewerContext.addOverlay({ pointerdown });
-        const { container } = render(Viewer, {
-            context: new Map<string, unknown>([
-                ["viewerContext", viewerContext],
-                ["viewerWindowContext", { addViewer: () => () => {} }],
-            ]),
-        });
-        const viewport = container.querySelector<HTMLElement>(".viewer")!;
-        const popover = document.body.appendChild(
-            document.createElement("div"),
-        );
-        popover.dataset.slot = "popover-content";
-        await fireEvent.pointerDown(viewport, { pointerId: 1 });
-        await fireEvent.pointerUp(viewport, { pointerId: 1 });
-        expect(pointerdown).not.toHaveBeenCalled();
-        popover.remove();
-        await fireEvent.pointerDown(viewport, { pointerId: 1 });
-        expect(pointerdown).toHaveBeenCalledOnce();
-    });
+    it.each(["popover-content", "tag-popover"])(
+        "gives a press that closes an open %s to no tool",
+        async (slot) => {
+            const viewerContext = viewerOf("colour");
+            const pointerdown = vi.fn();
+            viewerContext.addOverlay({ pointerdown });
+            const { container } = render(Viewer, {
+                context: new Map<string, unknown>([
+                    ["viewerContext", viewerContext],
+                    ["viewerWindowContext", { addViewer: () => () => {} }],
+                ]),
+            });
+            const viewport = container.querySelector<HTMLElement>(".viewer")!;
+            const popover = document.body.appendChild(
+                document.createElement("div"),
+            );
+            popover.dataset.slot = slot;
+            await fireEvent.pointerDown(viewport, { pointerId: 1 });
+            await fireEvent.pointerUp(viewport, { pointerId: 1 });
+            expect(pointerdown).not.toHaveBeenCalled();
+            popover.remove();
+            await fireEvent.pointerDown(viewport, { pointerId: 1 });
+            expect(pointerdown).toHaveBeenCalledOnce();
+        },
+    );
 
     it("a closing press released outside the viewer does not swallow the next release", async () => {
         const viewerContext = viewerOf("colour");

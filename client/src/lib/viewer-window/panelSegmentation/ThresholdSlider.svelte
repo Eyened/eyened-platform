@@ -1,46 +1,39 @@
 <script lang="ts">
+    import { SliderField } from "$lib/components/ui/slider/index.js";
     import { updateSegmentation } from "$lib/data/api";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
     import { getContext } from "svelte";
     import type { Segmentation } from "./segmentationContext.svelte";
-    import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
 
-    interface Props {
-        segmentation: Segmentation;
-        segmentationItem: SegmentationItem;
-    }
-    let { segmentation, segmentationItem }: Props = $props();
+    let {
+        segmentation,
+        segmentationItem,
+    }: { segmentation: Segmentation; segmentationItem: SegmentationItem } =
+        $props();
 
     const canEdit = globalContext.canEdit(segmentation);
 
+    // Saves in order, so the last value set is the one stored.
     let pendingUpdate = Promise.resolve();
-    async function onUpdateThreshold() {
-        if (canEdit) {
-            await pendingUpdate;
-            pendingUpdate = updateSegmentation(segmentation.id, {
-                threshold: segmentationItem.threshold,
-            });
-        }
+    async function save() {
+        if (!canEdit) return;
+        await pendingUpdate;
+        pendingUpdate = updateSegmentation(segmentation.id, {
+            threshold: segmentationItem.threshold,
+        });
     }
 </script>
 
-<label>
-    <span>Threshold: {segmentationItem.threshold.toFixed(2)}</span>
-    <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        bind:value={segmentationItem.threshold}
-        onchange={onUpdateThreshold}
-    />
-</label>
-
-<style>
-    label {
-        display: flex;
-        flex-direction: column;
-    }
-</style>
+<SliderField
+    labelText="Threshold"
+    value={segmentationItem.threshold}
+    onchange={(v) => (segmentationItem.threshold = v)}
+    oncommit={save}
+    min={0}
+    max={1}
+    step={0.01}
+    decimals={2}
+/>

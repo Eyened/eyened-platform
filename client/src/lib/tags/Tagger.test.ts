@@ -83,4 +83,22 @@ describe("Tagger", () => {
             ).toBeNull(),
         );
     });
+
+    it("without onUpdate no comment control renders", async () => {
+        render(Tagger, {
+            props: {
+                tagType: "Segmentation",
+                tags: [tag],
+                tag: vi.fn(),
+                untag: vi.fn(),
+            },
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Edit tags" }),
+        );
+        await screen.findByRole("button", { name: "Remove Blurry" });
+        expect(
+            screen.queryByRole("button", { name: "Edit comment on Blurry" }),
+        ).toBeNull();
+    });
 });

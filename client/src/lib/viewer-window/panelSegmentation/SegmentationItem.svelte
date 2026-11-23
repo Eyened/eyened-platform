@@ -6,7 +6,11 @@ Under it: the current row's save state, this slice's area, then the row's detail
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import * as Popover from "$lib/components/ui/popover/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
+    import { tagSegmentation, untagSegmentation } from "$lib/data/helpers";
+    import Tagger from "$lib/tags/Tagger.svelte";
+    import type { SegmentationGET } from "../../../types/openapi_types";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import SliceArea from "$lib/layers/SliceArea.svelte";
     import SyncStatus from "$lib/layers/SyncStatus.svelte";
@@ -29,6 +33,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
         getSegmentationKey,
         type Segmentation,
     } from "./segmentationContext.svelte";
+    import { representationLetter } from "./segmentationUtils";
     import ThresholdSlider from "./ThresholdSlider.svelte";
 
     const globalContext = getContext<GlobalContext>("globalContext");
@@ -47,6 +52,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
     }
 
     let { segmentation, showArea, ondelete }: Props = $props();
+    const uid = $props.id();
 
     const feature = segmentation.feature;
     const dataRepresentation = segmentation.data_representation;
@@ -72,7 +78,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
     const isEmptyForCurrentSlice = $derived(
         segmentationItem.isEmptyForSlice(viewerContext.index),
     );
-    let collapsed = $state(true);
+    let duplicateOpen = $state(false);
 
     function showOnly(e: MouseEvent) {
         e.preventDefault();
@@ -108,14 +114,6 @@ Under it: the current row's save state, this slice's area, then the row's detail
         mainViewerContext.highlightedSegmentationItem = undefined;
     }
 
-    const segmentationType = {
-        Binary: "B",
-        DualBitMask: "Q",
-        Probability: "P",
-        MultiClass: "MC",
-        MultiLabel: "ML",
-    }[dataRepresentation];
-
     function applyDuplicateAI() {
         duplicate(
             globalContext,
@@ -125,7 +123,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
             viewerContext,
             false,
             "Q",
-            segmentationItem.threshold ?? segmentation.threshold ?? 0.5, //original threshold
+            segmentationItem.threshold, //original threshold
             0.5, //new threshold
             taskContext,
         );
@@ -175,7 +173,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
             aria-pressed={isActive}
             onclick={toggleActive}>{feature.name}</button
         >
-        <Tag>{segmentationType}</Tag>
+        <Tag>{representationLetter(dataRepresentation)}</Tag>
         {#if isEditable}
             <IconButton
                 size="icon-xs"
@@ -190,9 +188,6 @@ Under it: the current row's save state, this slice's area, then the row's detail
         {#if isActive && isEditable && segmentationState}
             <SyncStatus sync={segmentationState.syncState} />
         {/if}
-        {#if showArea && !isMulti}
-            <SliceArea {segmentation} {segmentationItem} />
-        {/if}
         {#if dataRepresentation == "Probability" && isActive}
             <ThresholdSlider {segmentation} {segmentationItem} />
         {/if}
@@ -201,43 +196,81 @@ Under it: the current row's save state, this slice's area, then the row's detail
                 Duplicate
             </Button>
         {/if}
+        {#if showArea && !isMulti}
+            <SliceArea {segmentation} {segmentationItem} />
+        {/if}
         {#if isMulti}
-            <MultiFeatureSelector {segmentation} active={isActive} />
+            <MultiFeatureSelector {segmentation} active={isActive} {showArea} />
         {/if}
         {#if segmentationItem.loading}
             <p class="text-helper-text-01 text-text-secondary">
                 Loading segmentation…
             </p>
         {/if}
-        {#if isActive}
-            <button
-                type="button"
-                class="more text-body-compact-01"
-                aria-expanded={!collapsed}
-                onclick={() => (collapsed = !collapsed)}>More</button
+        {#if isActive && segmentation.annotation_type === "grader_segmentation"}
+            <!-- No comment editing: the segmentation tag API keeps no comment. -->
+            <div
+                class="flex flex-col gap-1"
+                role="group"
+                aria-labelledby="{uid}-tags"
             >
-            {#if !collapsed}
-                {#if isEditable}
-                    <ImportPanel {segmentation} {image} {segmentationItem} />
-                {/if}
-                {#if segmentationState}
-                    <DuplicateAnnotationPanel
-                        {segmentation}
-                        {image}
-                        {segmentationItem}
-                    />
-                {/if}
-                {#if segmentation.annotation_type === "grader_segmentation"}
-                    <ReferenceSegmentationPanel
-                        {segmentation}
-                        {image}
-                        {isEditable}
-                        {segmentationItem}
-                    />
-                {/if}
-                {#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
-                    <CCPanel {segmentationItem} />
-                {/if}
+                <p id="{uid}-tags" class="text-label-01 text-text-secondary">
+                    Tags
+                </p>
+                <Tagger
+                    tagType="Segmentation"
+                    tags={segmentation.tags}
+                    tag={(id) =>
+                        tagSegmentation(segmentation as SegmentationGET, id)}
+                    untag={(id) =>
+                        untagSegmentation(segmentation as SegmentationGET, id)}
+                />
+            </div>
+        {/if}
+        {#if isActive}
+            {#if segmentation.annotation_type === "grader_segmentation"}
+                <ReferenceSegmentationPanel
+                    {segmentation}
+                    {isEditable}
+                    {segmentationItem}
+                />
+            {/if}
+            {#if dataRepresentation == "Binary" || dataRepresentation == "DualBitMask"}
+                <CCPanel {segmentationItem} />
+            {/if}
+            {#if isEditable || segmentationState}
+                <div class="flex flex-wrap gap-x-4 pb-2">
+                    {#if isEditable}
+                        <ImportPanel
+                            {segmentation}
+                            {image}
+                            {segmentationItem}
+                        />
+                    {/if}
+                    {#if segmentationState}
+                        <Popover.Root bind:open={duplicateOpen}>
+                            <Popover.Trigger>
+                                {#snippet child({ props })}
+                                    <Button {...props} variant="ghost" size="sm"
+                                        >Duplicate…</Button
+                                    >
+                                {/snippet}
+                            </Popover.Trigger>
+                            <Popover.Content
+                                role="dialog"
+                                aria-label="Duplicate"
+                                align="start"
+                            >
+                                <DuplicateAnnotationPanel
+                                    {segmentation}
+                                    {image}
+                                    {segmentationItem}
+                                    oncreate={() => (duplicateOpen = false)}
+                                />
+                            </Popover.Content>
+                        </Popover.Root>
+                    {/if}
+                </div>
             {/if}
         {/if}
     </div>
@@ -266,8 +299,7 @@ Under it: the current row's save state, this slice's area, then the row's detail
         background: var(--color-layer-hover-01);
     }
     /* The name wraps; no ellipsis, no tooltip. */
-    .name,
-    .more {
+    .name {
         min-height: 1.5rem;
         padding-inline: 0.25rem;
         border: 0;
@@ -281,12 +313,10 @@ Under it: the current row's save state, this slice's area, then the row's detail
         min-width: 0;
         overflow-wrap: anywhere;
     }
-    .name:hover,
-    .more:hover {
+    .name:hover {
         background: var(--color-layer-hover-01);
     }
-    .name:focus-visible,
-    .more:focus-visible {
+    .name:focus-visible {
         outline: 2px solid var(--color-focus);
         outline-offset: -2px;
     }
@@ -295,7 +325,8 @@ Under it: the current row's save state, this slice's area, then the row's detail
         flex-direction: column;
         align-items: flex-start;
         gap: 0.25rem;
-        padding-inline: 3.5rem 0.5rem;
+        /* Starts under the eye, as the row line's ps-7 does. */
+        padding-inline: 1.75rem 0.5rem;
     }
     .details:empty {
         display: none;

@@ -27,6 +27,7 @@
     --color-layer-selected-inverse: #f4f4f4;
     --color-layer-active-01: #525252;
     --color-layer-accent-01: #393939;
+    --color-layer-accent-02: #525252;
     --color-field-01: #262626;
     --color-field-hover-01: #333333;
     --color-field-02: #393939;
@@ -281,10 +282,11 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus ring for everything except buttons, which draw Carbon's button focus, checkboxes, and command lists (their highlighted option shows the focus). */
+/* Focus ring for everything except buttons, which draw Carbon's button focus, checkboxes and radios, and command lists (their highlighted option shows the focus). */
 :focus-visible:not(
         [data-slot="button"],
         [data-slot="checkbox"],
+        [data-slot="radio-button"],
         [data-slot="command"],
         [class*="shadow-button-focus"]
     ) {
@@ -292,8 +294,9 @@ body {
     outline-offset: -2px;
 }
 
-/* Carbon draws the checkbox ring outside the box; an outline-offset utility loses to the rule above. */
-[data-slot="checkbox"]:focus-visible {
+/* Carbon draws the checkbox and radio rings outside the control; an outline-offset utility loses to the rule above. */
+[data-slot="checkbox"]:focus-visible,
+[data-slot="radio-button"]:focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 1px;
 }
