@@ -112,7 +112,7 @@ The form in the window: a header naming its target, its save state and whose it 
 
     // Keep value as independent $state (not derived from form.form_data), so a store update
     // from the saved reply doesn't loop back into the form. It starts from the form once, on mount.
-    let value: any = $state(undefined);
+    let value: unknown = $state(undefined);
     let loaded = $state(false);
     // One saver per annotation on the page; it outlives this window.
     let root: HTMLElement | null = $state(null);
