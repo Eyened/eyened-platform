@@ -309,6 +309,11 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
                 </LayerSection>
             </div>
         {/each}
+        {#if matched.other.length === 0}
+            <p class="px-4 text-label-01 text-text-secondary">
+                No forms for these images yet.
+            </p>
+        {/if}
     {:else}
         <!-- ASSUMPTION: with one patient the groups sit at level 3, so no heading level is skipped under "Forms". -->
         {@render groups(matched.other, 3)}

@@ -90,7 +90,7 @@ Ready is picked only once everything else saved; a pick that can't save shows on
     }
 </script>
 
-<div class={stacked ? "flex flex-col gap-2" : "contents"}>
+<div class={stacked ? "flex flex-col" : "contents"}>
     {#if showStatus}
         <ComboButton
             label={main?.label}
@@ -113,7 +113,9 @@ Ready is picked only once everything else saved; a pick that can't save shows on
             id={invalidId}
             role="alert"
             class="text-helper-text-01 text-text-error {stacked
-                ? ''
+                ? navigation.statusFailed
+                    ? 'mt-2'
+                    : ''
                 : xlg.current
                   ? 'whitespace-nowrap'
                   : 'sr-only'}"

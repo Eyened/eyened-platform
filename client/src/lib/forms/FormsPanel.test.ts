@@ -43,12 +43,12 @@ const QUALITY = {
 };
 const NOTES = { ...QUALITY, id: 2, name: "Lesion notes" };
 
-function image(id: string, laterality: "L" | "R") {
+function image(id: string, laterality: "L" | "R", patientId = 1) {
     return {
         image_id: id,
         instance: {
             id,
-            patient: { id: 1, identifier: "P-0001" },
+            patient: { id: patientId, identifier: `P-000${patientId}` },
             study: { id: 10, date: "2024-05-02" },
             laterality,
             modality: "OCT",
@@ -94,6 +94,28 @@ function renderGrading(config: unknown = { form_schema_name: QUALITY.name }) {
                     subTaskIndex: 0,
                 },
             ],
+            [
+                "globalContext",
+                {
+                    user: { id: ME },
+                    canEdit: (a: FormAnnotationGET) => a.creator.id === ME,
+                },
+            ],
+        ]),
+    });
+}
+
+function renderView() {
+    const ws = new Workspace();
+    ws.hydrate([entry("img-a"), entry("img-b", { eyeRank: 1 })], NO_URL);
+    const images = new SvelteMap([
+        ["img-a", image("img-a", "R", 1)],
+        ["img-b", image("img-b", "L", 2)],
+    ]);
+    return render(FormsPanel, {
+        context: new Map<string, unknown>([
+            ["workspace", ws],
+            ["viewerWindowContext", { images }],
             [
                 "globalContext",
                 {
@@ -193,5 +215,14 @@ describe("FormsPanel in a task (Grading)", () => {
                 ),
             { timeout: 3000 },
         );
+    });
+});
+
+describe("FormsPanel on /view", () => {
+    it("with several patients and no forms, says there are none", () => {
+        renderView();
+        expect(
+            screen.getByText("No forms for these images yet."),
+        ).toBeInTheDocument();
     });
 });
