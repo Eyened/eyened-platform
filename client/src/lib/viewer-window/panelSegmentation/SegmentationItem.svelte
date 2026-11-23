@@ -5,6 +5,8 @@ One segmentation row in Layers: color, the name (selects it) and the type letter
 <script lang="ts">
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
+    import { worstState } from "$lib/saving/saveTracker.svelte";
+    import { segmentationSavers } from "$lib/saving/thresholdSavers";
     import LayerRow from "$lib/layers/LayerRow.svelte";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import SliceArea from "$lib/layers/SliceArea.svelte";
@@ -53,6 +55,10 @@ One segmentation row in Layers: color, the name (selects it) and the type letter
     const segmentationItem =
         segmentationContext.getSegmentationItem(segmentation);
     const isEditable = globalContext.canEdit(segmentation);
+    // A failed save marks the row until it saves; Retry sits in the pane.
+    const saveFailed = $derived(
+        worstState(segmentationSavers(segmentationItem)) === "error",
+    );
     const isEmptyForCurrentSlice = $derived(
         segmentationItem.isEmptyForSlice(viewerContext.index),
     );
@@ -106,6 +112,7 @@ One segmentation row in Layers: color, the name (selects it) and the type letter
     {/snippet}
     {#snippet tags()}
         <Tag>{representationLetter(dataRepresentation)}</Tag>
+        {#if saveFailed}<Tag type="red">Couldn't save</Tag>{/if}
     {/snippet}
     {#snippet icons()}
         <IconButton

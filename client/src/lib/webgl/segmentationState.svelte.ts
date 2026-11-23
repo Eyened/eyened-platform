@@ -3,6 +3,7 @@ import {
     getModelSegmentationData,
     updateSegmentationData,
 } from "$lib/data/helpers";
+import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
 import { encodeNpy, NPYArray } from "$lib/utils/npy_loader";
 import type {
     ModelSegmentationGET,
@@ -25,10 +26,6 @@ import type { SegmentationItem } from "./segmentationItem.svelte";
 import { prepareImportedMask } from "./segmentationTransfer";
 import { segmentationPlaneSize } from "./segmentationProjection";
 
-function isNavigationTimeFetchFailure(error: unknown): boolean {
-    return error instanceof TypeError && error.message === "Failed to fetch";
-}
-
 type MaskConstructor = new (
     image: AbstractImage,
     segmentation: SegmentationGET,
@@ -44,72 +41,7 @@ export const constructors: Record<
     MultiLabel: MultiLabelMask,
 };
 
-/** Flush pending segmentation PUTs when the tab is hidden or unloaded (best-effort). */
-const segmentationSaveFlushCallbacks = new Set<() => void>();
-/** Return true if closing the tab may lose unsaved segmentation data (debounced or in-flight save). */
-const segmentationUnloadWarnCheckers = new Set<() => boolean>();
-let segmentationSaveLifecycleInstalled = false;
-
-function installSegmentationSaveLifecycle() {
-    if (typeof window === "undefined" || segmentationSaveLifecycleInstalled)
-        return;
-    segmentationSaveLifecycleInstalled = true;
-    const flushAll = () => {
-        for (const cb of segmentationSaveFlushCallbacks) {
-            try {
-                cb();
-            } catch (e) {
-                console.error(e);
-            }
-        }
-    };
-    window.addEventListener("pagehide", flushAll);
-    document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden") flushAll();
-    });
-    // Warn before closing (browser shows a generic "Leave site?" dialog).
-    // Do not fetch here: the browser tears down in-flight requests during beforeunload, which
-    // causes Failed to fetch, stuck "pending" in devtools, and a false error state. Saves run
-    // from pagehide / visibilitychange instead, or after the user chooses Stay and sync finishes.
-    window.addEventListener("beforeunload", (e: BeforeUnloadEvent) => {
-        let shouldWarn = false;
-        for (const check of segmentationUnloadWarnCheckers) {
-            try {
-                if (check()) {
-                    shouldWarn = true;
-                    break;
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }
-        if (shouldWarn) {
-            e.preventDefault();
-            e.returnValue = "";
-        }
-    });
-}
-
-function registerSegmentationSaveFlush(cb: () => void) {
-    segmentationSaveFlushCallbacks.add(cb);
-    installSegmentationSaveLifecycle();
-}
-
-function unregisterSegmentationSaveFlush(cb: () => void) {
-    segmentationSaveFlushCallbacks.delete(cb);
-}
-
-function registerSegmentationUnloadWarn(check: () => boolean) {
-    segmentationUnloadWarnCheckers.add(check);
-    installSegmentationSaveLifecycle();
-}
-
-function unregisterSegmentationUnloadWarn(check: () => boolean) {
-    segmentationUnloadWarnCheckers.delete(check);
-}
-
 // manages the segmentation state (history, mask) for a single scan
-export type SyncState = "synced" | "saving" | "error";
 
 export class SegmentationState {
     protected history: DrawingHistory<string>;
@@ -117,13 +49,8 @@ export class SegmentationState {
 
     private isDrawing = Promise.resolve();
     private hasInitialCheckpoint = false;
-    private updateTimeout: ReturnType<typeof setTimeout> | null = null;
-    private pendingUpdateResolve: (() => void) | null = null;
-    private readonly flushOnHide = () => {
-        this.flushPendingServerUpdate();
-    };
-    private readonly checkUnsavedForUnload = () => this.hasUnsavedServerData();
-    public syncState = $state<SyncState>("synced");
+    /** Sends the mask 2 s after the last change; the mask is exported when it is sent. */
+    public readonly saver: DebouncedSaver<void>;
     public isEmptyForSlice = $state(false);
     /** Settles when this slice's first fetch is done; resolved at once when it started with data. */
     public readonly loaded: Promise<void>;
@@ -153,10 +80,18 @@ export class SegmentationState {
             this.isDrawing = this.initialize();
         }
         this.loaded = this.isDrawing;
-        if (typeof window !== "undefined") {
-            registerSegmentationSaveFlush(this.flushOnHide);
-            registerSegmentationUnloadWarn(this.checkUnsavedForUnload);
-        }
+        this.saver = new DebouncedSaver<void>({
+            kind: "segmentation",
+            group: `${segmentation.annotation_type}_${segmentation.id}`,
+            target: {
+                to: "layers",
+                section: "segmentations",
+                imageId: image.image_id,
+                item: { kind: "segmentation", segmentation },
+            },
+            delay: 2000,
+            send: () => this.send(),
+        });
     }
 
     /** Takes the slice's first history entry, so a stroke that writes live can still be undone. */
@@ -241,7 +176,7 @@ export class SegmentationState {
 
     async checkpoint() {
         const data = this.mask.exportData();
-        await this.updateServer();
+        this.saver.edit();
         this.history.checkpoint(data);
     }
 
@@ -259,7 +194,7 @@ export class SegmentationState {
         if (data) {
             this.mask.importData(data);
             this.notifySliceChanged();
-            await this.updateServer();
+            this.saver.edit();
         }
     }
 
@@ -268,121 +203,42 @@ export class SegmentationState {
         if (data) {
             this.mask.importData(data);
             this.notifySliceChanged();
-            await this.updateServer();
+            this.saver.edit();
         }
     }
 
-    updateServer() {
-        // Clear existing timeout if one exists (debounce: cancel previous pending update)
-        if (this.updateTimeout) {
-            clearTimeout(this.updateTimeout);
+    private async send(): Promise<void> {
+        const data = this.mask.exportData();
+        const { planeHeight, planeWidth } = this.mask;
+        const expectedLen = planeHeight * planeWidth;
+        if (data.length !== expectedLen && data.length !== expectedLen * 4) {
+            console.error("Segmentation save: data length mismatch", {
+                got: data.length,
+                expected: expectedLen,
+                planeWidth,
+                planeHeight,
+            });
         }
-
-        // Resolve immediately for optimistic UI updates (don't block drawing)
-        // The actual server call will be debounced and happen in the background
-        const resolveImmediately = this.pendingUpdateResolve;
-        if (resolveImmediately) {
-            resolveImmediately();
+        const buffer = encodeNpy(data, [planeHeight, planeWidth]);
+        const sparse_axis = this.segmentation.sparse_axis ?? undefined;
+        let scan_nr: number | undefined = this.scanNr;
+        if (this.image.image_id.endsWith("proj")) {
+            scan_nr = undefined;
         }
-
-        // Set sync state to "saving" when update is triggered
-        this.syncState = "saving";
-
-        // Debounce: wait 2 seconds after last update before sending to server.
-        // If this tick was superseded by a newer timer, skip (the newer tick will save).
-        const tid = setTimeout(() => {
-            if (this.updateTimeout !== tid) return;
-            this.updateTimeout = null;
-            void this.performSave();
-        }, 2000);
-        this.updateTimeout = tid;
-
-        // Return a Promise that resolves immediately for optimistic updates
-        return new Promise<void>((resolve) => {
-            this.pendingUpdateResolve = resolve;
-            // Resolve immediately so checkpoint() doesn't block
-            resolve();
-        });
-    }
-
-    private async performSave(options?: { keepalive?: boolean }) {
-        try {
-            const data = this.mask.exportData();
-            const { planeHeight, planeWidth } = this.mask;
-            const expectedLen = planeHeight * planeWidth;
-            if (
-                data.length !== expectedLen &&
-                data.length !== expectedLen * 4
-            ) {
-                console.error("Segmentation save: data length mismatch", {
-                    got: data.length,
-                    expected: expectedLen,
-                    planeWidth,
-                    planeHeight,
-                });
-            }
-            const buffer = encodeNpy(data, [planeHeight, planeWidth]);
-            const sparse_axis = this.segmentation.sparse_axis ?? undefined;
-            let scan_nr: number | undefined = this.scanNr;
-            if (this.image.image_id.endsWith("proj")) {
-                scan_nr = undefined;
-            }
-            if (scan_nr !== undefined) {
-                this.segmentationItem?.addSavedScanIndex(scan_nr);
-            }
-            const resp = await updateSegmentationData(
-                this.segmentation.id,
-                buffer,
-                {
-                    sparse_axis,
-                    scan_nr,
-                    keepalive: options?.keepalive,
-                },
-            );
-            await resp.json();
-
-            this.syncState = "synced";
-        } catch (error) {
-            // keepalive runs around navigation; the browser often aborts these with TypeError:
-            // Failed to fetch — that is not a real server failure, avoid flipping to error UI.
-            if (
-                options?.keepalive &&
-                (isNavigationTimeFetchFailure(error) ||
-                    (error instanceof DOMException &&
-                        error.name === "AbortError"))
-            ) {
-                return;
-            }
-            this.syncState = "error";
-            console.error("Failed to update segmentation data:", error);
+        if (scan_nr !== undefined) {
+            this.segmentationItem?.addSavedScanIndex(scan_nr);
         }
-    }
-
-    /** True if a server sync is still pending (debounced timer, in-flight request, or error). */
-    private hasUnsavedServerData(): boolean {
-        return this.updateTimeout !== null || this.syncState !== "synced";
-    }
-
-    /**
-     * Encode and send the current mask without waiting for the debounce timer.
-     * Uses keepalive so the browser is more likely to complete the request on unload.
-     */
-    private flushPendingServerUpdate() {
-        const shouldSave = this.hasUnsavedServerData();
-        if (this.updateTimeout) {
-            clearTimeout(this.updateTimeout);
-            this.updateTimeout = null;
-        }
-        if (!shouldSave) return;
-        void this.performSave({ keepalive: true });
+        const resp = await updateSegmentationData(
+            this.segmentation.id,
+            buffer,
+            { sparse_axis, scan_nr },
+        );
+        await resp.json();
     }
 
     dispose() {
-        if (typeof window !== "undefined") {
-            unregisterSegmentationSaveFlush(this.flushOnHide);
-            unregisterSegmentationUnloadWarn(this.checkUnsavedForUnload);
-        }
-        this.flushPendingServerUpdate();
+        // The saver exports the mask as it sends, before the mask goes.
+        this.saver.dispose();
         this.mask.dispose();
         this.history.clear();
     }

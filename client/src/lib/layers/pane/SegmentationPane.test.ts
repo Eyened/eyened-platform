@@ -55,12 +55,17 @@ function renderPane(
 }
 
 describe("SegmentationPane", () => {
-    it("names the type with the list's group and shows the save state in words; an AI one has no save state", async () => {
-        const { sync } = renderPane(graderSegmentation(1, ME, "Drusen v2"));
+    it("names the type with the list's group and shows the save state; a failed save has Retry, which sends again; an AI one has no save state", async () => {
+        const { sync, item } = renderPane(
+            graderSegmentation(1, ME, "Drusen v2"),
+        );
         expect(screen.getByText("Segmentation · Mine")).toBeInTheDocument();
         expect(screen.getByText("Saved")).toBeInTheDocument();
         sync.get(1)!.set("error");
-        expect(await screen.findByText("Couldn't save")).toBeInTheDocument();
+        await fireEvent.click(
+            await screen.findByRole("button", { name: "Retry" }),
+        );
+        expect(vi.mocked(item.savers[0].flush)).toHaveBeenCalled();
         cleanup();
         renderPane(modelSegmentation(11, "Drusen AI"));
         expect(screen.getByText("Segmentation · AI")).toBeInTheDocument();

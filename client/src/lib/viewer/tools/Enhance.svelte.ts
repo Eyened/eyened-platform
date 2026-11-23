@@ -67,10 +67,12 @@ export class EnhanceTool extends BrushTool {
         const index = viewerContext.index;
         item.draw(index, null as never, {})
             .then(() => (undo ? item.undo(index) : undefined))
+            .then(() => this.report(null))
             .catch((error) => {
                 console.error(error);
+                // The item drawn on, not whatever is selected when the draw fails.
                 this.report(
-                    "Error drawing on segmentation. Check console for details.",
+                    `Couldn't draw on ${item.segmentation.feature.name}`,
                 );
             });
     }

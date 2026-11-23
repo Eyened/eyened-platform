@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { segmentations } from "$lib/data/stores.svelte";
 import { expectNoAxeViolations } from "$lib/workspace/testUtils";
@@ -56,5 +62,16 @@ describe("SegmentationItem", () => {
         await fireEvent.click(screen.getByRole("button", { name: "Delete" }));
         expect(ondelete).toHaveBeenCalledWith(drusen, expect.any(MouseEvent));
         await expectNoAxeViolations(view.container);
+    });
+
+    it("a failed save marks the row Couldn't save until it saves", async () => {
+        const { sync } = renderRow();
+        expect(screen.queryByText("Couldn't save")).toBeNull();
+        sync.get(1)!.set("error");
+        expect(await screen.findByText("Couldn't save")).toBeInTheDocument();
+        sync.get(1)!.set("synced");
+        await waitFor(() =>
+            expect(screen.queryByText("Couldn't save")).toBeNull(),
+        );
     });
 });

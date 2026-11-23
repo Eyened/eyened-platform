@@ -5,6 +5,7 @@ import type {
 } from "../../types/openapi_types";
 import { getSegmentationData, getModelSegmentationData } from "../data/helpers";
 import type { NPYArray } from "../utils/npy_loader";
+import type { Saver } from "$lib/saving/saveTracker.svelte";
 import type { AbstractImage } from "./abstractImage";
 import type { Mask, PaintSettings } from "./mask.svelte";
 import { SegmentationState } from "./segmentationState.svelte";
@@ -26,6 +27,11 @@ export class SegmentationItem {
 
     /** Called after a B-scan slice mask changes (draw, undo, redo, import). */
     onSliceChanged?: (scanNr: number) => void;
+
+    /** Its B-scans' savers; the pane shows the worst and Retry flushes them all. */
+    get savers(): Saver[] {
+        return [...this.segmentationStates.values()].map((s) => s.saver);
+    }
 
     constructor(
         readonly image: AbstractImage,

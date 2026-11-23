@@ -18,7 +18,7 @@
     import { EnfaceProjectionOverlay } from "$lib/viewer/overlays/EnfaceProjectionOverlay";
     import { instanceIdFromImageId } from "./viewerViewState";
     import { getContext, onDestroy, setContext, untrack } from "svelte";
-    import { toast } from "svelte-sonner";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     import { magnifierFeed } from "$lib/workspace/magnifier";
@@ -340,7 +340,7 @@
                 viewerContext,
                 segmentationContext,
                 workspace,
-                report: (message) => toast.error(message),
+                report: (message) => (segmentationContext.drawFailed = message),
             }),
         );
     });
@@ -512,12 +512,19 @@
             remove();
         };
     });
+    let section: HTMLElement | undefined = $state();
+    // Closing the notice unmounts its button; focus goes back to this viewport's image.
+    function closeDrawFailed() {
+        segmentationContext.drawFailed = null;
+        section?.querySelector<HTMLElement>(".viewer")?.focus();
+    }
 </script>
 
 <div class="main">
     <!-- ASSUMPTION: the sidebar is removed, not hidden, so the panel header component can be deleted (plan decision 12). -->
     <section
         class="viewer-section"
+        bind:this={section}
         class:has-bar={viewerContext.renderControls}
     >
         <Viewer />
@@ -525,6 +532,16 @@
             <p class="viewport-line text-helper-text-01">
                 {blend.viewportLine}
             </p>
+        {/if}
+        {#if segmentationContext.drawFailed}
+            <!-- A failed stroke shows where it happened, whichever panel is open. -->
+            <div class="draw-failed" class:below-line={!!blend.viewportLine}>
+                <InlineNotification
+                    title={segmentationContext.drawFailed}
+                    subtitle="Try again."
+                    onclose={closeDrawFailed}
+                />
+            </div>
         {/if}
         {#if image.is3D && image.depth > 1}
             <SliceScrollbar />
@@ -562,5 +579,16 @@
         padding: 0.25rem 0.5rem;
         background: var(--color-background);
         color: var(--color-text-primary);
+    }
+    /* Covers the top of the image until closed or until a stroke works. */
+    .draw-failed {
+        position: absolute;
+        top: 0.5rem;
+        inset-inline: 0.5rem;
+        z-index: 2;
+    }
+    /* Below the blend line (0.5rem + its 24 px), so it hides neither. */
+    .draw-failed.below-line {
+        top: 2.5rem;
     }
 </style>

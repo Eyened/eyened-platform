@@ -15,7 +15,7 @@ export function bindDrawTool(input: {
     viewerContext: ViewerContext;
     segmentationContext: SegmentationContext;
     workspace: PaintView;
-    report: (message: string) => void;
+    report: (message: string | null) => void;
 }): () => void {
     const { toolId, viewerContext, workspace } = input;
     if (!input.editable) {

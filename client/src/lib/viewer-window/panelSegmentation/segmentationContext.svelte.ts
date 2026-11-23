@@ -82,6 +82,8 @@ export class SegmentationContext {
     public busy: "Creating…" | "Duplicating…" | null = $state(null);
     /** The last quick create or duplicate failure, shown at the top of the section until the next one starts. */
     public failed: string | null = $state(null);
+    /** The last stroke's failure in this viewport, shown at its top until closed or until a stroke works. */
+    public drawFailed: string | null = $state(null);
 
     /** Per-segmentation bitmask: bit (i-1) = 1 means subfeature i is shown in multi-class / multi-label shaders. */
     private visibleFeatureMaskBySegmentationKey = new SvelteMap<
