@@ -14,8 +14,6 @@ import Undo from "./Undo.svelte";
 import Redo from "./Redo.svelte";
 import ImportSegmentation from "./ImportSegmentation.svelte";
 import ConnectedComponents from "./ConnectedComponents.svelte";
-import Form from "./Form.svelte";
-import Info from "./Info.svelte";
 import ETDRS from "./ETDRS.svelte";
 import Layers from "./Layers.svelte";
 import Rendering from "./Rendering.svelte";
@@ -47,8 +45,6 @@ export {
     Rendering,
     Layers,
     ETDRS,
-    Form,
-    Info,
     Lines,
     Intersection,
     RegionBox,

@@ -1,3 +1,4 @@
+import { ApiError } from "$lib/api/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DebouncedSaver } from "./debouncedSaver.svelte";
 import { SaveTracker } from "./saveTracker.svelte";
@@ -82,5 +83,26 @@ describe("DebouncedSaver", () => {
         calls[0].reject(new Error("offline"));
         await flushed;
         expect(saver.state).toBe("error");
+    });
+
+    it("a failed save logs the HTTP status, never what was being saved", async () => {
+        const log = vi.spyOn(console, "error").mockImplementation(() => {});
+        const saver = new DebouncedSaver<string>({
+            kind: "comments",
+            group: "comments",
+            target: { to: "focus", focus: () => {} },
+            delay: 0,
+            send: () =>
+                Promise.reject(
+                    new ApiError(422, "Unprocessable", {
+                        input: "Blurry OS, query drusen",
+                    }),
+                ),
+            tracker: new SaveTracker(),
+        });
+        saver.edit("Blurry OS, query drusen");
+        await saver.flush();
+        expect(log).toHaveBeenCalledWith("Couldn't save the comments", 422);
+        expect(JSON.stringify(log.mock.calls)).not.toContain("drusen");
     });
 });

@@ -4,6 +4,7 @@ import {
     TOOLS,
     type ToolDef,
     type ToolGroup,
+    type ToolId,
     type ToolMode,
 } from "./registry";
 
@@ -16,13 +17,18 @@ export interface Section {
     tools: ToolDef[];
 }
 
-/** The mode's tools by job, packed in registry order; ⋯ comes last outside All tools. */
-export function paletteSections(mode: ToolMode): Section[] {
+/** The mode's tools by job, packed in registry order, without the task's hidden tools; ⋯ comes last outside All tools. */
+export function paletteSections(
+    mode: ToolMode,
+    hidden: readonly ToolId[] = [],
+): Section[] {
     const sections: Section[] = GROUPS.map((group) => ({
         group,
         tools: TOOLS.filter(
             (t) =>
-                t.group === group && (mode === "all" || BROWSE.includes(t.id)),
+                t.group === group &&
+                !hidden.includes(t.id) &&
+                (mode === "all" || BROWSE.includes(t.id)),
         ),
     })).filter((s) => s.tools.length > 0);
     if (mode !== "all") sections.push({ group: "More", tools: [] });

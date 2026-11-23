@@ -19,19 +19,11 @@ describe("mergeClientConfig", () => {
         expect(resolved.layout).toEqual(CLIENT_DEFAULTS.layout);
     });
 
-    it("replaces layout.hide and layout.prepend arrays (no concat)", () => {
+    it("replaces layout.hide (no concat)", () => {
         const resolved = mergeClientConfig(CLIENT_DEFAULTS, {
-            layout: {
-                hide: ["Form"],
-                prepend: [
-                    { type: "quick-form", title: "Grading", expanded: true },
-                ],
-            },
+            layout: { hide: ["Form"] },
         });
         expect(resolved.layout.hide).toEqual(["Form"]);
-        expect(resolved.layout.prepend).toEqual([
-            { type: "quick-form", title: "Grading", expanded: true },
-        ]);
     });
 
     it("ignores unknown keys", () => {

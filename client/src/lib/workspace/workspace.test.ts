@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { entry, NO_URL, workspaceWith } from "./testUtils";
 import { Workspace } from "./workspace.svelte";
+import { hiddenTools } from "./tools/registry";
 import { pointArming } from "$lib/forms/pointArming.svelte";
 
 const ids = (ws: Workspace) => ws.slots.map((s) => s.imageId);
@@ -115,6 +116,14 @@ describe("Workspace tools", () => {
 });
 
 describe("Workspace.arm", () => {
+    it("a tool the task hides never arms, from a key, the palette or Layers", () => {
+        const ws = new Workspace({ hiddenTools: hiddenTools(["Measure"]) });
+        ws.arm("distance");
+        ws.toggleTool("circle");
+        expect(ws.armedTool).toBeNull();
+        ws.arm("zoom");
+        expect(ws.armedTool).toBe("zoom");
+    });
     it("arming P drops an armed form point field, so one click never places two points", () => {
         const persist = vi.fn();
         pointArming.arm({ key: "form-point", persist } as never);

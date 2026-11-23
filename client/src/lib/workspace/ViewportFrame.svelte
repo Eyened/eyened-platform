@@ -41,6 +41,10 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     // The viewer inside attaches its zoom and reset to this position.
     setContext("viewportPosition", () => position);
     const selected = $derived(workspace.selected === position);
+    const highlighted = $derived(
+        slot.imageId !== null &&
+            workspace.highlightedImages.includes(slot.imageId),
+    );
     const maximised = $derived(workspace.maximised === position);
     // ASSUMPTION: the selected viewport's controls follow it in Tab order (plan decision 2).
     const tab = $derived(selected ? 0 : -1);
@@ -185,6 +189,10 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     {ondragleave}
     {ondrop}
 >
+    {#if highlighted}
+        <!-- A Grading row is about this image: dashed, inside the selected frame. -->
+        <div class="highlight" aria-hidden="true"></div>
+    {/if}
     <div class="body">
         {#if overlayable}
             <div class="zones" aria-hidden="true">
@@ -333,6 +341,15 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
         position: absolute;
         inset: 2px;
         outline: 2px solid var(--color-focus);
+        outline-offset: -2px;
+        pointer-events: none;
+        z-index: 3;
+    }
+    /* Its own element: ::after draws the selected frame and ::before the focus ring, which it sits inside. */
+    .highlight {
+        position: absolute;
+        inset: 4px;
+        outline: 2px dashed var(--color-border-interactive);
         outline-offset: -2px;
         pointer-events: none;
         z-index: 3;

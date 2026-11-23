@@ -68,6 +68,7 @@ export function taskHeaderShows(config: TaskPanelConfig) {
         nav: on("nav"),
         overview: on("overview"),
         status: on("status"),
+        comments: on("comments"),
         goToNext: !on("status") && on("nav"),
     };
 }

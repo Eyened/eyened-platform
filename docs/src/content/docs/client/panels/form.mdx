@@ -1,28 +1,41 @@
 ---
-title: Form panel
-description: Clinical and custom grading forms
+title: Grading and Forms
+description: Grade a task's images and manage the forms of the open images
 sidebar:
+  label: Grading and Forms
   order: 7
 ---
 
-The **Form** panel lists grading forms attached to the current patient, study, or image. Each form is driven by a **FormSchema** that defines the fields shown and validates your input on save.
+The right-hand panel lists the **forms** of the images open in the viewer. In a grading task it is called **Grading**; when you open images from the browser (`/view`) it is called **Forms**. Each form is driven by a **FormSchema** that defines the fields and validates your input.
 
 ## Using the panel
 
-### Intended use
+### Rows and targets
 
-Use this panel for **clinical grading** (AMD, glaucoma, naevi, etc.) and other site-specific questionnaires. Builtin viewer infrastructure (ETDRS grid, registration) is managed in dedicated panels, not here.
+Forms attach to a **target**: an image, an eye at a visit, a visit, an eye, or a patient. Which one depends on the form's schema (`EntityType`). A row shows the target's name; the form itself opens in the form window.
 
-### Workflow
+### In a grading task (Grading)
 
-1. Expand the **Form** panel.
-2. Select a form schema from the dropdown (only schemas matching the current context are listed).
-3. Create a new form annotation or open an existing one.
-4. Fill in the fields; changes are saved automatically or on submit, depending on the schema.
+1. The task's form (`form_schema_name`) is listed first, one row per target of the open images. A row shows whether your form is **complete** or incomplete; "n of m complete" is in the section header.
+2. Press **Grade** on a row with no form yet to create it and open it. Click a row with a form to open it again.
+3. **Copy** on a row makes a new form with the same answers (for example to start from a colleague's grading); it joins this set. **Delete form** removes your own forms.
+4. **Other forms** lists the remaining forms of these images, grouped by target.
+5. The set's **comments** are at the top of Grading.
+6. **Add form** at the bottom creates a form of any other schema for the selected viewport's image; it starts on the task form.
 
-When you open the viewer from a **grading task**, new annotations are linked to the active subtask.
+If the task names a form that does not exist, Grading says so; ask the task owner.
 
-### Points
+When images of more than one patient are open, Grading puts a heading per patient over the task rows and over **Other forms**, and the "isn't complete" list below names the patient.
+
+**Mark ready** warns when forms are not complete: a task row with no form ("not graded") or an incomplete one, and your other incomplete forms in this set. For each target only the newest of your task forms counts. **Go back** changes nothing; **Mark ready** (or **Mark ready and next**) goes on anyway.
+
+Below the `md` breakpoint (42 rem) the set's status, save state and the combo button sit in a footer at the bottom of Grading.
+
+### On /view (Forms)
+
+**Add form** is at the top; below it the forms are grouped by target, under a heading per patient when images of more than one patient are open. Rows have the same Copy and Delete form actions, and a form is opened by clicking its row.
+
+### Points (in the form window)
 
 Activate a point field, then left-click empty image to place a point. Drag a point to move it. Del removes the point under the pointer.
 
@@ -33,43 +46,12 @@ Activate a point field, then left-click empty image to place a point. Drag a poi
 
 A **required** grade starts on the first value when the point is placed. An **optional** grade stays unset until the first click, and the form keeps a blank choice for it. Further clicks walk the values and wrap. A single landmark stays one point.
 
-## Quick-form layout panel
-
-Some grading tasks replace the standard Form panel with a task-specific **quick-form** panel configured via `TaskDefinition.TaskConfig.layout`:
-
-```json
-{
-  "layout": {
-    "hide": ["Form"],
-    "prepend": [
-      { "type": "quick-form", "title": "Grading", "expanded": true }
-    ]
-  }
-}
-```
-
-The quick-form panel:
-
-1. Shows only the current grader's annotation for `form_schema_name` on the current image.
-2. Displays validation status (**Valid ✓** or **Incomplete (N)**) from the JSON Schema.
-3. Provides a **Grade** button that find-or-creates the annotation and opens the form in a new window.
-
-See **[Form schemas — TaskConfig](/eyened-platform/orm/form_schemas#taskconfig-for-grading-tasks)** for the full layout schema.
-
-:::note
-This page is a stub — document schema selection, laterality, and validation errors from `PanelForm.svelte` and `FormPanelHelp.svelte`.
-:::
-
 ## Implementation & analysis
 
-### Deployment-specific schemas
+Clinical forms are **inserted per site**; they are not part of the default platform seed. Each `FormSchema` row defines a JSON Schema (Draft 7) and an `EntityType`. Builtin viewer schemas (ETDRS, registration) are not offered under Add form.
 
-Clinical forms are **inserted per site** — they are not part of the default platform seed. Each `FormSchema` row defines a JSON Schema (Draft 7) and an `EntityType` (Patient, Study, StudyEye, ImageInstance, …).
-
-Configure which form a task uses via **`TaskDefinition.TaskConfig`** (`form_schema_name`). Attachment scope comes from the FormSchema’s `EntityType`. See **[Form schemas](/eyened-platform/orm/form_schemas)**.
-
-### Storage and API
+Configure which form a task grades with via **`TaskDefinition.TaskConfig`** (`form_schema_name`), and which sections and tools it hides via `layout.hide`. See **[Form schemas — TaskConfig](/eyened-platform/orm/form_schemas#taskconfig-for-grading-tasks)**.
 
 - **Data model:** [Form annotations](/eyened-platform/orm/data_model/form_annotations)
-- **API:** [Forms](/eyened-platform/api/forms) — create, update, and list `FormAnnotation` rows
+- **API:** [Forms](/eyened-platform/api/forms): create, update, and list `FormAnnotation` rows
 - **Validation:** `eorm validate-forms` checks schemas and existing annotation data

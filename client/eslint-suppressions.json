@@ -95,7 +95,7 @@
   },
   "src/lib/newWindow.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
+      "count": 2
     }
   },
   "src/lib/openapi/enums.ts": {
@@ -158,21 +158,6 @@
   },
   "src/lib/viewer-window/panelForm/FormItemContent.svelte": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelForm/PanelForm.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelHelp/SegmentationPanelHelp.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelInfo/panelInfo.svelte": {
-    "svelte/require-each-key": {
       "count": 1
     }
   },

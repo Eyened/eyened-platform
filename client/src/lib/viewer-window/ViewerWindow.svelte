@@ -5,10 +5,26 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 -->
 <script lang="ts">
     import { resolve } from "$app/paths";
+    import FormsPanel from "$lib/forms/FormsPanel.svelte";
+    import {
+        formAnnotations,
+        formSchemas,
+        formSchemasByName,
+    } from "$lib/data/stores.svelte";
+    import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import {
+        incompleteForms,
+        matchForms,
+        openImages,
+    } from "$lib/forms/formTargets";
+    import { taskFormName } from "$lib/forms/taskForm";
+    import IncompleteFormsModal from "$lib/tasks/IncompleteFormsModal.svelte";
     import { instances, patients } from "$lib/data";
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
     import { updateSubTask } from "$lib/data/api";
+    import { updateSubTaskComments } from "$lib/data/helpers";
+    import { COMMENTS_ID } from "$lib/forms/CommentsField.svelte";
     import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
     import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import LeaveSetModal from "$lib/tasks/LeaveSetModal.svelte";
@@ -64,6 +80,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
     const workspace = getContext<Workspace>("workspace");
+    const globalContext = getContext<GlobalContext>("globalContext");
     const navigation = taskContext ? new TaskNavigation(taskContext) : null;
     // subTaskIndex is 0-based; people read sets from 1.
     const setNumber = (taskContext?.subTaskIndex ?? 0) + 1;
@@ -75,7 +92,11 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         ? new DebouncedSaver<SubTaskState>({
               kind: "status",
               group: "status",
-              target: { to: "focus", focus: () => focusSetControl("status") },
+              target: {
+                  to: "grading",
+                  footer: true,
+                  focus: () => focusSetControl("status"),
+              },
               delay: 0,
               send: (state) =>
                   updateSubTask(taskContext.subTask.id, { task_state: state }),
@@ -94,6 +115,31 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                       maximised: workspace.maximised,
                   }),
                   focus: focusSetControl,
+                  // Read from the stores, so it works with Grading hidden or the column folded.
+                  incomplete: () => {
+                      const name = taskFormName(
+                          taskContext.task.task_definition.config,
+                      );
+                      const userId = globalContext.user.id;
+                      return incompleteForms(
+                          matchForms({
+                              forms: formAnnotations.values(),
+                              images: openImages(
+                                  workspace.catalogue,
+                                  viewerWindowContext.images,
+                              ),
+                              schemas: formSchemas,
+                              taskSchemaId: name
+                                  ? formSchemasByName.get(name)?.id
+                                  : undefined,
+                              userId,
+                              subTaskId: taskContext.subTask.id,
+                          }),
+                          formSchemas,
+                          userId,
+                          taskContext.subTask.id,
+                      );
+                  },
               })
             : null;
     const shows = taskContext
@@ -101,6 +147,22 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
               parseTaskPanelConfig(taskContext.task.task_definition.config),
           )
         : null;
+    // The comments outlive the panel's markup, so their saver lives with the page, like the status saver.
+    const commentsSaver =
+        taskContext && shows?.comments
+            ? new DebouncedSaver<string>({
+                  kind: "comments",
+                  group: "comments",
+                  target: {
+                      to: "grading",
+                      focus: () =>
+                          document.getElementById(COMMENTS_ID)?.focus(),
+                  },
+                  delay: 500,
+                  send: (text) =>
+                      updateSubTaskComments(taskContext.subTask.id, text),
+              })
+            : null;
     const task: TaskHeader | null = $derived(
         taskContext && navigation && setNavigation && shows
             ? {
@@ -133,8 +195,10 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     );
 
     // The control that left the last set keeps focus here: ▶ when ◀ can't take it.
+    // Read once per page; the frame reopens Grading from it below md.
+    const handoff = takeHandoff();
     onMount(() => {
-        const control = takeHandoff()?.control;
+        const control = handoff?.control;
         if (!control || !navigation) return;
         focusSetControl(
             control === "prev" && navigation.prevDisabled ? "next" : control,
@@ -160,7 +224,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     {/if}
 {/snippet}
 
-{#snippet setStatus()}
+{#snippet setStatus(layout: "header" | "stacked")}
     {#if taskContext && setNavigation && statusSaver && shows}
         <SetStatusControl
             subTaskId={taskContext.subTask.id}
@@ -169,6 +233,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
             showStatus={shows.status}
             navigation={setNavigation}
             status={statusSaver}
+            {layout}
         />
     {/if}
 {/snippet}
@@ -179,6 +244,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 <WorkspaceFrame
     {titleFor}
     {task}
+    startOnGrading={handoff?.reopenPanel === "forms"}
     onaddimages={() => (browserOpen = true)}
     emptyMessage={viewerWindowContext.instanceIds.length === 0
         ? "Enter instance IDs in url"
@@ -196,6 +262,9 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
             <StripViewer {image} />
         {/if}
     {/snippet}
+    {#snippet forms()}
+        <FormsPanel comments={commentsSaver} />
+    {/snippet}
 </WorkspaceFrame>
 
 {#if setNavigation?.question}
@@ -203,6 +272,15 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         {setNumber}
         markReady={setNavigation.question.markReady}
         onanswer={(leave) => setNavigation.answerLeave(leave)}
+    />
+{/if}
+
+{#if setNavigation?.readyQuestion}
+    <IncompleteFormsModal
+        {setNumber}
+        lines={setNavigation.readyQuestion}
+        last={lastSet}
+        onanswer={(go) => setNavigation.answerReady(go)}
     />
 {/if}
 

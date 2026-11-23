@@ -1,11 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import {
+    entries,
     expectNoAxeViolations,
+    NO_URL,
     workspaceContext,
     workspaceWith,
 } from "../testUtils";
-import type { Workspace } from "../workspace.svelte";
+import { Workspace } from "../workspace.svelte";
+import { hiddenTools } from "./registry";
 import ToolPalette from "./ToolPalette.svelte";
 
 // All tools: 12 slots and 3 gaps between the 4 jobs, plus the Magnifier slot and its gap.
@@ -159,5 +162,22 @@ describe("ToolPalette", () => {
             screen.getByRole("button", { name: "Brush (More tools)" }),
         ).toBeInTheDocument();
         await expectNoAxeViolations(container);
+    });
+
+    it("a task that hides Measure has no Distance on the rail and no ETDRS circle under ⋯", async () => {
+        const ws = new Workspace({ hiddenTools: hiddenTools(["Measure"]) });
+        ws.hydrate(entries(1), NO_URL);
+        ws.toolMode = "browse";
+        renderPalette(ws, 1000);
+        expect(screen.queryByRole("button", { name: "Distance" })).toBeNull();
+        await fireEvent.click(
+            screen.getByRole("button", { name: "More tools" }),
+        );
+        expect(
+            screen.queryByRole("button", { name: "ETDRS circle" }),
+        ).toBeNull();
+        expect(
+            screen.getByRole("button", { name: "Brush" }),
+        ).toBeInTheDocument();
     });
 });

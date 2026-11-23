@@ -17,8 +17,8 @@
         overviewHref: ResolvedPathname;
         /** The set's status, right after the set label. */
         tag?: Snippet;
-        /** The set's move and its Set status menu; unset when there is nothing to show. */
-        status?: Snippet;
+        /** The set's move and its Set status menu, in the header or the narrow footer; unset when there is nothing to show. */
+        status?: Snippet<["header" | "stacked"]>;
         /** After "Mark ready" on the last set; shown at the top of the canvas. */
         notice?: { title: string; subtitle: string } | null;
     }
@@ -34,6 +34,7 @@
     import { ContentSwitcher } from "$lib/components/ui/content-switcher/index.js";
     import { getContext } from "svelte";
     import SaveStateSlot from "$lib/saving/SaveStateSlot.svelte";
+    import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import { MediaQuery } from "svelte/reactivity";
     import LayoutPopover from "./LayoutPopover.svelte";
     import type { ToolMode } from "./tools/registry";
@@ -180,14 +181,19 @@
     <div class="contents" data-header-slot="patients-open"></div>
     <!-- Save state: 4 and 5; "Mark ready and next": 5. -->
     <div class="contents" data-header-slot="save-state">
-        {#if !narrow}<SaveStateSlot iconOnly={!xlg.current} />{/if}
+        {#if narrow}
+            <!-- The footer's save state isn't live, so this one announces it below md. -->
+            <span role="status" class="sr-only">{saveTracker.text}</span>
+        {:else}
+            <SaveStateSlot iconOnly={!xlg.current} />
+        {/if}
     </div>
     {#if task}
         <div class="contents" data-header-slot="mark-ready">
             <!-- Below md, the set's move and status wait for the narrow footer. -->
             {#if !narrow && task.status}
                 {@render divider()}
-                {@render task.status()}
+                {@render task.status("header")}
             {/if}
         </div>
     {/if}

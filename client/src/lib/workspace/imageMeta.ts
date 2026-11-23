@@ -41,7 +41,7 @@ export const MODALITY_LABELS: Partial<Record<string, string>> = {
 };
 
 /** "CF F2", "FAF"; null without a modality. */
-function modalityField(meta: ImageMeta): string | null {
+export function modalityField(meta: ImageMeta): string | null {
     const modality = meta.modality
         ? (MODALITY_LABELS[meta.modality] ?? meta.modality)
         : null;
@@ -50,15 +50,21 @@ function modalityField(meta: ImageMeta): string | null {
         : modality;
 }
 
-function deviceText(meta: ImageMeta): string {
+export function deviceText(meta: ImageMeta): string {
     return [meta.device.manufacturer, meta.device.model]
         .filter(Boolean)
         .join(" ");
 }
 
+/** "OD", "OS"; null when the eye is unknown. */
+export function eyeLabel(
+    laterality: ImageMeta["laterality"],
+): "OD" | "OS" | null {
+    return laterality === "R" ? "OD" : laterality === "L" ? "OS" : null;
+}
+
 export function viewportTitle(meta: ImageMeta): ViewportTitle {
-    const eye =
-        meta.laterality === "R" ? "OD" : meta.laterality === "L" ? "OS" : null;
+    const eye = eyeLabel(meta.laterality);
     return {
         patient: meta.patient.identifier,
         rest: [eye, modalityField(meta), meta.study.date, deviceText(meta)]

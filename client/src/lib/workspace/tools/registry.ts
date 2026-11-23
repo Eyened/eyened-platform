@@ -261,3 +261,24 @@ export function toolForKey(key: string): ToolDef | undefined {
 export function offered(id: ToolId, mode: ToolMode): boolean {
     return mode === "all" || BROWSE.includes(id);
 }
+
+/** The `layout.hide` name of the Layers section a tool works in; hiding the section hides the tool. */
+const HIDDEN_BY: Partial<Record<ToolId, string>> = {
+    distance: "Measure",
+    // ASSUMPTION: the circle is a Measure tool, so a task hiding Measure hides it too.
+    circle: "Measure",
+    brush: "Segmentation",
+    eraser: "Segmentation",
+    polygon: "Segmentation",
+    enhance: "Segmentation",
+    etdrs: "ETDRS",
+    point: "Registration",
+};
+
+/** The tools a task's `layout.hide` takes away: off the rail and ⋯, and their keys do nothing. */
+export function hiddenTools(hide: readonly string[]): ToolId[] {
+    return TOOLS.filter((t) => {
+        const name = HIDDEN_BY[t.id];
+        return name !== undefined && hide.includes(name);
+    }).map((t) => t.id);
+}

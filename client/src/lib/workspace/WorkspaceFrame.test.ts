@@ -7,7 +7,17 @@ import {
     within,
 } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+    afterEach,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+} from "vitest";
+import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
+import { saveTracker } from "$lib/saving/saveTracker.svelte";
 import {
     expectNoAxeViolations,
     mockWidth,
@@ -51,7 +61,11 @@ function taskHeader(): TaskHeader {
     };
 }
 
-function renderFrame(ws: Workspace, task: TaskHeader | null = null) {
+function renderFrame(
+    ws: Workspace,
+    task: TaskHeader | null = null,
+    extra: Record<string, unknown> = {},
+) {
     return render(WorkspaceFrame, {
         props: {
             viewer,
@@ -60,6 +74,7 @@ function renderFrame(ws: Workspace, task: TaskHeader | null = null) {
             onaddimages: vi.fn(),
             emptyMessage: null,
             task,
+            ...extra,
         },
         context: workspaceContext(ws),
     });
@@ -387,5 +402,92 @@ describe("Layers", () => {
         expect(
             await screen.findByText("Viewport 2 · P-000417 OD · CF F1 · img02"),
         ).toBeInTheDocument();
+    });
+});
+
+const footerTag = createRawSnippet(() => ({
+    render: () => `<span>In progress</span>`,
+}));
+const footerStatus = createRawSnippet((layout: () => string) => ({
+    render: () =>
+        `<button data-set-control="primary" data-layout="${layout()}">Mark ready and next</button>`,
+}));
+
+describe("below md, the Grading footer", () => {
+    // The tracker is page-wide; a saver left behind by a failing test would leak into the next.
+    let failing: DebouncedSaver<number> | null = null;
+    afterEach(() => {
+        failing?.discard();
+        failing?.dispose();
+        failing = null;
+        saveTracker.edited = false;
+    });
+
+    it("holds the status tag, the save state and the stacked combo button", async () => {
+        mockWidth({ md: false, xlg: false });
+        renderFrame(workspaceWith(1), {
+            ...taskHeader(),
+            tag: footerTag,
+            status: footerStatus,
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Show Layers and Grading" }),
+        );
+        const footer = document.querySelector("[data-set-footer]")!;
+        expect(
+            within(footer as HTMLElement).getByText("In progress"),
+        ).toBeInTheDocument();
+        expect(footer.querySelector('[data-layout="stacked"]')).not.toBeNull();
+    });
+
+    it("isn't there when the task shows neither status nor move", async () => {
+        mockWidth({ md: false, xlg: false });
+        renderFrame(workspaceWith(1), taskHeader());
+        expect(document.querySelector("[data-set-footer]")).toBeNull();
+    });
+
+    it("a save that failed puts a dot on the panels button and says what failed", async () => {
+        mockWidth({ md: false, xlg: false });
+        failing = new DebouncedSaver<number>({
+            kind: "form",
+            group: "form-annotation-1",
+            target: { to: "focus", focus: () => {} },
+            delay: 0,
+            send: () => Promise.reject(new Error("offline")),
+        });
+        failing.edit(1);
+        await failing.flush();
+        renderFrame(workspaceWith(1), taskHeader());
+        expect(
+            screen.getByRole("button", {
+                name: "Show Layers and Grading, 1 form couldn't save",
+            }),
+        ).toBeInTheDocument();
+    });
+
+    it("arriving from the footer opens Grading and focuses its button", async () => {
+        mockWidth({ md: false, xlg: false });
+        renderFrame(
+            workspaceWith(1),
+            { ...taskHeader(), tag: footerTag, status: footerStatus },
+            { startOnGrading: true },
+        );
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                document.querySelector(
+                    '[data-set-footer] [data-set-control="primary"]',
+                ),
+            ),
+        );
+    });
+
+    it("arriving with no footer button focuses the Grading heading", async () => {
+        mockWidth({ md: false, xlg: false });
+        renderFrame(workspaceWith(1), taskHeader(), { startOnGrading: true });
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getByRole("heading", { name: "Grading" }),
+            ),
+        );
     });
 });

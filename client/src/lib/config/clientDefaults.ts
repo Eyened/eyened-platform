@@ -1,12 +1,5 @@
-export type QuickFormPanelConfig = {
-    type: "quick-form";
-    title: string;
-    expanded?: boolean;
-};
-
 export type ClientConfigLayout = {
     hide: string[];
-    prepend: QuickFormPanelConfig[];
     /** The thumbnail strip above the viewport grid; on when missing. */
     strip: boolean;
 };
@@ -30,7 +23,7 @@ export type ClientConfig = {
 
 export const CLIENT_DEFAULTS: ClientConfig = {
     update_subtask_image_links: false,
-    layout: { hide: [], prepend: [], strip: true },
+    layout: { hide: [], strip: true },
     point_marker: {
         style: "cross",
         radius: 12,
@@ -40,15 +33,6 @@ export const CLIENT_DEFAULTS: ClientConfig = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isQuickFormPanel(value: unknown): value is QuickFormPanelConfig {
-    if (!isRecord(value)) return false;
-    return (
-        value.type === "quick-form" &&
-        typeof value.title === "string" &&
-        (value.expanded === undefined || typeof value.expanded === "boolean")
-    );
 }
 
 function isPointMarkerStyle(value: unknown): value is PointMarkerStyle {
@@ -64,7 +48,6 @@ export function mergeClientConfig(
             ...defaults,
             layout: {
                 hide: [...defaults.layout.hide],
-                prepend: [...defaults.layout.prepend],
                 strip: defaults.layout.strip,
             },
             point_marker: { ...defaults.point_marker },
@@ -75,7 +58,6 @@ export function mergeClientConfig(
         ...defaults,
         layout: {
             hide: [...defaults.layout.hide],
-            prepend: [...defaults.layout.prepend],
             strip: defaults.layout.strip,
         },
         point_marker: { ...defaults.point_marker },
@@ -94,9 +76,6 @@ export function mergeClientConfig(
             next.layout.hide = layout.hide.filter(
                 (x): x is string => typeof x === "string",
             );
-        }
-        if (Array.isArray(layout.prepend)) {
-            next.layout.prepend = layout.prepend.filter(isQuickFormPanel);
         }
         if (typeof layout.strip === "boolean") {
             next.layout.strip = layout.strip;
