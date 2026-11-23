@@ -5,6 +5,8 @@ export interface SetHandoff {
     selected: number;
     maximised: number | null;
     control: SetControl;
+    /** Below md, the move came from the Grading footer: the next set opens there. */
+    reopenPanel?: "forms";
 }
 
 const KEY = "eyened.setHandoff";

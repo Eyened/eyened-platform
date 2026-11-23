@@ -76,7 +76,10 @@ export class SetNavigation {
 
     async move(
         control: SetControl,
-        { markReady }: { markReady: boolean },
+        {
+            markReady,
+            reopenPanel,
+        }: { markReady: boolean; reopenPanel?: "forms" },
     ): Promise<void> {
         if (this.moving) return;
         this.moving = true;
@@ -91,7 +94,7 @@ export class SetNavigation {
             if (!saved) {
                 // On the last set there is nowhere to leave to, so no question.
                 if (!last && (await this.ask(markReady)))
-                    this.leave(control, to);
+                    this.leave(control, to, reopenPanel);
                 else this.revealUnsaved(control);
                 return;
             }
@@ -112,7 +115,7 @@ export class SetNavigation {
                 this.deps.focus("status");
                 return;
             }
-            this.leave(control, to);
+            this.leave(control, to, reopenPanel);
         } finally {
             clearTimeout(pendingTimer);
             this.pending = null;
@@ -162,9 +165,13 @@ export class SetNavigation {
         else this.deps.focus(control);
     }
 
-    private leave(control: SetControl, to: number): void {
+    private leave(
+        control: SetControl,
+        to: number,
+        reopenPanel?: "forms",
+    ): void {
         this.deps.tracker.leaving = true;
-        writeHandoff({ ...this.deps.handoff(), control });
+        writeHandoff({ ...this.deps.handoff(), control, reopenPanel });
         this.deps.navigate(to);
     }
 }

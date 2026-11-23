@@ -25,12 +25,15 @@ Ready is picked only once everything else saved; a pick that can't save shows on
         count,
         showStatus,
         navigation,
+        layout = "header",
     }: {
         subTaskId: number;
         index: number;
         count: number;
         showStatus: boolean;
         navigation: SetNavigation;
+        /** "stacked" in the narrow footer: full width, the failure in words under it. */
+        layout?: "header" | "stacked";
         status: DebouncedSaver<SubTaskState>;
     } = $props();
 
@@ -77,57 +80,68 @@ Ready is picked only once everything else saved; a pick that can't save shows on
     const pending = $derived(navigation.pending === "primary");
 
     // aria-disabled keeps focus on the button while it is pending.
+    const stacked = $derived(layout === "stacked");
+
     function go() {
         if (main && !pending)
-            void navigation.move("primary", { markReady: main.markReady });
+            void navigation.move("primary", {
+                markReady: main.markReady,
+                reopenPanel: stacked ? "forms" : undefined,
+            });
     }
 </script>
 
-{#if showStatus}
-    <ComboButton
-        label={main?.label}
-        onclick={go}
-        {pending}
-        data-set-control="primary"
-        triggerId={STATUS_ID}
-        triggerLabel="Set status: {SUBTASK_STATUS[saved].label}"
-        heading="Set status"
-        {items}
-        selectedId={saved}
-        onselect={pick}
-        {menuDisabled}
-        invalid={navigation.statusFailed}
-        describedBy={invalidId}
-    />
-    <!-- Always mounted, so the text is announced when it appears. -->
-    <span
-        id={invalidId}
-        role="alert"
-        class="text-helper-text-01 whitespace-nowrap text-text-error {xlg.current
-            ? ''
-            : 'sr-only'}"
-        >{navigation.statusFailed
-            ? "Status couldn't save. Pick it again."
-            : ""}</span
-    >
-{:else if main}
-    <!-- Status off: only "Go to next set", tertiary, no menu. -->
-    <Button
-        variant="outline"
-        size="sm"
-        data-set-control="primary"
-        aria-disabled={pending || undefined}
-        onclick={go}
-    >
-        {#if pending}
-            <InlineLoading
-                class="text-inherit"
-                status="active"
-                description={main.label}
-                live={false}
-            />
-        {:else}
-            {main.label}
-        {/if}
-    </Button>
-{/if}
+<div class={stacked ? "flex flex-col gap-2" : "contents"}>
+    {#if showStatus}
+        <ComboButton
+            label={main?.label}
+            onclick={go}
+            {pending}
+            data-set-control="primary"
+            triggerId={STATUS_ID}
+            triggerLabel="Set status: {SUBTASK_STATUS[saved].label}"
+            heading="Set status"
+            {items}
+            selectedId={saved}
+            onselect={pick}
+            {menuDisabled}
+            invalid={navigation.statusFailed}
+            describedBy={invalidId}
+            fullWidth={stacked}
+        />
+        <!-- Always mounted, so the text is announced when it appears. -->
+        <span
+            id={invalidId}
+            role="alert"
+            class="text-helper-text-01 text-text-error {stacked
+                ? ''
+                : xlg.current
+                  ? 'whitespace-nowrap'
+                  : 'sr-only'}"
+            >{navigation.statusFailed
+                ? "Status couldn't save. Pick it again."
+                : ""}</span
+        >
+    {:else if main}
+        <!-- Status off: only "Go to next set", tertiary, no menu. -->
+        <Button
+            variant="outline"
+            size="sm"
+            class={stacked ? "w-full" : undefined}
+            data-set-control="primary"
+            aria-disabled={pending || undefined}
+            onclick={go}
+        >
+            {#if pending}
+                <InlineLoading
+                    class="text-inherit"
+                    status="active"
+                    description={main.label}
+                    live={false}
+                />
+            {:else}
+                {main.label}
+            {/if}
+        </Button>
+    {/if}
+</div>

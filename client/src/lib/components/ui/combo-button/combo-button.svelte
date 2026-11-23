@@ -27,6 +27,7 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
         menuDisabled = false,
         invalid = false,
         describedBy,
+        fullWidth = false,
         ...mainProps
     }: Omit<
         ButtonProps,
@@ -51,6 +52,8 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
         /** A red outline; `describedBy` names the text that says why. */
         invalid?: boolean;
         describedBy?: string;
+        /** Fills its container, as in the narrow footer; the main part takes the room. */
+        fullWidth?: boolean;
     } = $props();
 
     let open = $state(false);
@@ -63,7 +66,8 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
 <!-- The invalid border is an overlay: the buttons are positioned and would paint over the wrapper's own outline. -->
 <div
     class={cn(
-        "relative inline-flex gap-px",
+        "relative gap-px",
+        fullWidth ? "flex w-full" : "inline-flex",
         invalid &&
             "after:pointer-events-none after:absolute after:inset-0 after:border-2 after:border-support-error",
     )}
@@ -72,7 +76,9 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
         <Button
             {...mainProps}
             size="sm"
-            class="max-w-59.75 min-w-31.75"
+            class={fullWidth
+                ? "max-w-none min-w-0 flex-1"
+                : "max-w-59.75 min-w-31.75"}
             aria-disabled={pending || undefined}
             onclick={() => onclick?.()}
         >

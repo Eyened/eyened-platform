@@ -19,7 +19,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     import Layers from "carbon-icons-svelte/lib/Layers.svelte";
     import Menu from "carbon-icons-svelte/lib/Menu.svelte";
     import RightPanelOpen from "carbon-icons-svelte/lib/RightPanelOpen.svelte";
-    import { getContext, tick, untrack, type Snippet } from "svelte";
+    import { getContext, onMount, tick, untrack, type Snippet } from "svelte";
+    import SaveStateSlot from "$lib/saving/SaveStateSlot.svelte";
     import { MediaQuery } from "svelte/reactivity";
     import {
         saveTracker,
@@ -53,6 +54,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         task = null,
         emptyMessage = null,
         forms,
+        startOnGrading = false,
     }: {
         viewer: Snippet<[string]>;
         tile: Snippet<[string]>;
@@ -62,6 +64,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         emptyMessage?: string | null;
         /** The Grading or Forms panel's content. */
         forms?: Snippet;
+        /** Below md, open on Grading with focus on the footer's button (the last set left from there). */
+        startOnGrading?: boolean;
     } = $props();
 
     const workspace = getContext<Workspace>("workspace");
@@ -101,6 +105,30 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     const rightShown = $derived(narrow ? overlay === "right" : rightOpen);
     const overlayOpen = $derived(narrow && overlay !== null);
     const formsName = $derived(task ? "Grading" : "Forms");
+    const footer = $derived(
+        narrow && task !== null && !!(task.tag || task.status),
+    );
+    let footerHeight = $state(0);
+    // The header's words on the narrow panels button while something couldn't save.
+    const saveFailure = $derived(
+        saveTracker.worst === "error" ? saveTracker.text : "",
+    );
+
+    onMount(() => {
+        if (startOnGrading && narrow) void reopenGrading();
+    });
+
+    async function reopenGrading() {
+        panel = "forms";
+        overlay = "right";
+        opener = byControls(`${uid}-right-panels`);
+        await tick();
+        document
+            .querySelector<HTMLElement>(
+                '[data-set-footer] [data-set-control="primary"]',
+            )
+            ?.focus();
+    }
     const layersSubtitle = $derived.by(() => {
         const position = workspace.selected;
         const imageId = workspace.slots[position]?.imageId ?? null;
@@ -388,8 +416,15 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
 
 {#snippet headerEnd()}
     <IconButton
-        label="{overlay === 'right' ? 'Hide' : 'Show'} Layers and {formsName}"
+        label="{overlay === 'right'
+            ? 'Hide'
+            : 'Show'} Layers and {formsName}{saveFailure
+            ? `, ${saveFailure}`
+            : ''}"
         aria-controls="{uid}-right-panels"
+        class={saveFailure
+            ? "relative after:absolute after:end-2 after:top-2 after:size-2 after:rounded-full after:bg-support-error"
+            : undefined}
         onclick={(e) => toggleOverlay("right", e)}
     >
         {#if overlay === "right"}<Close />{:else}<RightPanelOpen />{/if}
@@ -562,7 +597,14 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         {#if !narrow}
             <div class="right-rail">{@render panelSwitch()}</div>
         {/if}
-        <div id="{uid}-right-panels" class="right-panels" hidden={!rightShown}>
+        <div
+            id="{uid}-right-panels"
+            class="right-panels"
+            hidden={!rightShown}
+            style:scroll-padding-bottom={footer
+                ? `${footerHeight}px`
+                : undefined}
+        >
             {#if narrow}
                 <div
                     role="group"
@@ -602,6 +644,27 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                     {formsName}
                 </h2>
                 {@render forms?.()}
+                {#if footer && task}
+                    <!-- Pinned to the bottom of the overlay; the scroll area keeps focused rows above it. -->
+                    <div
+                        class="footer"
+                        data-set-footer
+                        bind:offsetHeight={footerHeight}
+                    >
+                        <!-- At 320 px a tag and "1 form couldn't save" don't fit on one line, so it wraps. -->
+                        <div class="flex min-h-6 flex-wrap items-center gap-2">
+                            {@render task.tag?.()}
+                            <div class="ms-auto">
+                                <SaveStateSlot
+                                    iconOnly={false}
+                                    live={false}
+                                    reserve={false}
+                                />
+                            </div>
+                        </div>
+                        {@render task.status?.("stacked")}
+                    </div>
+                {/if}
             </section>
         </div>
     </aside>
@@ -696,6 +759,17 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     }
     .right-panels > section[id$="-layers"]:not([hidden]) {
         min-height: 21rem;
+    }
+    .footer {
+        position: sticky;
+        bottom: 0;
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem 0.75rem;
+        background: var(--color-layer-01);
+        border-top: 1px solid var(--color-border-subtle-01);
     }
     .narrow .right {
         border-inline-start: 0;

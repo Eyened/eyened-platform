@@ -195,8 +195,10 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     );
 
     // The control that left the last set keeps focus here: ▶ when ◀ can't take it.
+    // Read once per page; the frame reopens Grading from it below md.
+    const handoff = takeHandoff();
     onMount(() => {
-        const control = takeHandoff()?.control;
+        const control = handoff?.control;
         if (!control || !navigation) return;
         focusSetControl(
             control === "prev" && navigation.prevDisabled ? "next" : control,
@@ -222,7 +224,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     {/if}
 {/snippet}
 
-{#snippet setStatus()}
+{#snippet setStatus(layout: "header" | "stacked")}
     {#if taskContext && setNavigation && statusSaver && shows}
         <SetStatusControl
             subTaskId={taskContext.subTask.id}
@@ -231,6 +233,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
             showStatus={shows.status}
             navigation={setNavigation}
             status={statusSaver}
+            {layout}
         />
     {/if}
 {/snippet}
@@ -241,6 +244,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 <WorkspaceFrame
     {titleFor}
     {task}
+    startOnGrading={handoff?.reopenPanel === "forms"}
     onaddimages={() => (browserOpen = true)}
     emptyMessage={viewerWindowContext.instanceIds.length === 0
         ? "Enter instance IDs in url"

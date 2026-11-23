@@ -1,6 +1,7 @@
 <!--
 @component
 The header's save state: nothing before the first edit, then Saving…, Saved, or what couldn't save as a button to it.
+In the narrow footer it isn't a live region (the header's hidden one already announces it) and keeps no width.
 Below xlg only its icon shows, with the words in a tooltip and in hidden text. The icon is a tab stop then, so the tooltip opens on focus as well as hover. S2 Tooltip: "Tooltips must be placed on focusable elements… Use ContextualHelp to provide context for non-interactive elements such as plain text"; a focusable status is a recorded deviation.
 -->
 <script lang="ts">
@@ -12,7 +13,16 @@ Below xlg only its icon shows, with the words in a tooltip and in hidden text. T
     import ErrorFilled from "carbon-icons-svelte/lib/ErrorFilled.svelte";
     import { saveTracker } from "./saveTracker.svelte";
 
-    let { iconOnly }: { iconOnly: boolean } = $props();
+    let {
+        iconOnly,
+        live = true,
+        reserve = true,
+    }: {
+        iconOnly: boolean;
+        live?: boolean;
+        /** Keeps 160 px from the start, so the header doesn't shift; the narrow footer has no room for it. */
+        reserve?: boolean;
+    } = $props();
     const text = $derived(saveTracker.text);
     const state = $derived(saveTracker.worst);
 
@@ -25,10 +35,12 @@ Below xlg only its icon shows, with the words in a tooltip and in hidden text. T
 <!-- Always mounted, so a change is announced; the width is kept from the start. -->
 <!-- ASSUMPTION: min-w-40 (160 px) holds "Saving…" and "Saved"; a failure's longer words may widen it. -->
 <div
-    role="status"
+    role={live ? "status" : undefined}
     class="flex shrink-0 items-center {iconOnly
         ? 'w-10 justify-center'
-        : 'min-w-40 justify-end'}"
+        : reserve
+          ? 'min-w-40 justify-end'
+          : 'justify-end'}"
 >
     {#if text && state === "error"}
         {#if iconOnly}

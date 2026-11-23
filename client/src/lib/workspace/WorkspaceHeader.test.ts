@@ -8,6 +8,8 @@ import {
     workspaceContext,
     workspaceWith,
 } from "./testUtils";
+import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
+import { saveTracker } from "$lib/saving/saveTracker.svelte";
 import WorkspaceHeader, { type TaskHeader } from "./WorkspaceHeader.svelte";
 
 function taskHeader(over: Partial<TaskHeader> = {}): TaskHeader {
@@ -40,6 +42,29 @@ function renderHeader(task: TaskHeader | null, narrow = false) {
 }
 
 describe("WorkspaceHeader", () => {
+    it("below md, a hidden live region says what couldn't save", async () => {
+        const saver = new DebouncedSaver<number>({
+            kind: "form",
+            group: "form-annotation-1",
+            target: { to: "focus", focus: () => {} },
+            delay: 0,
+            send: () => Promise.reject(new Error("offline")),
+        });
+        try {
+            saver.edit(1);
+            await saver.flush();
+            renderHeader(taskHeader(), true);
+            expect(
+                document.querySelector('header [role="status"].sr-only'),
+            ).toHaveTextContent("1 form couldn't save");
+        } finally {
+            // The tracker is page-wide; leave it clean for the next test.
+            saver.discard();
+            saver.dispose();
+            saveTracker.edited = false;
+        }
+    });
+
     it("shows no set navigation outside a task", () => {
         renderHeader(null);
         expect(screen.queryByRole("button", { name: "Next set" })).toBeNull();
