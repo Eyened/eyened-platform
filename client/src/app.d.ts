@@ -8,3 +8,8 @@ declare namespace App {
     // interface PageData {}
     // interface Platform {}
 }
+
+interface Window {
+    /** Set by the viewer page; the form window's hand-back calls it after a page load. */
+    adoptFormWindow?: (win: Window) => void;
+}

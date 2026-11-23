@@ -370,3 +370,17 @@ export function windowHeading(
                   : [];
     return [patient, ...rest].filter(Boolean).join(" · ");
 }
+
+/** The open target a stored form is about, or null when none of its images is open. */
+export function targetOf(
+    form: FormAnnotationGET,
+    schema: FormSchemaGET,
+    images: readonly OpenImage[],
+): FormTarget | null {
+    const scope = resolveFormEntityScope(schema.entity_type);
+    return (
+        targetsFor(images, scope).find((t) =>
+            matchesFormEntityScope(form, scope, t.ctx),
+        ) ?? null
+    );
+}
