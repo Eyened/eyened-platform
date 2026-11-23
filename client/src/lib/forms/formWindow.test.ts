@@ -112,6 +112,20 @@ describe("formWindow", () => {
         expect(current.focus).toHaveBeenCalled();
     });
 
+    it("showing a form takes the window's focus unless the caller says it is only following the set", () => {
+        current = fakeWindow();
+        vi.spyOn(window, "open").mockReturnValue(current as never);
+        formWindow.open(form(3), opts);
+        current.focus.mockClear();
+        formWindow.showForm(current as never, form(3), {
+            ...opts,
+            focus: false,
+        });
+        expect(current.focus).not.toHaveBeenCalled();
+        formWindow.showForm(current as never, form(3), opts);
+        expect(current.focus).toHaveBeenCalled();
+    });
+
     it("the grader closing the window clears the open form and its viewports", () => {
         current = fakeWindow();
         vi.spyOn(window, "open").mockReturnValue(current as never);

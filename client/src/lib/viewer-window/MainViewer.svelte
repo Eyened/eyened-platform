@@ -400,6 +400,7 @@
                     ? undefined
                     : formAnnotations.get(grids.currentId),
             instanceId: image.instance.id,
+            is3D: image.is3D,
             userId: globalContext.user.id,
             canEdit: (grid) => globalContext.canEdit(grid),
         }),

@@ -52,6 +52,7 @@ export interface GridTarget {
 export function gridBinding(input: {
     grid: FormAnnotationGET | undefined;
     instanceId: string | number;
+    is3D?: boolean;
     userId: number;
     canEdit: (grid: FormAnnotationGET) => boolean;
 }): GridTarget {
@@ -60,6 +61,12 @@ export function gridBinding(input: {
         return {
             name: null,
             reason: "Select an ETDRS grid to place",
+        };
+    // ASSUMPTION: this reason comes before the grid's own (editable, image) reasons.
+    if (input.is3D)
+        return {
+            name: null,
+            reason: "Place ETDRS goes on a fundus or en-face image. Select one.",
         };
     const name =
         grid.creator.id === input.userId

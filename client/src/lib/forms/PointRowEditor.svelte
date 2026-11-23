@@ -14,7 +14,7 @@
         enumExtras: readonly PointEnumExtra[];
         stringExtraKeys: string[];
         indexApplicable: (pt: ImagePoint) => boolean;
-        /** When false (volume schemas), blanking i is rejected upstream. */
+        /** When false (volume schemas), the editor rejects a blank i with the B-scan error. */
         allowNullIndex?: boolean;
         coordLabel: string;
         /** Why the viewer didn't move to this point. */

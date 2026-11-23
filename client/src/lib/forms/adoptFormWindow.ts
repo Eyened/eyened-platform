@@ -35,6 +35,8 @@ export function adoptFormWindow(
             imageIds: target?.imageIds ?? [],
             from: "viewer",
             contexts,
+            // Arriving after a page load must not take the keyboard from the viewer.
+            focus: false,
         });
     const closed = () => formWindow.showView(win, { kind: "closed" }, contexts);
 

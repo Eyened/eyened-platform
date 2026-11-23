@@ -276,7 +276,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
             </Tooltip.Root>
         </Tooltip.Provider>
         <span class="controls">
-            <!-- Sub-project 2 adds the link chip here. Maximise never folds; below 260 px only Close does. -->
+            <!-- Maximise never folds; below 260 px only Close does. -->
             {#if slot.imageId !== null && formWindow.imageIds.includes(slot.imageId)}
                 <!-- Primary, so it stands out in a full grid; it brings the form window to the front. -->
                 <IconButton

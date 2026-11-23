@@ -72,6 +72,18 @@ describe("gridBinding", () => {
             reason: null,
         });
     });
+
+    it("on an OCT volume it says Place ETDRS goes on a fundus or en-face image", () => {
+        expect(
+            gridBinding({
+                grid: grid(12, 5, "inst-1"),
+                instanceId: "inst-1",
+                is3D: true,
+                userId: 5,
+                canEdit: () => true,
+            }).reason,
+        ).toBe("Place ETDRS goes on a fundus or en-face image. Select one.");
+    });
 });
 
 describe("keepGridSize", () => {

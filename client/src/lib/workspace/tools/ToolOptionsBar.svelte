@@ -1,6 +1,6 @@
 <!--
 @component
-The tool options bar: the armed tool's icon and name, its target or why it can't act there, its options, then Keys, which lists the keys without a button. When the bar is short the keyboard cursor's keys cut first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first; Keys never folds.
+The tool options bar: the armed tool's icon and name, its target or why it can't act there, its options, then Keys, which lists the keys without a button. When the bar is short the keyboard cursor's keys cut first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first; Keys never folds. A form's armed point field takes the bar instead of the armed tool.
 -->
 <script lang="ts">
     import { getContext, tick, untrack } from "svelte";

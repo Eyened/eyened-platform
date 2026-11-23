@@ -49,6 +49,8 @@ export interface ShowOptions {
     from: "viewer" | "browse";
     /** The opening component's getAllContexts(), so the form sees the task, the workspace and the user. */
     contexts: Map<unknown, unknown>;
+    /** Raise the window and take keyboard focus; false when it only follows the set. Default true. */
+    focus?: boolean;
 }
 
 /** What the window showed before a page load, kept on its own document. */
@@ -153,7 +155,7 @@ class FormWindow {
         this.formId = form.id;
         this.imageIds = opts.imageIds;
         this.label = formLabel(form);
-        win.focus();
+        if (opts.focus !== false) win.focus();
     }
 
     /** Replaces what the window shows; focus, if it was in the window, goes to the new view's heading. */
