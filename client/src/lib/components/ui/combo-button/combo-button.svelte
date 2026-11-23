@@ -52,7 +52,7 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
         /** A red outline; `describedBy` names the text that says why. */
         invalid?: boolean;
         describedBy?: string;
-        /** Fills its container, as in the narrow footer; the main part takes the room. */
+        /** Fills its container, as in the narrow footer; the main part takes the room and its label wraps. */
         fullWidth?: boolean;
     } = $props();
 
@@ -90,7 +90,9 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
                     live={false}
                 />
             {:else}
-                <span class="truncate">{label}</span>
+                <span class={fullWidth ? "min-w-0 break-words" : "truncate"}
+                    >{label}</span
+                >
             {/if}
         </Button>
     {/if}
@@ -109,6 +111,8 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
                     class={cn(
                         "[&>svg]:transition-transform data-[state=open]:[&>svg]:rotate-180",
                         label && "w-8 justify-center px-0 [&>svg]:static",
+                        // Two lines tall: ▾ stays at the top, level with the first line.
+                        label && fullWidth && "items-start [&>svg]:mt-px",
                     )}
                 >
                     {#if !label}{selectedLabel}{/if}
