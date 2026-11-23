@@ -247,7 +247,7 @@
       "count": 2
     },
     "svelte/prefer-svelte-reactivity": {
-      "count": 5
+      "count": 4
     }
   },
   "src/lib/viewer/overlays/MainViewerContext.svelte.ts": {

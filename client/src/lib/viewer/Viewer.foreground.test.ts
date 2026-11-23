@@ -1,12 +1,32 @@
 import { render } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("cornerstone-wado-image-loader", () => ({
-    external: {},
-    configure: vi.fn(),
+vi.mock("@cornerstonejs/codec-openjpeg/decodewasmjs", () => ({
+    default: () =>
+        Promise.resolve({
+            J2KDecoder: class {
+                getEncodedBuffer(n: number) {
+                    return new Uint8Array(n);
+                }
+                decode() {}
+                getFrameInfo() {
+                    return {
+                        width: 0,
+                        height: 0,
+                        bitsPerSample: 8,
+                        componentCount: 1,
+                        isSigned: false,
+                    };
+                }
+                getDecodedBuffer() {
+                    return new Uint8Array();
+                }
+            },
+        }),
 }));
-vi.mock("cornerstone-core", () => ({}));
-vi.mock("dicom-parser", () => ({}));
+vi.mock("@cornerstonejs/codec-openjpeg/decodewasm?url", () => ({
+    default: "/mock-openjpeg.wasm",
+}));
 
 import Viewer from "./Viewer.svelte";
 

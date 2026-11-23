@@ -47,6 +47,16 @@ export class ImageLoader {
             );
             return this.returnLoadedVolume(image);
         } else if (dataFormat === "dicom") {
+            const flowStorageId = angioFlowStorageId(instance);
+            if (flowStorageId != null) {
+                return this.loadOctaDicom(
+                    instance,
+                    img_id,
+                    imageId,
+                    flowStorageId,
+                    progress,
+                );
+            }
             return this.loadDicom(instance, img_id, imageId, progress);
         } else if (dataFormat === "png_series") {
             const meta = await this.loadPngSeriesMeta(imageId);
@@ -239,12 +249,125 @@ export class ImageLoader {
     }
 
     /**
+     * Show structural OCT first; attach angio_flow in the background so the
+     * viewer is usable while the second J2K volume still unpacks.
+     */
+    async loadOctaDicom(
+        instance: ImageGET,
+        img_id: string,
+        imageId: string,
+        flowStorageId: number,
+        progress?: ImageLoadProgress,
+    ): Promise<LoadedImages> {
+        console.info(
+            `[imageLoader] dicom ${img_id}: OCTA structural first, then angio_flow ` +
+                `(storage_id=${flowStorageId})`,
+        );
+        const structural = await this.decodeDicomVolume(
+            this.buildDataUrl(imageId),
+            img_id,
+            progress,
+        );
+        const { width, height, depth } = structural.dimensions;
+        const expected = width * height * depth;
+        if (structural.volume.length !== expected) {
+            return this.returnLoadedVolume(
+                createVolumeImage(
+                    instance,
+                    this.webgl,
+                    img_id,
+                    structural.volume,
+                    structural.dimensions,
+                    structural.meta,
+                ),
+            );
+        }
+
+        const loaded = await this.returnLoadedVolume(
+            createVolumeImage(
+                instance,
+                this.webgl,
+                img_id,
+                structural.volume,
+                structural.dimensions,
+                structural.meta,
+            ),
+        );
+        const volumeImage = loaded.find(
+            (img): img is Image3D | ImageSliceStack =>
+                img instanceof Image3D || img instanceof ImageSliceStack,
+        );
+
+        void this.attachOctaFlowInBackground(
+            volumeImage,
+            imageId,
+            flowStorageId,
+            expected,
+            { width, height, depth },
+            progress,
+            volumeImage?.flowAbort?.signal,
+        );
+
+        return loaded;
+    }
+
+    private async attachOctaFlowInBackground(
+        volumeImage: Image3D | ImageSliceStack | undefined,
+        imageId: string,
+        flowStorageId: number,
+        expected: number,
+        structuralShape: { width: number; height: number; depth: number },
+        progress?: ImageLoadProgress,
+        signal?: AbortSignal,
+    ): Promise<void> {
+        if (!volumeImage) {
+            return;
+        }
+        try {
+            const flow = await this.decodeDicomVolume(
+                this.buildDataUrl(imageId, { storage_id: flowStorageId }),
+                `${imageId}-flow`,
+                undefined,
+                signal,
+            );
+            if (signal?.aborted || volumeImage.disposed) {
+                return;
+            }
+            const { width: fw, height: fh, depth: fd } = flow.dimensions;
+            const { width, height, depth } = structuralShape;
+            if (fw !== width || fh !== height || fd !== depth) {
+                throw new Error(
+                    `OCTA shape mismatch: structural ${width}x${height}x${depth} ` +
+                        `vs flow ${fw}x${fh}x${fd}`,
+                );
+            }
+            if (flow.volume.length !== expected) {
+                throw new Error(
+                    `OCTA flow length ${flow.volume.length} != ${expected}`,
+                );
+            }
+            volumeImage.attachFlow(flow.volume);
+            progress?.onFlowReady?.(imageId);
+            console.info(`[imageLoader] dicom ${imageId}: angio_flow attached`);
+        } catch (err) {
+            if (err instanceof DOMException && err.name === "AbortError") {
+                return;
+            }
+            console.error(
+                `[imageLoader] dicom ${imageId}: angio_flow load failed`,
+                err,
+            );
+        }
+    }
+
+    /**
      * Fetch + decode a DICOM at ``url`` into a mono volume (or single-frame buffer).
      */
     async decodeDicomVolume(
         url: string,
         logId: string,
         progress?: ImageLoadProgress,
+        signal?: AbortSignal,
     ): Promise<{
         volume: Uint8Array;
         dimensions: Dimensions;
@@ -254,6 +377,7 @@ export class ImageLoader {
         setLoadMessage(progress, "Downloading…");
         const response = await fetch(url, {
             headers: { Accept: "application/dicom" },
+            signal,
         });
         if (!response.ok) {
             throw new Error(
@@ -370,6 +494,11 @@ export class ImageLoader {
         }
         return await response.json();
     }
+}
+
+function angioFlowStorageId(instance: ImageGET): number | null {
+    const row = (instance.storages ?? []).find((s) => s.role === "angio_flow");
+    return row?.id ?? null;
 }
 
 async function getImage(url: string): Promise<ImageBitmap> {

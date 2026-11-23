@@ -15,6 +15,19 @@ export abstract class AbstractImage {
     public readonly depth: number;
     abstract texture: WebGLTexture;
 
+    /**
+     * Optional OCTA angio_flow companion (same W×H×D as structural).
+     * Structural `texture` / `data` remain the segmentation lattice.
+     */
+    flowTexture: WebGLTexture | null = null;
+    /** Set in dispose(); in-flight flow loads must not upload after this. */
+    disposed = false;
+    readonly flowAbort = new AbortController();
+
+    get hasFlow(): boolean {
+        return this.flowTexture !== null;
+    }
+
     // in micrometers / pixel
     public readonly resolution: { x: number; y: number; z: number };
     transform: Matrix = Matrix.identity;
@@ -179,6 +192,12 @@ export abstract class AbstractImage {
      * navigating away or destroying the WebGL context.
      */
     dispose(): void {
+        this.disposed = true;
+        this.flowAbort.abort();
+        if (this.flowTexture) {
+            this.webgl.gl.deleteTexture(this.flowTexture);
+            this.flowTexture = null;
+        }
         // Dispose all segmentation items
         for (const segmentationItem of this.segmentationItems.values()) {
             segmentationItem.dispose();
