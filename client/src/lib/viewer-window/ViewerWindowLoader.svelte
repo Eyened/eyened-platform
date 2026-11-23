@@ -14,6 +14,7 @@ Without WebGL 2, or once the browser drops the context, a notice takes the windo
         CLIENT_DEFAULTS,
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
+    import { hiddenTools } from "$lib/workspace/tools/registry";
     import { Workspace } from "$lib/workspace/workspace.svelte";
     import {
         readMagnifier,
@@ -48,14 +49,13 @@ Without WebGL 2, or once the browser drops the context, a notice takes the windo
     const taskContext = getContext<TaskContext | undefined>("taskContext");
 
     // Off on a narrow window; else a task takes the strip from its config, /view from the user's choice.
-    const strip = startStripOn(
-        taskContext
-            ? mergeClientConfig(
-                  CLIENT_DEFAULTS,
-                  taskContext.task.task_definition.config,
-              ).layout.strip
-            : undefined,
-    );
+    const taskLayout = taskContext
+        ? mergeClientConfig(
+              CLIENT_DEFAULTS,
+              taskContext.task.task_definition.config,
+          ).layout
+        : undefined;
+    const strip = startStripOn(taskLayout?.strip);
 
     // One Workspace per viewer window, never a module singleton.
     const urlWriter = createWorkspaceUrlWriter({
@@ -83,6 +83,7 @@ Without WebGL 2, or once the browser drops the context, a notice takes the windo
         paint: readPaint(),
         // A task always offers every tool (no switcher); /view starts in the stored mode.
         toolMode: taskContext ? "all" : readToolMode(),
+        hiddenTools: hiddenTools(taskLayout?.hide ?? []),
     });
     setContext("workspace", workspace);
 

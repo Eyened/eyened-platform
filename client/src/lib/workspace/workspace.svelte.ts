@@ -73,6 +73,8 @@ export interface WorkspaceOptions {
     paint?: PaintPrefs;
     /** The palette's mode; All tools when missing. */
     toolMode?: ToolMode;
+    /** Tools the task's `layout.hide` takes away; none when missing. */
+    hiddenTools?: readonly ToolId[];
 }
 
 /** What Layers acts on: one viewport's viewer, its segmentation state and its layer state. */
@@ -175,6 +177,8 @@ export class Workspace {
         Place: "point",
     });
     toolMode: ToolMode = $state("all");
+    /** Tools this task hides; they never arm. */
+    readonly hiddenTools: readonly ToolId[];
     /** The image a strip tile drag carries, from dragstart to dragend; during dragover the browser shows only its type. */
     draggedImageId: string | null = $state(null);
 
@@ -213,6 +217,7 @@ export class Workspace {
         this.magnifier = options.magnifier ?? { ...MAGNIFIER_DEFAULTS };
         this.paint = options.paint ?? { ...PAINT_DEFAULTS };
         this.toolMode = options.toolMode ?? "all";
+        this.hiddenTools = options.hiddenTools ?? [];
     }
 
     /** The first state once the catalogue has loaded: v= wins, then a named layout, then one viewport with the first image. */
@@ -384,6 +389,8 @@ export class Workspace {
 
     /** A key or a menu pick: arms a modal tool; Reset view, the one action, resets the selected viewport. */
     arm(id: ToolId): void {
+        // One gate for the palette, ⋯, the keys and Layers' buttons.
+        if (this.hiddenTools.includes(id)) return;
         const tool = toolById(id);
         if (tool.kind === "action") {
             this.selectedViewport?.reset();

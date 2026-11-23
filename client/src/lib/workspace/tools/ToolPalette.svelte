@@ -37,14 +37,21 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     } = $props();
 
     const workspace = getContext<Workspace>("workspace");
-    const sections = $derived(paletteSections(workspace.toolMode));
+    const sections = $derived(
+        paletteSections(workspace.toolMode, workspace.hiddenTools),
+    );
     // The Magnifier toggle keeps its own slot, so the tools get the rest.
     const flat = $derived(
         orientation === "horizontal" ||
             paletteLayout(available - SLOT_PX - GAP_PX, sections) === "flat",
     );
+    // A tool the task hides is in neither the rail nor ⋯.
     const leftOut = $derived(
-        TOOLS.filter((t) => !offered(t.id, workspace.toolMode)),
+        TOOLS.filter(
+            (t) =>
+                !offered(t.id, workspace.toolMode) &&
+                !workspace.hiddenTools.includes(t.id),
+        ),
     );
     const armedOut = $derived(
         leftOut.find((t) => t.id === workspace.armedTool) ?? null,
