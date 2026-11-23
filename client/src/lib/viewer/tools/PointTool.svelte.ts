@@ -18,7 +18,6 @@ import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
-import { toast } from "svelte-sonner";
 import { cased, casedText } from "../overlays/casing";
 
 const defaultStroke = "rgba(0, 255, 0, 1)";
@@ -161,10 +160,8 @@ export class PointTool implements Overlay {
                 this.coordinateSpace,
                 viewerContext.image,
             );
-            if (!gate.ok) {
-                toast.warning(gate.message);
-                return;
-            }
+            // The tool bar says why; a click here does nothing.
+            if (!gate.ok) return;
         }
         const position = viewerContext.viewerToImageCoordinates(cursor);
         const before = this.points;

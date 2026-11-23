@@ -5,6 +5,8 @@
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
     import { formAnnotations } from "$lib/data";
+    import { formSchemas } from "$lib/data/stores.svelte";
+    import { schemaName } from "$lib/forms/formTargets";
     import PointImageGroup from "$lib/forms/PointImageGroup.svelte";
     import PointRowEditor from "$lib/forms/PointRowEditor.svelte";
     import {
@@ -48,6 +50,14 @@
     const formAnnotationId = getContext<number | undefined>(
         "pointFormAnnotationId",
     );
+    const formName = $derived.by(() => {
+        const annotation =
+            formAnnotationId == null
+                ? undefined
+                : formAnnotations.get(formAnnotationId);
+        const schema = annotation && formSchemas.get(annotation.form_schema_id);
+        return `${schema ? schemaName(schema) : "Form"} #${formAnnotationId}`;
+    });
     const boundImageId = getContext<string | undefined>("pointBoundImageId");
     const taskContext = getContext<TaskContext | undefined>("taskContext");
 
@@ -209,6 +219,7 @@
                 radius: pointMarker.radius,
                 color: pointMarker.color,
                 label: schema.title || fieldPath,
+                form: formName,
                 analysis,
                 initialValue: value,
                 setFieldValue: (next) => onchange(next),

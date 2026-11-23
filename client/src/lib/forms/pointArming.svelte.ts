@@ -18,6 +18,8 @@ export class FormPointSession {
     readonly radius: number;
     readonly color: string;
     readonly label: string | undefined;
+    /** The form, e.g. "AMD lesion points #9101", for the tool bar. */
+    readonly form: string;
     readonly analysis: PointSchemaAnalysis;
     private readonly setFieldValue: (next: unknown) => void;
 
@@ -31,6 +33,7 @@ export class FormPointSession {
         radius: number;
         color: string;
         label?: string;
+        form: string;
         analysis: PointSchemaAnalysis;
         initialValue: unknown;
         setFieldValue: (next: unknown) => void;
@@ -41,6 +44,7 @@ export class FormPointSession {
         this.radius = args.radius;
         this.color = args.color;
         this.label = args.label;
+        this.form = args.form;
         this.analysis = args.analysis;
         this.setFieldValue = args.setFieldValue;
         this.fieldValue = args.initialValue;

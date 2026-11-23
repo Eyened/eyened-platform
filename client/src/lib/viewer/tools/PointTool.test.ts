@@ -105,11 +105,11 @@ describe("PointTool", () => {
         expect(tool.points).toEqual([]);
     });
 
-    it("warns and skips placement when coordinate space rejects the viewer", () => {
+    it("skips placement, with no toast, when the coordinate space rejects the viewer", () => {
         const tool = new PointTool({ coordinateSpace: "enface2d" });
         tool.placeAtCursor(mockViewer({ is3D: true }), { x: 1, y: 1 });
         expect(tool.points).toEqual([]);
-        expect(toast.warning).toHaveBeenCalled();
+        expect(toast.warning).not.toHaveBeenCalled();
     });
 
     it("stores a B-scan index on volume viewers", () => {
@@ -329,11 +329,11 @@ describe("PointTool", () => {
         expect(tool.points).toEqual([{ x: 9, y: 8 }]);
     });
 
-    it("warns when volume space is used on a 2D viewer", () => {
+    it("skips placement, with no toast, when volume space is used on a 2D viewer", () => {
         const tool = new PointTool({ coordinateSpace: "volume" });
         tool.placeAtCursor(mockViewer({ is3D: false }), { x: 1, y: 1 });
         expect(tool.points).toEqual([]);
-        expect(toast.warning).toHaveBeenCalled();
+        expect(toast.warning).not.toHaveBeenCalled();
     });
 
     it("ignores keyboard and pointer when not editable", () => {

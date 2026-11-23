@@ -52,14 +52,13 @@ export function canPlaceOnViewer(
         return {
             ok: false,
             message:
-                "This point field is 2D-only — switch to a fundus or enface image (not an OCT B-scan volume).",
+                "These points go on a fundus or en-face image. Select one.",
         };
     }
     if (coordinateSpace === "volume" && !image.is3D) {
         return {
             ok: false,
-            message:
-                "This point field requires an OCT B-scan volume (numeric index is required) — switch to a volume viewer.",
+            message: "These points go on an OCT volume. Select one.",
         };
     }
     return { ok: true };
