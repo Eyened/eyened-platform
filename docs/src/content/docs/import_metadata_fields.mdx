@@ -52,7 +52,7 @@ Each row is walked through the importer graph (`Project → Patient → Study �
 | **ModalityTable** | `modality_id` | `modality_tag` | Optional; distinct from `modality` enum |
 | **ImageInstance** | `image_instance_id` | `public_id` | Or `image_anonymous_identity` within the series |
 | **StorageBackend** | `storage_backend_id` | `storage_backend_key` | |
-| **ImageStorage** | `image_storage_id` | `sop_instance_uid`, or `storage_backend` + `object_key` | Unique `(backend, object_key)`. SOP UID is unique per file |
+| **ImageStorage** | `image_storage_id` | `storage_backend` + `object_key`, then `sop_instance_uid` | Object key is tried first when both are present, so a later row can set a UID on an existing file. SOP UID is unique per file |
 
 **Role column** in the tables below:
 

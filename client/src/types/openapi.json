@@ -639,7 +639,7 @@
     "/images/{image_id}/data": {
       "get": {
         "summary": "Get Public Image Data",
-        "description": "Redirect to the stored image data for an instance (by PublicID).\n\nOptional ``storage_id`` selects an ImageStorage row on this instance. When omitted, the primary storage is used.",
+        "description": "Redirect to the stored image data for an instance (by PublicID).\n\nOptional ``storage_id`` selects an ImageStorage row on this instance.\nWhen omitted, the primary storage is used.",
         "operationId": "get_public_image_data_images__image_id__data_get",
         "parameters": [
           {
@@ -8494,7 +8494,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": ["angio_flow"]
+                "const": "angio_flow"
               },
               {
                 "type": "null"

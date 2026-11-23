@@ -202,11 +202,14 @@ IMAGE_STORAGE = Entity(
     pk_column="ImageStorageID",
     pk_row_field="image_storage_id",
     lookups=(
-        lookup(key("SOPInstanceUid")),
+        # Object key before SOP UID. _first_lookup stops at the first lookup
+        # whose fields are present, so a row that adds a UID to an existing
+        # file must still match that file by (backend, object key).
         lookup(
             key("StorageBackendID", STORAGE_BACKEND),
             key("ObjectKey"),
         ),
+        lookup(key("SOPInstanceUid")),
     ),
     implies=(
         req(STORAGE_BACKEND, "StorageBackend"),

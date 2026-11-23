@@ -262,6 +262,9 @@ export interface paths {
         /**
          * Get Public Image Data
          * @description Redirect to the stored image data for an instance (by PublicID).
+         *
+         *     Optional ``storage_id`` selects an ImageStorage row on this instance.
+         *     When omitted, the primary storage is used.
          */
         get: operations["get_public_image_data_images__image_id__data_get"];
         put?: never;
@@ -1671,21 +1674,6 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /** ImageGET */
-        ImageStorageGET: {
-            /**
-             * @description One on-disk (or object-store) file belonging to an ImageInstance.
-             */
-            id: number;
-            format: string;
-            is_primary: boolean;
-            /**
-             * Role
-             * @description Channel of this file, such as angio_flow
-             */
-            role?: string | null;
-            /** Sop Instance Uid */
-            sop_instance_uid?: string | null;
-        };
         ImageGET: {
             /** Sop Instance Uid */
             sop_instance_uid: string;
@@ -1760,6 +1748,25 @@ export interface components {
             attrs: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ImageStorageGET
+         * @description One on-disk (or object-store) file belonging to an ImageInstance.
+         */
+        ImageStorageGET: {
+            /** Id */
+            id: number;
+            /** Format */
+            format: string;
+            /** Is Primary */
+            is_primary: boolean;
+            /**
+             * Role
+             * @description Channel of this file, such as angio_flow
+             */
+            role?: string | null;
+            /** Sop Instance Uid */
+            sop_instance_uid?: string | null;
         };
         /**
          * ImportOptions
@@ -2049,7 +2056,6 @@ export interface components {
             /**
              * Image Storage Role
              * @description If set, maps to ImageStorage.Role
-             * @enum {string|null}
              */
             image_storage_role?: "angio_flow" | null;
             /**
@@ -3391,6 +3397,7 @@ export interface operations {
             query?: {
                 index?: number | null;
                 meta?: boolean;
+                storage_id?: number | null;
             };
             header?: {
                 authorization?: string;
