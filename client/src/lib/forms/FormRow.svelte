@@ -141,14 +141,21 @@ The blue bar, tint and Document icon mark the form open in the window; the grey 
     {/snippet}
     {#snippet icons()}
         {#if form}
-            <IconButton size="icon-xs" label="Copy" onclick={oncopy}>
+            <!-- These appear where "Grade" was, so the second click of a double-click on Grade must not reach them. -->
+            <IconButton
+                size="icon-xs"
+                label="Copy"
+                onclick={(e) => e.detail < 2 && oncopy()}
+            >
                 <Copy />
             </IconButton>
             {#if canDelete}
                 <IconButton
                     size="icon-xs"
                     label="Delete form"
-                    onclick={(e) => ondelete(e.currentTarget as HTMLElement)}
+                    onclick={(e) =>
+                        e.detail < 2 &&
+                        ondelete(e.currentTarget as HTMLElement)}
                 >
                     <TrashCan />
                 </IconButton>

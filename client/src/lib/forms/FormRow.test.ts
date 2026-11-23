@@ -96,4 +96,24 @@ describe("FormRow", () => {
         await fireEvent.focusOut(row);
         expect(ws.highlightedImages).toEqual([]);
     });
+
+    it("Copy ignores the second click of a double-click, not a single click", async () => {
+        const oncopy = vi.fn();
+        renderRow({ oncopy });
+        const copy = screen.getByRole("button", { name: "Copy" });
+        await fireEvent.click(copy, { detail: 2 });
+        expect(oncopy).not.toHaveBeenCalled();
+        await fireEvent.click(copy, { detail: 1 });
+        expect(oncopy).toHaveBeenCalledTimes(1);
+    });
+
+    it("Delete form ignores the second click of a double-click, not a single click", async () => {
+        const ondelete = vi.fn();
+        renderRow({ canDelete: true, ondelete });
+        const del = screen.getByRole("button", { name: "Delete form" });
+        await fireEvent.click(del, { detail: 2 });
+        expect(ondelete).not.toHaveBeenCalled();
+        await fireEvent.click(del, { detail: 1 });
+        expect(ondelete).toHaveBeenCalledTimes(1);
+    });
 });
