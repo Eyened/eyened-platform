@@ -24,9 +24,11 @@
     import { deletePointAt } from "$lib/forms/pointMutations";
     import type { JSONSchema } from "$lib/forms/schemaType";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
+    import { goToPoint } from "$lib/viewer/tools/PointTool.svelte";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
+    import type { Workspace } from "$lib/workspace/workspace.svelte";
     import { getContext, onDestroy } from "svelte";
-    import { toast } from "svelte-sonner";
+    import { viewportForImage } from "./formViewer";
 
     interface Props {
         schema: JSONSchema;
@@ -60,6 +62,7 @@
     });
     const boundImageId = getContext<string | undefined>("pointBoundImageId");
     const taskContext = getContext<TaskContext | undefined>("taskContext");
+    const workspace = getContext<Workspace | undefined>("workspace");
 
     const pointMarker = $derived(
         mergeClientConfig(
@@ -202,9 +205,29 @@
         return `${row.publicId}:${row.index}`;
     }
 
-    function toggleExpand(row: PointRow) {
-        const key = rowKey(row);
-        expandedKey = expandedKey === key ? null : key;
+    let hint = $state<string | null>(null);
+
+    /** A chip opens its editor and goes to the point in the viewport showing its image. */
+    function goTo(row: PointRow) {
+        expandedKey = rowKey(row);
+        // On /browse there is no viewer to go to, so no hint either.
+        if (!workspace) return;
+        const layers = viewportForImage(
+            workspace,
+            row.publicId,
+            typeof row.pt.index === "number",
+        );
+        hint = layers ? null : "Open this image in the viewer first.";
+        if (!layers) return;
+        goToPoint(row.pt, layers.viewerContext);
+        // The armed field's tool marks the point current, so [ ] step on from it.
+        if (armed && layers.formPointTool)
+            layers.formPointTool.current = row.index;
+    }
+
+    /** Holds the chip's visible text, so voice control can say what it sees. */
+    function chipName(row: PointRow): string {
+        return `Point ${row.index + 1}, ${formatCoord(row.pt)}${extraPreview(row.pt)}: go to it and edit`;
     }
 
     const canActivate = $derived(!!(canEdit && analysis && seedViewerContext));
@@ -318,10 +341,8 @@
         if (!pt) return;
         if (key === "index" && raw.trim() === "") {
             // volume: index is required; blanking would strand the marker.
-            if (analysis?.coordinateSpace === "volume") {
-                toast.warning("B-scan index is required for this field");
-                return;
-            }
+            // The editor shows the error; a volume point keeps its stored B-scan.
+            if (analysis?.coordinateSpace === "volume") return;
             pts[index] = { ...pt, index: null };
             commitPoints(pid, pts);
             return;
@@ -343,6 +364,8 @@
 </script>
 
 <div class="point-field">
+    <!-- Always mounted, so a new hint is announced. -->
+    <p role="status" class="sr-only">{hint ?? ""}</p>
     <div class="header">
         <span class="title">{schema.title || fieldPath}</span>
         {#if schema.description}
@@ -398,10 +421,9 @@
                     type="button"
                     class="coord-chip"
                     class:expanded={expandedKey === rowKey(row)}
-                    title={canEdit
-                        ? "Click to edit labels / coordinates"
-                        : formatCoord(row.pt) + extraPreview(row.pt)}
-                    onclick={() => toggleExpand(row)}
+                    aria-label={chipName(row)}
+                    aria-expanded={expandedKey === rowKey(row)}
+                    onclick={() => goTo(row)}
                 >
                     {formatCoord(row.pt)}{#if extraPreview(row.pt)}<span
                             class="extra-preview">{extraPreview(row.pt)}</span
@@ -416,6 +438,7 @@
                         {stringExtraKeys}
                         {indexApplicable}
                         {allowNullIndex}
+                        {hint}
                         coordLabel={formatCoord(row.pt) + extraPreview(row.pt)}
                         onUpdateCoord={updatePointCoord}
                         onUpdateExtra={updatePointExtra}
@@ -440,7 +463,9 @@
                     {rowKey}
                     {indexApplicable}
                     {allowNullIndex}
-                    onToggleExpand={toggleExpand}
+                    onGoTo={goTo}
+                    {chipName}
+                    {hint}
                     onUpdateCoord={updatePointCoord}
                     onUpdateExtra={updatePointExtra}
                     onRemovePoint={removePoint}

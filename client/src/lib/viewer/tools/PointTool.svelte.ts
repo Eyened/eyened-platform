@@ -66,6 +66,16 @@ export type PointToolOptions = {
     onPersist?: (points: PointList) => void;
 };
 
+/** Sets the point's B-scan and centres it at 100 %. */
+export function goToPoint(
+    point: ImagePoint,
+    viewerContext: ViewerContext,
+): void {
+    if (typeof point.index === "number") viewerContext.setIndex(point.index);
+    const w = viewerContext.viewerSize.width;
+    viewerContext.focusPoint(point.x, point.y, viewerContext.image.width / w);
+}
+
 /**
  * Viewer overlay that edits an in-memory point list.
  * FormAnnotation / schema storage stay outside — sync via `onChange` + assigning `points`.
@@ -331,14 +341,7 @@ export class PointTool implements Overlay {
             const point = this.points[i];
             if (!point) continue;
             this.current = i;
-            if (typeof point.index === "number")
-                viewerContext.setIndex(point.index);
-            const w = viewerContext.viewerSize.width;
-            viewerContext.focusPoint(
-                point.x,
-                point.y,
-                viewerContext.image.width / w,
-            );
+            goToPoint(point, viewerContext);
             return;
         }
     }

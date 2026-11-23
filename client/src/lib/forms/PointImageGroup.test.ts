@@ -12,7 +12,7 @@ const group = {
 
 describe("PointImageGroup", () => {
     it("renders by-image chips and expands an editor", async () => {
-        const onToggleExpand = vi.fn();
+        const onGoTo = vi.fn();
         const onRemovePoint = vi.fn();
         const onCollapse = vi.fn();
 
@@ -31,7 +31,9 @@ describe("PointImageGroup", () => {
                     typeof pt.note === "string" ? ` ${pt.note}` : "",
                 rowKey: (row) => `${row.publicId}:${row.index}`,
                 indexApplicable: () => false,
-                onToggleExpand,
+                onGoTo,
+                chipName: () => "Point",
+                hint: null,
                 onUpdateCoord: vi.fn(),
                 onUpdateExtra: vi.fn(),
                 onRemovePoint,
@@ -48,7 +50,7 @@ describe("PointImageGroup", () => {
         ).toBeInTheDocument();
 
         await fireEvent.click(screen.getByText("[1,2]"));
-        expect(onToggleExpand).toHaveBeenCalled();
+        expect(onGoTo).toHaveBeenCalled();
 
         await fireEvent.click(
             screen.getByRole("button", { name: "Remove point" }),
@@ -79,7 +81,9 @@ describe("PointImageGroup", () => {
                 extraPreview: () => "",
                 rowKey: (row) => `${row.publicId}:${row.index}`,
                 indexApplicable: () => false,
-                onToggleExpand: vi.fn(),
+                onGoTo: vi.fn(),
+                chipName: () => "Point",
+                hint: null,
                 onUpdateCoord: vi.fn(),
                 onUpdateExtra: vi.fn(),
                 onRemovePoint: vi.fn(),

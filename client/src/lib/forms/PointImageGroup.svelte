@@ -23,7 +23,9 @@
         rowKey: (row: PointRow) => string;
         indexApplicable: (pt: ImagePoint) => boolean;
         allowNullIndex?: boolean;
-        onToggleExpand: (row: PointRow) => void;
+        onGoTo: (row: PointRow) => void;
+        chipName: (row: PointRow) => string;
+        hint: string | null;
         onUpdateCoord: (
             pid: string,
             index: number,
@@ -54,7 +56,9 @@
         rowKey,
         indexApplicable,
         allowNullIndex = true,
-        onToggleExpand,
+        onGoTo,
+        chipName,
+        hint,
         onUpdateCoord,
         onUpdateExtra,
         onRemovePoint,
@@ -80,10 +84,9 @@
                 type="button"
                 class="coord-chip"
                 class:expanded={expandedKey === rowKey(row)}
-                title={canEdit
-                    ? "Click to edit labels / coordinates"
-                    : formatCoord(row.pt) + extraPreview(row.pt)}
-                onclick={() => onToggleExpand(row)}
+                aria-label={chipName(row)}
+                aria-expanded={expandedKey === rowKey(row)}
+                onclick={() => onGoTo(row)}
             >
                 {formatCoord(row.pt)}{#if extraPreview(row.pt)}<span
                         class="extra-preview">{extraPreview(row.pt)}</span
@@ -105,6 +108,7 @@
                 {stringExtraKeys}
                 {indexApplicable}
                 {allowNullIndex}
+                {hint}
                 coordLabel={formatCoord(row.pt) + extraPreview(row.pt)}
                 {onUpdateCoord}
                 {onUpdateExtra}
