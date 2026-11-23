@@ -5,6 +5,7 @@ from datetime import date
 from sqlalchemy import func, select
 
 from eyened_orm import ImageInstance, ImageStorage, Patient, Project, Series, Study
+from eyened_orm.utils.factories import image_by_sop
 from eyened_orm.importer.importer import plan_image_import
 from eyened_orm.importer.importer_dtos import ImportRow
 
@@ -137,10 +138,10 @@ def test_sequential_imports_two_batches_equivalent_to_cumulative_state(session):
     assert _count(session, ImageStorage) == 2
 
     assert (
-        ImageInstance.by_column(session, SOPInstanceUid="SOP-F1") is not None
+        image_by_sop(session, "SOP-F1") is not None
     )
     assert (
-        ImageInstance.by_column(session, SOPInstanceUid="SOP-F2") is not None
+        image_by_sop(session, "SOP-F2") is not None
     )
 
 
@@ -179,7 +180,7 @@ def test_reimport_subset_of_rows_leaves_sibling_entities_untouched(session):
     session.commit()
 
     assert _count(session, ImageInstance) == 2
-    assert ImageInstance.by_column(session, SOPInstanceUid="SOP-S2") is not None
+    assert image_by_sop(session, "SOP-S2") is not None
 
 
 def test_second_full_import_overwrites_mutable_fields_without_duplicates(session):
@@ -237,7 +238,7 @@ def test_second_full_import_overwrites_mutable_fields_without_duplicates(session
     session.refresh(proj)
     assert proj.Description == "description v2"
 
-    img = ImageInstance.by_column(session, SOPInstanceUid="SOP-OW1")
+    img = image_by_sop(session, "SOP-OW1")
     assert img is not None
     assert getattr(img.Laterality, "value", img.Laterality) == "R"
 

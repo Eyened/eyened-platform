@@ -150,7 +150,6 @@ IMAGE_INSTANCE = Entity(
     pk_column="ImageInstanceID",
     pk_row_field="image_instance_id",
     lookups=(
-        lookup(key("SOPInstanceUid")),
         lookup(key("PublicID")),
     ),
     anonymous_identity="image_anonymous_identity",
@@ -161,7 +160,6 @@ IMAGE_INSTANCE = Entity(
         opt(MODALITY_TABLE, "_Modality"),
     ),
     fields={
-        "SOPInstanceUid": "sop_instance_uid",
         "PublicID": "public_id",
         "Modality": "modality",
         "DICOMModality": "dicom_modality",
@@ -204,10 +202,14 @@ IMAGE_STORAGE = Entity(
     pk_column="ImageStorageID",
     pk_row_field="image_storage_id",
     lookups=(
+        # Object key before SOP UID. _first_lookup stops at the first lookup
+        # whose fields are present, so a row that adds a UID to an existing
+        # file must still match that file by (backend, object key).
         lookup(
             key("StorageBackendID", STORAGE_BACKEND),
             key("ObjectKey"),
         ),
+        lookup(key("SOPInstanceUid")),
     ),
     implies=(
         req(STORAGE_BACKEND, "StorageBackend"),
@@ -217,6 +219,8 @@ IMAGE_STORAGE = Entity(
         "ObjectKey": "object_key",
         "Format": "image_storage_format",
         "IsPrimary": "image_storage_is_primary",
+        "Role": "image_storage_role",
+        "SOPInstanceUid": "sop_instance_uid",
         "Hash": "image_storage_hash",
         "Checksum": "image_storage_checksum",
     },

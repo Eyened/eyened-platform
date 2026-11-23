@@ -78,15 +78,22 @@ def get_public_image_data(
     image_id: str,
     index: Optional[int] = None,
     meta: bool = False,
+    storage_id: Optional[int] = None,
     _: bool = Depends(is_authenticated),
     service: ImageInstanceService = Depends(get_image_instance_service),
 ):
-    """Redirect to the stored image data for an instance (by PublicID)."""
+    """Redirect to the stored image data for an instance (by PublicID).
+
+    Optional ``storage_id`` selects an ImageStorage row on this instance.
+    When omitted, the primary storage is used.
+    """
     item = service.get_for_storage(image_id)
     if index is not None and index < 0:
         raise HTTPException(400, "index must be >= 0")
     try:
-        ref = resolve_image_data_ref(item, index=index, meta=meta)
+        ref = resolve_image_data_ref(
+            item, index=index, meta=meta, storage_id=storage_id
+        )
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     return build_storage_redirect_response(f"/data{ref.nginx_path}")

@@ -36,7 +36,7 @@ Each row is walked through the importer graph (`Project → Patient → Study �
 | Image file | `storage_backend_key` + `object_key` |
 | Image metadata | `modality` (required for the viewer; can be partially filled from DICOM when using [preparation](/eyened-platform/orm/importer#row-preparation)) |
 
-**Patch an existing image** — provide `image_instance_id`, `public_id`, or `sop_instance_uid` plus only the fields you want to change.
+**Patch an existing image** — provide `image_instance_id` or `public_id` plus only the fields you want to change. `sop_instance_uid` identifies the file (`ImageStorage`), not the image.
 
 ### Lookup keys per entity
 
@@ -50,9 +50,9 @@ Each row is walked through the importer graph (`Project → Patient → Study �
 | **DeviceInstance** | `device_id` | `device_model` + `device_description` | |
 | **Scan** | `scan_id` | `scan_mode` | Optional on image |
 | **ModalityTable** | `modality_id` | `modality_tag` | Optional; distinct from `modality` enum |
-| **ImageInstance** | `image_instance_id` | `sop_instance_uid` or `public_id` | Or `image_anonymous_identity` within the series |
+| **ImageInstance** | `image_instance_id` | `public_id` | Or `image_anonymous_identity` within the series |
 | **StorageBackend** | `storage_backend_id` | `storage_backend_key` | |
-| **ImageStorage** | `image_storage_id` | `storage_backend` + `object_key` | Unique `(backend, object_key)` |
+| **ImageStorage** | `image_storage_id` | `storage_backend` + `object_key`, then `sop_instance_uid` | Object key is tried first when both are present, so a later row can set a UID on an existing file. SOP UID is unique per file |
 
 **Role column** in the tables below:
 
@@ -121,8 +121,7 @@ Each row is walked through the importer graph (`Project → Patient → Study �
 |-------|------|------|-------------|
 | `image_instance_id` | int | PK | Existing image (patch mode) |
 | `public_id` | str | Lookup | **Public API identifier** — 12-character string used in URLs such as `/api/images/{public_id}/data` and `/api/images/{public_id}/thumbnail`, and in many instance routes. Auto-generated on create if omitted. Use as lookup to patch metadata on an existing image. **Cannot be changed** after creation. |
-| `sop_instance_uid` | str | Lookup | DICOM SOP instance UID |
-| `image_anonymous_identity` | int | Group | Batch-local key: rows with the same value **and** the same series share one new instance when no UID/`public_id` is given; distinct `object_key` values can add multiple `ImageStorage` rows to that instance |
+| `image_anonymous_identity` | int | Group | Batch-local key: rows with the same value **and** the same series share one new instance when no `public_id` is given; distinct `object_key` values can add multiple `ImageStorage` rows to that instance |
 | `modality` | str | Property | **Required for new images** in practice. Image type: `ColorFundus`, `OCT`, `OCTA`, … — drives viewer behaviour and processing |
 | `laterality` | str | Property | `"L"` or `"R"` |
 | `height` | int | Property | Rows in pixels (`Rows_y`) |
@@ -156,9 +155,11 @@ Files are referenced by storage backend + path within that backend (resolved via
 | `storage_backend_key` | str | Lookup | Backend key (nginx location / mount name); created with `storage_backend_kind` if missing |
 | `storage_backend_kind` | str | Property | Backend kind when **creating** a new backend |
 | `image_storage_id` | int | PK | Existing `ImageStorage` row |
+| `sop_instance_uid` | str | Lookup | DICOM SOP Instance UID of this file. Unique. Two files on one image (structural OCT and angio flow) have different values. |
 | `object_key` | str | Lookup | **Required for new images.** Path to the file within the backend (unique per backend) |
-| `image_storage_format` | str | Property | MIME or format string (`image/png`, `dicom`, …); often inferred from `object_key` during [preparation](/eyened-platform/orm/importer#row-preparation) |
-| `image_storage_is_primary` | bool | Property | Whether this row is the primary storage location for the instance |
+| `image_storage_format` | str | Property | MIME or format string (`image/png`, `dicom`, …); often inferred from `object_key` during [preparation](/eyened-platform/orm/importer#row-preparation). OCTA structural and flow files are both `dicom`. |
+| `image_storage_is_primary` | bool | Property | Whether this row is the primary storage location for the instance. The OCTA flow row is `false`. |
+| `image_storage_role` | str | Property | Channel of the file. Set `angio_flow` on the OCTA flow companion. |
 | `image_storage_hash` | bytes | Property | SHA-256 digest (32 bytes) |
 | `image_storage_checksum` | str | Property | Checksum string (e.g. MD5 hex) |
 

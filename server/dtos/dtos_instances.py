@@ -133,6 +133,18 @@ class ScanMeta(BaseModel):
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
+class ImageStorageGET(BaseModel):
+    """One on-disk (or object-store) file belonging to an ImageInstance."""
+
+    id: int
+    format: str
+    is_primary: bool
+    role: Optional[str] = Field(
+        None, description="Channel of this file, such as angio_flow"
+    )
+    sop_instance_uid: Optional[str] = None
+
+
 class ImageBase(BaseModel):
     """Image metadata exposed via public id."""
 
@@ -157,6 +169,7 @@ class ImageBase(BaseModel):
     date_inserted: datetime
     date_modified: Optional[datetime] = None
     date_preprocessed: Optional[datetime] = None
+    storages: List[ImageStorageGET]
 
 
 class ImageGET(ImageBase):

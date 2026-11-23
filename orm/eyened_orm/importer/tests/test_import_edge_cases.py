@@ -82,6 +82,94 @@ def test_image_anonymous_identity_one_instance_two_storages(session):
     assert sum(1 for s in storages if not s.IsPrimary) == 1
 
 
+def test_reimport_by_object_key_sets_sop_on_existing_storage(session):
+    """A file imported without a UID is updated when a later row adds one.
+
+    SOP is also a lookup, but only after (backend, object key). Matching the
+    new UID first would plan a second storage and hit the object-key unique key.
+    """
+    d = date(2026, 6, 16)
+    common = dict(
+        project_name="sop-onto-existing",
+        project_external="Y",
+        dataset_identifier="",
+        patient_identifier="p1",
+        study_date=d,
+        series_instance_uid="SER-SOP-EXISTING",
+        manufacturer="m",
+        manufacturer_model_name="mm",
+        device_description="d",
+        storage_backend_key="sb-sop-existing",
+        storage_backend_kind="test-kind",
+        object_key="oct.dcm",
+        modality="ColorFundus",
+        laterality="L",
+        image_storage_is_primary=True,
+    )
+    run1 = plan_image_import(session, [ImportRow(**common)])
+    run1.apply()
+    session.commit()
+
+    storage = session.scalar(select(ImageStorage))
+    assert storage is not None
+    assert storage.SOPInstanceUid is None
+
+    run2 = plan_image_import(
+        session,
+        [ImportRow(**common, sop_instance_uid="1.2.3.4.5")],
+    )
+    run2.apply()
+    session.commit()
+
+    assert _count(session, ImageStorage) == 1
+    session.refresh(storage)
+    assert storage.SOPInstanceUid == "1.2.3.4.5"
+
+
+def test_reimport_by_sop_only_finds_existing_storage(session):
+    """A row that only carries the UID still matches the file."""
+    d = date(2026, 6, 17)
+    common = dict(
+        project_name="sop-only-lookup",
+        project_external="Y",
+        dataset_identifier="",
+        patient_identifier="p1",
+        study_date=d,
+        series_instance_uid="SER-SOP-ONLY",
+        manufacturer="m",
+        manufacturer_model_name="mm",
+        device_description="d",
+        storage_backend_key="sb-sop-only",
+        storage_backend_kind="test-kind",
+        object_key="flow.dcm",
+        sop_instance_uid="1.2.3.4.6",
+        modality="ColorFundus",
+        laterality="L",
+        image_storage_is_primary=True,
+    )
+    run1 = plan_image_import(session, [ImportRow(**common)])
+    run1.apply()
+    session.commit()
+
+    run2 = plan_image_import(
+        session,
+        [
+            ImportRow(
+                sop_instance_uid="1.2.3.4.6",
+                image_storage_role="angio_flow",
+            )
+        ],
+    )
+    run2.apply()
+    session.commit()
+
+    assert _count(session, ImageStorage) == 1
+    storage = session.scalar(select(ImageStorage))
+    assert storage is not None
+    assert storage.ObjectKey == "flow.dcm"
+    assert storage.Role == "angio_flow"
+
+
 def test_idempotency_same_import_twice_produces_no_changes_second_time(session):
     rows = [
         ImportRow(
