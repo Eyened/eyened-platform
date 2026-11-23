@@ -7,6 +7,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import * as Tabs from "$lib/components/ui/tabs/index.js";
     import LayersPanel from "$lib/layers/LayersPanel.svelte";
     import Close from "carbon-icons-svelte/lib/Close.svelte";
@@ -514,6 +515,20 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 {emptyMessage}
             </p>
         {:else}
+            <!-- Always mounted, so screen readers announce the notice when it appears. -->
+            <div role="status">
+                {#if task?.notice}
+                    <!-- Carbon: an action's inline notification sits at the top of the content it is about. -->
+                    <div class="px-4 pt-2">
+                        <InlineNotification
+                            kind="success"
+                            title={task.notice.title}
+                            subtitle={task.notice.subtitle}
+                            role="none"
+                        />
+                    </div>
+                {/if}
+            </div>
             {#if workspace.strip}
                 <ThumbnailStrip {tile} {titleFor} />
             {/if}

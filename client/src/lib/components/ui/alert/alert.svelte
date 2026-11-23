@@ -12,6 +12,8 @@
                     "border-y border-r border-l-3 border-y-support-error/40 border-r-support-error/40 border-l-support-error bg-notification-background-error [&>svg]:text-support-error",
                 warning:
                     "border-y border-r border-l-3 border-y-support-warning/40 border-r-support-warning/40 border-l-support-warning bg-notification-background-warning [&>svg]:text-support-warning",
+                success:
+                    "border-y border-r border-l-3 border-y-support-success/40 border-r-support-success/40 border-l-support-success bg-notification-background-success [&>svg]:text-support-success",
             },
         },
         defaultVariants: {

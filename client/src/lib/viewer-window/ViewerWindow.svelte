@@ -11,6 +11,11 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
     import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import LeaveSetModal from "$lib/tasks/LeaveSetModal.svelte";
+    import SetStatusControl from "$lib/tasks/SetStatusControl.svelte";
+    import {
+        parseTaskPanelConfig,
+        taskHeaderShows,
+    } from "$lib/tasks/taskPanelConfig";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import { takeHandoff } from "$lib/tasks/setHandoff";
     import {
@@ -86,11 +91,16 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                   focus: focusSetControl,
               })
             : null;
+    const shows = taskContext
+        ? taskHeaderShows(
+              parseTaskPanelConfig(taskContext.task.task_definition.config),
+          )
+        : null;
     const task: TaskHeader | null = $derived(
-        taskContext && navigation && setNavigation
+        taskContext && navigation && setNavigation && shows
             ? {
                   label: `Set ${setNumber} of ${taskContext.task.num_tasks}`,
-                  show: { title: true, nav: true, overview: true },
+                  show: shows,
                   prevDisabled: navigation.prevDisabled,
                   nextDisabled: navigation.nextDisabled,
                   pending: setNavigation.pending,
@@ -101,6 +111,14 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                   overview: () => {
                       window.location.href = `/tasks/${taskContext.task.id}`;
                   },
+                  status:
+                      shows.status || shows.goToNext ? setStatus : undefined,
+                  notice: setNavigation.lastReady
+                      ? {
+                            title: `Set ${setNumber} marked ready`,
+                            subtitle: "This was the last set in this task.",
+                        }
+                      : null,
               }
             : null,
     );
@@ -126,6 +144,19 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
             : null;
     }
 </script>
+
+{#snippet setStatus()}
+    {#if taskContext && setNavigation && statusSaver && shows}
+        <SetStatusControl
+            subTaskId={taskContext.subTask.id}
+            index={taskContext.subTaskIndex}
+            count={taskContext.task.num_tasks}
+            showStatus={shows.status}
+            navigation={setNavigation}
+            status={statusSaver}
+        />
+    {/if}
+{/snippet}
 
 <!-- Patient attrs first, then form pointset/affine (pointset wins on conflict). -->
 <RegistrationItemLoader {registration} {registrationSet} />
