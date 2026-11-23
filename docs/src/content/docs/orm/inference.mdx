@@ -61,6 +61,19 @@ Dependent models (`cfi-keypoints`, `cfi-odfd`, `cfi-quality`) declare `CFI_ROI` 
 
 Implementation uses optional preprocess → batch → postprocess stages; see `orm/eyened_orm/commands/` in the repository for extending with custom models.
 
+The PyTorch CFI pipelines pass their ROI-cropped, normalized tensors to
+`retinalysis-inference` through `predict_batch({"image": tensor}, fields=...)`.
+They retain the platform's stored `CFI_ROI` transform; the ensemble's image loader
+and canonical-space postprocessing are not needed for these already prepared batches.
+
+Quality and ODFD request member `prediction` tensors (batch, member, channel) and
+average them in NumPy to preserve existing scores and distances. Keypoints request
+raw `heatmaps` (batch, member, keypoint, height, width), using float32 inference on
+both CPU and CUDA. They locate the maximum **after averaging heatmaps**, add the
+half-pixel center offset, and apply the inverse ROI transform to return original
+image coordinates. The generic keypoint `aggregate` averages member coordinates
+and is not interchangeable with this calculation.
+
 ## Segmentation models (`run-segmentation`)
 
 Runs **SegmentationModel** inference into `ModelSegmentation` zarr arrays.
