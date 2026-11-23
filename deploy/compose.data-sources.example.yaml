@@ -9,4 +9,4 @@
 services:
   server:
     volumes:
-      - ./extensions:/app/server/extensions:ro
+      - ./extensions:/app/server/extensions:ro,z

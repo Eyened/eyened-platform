@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, Response
+from sqlalchemy.orm import Session
 
+from ..db import get_db
 from ..dtos.dto_converter import DTOConverter
 from ..dtos.dtos_aux import DataSourceGET, ObjectTagPATCH, ObjectTagPOST, TagMeta
 from ..study_extension import TablesContribution
@@ -75,7 +77,15 @@ def get_study_data_source(
     study_id: int,
     name: str,
     service: StudyService = Depends(get_study_service),
+    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> TablesContribution:
-    """This study's contribution from a named extension."""
-    return service.fetch_data_source(study_id, name)
+    """This study's contribution from a named extension.
+
+    The lookup's transaction is committed before the callback so its
+    connection returns to the pool. The callback receives that same session
+    and checks a connection out again only if it queries.
+    """
+    extension, ctx = service.resolve_data_source(study_id, name)
+    db.commit()
+    return service.fetch_data_source(extension, ctx)

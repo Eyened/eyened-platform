@@ -124,6 +124,24 @@ def test_an_unknown_source_is_404(client, sources, registry, studies):
     assert registry.fetch_calls == 0
 
 
+def test_fetch_starts_outside_the_read_transaction(
+    client, session, sources, registry, studies
+):
+    seen = []
+    real_fetch = registry.fetch
+
+    def fetch(ctx):
+        seen.append(ctx.session.in_transaction())
+        return real_fetch(ctx)
+
+    registry.fetch = fetch  # type: ignore[method-assign]
+
+    response = client.get(f"/studies/{studies['Alpha']['study']}/data-sources/Registry")
+
+    assert response.status_code == 200
+    assert seen == [False]
+
+
 def test_fetch_none_is_404(client, sources, registry, studies):
     registry.result = None
 

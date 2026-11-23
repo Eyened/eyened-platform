@@ -92,6 +92,42 @@ describe("AdditionalDataSources", () => {
         expect(container.textContent?.trim()).toBe("");
     });
 
+    it("shows no data when a source answers 404", async () => {
+        fetchApi.mockImplementation(async (path: string) =>
+            path === "/studies/11/data-sources"
+                ? json([{ name: "Empty" }])
+                : json({ detail: "none" }, 404),
+        );
+
+        render(AdditionalDataSources, { props: { studyId: 11 } });
+
+        expect(await screen.findByText("No data for this study.")).toBeTruthy();
+        expect(screen.queryByText("Empty could not be loaded")).toBeNull();
+    });
+
+    it("retries a source that failed", async () => {
+        let loads = 0;
+        fetchApi.mockImplementation(async (path: string) => {
+            if (path === "/studies/12/data-sources") {
+                return json([{ name: "Broken" }]);
+            }
+            loads += 1;
+            return json({ detail: "x" }, 502);
+        });
+
+        const first = render(AdditionalDataSources, { props: { studyId: 12 } });
+        expect(
+            await screen.findByText("Broken could not be loaded"),
+        ).toBeTruthy();
+        first.unmount();
+
+        render(AdditionalDataSources, { props: { studyId: 12 } });
+        expect(
+            await screen.findByText("Broken could not be loaded"),
+        ).toBeTruthy();
+        expect(loads).toBe(2);
+    });
+
     it("keeps the page up when one source fails", async () => {
         fetchApi.mockImplementation(async (path: string) =>
             path === "/studies/9/data-sources"

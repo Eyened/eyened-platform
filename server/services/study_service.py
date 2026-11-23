@@ -16,6 +16,7 @@ from eyened_orm.authz.scope import AccessScope
 
 from ..db import get_db
 from ..study_extension import (
+    ExtensionContext,
     StudyExtension,
     TablesContribution,
     extension_context,
@@ -269,13 +270,14 @@ class StudyService:
         """
         return self._extensions_for(self._visible_study(study_id))
 
-    def fetch_data_source(self, study_id: int, name: str) -> TablesContribution:
-        """Run the named extension's fetch for a visible study.
+    def resolve_data_source(
+        self, study_id: int, name: str
+    ) -> tuple[StudyExtension, ExtensionContext]:
+        """The extension and context for a visible study.
 
         Raises:
-            NotFoundError: If the study is missing or out of scope, the
-                extension does not apply, or fetch returns None.
-            UpstreamError: If fetch raises, times out, or returns a bad envelope.
+            NotFoundError: If the study is missing or out of scope, or the
+                extension does not apply.
         """
         study = self._visible_study(study_id)
         ctx = self._context(study)
@@ -285,6 +287,21 @@ class StudyService:
         )
         if extension is None:
             raise NotFoundError(f"Data source {name} not found")
+        return extension, ctx
+
+    def fetch_data_source(
+        self, extension: StudyExtension, ctx: ExtensionContext
+    ) -> TablesContribution:
+        """Run the extension's fetch.
+
+        The caller ends the request's read transaction before this, so the
+        callback does not keep that connection checked out.
+
+        Raises:
+            NotFoundError: If fetch returns None.
+            UpstreamError: If fetch raises, times out, or returns a bad envelope.
+        """
+        name = extension.name
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         try:
             future = pool.submit(extension.fetch, ctx)

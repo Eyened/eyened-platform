@@ -1,5 +1,6 @@
 <script lang="ts">
     import {
+        DataSourceError,
         isTablesContribution,
         listDataSources,
         loadDataSource,
@@ -58,11 +59,17 @@
                                 subtitle="Try again later."
                             />
                         {/if}
-                    {:catch}
-                        <InlineNotification
-                            title="{source.name} could not be loaded"
-                            subtitle="Try again later."
-                        />
+                    {:catch error}
+                        {#if error instanceof DataSourceError && error.status === 404}
+                            <p class="px-4 text-label-01 text-text-secondary">
+                                No data for this study.
+                            </p>
+                        {:else}
+                            <InlineNotification
+                                title="{source.name} could not be loaded"
+                                subtitle="Try again later."
+                            />
+                        {/if}
                     {/await}
                 </Accordion.Content>
             </Accordion.Item>

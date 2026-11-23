@@ -8,19 +8,37 @@ export type TablesContribution = {
     groups: Record<string, DataRow[]>;
 };
 
+export class DataSourceError extends Error {
+    constructor(
+        message: string,
+        readonly status: number,
+    ) {
+        super(message);
+        this.name = "DataSourceError";
+    }
+}
+
 const cache = new Map<string, Promise<unknown>>();
 
 function cachedJson<T>(path: string): Promise<T> {
-    if (!cache.has(path)) {
-        const promise = fetchApi(path).then((response) => {
+    let promise = cache.get(path);
+    if (!promise) {
+        promise = fetchApi(path).then((response) => {
             if (!response.ok) {
-                throw new Error(`Failed to load ${path}`);
+                throw new DataSourceError(
+                    `Failed to load ${path}`,
+                    response.status,
+                );
             }
             return response.json();
         });
+        // Only a successful fetch stays cached, so the next render retries a failure.
+        promise.catch(() => {
+            if (cache.get(path) === promise) cache.delete(path);
+        });
         cache.set(path, promise);
     }
-    return cache.get(path) as Promise<T>;
+    return promise as Promise<T>;
 }
 
 export function listDataSources(studyId: number): Promise<DataSourceGET[]> {

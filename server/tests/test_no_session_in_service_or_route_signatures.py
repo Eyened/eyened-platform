@@ -52,6 +52,8 @@ Exemptions, and what would remove them:
 - One route handler, ``oidc_authenticate``, holds ``session`` only to forward
   it to ``check_oidc_login``. The six password-path handlers take
   ``Depends(get_auth_service)`` instead (``_is_di_factory``).
+- ``get_study_data_source`` holds ``db`` only to commit the lookup early, so
+  that connection is back in the pool while the extension callback runs.
 
 Blind spot: both scans key on the bare names ``session``/``db`` (parameter
 name for guard 1, call-receiver name for guard 2), so a local alias (e.g.
@@ -121,6 +123,11 @@ _SIGNATURE_ALLOWED: dict[tuple[str, str], str] = {
     ("routes/auth.py", "oidc_authenticate"): (
         "forwards session to check_oidc_login only. What would remove it: the "
         "check_oidc_login extraction above"
+    ),
+    ("routes/studies.py", "get_study_data_source"): (
+        "commits the request's read-only lookup early so the DB connection is "
+        "back in the pool while the extension callback runs. What would remove "
+        "it: a get_db variant that ends the transaction before the handler"
     ),
     # R1: import_api.py is slated for deprecation (see module docstring); only
     # import_single_image holds a Session, for ImportRun.apply().
@@ -232,6 +239,10 @@ _DB_ACCESS_ALLOWED: dict[tuple[str, str], str] = {
     # Human decision: import_api.py is slated for deprecation. Calls
     # session.rollback() on the caught-failure path.
     ("routes/import_api.py", "import_single_image"): "human decision: import_api.py is slated for deprecation; calls session.rollback() on the caught-failure path",
+    ("routes/studies.py", "get_study_data_source"): (
+        "commits the read-only lookup before the extension callback. What would "
+        "remove it: a get_db variant that ends the transaction before the handler"
+    ),
     ("services/access_scope.py", "get_access_scope"): (
         "scope resolver -- reads Creator (IsAdmin/Inactive) before any scope "
         "exists, the same case as the auth resolvers above. What would remove "
