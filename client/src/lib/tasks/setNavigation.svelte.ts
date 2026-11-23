@@ -93,6 +93,11 @@ export class SetNavigation {
             if (markReady) {
                 // A failure shows on the combo button; the grader stays.
                 if (!(await this.saveStatus("Ready"))) return;
+                // Work that became unsaved during the status save keeps the grader here.
+                if (!last && tracker.firstUnsaved()) {
+                    this.revealUnsaved(control);
+                    return;
+                }
             }
             if (last) {
                 this.lastReady = true;

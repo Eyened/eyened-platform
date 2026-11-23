@@ -140,4 +140,21 @@ describe("SetNavigation", () => {
         expect(s.revealed).toEqual([s.work.target]);
         expect(s.navigate).not.toHaveBeenCalled();
     });
+
+    it("Mark ready and next stays and shows work that became unsaved during the status save", async () => {
+        vi.useFakeTimers();
+        const s = setup(async () => {});
+        let release!: () => void;
+        s.statusSend.mockImplementationOnce(
+            () => new Promise<void>((resolve) => (release = resolve)),
+        );
+        void s.navigation.move("primary", { markReady: true });
+        await settle();
+        expect(s.statusSend).toHaveBeenCalledWith("Ready");
+        s.work.edit(1);
+        release();
+        await settle();
+        expect(s.navigate).not.toHaveBeenCalled();
+        expect(s.revealed).toEqual([s.work.target]);
+    });
 });
