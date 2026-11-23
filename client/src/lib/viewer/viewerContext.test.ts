@@ -62,3 +62,12 @@ describe("syncIndex", () => {
         expect(tile.index).toBe(30);
     });
 });
+
+describe("projection start mode", () => {
+    it("starts an OCT's own projection in Mask and other images Off", () => {
+        expect(
+            viewerOf("grey", { imageId: "oct-1_proj" }).enfaceProjectionMode,
+        ).toBe("binary");
+        expect(viewerOf("grey").enfaceProjectionMode).toBe("off");
+    });
+});

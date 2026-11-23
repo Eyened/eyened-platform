@@ -2,21 +2,34 @@
     import { ToggleGroup as ToggleGroupPrimitive } from "bits-ui";
     import { cn } from "$lib/utils.js";
 
-    // Single-select toggle group (Carbon has none): one tab stop, arrow keys inside. No item is selected
-    // when `value` matches none; pressing the selected item keeps it selected.
+    // Single-select toggle group (Carbon has none): one Tab stop on the selected option, arrow keys inside.
+    // No item is selected when `value` matches none; pressing the selected item keeps it selected.
     let {
         value,
         onchange,
         items,
         label,
+        describedby,
         class: className,
     }: {
         value: string;
         onchange: (value: string) => void;
         items: { value: string; text: string; label: string }[];
         label: string;
+        /** The id of the element that describes the group. */
+        describedby?: string;
         class?: string;
     } = $props();
+
+    // bits-ui moves its Tab stop only on click or arrow, so a value set in code would leave it behind.
+    // Inside the group the focused option holds the stop, so Tab leaves the group from any option.
+    let focused = $state<string | null>(null);
+    const tabStop = $derived(
+        focused ??
+            (items.some((item) => item.value === value)
+                ? value
+                : items[0]?.value),
+    );
 </script>
 
 <ToggleGroupPrimitive.Root
@@ -28,6 +41,11 @@
         }
     }
     aria-label={label}
+    aria-describedby={describedby}
+    onfocusout={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            focused = null;
+    }}
     class={cn(
         "flex border border-border-strong-01 in-dialog:border-border-strong-02",
         className,
@@ -39,7 +57,15 @@
             aria-label={item.label}
             class="flex h-6 min-w-6 cursor-pointer items-center justify-center px-1 text-label-01 text-text-secondary hover:bg-content-switcher-background-hover hover:text-text-primary data-[state=on]:bg-content-switcher-selected data-[state=on]:text-text-primary data-[state=on]:shadow-content-switcher-selected"
         >
-            {item.text}
+            {#snippet child({ props })}
+                <button
+                    {...props}
+                    tabindex={item.value === tabStop ? 0 : -1}
+                    onfocus={() => (focused = item.value)}
+                >
+                    {item.text}
+                </button>
+            {/snippet}
         </ToggleGroupPrimitive.Item>
     {/each}
 </ToggleGroupPrimitive.Root>

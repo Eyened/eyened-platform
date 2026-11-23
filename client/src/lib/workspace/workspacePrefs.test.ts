@@ -3,7 +3,6 @@ import { mockWidth } from "./testUtils";
 import {
     readLayerArea,
     readLayerSections,
-    readStripLocalizer,
     readToolMode,
     readStripTracking,
     startStripOn,
@@ -27,12 +26,9 @@ describe("startStripOn", () => {
     });
 });
 
-describe("strip settings", () => {
-    it("start on and All, and ignore a stored value they do not know", () => {
+describe("strip tracking", () => {
+    it("starts on", () => {
         expect(readStripTracking()).toBe(true);
-        expect(readStripLocalizer()).toBe("all");
-        localStorage.setItem("eyened:viewer:stripLocalizer", "lines");
-        expect(readStripLocalizer()).toBe("all");
     });
 });
 
@@ -61,18 +57,24 @@ describe("Layers sections", () => {
             etdrs: false,
             pointsets: false,
             distance: false,
+            projection: false,
+            localizer: false,
         });
         writeLayerSections({
             segmentations: false,
             etdrs: true,
             pointsets: false,
             distance: true,
+            projection: true,
+            localizer: true,
         });
         expect(readLayerSections()).toEqual({
             segmentations: false,
             etdrs: true,
             pointsets: false,
             distance: false,
+            projection: true,
+            localizer: true,
         });
         localStorage.setItem("eyened:viewer:layerSections", "{");
         expect(readLayerSections().segmentations).toBe(true);

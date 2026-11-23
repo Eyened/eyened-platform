@@ -11,6 +11,7 @@ import { Line } from "$lib/viewer/tools/Measure.svelte";
 import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
 import { workspaceWith } from "$lib/workspace/testUtils";
 import type { Workspace } from "$lib/workspace/workspace.svelte";
+import { LocalizerLines } from "./localizerLines.svelte";
 import { graderSegmentation, layersContexts, ME } from "./testContexts";
 
 vi.mock("$lib/viewer-window/panelSegmentation/DrawingTools.svelte", () => ({
@@ -42,6 +43,8 @@ function attach(ws: Workspace, position: number, instanceId: string) {
             mainViewerContext: ctx.mainViewerContext as never,
             grids: ctx.grids,
             measure: ctx.measure,
+            projectionSources: [],
+            localizer: new LocalizerLines(() => []),
         },
     });
     return ctx;

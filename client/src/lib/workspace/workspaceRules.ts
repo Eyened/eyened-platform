@@ -293,5 +293,5 @@ export function setSplit(
     return next;
 }
 
-/** Which localizer lines strip tiles draw. */
+/** Which localizer lines a viewport draws. */
 export type LocalizerMode = "off" | "current" | "all";
