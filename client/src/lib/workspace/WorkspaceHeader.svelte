@@ -17,6 +17,8 @@
     import ChevronRight from "carbon-icons-svelte/lib/ChevronRight.svelte";
     import { ContentSwitcher } from "$lib/components/ui/content-switcher/index.js";
     import { getContext, type Snippet } from "svelte";
+    import SaveStateSlot from "$lib/saving/SaveStateSlot.svelte";
+    import { MediaQuery } from "svelte/reactivity";
     import LayoutPopover from "./LayoutPopover.svelte";
     import type { ToolMode } from "./tools/registry";
     import type { Workspace } from "./workspace.svelte";
@@ -36,6 +38,8 @@
     } = $props();
 
     const workspace = getContext<Workspace>("workspace");
+    // ASSUMPTION: words from xlg (82rem); below it the save state is an icon.
+    const xlg = new MediaQuery("min-width: 82rem");
     const MODES = [
         { id: "browse", text: "Browse" },
         { id: "all", text: "All tools" },
@@ -111,7 +115,9 @@
     <div class="min-w-0 flex-1"></div>
     <div class="contents" data-header-slot="patients-open"></div>
     <!-- Save state: 4 and 5; "Mark ready and next": 5. -->
-    <div class="contents" data-header-slot="save-state"></div>
+    <div class="contents" data-header-slot="save-state">
+        {#if !narrow}<SaveStateSlot iconOnly={!xlg.current} />{/if}
+    </div>
     {#if task}
         <div class="contents" data-header-slot="mark-ready"></div>
     {/if}

@@ -151,6 +151,8 @@ export class Workspace {
         $state.raw(readLayerSections());
     /** Area on Segmentations rows and in the Selected pane; stored per browser. */
     layerArea = $state(readLayerArea());
+    /** The Layers panel's tab; a reveal switches it to Layers. This session only. */
+    layersTab: "layers" | "display" = $state("layers");
     arrange: ArrangeOrder = $state("opened");
     preset: Preset = $state.raw(getPreset(DEFAULT_PRESET_ID)!);
     page = $state(1);

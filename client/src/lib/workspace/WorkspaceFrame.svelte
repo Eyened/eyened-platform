@@ -19,6 +19,10 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     import RightPanelOpen from "carbon-icons-svelte/lib/RightPanelOpen.svelte";
     import { getContext, tick, untrack, type Snippet } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
+    import {
+        saveTracker,
+        type RevealTarget,
+    } from "$lib/saving/saveTracker.svelte";
     import { titleText, type ViewportTitle } from "./imageMeta";
     import ImagesListShell from "./ImagesListShell.svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
@@ -131,6 +135,52 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         rightChoice = open;
         writeRightOpen(open);
     }
+
+    /** Stay and the header's "couldn't save" bring the grader to the item: selected in a viewport showing its image, on its pane's Retry. */
+    async function revealItem(target: Extract<RevealTarget, { to: "layers" }>) {
+        const position = workspace.slots.findIndex(
+            (slot) => slot.imageId === target.imageId,
+        );
+        // ASSUMPTION: when no viewport shows the image, Layers opens without a selection change.
+        if (position !== -1) workspace.select(position);
+        const layers =
+            position !== -1 ? workspace.selectedViewport?.layers : undefined;
+        if (layers) {
+            const { item } = target;
+            layers.selection.select(
+                item.kind === "segmentation"
+                    ? {
+                          kind: "segmentation",
+                          item: layers.mainViewerContext.segmentationContext.getSegmentationItem(
+                              item.segmentation,
+                          ),
+                      }
+                    : item,
+            );
+        }
+        workspace.setLayerSection(target.section, true);
+        workspace.layersTab = "layers";
+        panel = "layers";
+        if (narrow) overlay = "right";
+        else setRight(true);
+        await tick();
+        // The pane's Retry; while the save still runs there is none, so the selected row's name.
+        // With no viewport on the image nothing is selected, so the Layers panel's heading.
+        (
+            document.querySelector<HTMLElement>("[data-save-retry]") ??
+            document.querySelector<HTMLElement>(
+                "[data-layers-list] [data-layer-row].selected button",
+            ) ??
+            document.getElementById(`${uid}-layers-title`)
+        )?.focus();
+    }
+    $effect(() => {
+        saveTracker.revealer = revealItem;
+        return () => {
+            if (saveTracker.revealer === revealItem)
+                saveTracker.revealer = null;
+        };
+    });
 
     /** Opening a left panel moves focus to its heading (overview §3). */
     async function focusPanel(panel: LeftPanel) {
