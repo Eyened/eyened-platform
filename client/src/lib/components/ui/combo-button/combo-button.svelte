@@ -60,10 +60,12 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
 </script>
 
 <!-- @carbon/styles 1.117.0 combo-button: the two parts 1 px apart. -->
+<!-- The invalid border is an overlay: the buttons are positioned and would paint over the wrapper's own outline. -->
 <div
     class={cn(
-        "inline-flex gap-px",
-        invalid && "outline-2 -outline-offset-2 outline-support-error",
+        "relative inline-flex gap-px",
+        invalid &&
+            "after:pointer-events-none after:absolute after:inset-0 after:border-2 after:border-support-error",
     )}
 >
     {#if label}
