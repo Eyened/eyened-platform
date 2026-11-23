@@ -92,7 +92,7 @@ The icons keep their space at rest and show on hover, on focus inside the row an
                     {/snippet}
                 </Tooltip.Trigger>
                 <!-- A tooltip can hold several lines. -->
-                <Tooltip.Content class="whitespace-pre-line"
+                <Tooltip.Content side="left" class="whitespace-pre-line"
                     >{tooltip ?? name}</Tooltip.Content
                 >
             </Tooltip.Root>
