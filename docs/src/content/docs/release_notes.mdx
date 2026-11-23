@@ -227,6 +227,18 @@ database.
   reference under Appearance; folded sections say what they hold (Tags 2, the reference, or
   None). Your own grid and pointset panes, and line panes, end with **Edit with** and the tool
   that changes them.
+- **Sets count from 1**, in the viewer header, the Task overview and the address:
+  `/tasks/<id>/set/<n>`. Old `/tasks/<id>/grade/<i>` links open the same set.
+- **The header shows whether your work is saved**, and Status with "Mark ready and next".
+  ◀ ▶ and "Mark ready and next" save first; if something couldn't save, they ask before
+  leaving, and a set left that way keeps its status. Ready is set only when everything saved.
+  The next set opens with the same viewport selected and focus on the same button.
+- **The Selected pane shows whether an item saved, with Retry**: segmentations (all B-scans
+  together), Threshold, registrations and ETDRS grids. A Layers row that couldn't save is tagged
+  "Couldn't save". Saves no longer overtake each other, and a mask saved as the tab is hidden is
+  no longer lost.
+- **A drawing error shows at the top of its viewport**, not as a toast, until you close it or
+  draw again.
 
 ## v2026.09.0
 
