@@ -179,11 +179,21 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
             document.getElementById(`${uid}-layers-title`)
         )?.focus();
     }
+    /** Comments, and the status in the narrow footer, live in Grading: show it first. */
+    async function reveal(target: Exclude<RevealTarget, { to: "focus" }>) {
+        if (target.to === "layers") return revealItem(target);
+        if (!target.footer || narrow) {
+            panel = "forms";
+            if (narrow) overlay = "right";
+            else setRight(true);
+            await tick();
+        }
+        target.focus();
+    }
     $effect(() => {
-        saveTracker.revealer = revealItem;
+        saveTracker.revealer = reveal;
         return () => {
-            if (saveTracker.revealer === revealItem)
-                saveTracker.revealer = null;
+            if (saveTracker.revealer === reveal) saveTracker.revealer = null;
         };
     });
 

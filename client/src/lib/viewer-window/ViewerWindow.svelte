@@ -10,6 +10,8 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
     import { updateSubTask } from "$lib/data/api";
+    import { updateSubTaskComments } from "$lib/data/helpers";
+    import { COMMENTS_ID } from "$lib/forms/CommentsField.svelte";
     import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
     import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import LeaveSetModal from "$lib/tasks/LeaveSetModal.svelte";
@@ -76,7 +78,11 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         ? new DebouncedSaver<SubTaskState>({
               kind: "status",
               group: "status",
-              target: { to: "focus", focus: () => focusSetControl("status") },
+              target: {
+                  to: "grading",
+                  footer: true,
+                  focus: () => focusSetControl("status"),
+              },
               delay: 0,
               send: (state) =>
                   updateSubTask(taskContext.subTask.id, { task_state: state }),
@@ -102,6 +108,22 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
               parseTaskPanelConfig(taskContext.task.task_definition.config),
           )
         : null;
+    // The comments outlive the panel's markup, so their saver lives with the page, like the status saver.
+    const commentsSaver =
+        taskContext && shows?.comments
+            ? new DebouncedSaver<string>({
+                  kind: "comments",
+                  group: "comments",
+                  target: {
+                      to: "grading",
+                      focus: () =>
+                          document.getElementById(COMMENTS_ID)?.focus(),
+                  },
+                  delay: 500,
+                  send: (text) =>
+                      updateSubTaskComments(taskContext.subTask.id, text),
+              })
+            : null;
     const task: TaskHeader | null = $derived(
         taskContext && navigation && setNavigation && shows
             ? {
@@ -198,7 +220,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         {/if}
     {/snippet}
     {#snippet forms()}
-        <FormsPanel />
+        <FormsPanel comments={commentsSaver} />
     {/snippet}
 </WorkspaceFrame>
 

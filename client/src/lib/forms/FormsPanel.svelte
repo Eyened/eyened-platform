@@ -25,7 +25,9 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
         FormAnnotationGET,
         FormSchemaGET,
     } from "../../types/openapi_types";
+    import type { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
     import AddForm from "./AddForm.svelte";
+    import CommentsField from "./CommentsField.svelte";
     import { focusAfterFormDelete } from "./focusAfterFormDelete";
     import { FormCreator } from "./formCreator.svelte";
     import FormGroups from "./FormGroups.svelte";
@@ -42,6 +44,9 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     } from "./formTargets";
     import { viewerFor } from "./formViewer";
     import { copyPayload, taskFormName } from "./taskForm";
+
+    let { comments = null }: { comments?: DebouncedSaver<string> | null } =
+        $props();
 
     const workspace = getContext<Workspace>("workspace");
     const viewerWindowContext = getContext<ViewerWindowContext>(
@@ -221,6 +226,12 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
         {@render addForm()}
     {/if}
     {#if taskContext}
+        {#if comments}
+            <CommentsField
+                saver={comments}
+                initial={taskContext.subTask.comments ?? ""}
+            />
+        {/if}
         {#if taskName && !taskSchema}
             <div class="px-4 pb-2">
                 <InlineNotification

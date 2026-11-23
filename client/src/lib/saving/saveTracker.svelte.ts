@@ -9,7 +9,8 @@ export type SaveKind =
     | "registration"
     | "ETDRS grid"
     | "segmentation"
-    | "status";
+    | "status"
+    | "comments";
 
 /** The Layers item a Retry belongs to; grid and pointset have the shape of a Layers selection. */
 export type RevealItem =
@@ -25,7 +26,9 @@ export type RevealTarget =
           imageId: string;
           item: RevealItem;
       }
-    | { to: "focus"; focus: () => void };
+    | { to: "focus"; focus: () => void }
+    /** In the Grading panel, which the frame shows first; with `footer`, only below md, where the footer holds it. */
+    | { to: "grading"; focus: () => void; footer?: boolean };
 
 export interface Saver {
     readonly kind: SaveKind;
@@ -37,7 +40,10 @@ export interface Saver {
     flush(): Promise<void>;
 }
 
-const NOUNS: Record<Exclude<SaveKind, "status">, [string, string]> = {
+const NOUNS: Record<
+    Exclude<SaveKind, "status" | "comments">,
+    [string, string]
+> = {
     form: ["form", "forms"],
     registration: ["registration", "registrations"],
     "ETDRS grid": ["ETDRS grid", "ETDRS grids"],
@@ -60,7 +66,7 @@ export class SaveTracker {
     leaving = false;
     /** Set by the workspace frame, the one place that can open Layers. */
     revealer:
-        | ((target: Extract<RevealTarget, { to: "layers" }>) => void)
+        | ((target: Exclude<RevealTarget, { to: "focus" }>) => void)
         | null = null;
     private installed = false;
 
@@ -83,6 +89,7 @@ export class SaveTracker {
         if (kinds.length > 1) return `${failed.length} items couldn't save`;
         const kind = kinds[0]!;
         if (kind === "status") return "Status couldn't save";
+        if (kind === "comments") return "Comments couldn't save";
         const [one, many] = NOUNS[kind];
         return `${failed.length} ${failed.length === 1 ? one : many} couldn't save`;
     });

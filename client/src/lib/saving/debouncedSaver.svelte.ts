@@ -1,3 +1,4 @@
+import { ApiError } from "$lib/api/client";
 import {
     saveTracker,
     type RevealTarget,
@@ -95,7 +96,11 @@ export class DebouncedSaver<T> implements Saver {
                 if (!this.sending && !this.waiting) this.settle();
             },
             (error: unknown) => {
-                console.error(`Couldn't save the ${this.kind}`, error);
+                // Only the status: an error body can echo the value, and comments and answers are clinical text.
+                console.error(
+                    `Couldn't save the ${this.kind}`,
+                    error instanceof ApiError ? error.status : "request failed",
+                );
                 this.sending = false;
                 // Retry, or the next edit, sends the newest value.
                 this.waiting ??= { value };
