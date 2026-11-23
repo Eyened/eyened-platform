@@ -115,6 +115,7 @@
                 viewerContext.zoom(width / 2, height / 2, factor);
             },
             reset: () => viewerContext.initTransform(),
+            layers: { viewerContext, mainViewerContext },
         });
     });
 

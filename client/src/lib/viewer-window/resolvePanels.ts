@@ -7,16 +7,14 @@ import PanelETDRS from "./panelETRDS/PanelETDRS.svelte";
 import PanelRegistration from "./panelRegistration/PanelRegistration.svelte";
 import PanelMeasure from "./panelMeasure/PanelMeasure.svelte";
 import PanelForm from "./panelForm/PanelForm.svelte";
-import PanelSegmentation from "./panelSegmentation/PanelSegmentation.svelte";
 import PanelQuickForm from "./panelQuickForm/PanelQuickForm.svelte";
-import { Draw, ETDRS, Form, Info, Registration } from "./icons/icons";
+import { ETDRS, Form, Info, Registration } from "./icons/icons";
 import Measure from "./icons/Measure.svelte";
 import InfoPanelHelp from "./panelHelp/InfoPanelHelp.svelte";
 import EtdrsPanelHelp from "./panelHelp/EtdrsPanelHelp.svelte";
 import RegistrationPanelHelp from "./panelHelp/RegistrationPanelHelp.svelte";
 import MeasurePanelHelp from "./panelHelp/MeasurePanelHelp.svelte";
 import FormPanelHelp from "./panelHelp/FormPanelHelp.svelte";
-import SegmentationPanelHelp from "./panelHelp/SegmentationPanelHelp.svelte";
 
 export type ResolvedPanel = {
     name: PanelName;
@@ -87,12 +85,6 @@ export function buildDefaultPanels(
             props: { active: false },
         },
         { name: "Form", component: PanelForm, Icon: Form, Help: FormPanelHelp },
-        {
-            name: "Segmentation",
-            component: PanelSegmentation,
-            Icon: Draw,
-            Help: SegmentationPanelHelp,
-        },
     );
 
     return panels;

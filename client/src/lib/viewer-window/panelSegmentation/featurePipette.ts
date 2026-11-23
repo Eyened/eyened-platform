@@ -35,11 +35,8 @@ export function getVisibleSegmentationsInPanelOrder(
     segmentationContext: SegmentationContext,
     userId: number,
 ): Segmentation[] {
-    const models = segmentationContext.modelVisible
-        ? segmentationContext.modelSegmentations
-        : [];
     const ordered = orderSegmentationsByCreator(
-        models,
+        segmentationContext.modelSegmentations,
         segmentationContext.graderSegmentations,
         userId,
     );
@@ -127,7 +124,6 @@ export function shouldHandleFeaturePipetteKey(
 ): boolean {
     if (event.code !== FEATURE_PIPETTE_KEY || event.repeat) return false;
     if (isTypingTarget(event)) return false;
-    if (!mainViewerContext.active) return false;
     return viewerContext.activePanels.has("Segmentation");
 }
 

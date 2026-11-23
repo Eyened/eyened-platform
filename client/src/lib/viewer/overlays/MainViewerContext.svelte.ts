@@ -1,5 +1,10 @@
 import { toggleInSet, type Color } from "$lib/utils";
-import { getImageUiPref, setImageUiPref } from "$lib/viewer/imageUiPrefs";
+import {
+    getImageUiPref,
+    readOpacity,
+    setImageUiPref,
+    writeOpacity,
+} from "$lib/viewer/imageUiPrefs";
 import {
     getSegmentationKey,
     SegmentationContext,
@@ -26,7 +31,6 @@ export class MainViewerContext implements Overlay {
         new SvelteSet<SegmentationItem>();
     /** Segmentation keys for which reference-masking is turned off (default: on). */
     public readonly skipMasking = new SvelteSet<string>();
-    public active = $state(false);
     public renderOutline = $state(false);
     public alpha = $state(1.0);
     public highlightedFeatureIndex = $state<number | undefined>(undefined);
@@ -49,6 +53,7 @@ export class MainViewerContext implements Overlay {
         for (const key of this.loadSkipMaskingKeys()) {
             this.skipMasking.add(key);
         }
+        this.alpha = readOpacity(instanceId);
     }
 
     isMaskingApplied(segmentation: Segmentation): boolean {
@@ -61,6 +66,11 @@ export class MainViewerContext implements Overlay {
             getSegmentationKey(segmentation.segmentation),
         );
         setImageUiPref(this.instanceId, "skipMasking", [...this.skipMasking]);
+    }
+
+    /** Saves this image's opacity; the slider calls it when a drag ends. */
+    saveOpacity(): void {
+        writeOpacity(this.instanceId, this.alpha);
     }
 
     private loadSkipMaskingKeys(): string[] {
@@ -175,9 +185,6 @@ export class MainViewerContext implements Overlay {
     }
 
     repaint(viewerContext: ViewerContext, renderTarget: RenderTarget) {
-        if (!this.active) {
-            return;
-        }
         const { index, hideOverlays } = viewerContext;
         if (hideOverlays) {
             return;

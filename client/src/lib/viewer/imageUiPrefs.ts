@@ -44,3 +44,13 @@ export function setImageUiPref(
     all[imageId] = { ...all[imageId], [key]: value };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 }
+
+/** The segmentation opacity saved for an image; 1 when none is saved or the value is bad. */
+export function readOpacity(imageId: string): number {
+    const value = getImageUiPref<unknown>(imageId, "opacity", 1);
+    return typeof value === "number" && value >= 0 && value <= 1 ? value : 1;
+}
+
+export function writeOpacity(imageId: string, value: number): void {
+    setImageUiPref(imageId, "opacity", value);
+}

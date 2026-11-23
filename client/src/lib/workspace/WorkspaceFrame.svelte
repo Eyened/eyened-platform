@@ -7,6 +7,7 @@ Below md there are no icon columns: a menu button opens the left column's conten
     import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import * as Tabs from "$lib/components/ui/tabs/index.js";
+    import LayersPanel from "$lib/layers/LayersPanel.svelte";
     import Close from "carbon-icons-svelte/lib/Close.svelte";
     import Document from "carbon-icons-svelte/lib/Document.svelte";
     import Help from "carbon-icons-svelte/lib/Help.svelte";
@@ -17,7 +18,7 @@ Below md there are no icon columns: a menu button opens the left column's conten
     import RightPanelOpen from "carbon-icons-svelte/lib/RightPanelOpen.svelte";
     import { getContext, tick, untrack, type Snippet } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
-    import type { ViewportTitle } from "./imageMeta";
+    import { titleText, type ViewportTitle } from "./imageMeta";
     import ImagesListShell from "./ImagesListShell.svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
     import Pager from "./Pager.svelte";
@@ -87,6 +88,17 @@ Below md there are no icon columns: a menu button opens the left column's conten
     const rightShown = $derived(narrow ? overlay === "right" : rightOpen);
     const overlayOpen = $derived(narrow && overlay !== null);
     const formsName = $derived(task ? "Grading" : "Forms");
+    const layersSubtitle = $derived.by(() => {
+        const position = workspace.selected;
+        const imageId = workspace.slots[position]?.imageId ?? null;
+        const title = imageId ? titleFor(imageId) : null;
+        const what = title
+            ? titleText(title)
+            : imageId || !workspace.loaded
+              ? "Loading…"
+              : "Empty";
+        return `Viewport ${position + 1} · ${what}`;
+    });
     let opener: HTMLElement | null = null;
     // The palette gets what the rail leaves after the bottom group and one gap.
     let railHeight = $state(0);
@@ -464,6 +476,10 @@ Below md there are no icon columns: a menu button opens the left column's conten
                 >
                     Layers
                 </h2>
+                <LayersPanel
+                    subtitle={layersSubtitle}
+                    shown={rightShown && (narrow || expanded.layers)}
+                />
             </section>
             <section
                 id="{uid}-forms"

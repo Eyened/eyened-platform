@@ -12,9 +12,6 @@ vi.mock("./panelRegistration/PanelRegistration.svelte", () => ({
 }));
 vi.mock("./panelMeasure/PanelMeasure.svelte", () => ({ default: {} }));
 vi.mock("./panelForm/PanelForm.svelte", () => ({ default: {} }));
-vi.mock("./panelSegmentation/PanelSegmentation.svelte", () => ({
-    default: {},
-}));
 vi.mock("./panelQuickForm/PanelQuickForm.svelte", () => ({ default: {} }));
 vi.mock("./icons/icons", () => ({
     Info: {},
@@ -22,7 +19,6 @@ vi.mock("./icons/icons", () => ({
     ETDRS: {},
     Registration: {},
     Form: {},
-    Draw: {},
 }));
 vi.mock("./icons/Measure.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/InfoPanelHelp.svelte", () => ({ default: {} }));
@@ -30,7 +26,6 @@ vi.mock("./panelHelp/EtdrsPanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/RegistrationPanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/MeasurePanelHelp.svelte", () => ({ default: {} }));
 vi.mock("./panelHelp/FormPanelHelp.svelte", () => ({ default: {} }));
-vi.mock("./panelHelp/SegmentationPanelHelp.svelte", () => ({ default: {} }));
 
 const { resolvePanels } = await import("./resolvePanels");
 
@@ -46,12 +41,7 @@ describe("resolvePanels", () => {
             baseInput,
             CLIENT_DEFAULTS,
         );
-        expect(panels.map((p) => p.name)).toEqual([
-            "Info",
-            "Measure",
-            "Form",
-            "Segmentation",
-        ]);
+        expect(panels.map((p) => p.name)).toEqual(["Info", "Measure", "Form"]);
         expect(expandedPanelNames).toEqual([]);
     });
 
@@ -84,12 +74,7 @@ describe("resolvePanels", () => {
 
     it("returns defaults immediately when taskConfig has no layout object", () => {
         const { panels, expandedPanelNames } = resolvePanels(baseInput);
-        expect(panels.map((p) => p.name)).toEqual([
-            "Info",
-            "Measure",
-            "Form",
-            "Segmentation",
-        ]);
+        expect(panels.map((p) => p.name)).toEqual(["Info", "Measure", "Form"]);
         expect(expandedPanelNames).toEqual([]);
     });
 
@@ -105,7 +90,6 @@ describe("resolvePanels", () => {
             "Registration",
             "Measure",
             "Form",
-            "Segmentation",
         ]);
     });
 
