@@ -95,7 +95,7 @@
   },
   "src/lib/newWindow.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
+      "count": 2
     }
   },
   "src/lib/openapi/enums.ts": {

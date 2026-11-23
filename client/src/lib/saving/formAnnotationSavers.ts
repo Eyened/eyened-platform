@@ -37,3 +37,12 @@ export function formAnnotationSaver(
     saver.target = target;
     return saver;
 }
+
+/** After a delete: what waits is dropped, so nothing is sent to the deleted id, and the saver leaves the header. */
+export function dropFormAnnotationSaver(id: number): void {
+    const saver = formAnnotationSavers.get(id);
+    if (!saver) return;
+    saver.discard();
+    saver.dispose();
+    formAnnotationSavers.delete(id);
+}

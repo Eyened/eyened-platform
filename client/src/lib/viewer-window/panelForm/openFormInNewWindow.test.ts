@@ -1,72 +1,72 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { formSchemas } from "$lib/data/stores.svelte";
 import { pointArming } from "$lib/forms/pointArming.svelte";
-import { openFormInNewWindow } from "./openFormInNewWindow";
 import type { FormAnnotationGET } from "../../../types/openapi_types";
-
-const close = vi.fn();
-const addEventListener = vi.fn();
+import { openForm } from "./openForm.svelte";
+import { openFormInNewWindow } from "./openFormInNewWindow";
 
 vi.mock("$lib/newWindow", () => ({
-    openNewWindow: vi.fn(() => ({ close, addEventListener })),
+    openBlankWindow: vi.fn(),
+    mountInWindow: vi.fn(),
 }));
+const { openBlankWindow, mountInWindow } = await import("$lib/newWindow");
 
-const { openNewWindow } = await import("$lib/newWindow");
+/** A window whose listeners the test fires by hand. */
+function fakeWindow() {
+    const listeners = new Map<string, () => void>();
+    const win = {
+        closed: false,
+        close: vi.fn(() => {
+            win.closed = true;
+        }),
+        addEventListener: (type: string, fn: () => void) =>
+            listeners.set(type, fn),
+        fire: (type: string) => listeners.get(type)?.(),
+    };
+    return win;
+}
 
-const form = {
-    id: 3,
-    form_schema_id: 10,
-    form_data: {},
-} as FormAnnotationGET;
+const form = (id: number) =>
+    ({ id, form_schema_id: 10, form_data: {} }) as FormAnnotationGET;
 
 describe("openFormInNewWindow", () => {
     beforeEach(() => {
         formSchemas.clear();
-        close.mockClear();
-        addEventListener.mockClear();
-        vi.mocked(openNewWindow).mockClear();
+        vi.mocked(openBlankWindow).mockReset();
+        vi.mocked(mountInWindow).mockReset();
         pointArming.session = null;
+        openForm.id = null;
     });
 
-    it("opens a titled window and disarms on unload", () => {
-        formSchemas.set(10, {
-            id: 10,
-            name: "Naevi",
-        } as never);
-
-        const win = openFormInNewWindow(form, true);
-        expect(openNewWindow).toHaveBeenCalledWith(
+    it("mounts the form under its schema's name and marks it open", () => {
+        formSchemas.set(10, { id: 10, name: "Naevi" } as never);
+        const win = fakeWindow();
+        vi.mocked(openBlankWindow).mockReturnValue(win as never);
+        openFormInNewWindow(form(3), true);
+        expect(mountInWindow).toHaveBeenCalledWith(
+            win,
             expect.anything(),
-            { form, canEdit: true, viewerContext: undefined },
+            { form: form(3), canEdit: true, viewerContext: undefined },
             "Naevi 3",
         );
-        expect(addEventListener).toHaveBeenCalledWith(
-            "beforeunload",
-            expect.any(Function),
-        );
-
-        const handler = addEventListener.mock.calls[0][1] as () => void;
-        handler();
-        expect(pointArming.session).toBeNull();
-        expect(win).toBeTruthy();
+        expect(openForm.id).toBe(3);
     });
 
-    it("closes a previous window and disarms before opening another", () => {
+    it("opening another form closes the window and its point session; a late unload leaves the newer form open", () => {
+        const a = fakeWindow();
+        const b = fakeWindow();
+        vi.mocked(openBlankWindow)
+            .mockReturnValueOnce(a as never)
+            .mockReturnValueOnce(b as never);
+        openFormInNewWindow(form(3), true);
         const persist = vi.fn();
-        pointArming.session = {
-            key: "a",
-            persist,
-        } as never;
-        openFormInNewWindow(form, false);
-        expect(close).not.toHaveBeenCalled();
-
-        openFormInNewWindow({ ...form, id: 4 } as FormAnnotationGET, false);
-        expect(close).toHaveBeenCalled();
+        pointArming.session = { key: "a", persist } as never;
+        openFormInNewWindow(form(4), true);
+        expect(a.close).toHaveBeenCalled();
         expect(persist).toHaveBeenCalled();
-        expect(openNewWindow).toHaveBeenLastCalledWith(
-            expect.anything(),
-            expect.objectContaining({ canEdit: false }),
-            "Form 4",
-        );
+        a.fire("beforeunload");
+        expect(openForm.id).toBe(4);
+        b.fire("beforeunload");
+        expect(openForm.id).toBeNull();
     });
 });
