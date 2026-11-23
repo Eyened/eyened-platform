@@ -15,8 +15,12 @@
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import ChevronLeft from "carbon-icons-svelte/lib/ChevronLeft.svelte";
     import ChevronRight from "carbon-icons-svelte/lib/ChevronRight.svelte";
-    import type { Snippet } from "svelte";
+    import { ContentSwitcher } from "$lib/components/ui/content-switcher/index.js";
+    import { getContext, type Snippet } from "svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
+    import type { ToolMode } from "./tools/registry";
+    import type { Workspace } from "./workspace.svelte";
+    import { writeToolMode } from "./workspacePrefs";
 
     // Below md the frame supplies the menu button (start) and the right-column button (end).
     let {
@@ -30,6 +34,17 @@
         start?: Snippet;
         end?: Snippet;
     } = $props();
+
+    const workspace = getContext<Workspace>("workspace");
+    const MODES = [
+        { id: "browse", text: "Browse" },
+        { id: "all", text: "All tools" },
+    ];
+
+    function setMode(id: string) {
+        workspace.toolMode = id as ToolMode;
+        writeToolMode(workspace.toolMode);
+    }
 </script>
 
 <header
@@ -45,7 +60,19 @@
     {/if}
     <!-- ASSUMPTION: reserved slots in the overview's order (plan decision 23). Patient context: 6; mode: 3. -->
     <div class="contents" data-header-slot="patient-context"></div>
-    <div class="contents" data-header-slot="mode"></div>
+    <div class="contents" data-header-slot="mode">
+        {#if !task}
+            <!-- A task is always All tools and shows no switcher. -->
+            <ContentSwitcher
+                size="sm"
+                label="Mode"
+                class="ms-2 w-fit"
+                items={MODES}
+                selectedId={workspace.toolMode}
+                onchange={setMode}
+            />
+        {/if}
+    </div>
     {#if task}
         {#if narrow}
             <!-- Below md "Set" is dropped from view to fit 320 px; ◀ ▶ still say "set". -->

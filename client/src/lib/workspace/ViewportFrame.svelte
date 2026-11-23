@@ -10,7 +10,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     import Close from "carbon-icons-svelte/lib/Close.svelte";
     import Maximize from "carbon-icons-svelte/lib/Maximize.svelte";
     import Minimize from "carbon-icons-svelte/lib/Minimize.svelte";
-    import { getContext, tick, type Snippet } from "svelte";
+    import { getContext, setContext, tick, type Snippet } from "svelte";
     import { IMAGE_MIME, SLOT_MIME } from "./dragTypes";
     import { titleText, type ViewportTitle } from "./imageMeta";
     import OverflowMenu from "./OverflowMenu.svelte";
@@ -38,6 +38,8 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     } = $props();
 
     const workspace = getContext<Workspace>("workspace");
+    // The viewer inside attaches its zoom and reset to this position.
+    setContext("viewportPosition", () => position);
     const selected = $derived(workspace.selected === position);
     const maximised = $derived(workspace.maximised === position);
     // ASSUMPTION: the selected viewport's controls follow it in Tab order (plan decision 2).

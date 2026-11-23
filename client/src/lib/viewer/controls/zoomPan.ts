@@ -91,14 +91,4 @@ export class ZoomPan implements ViewerEventListener {
                 return event.deltaY;
         }
     }
-
-    /**
-     * Handles keyboard events for resetting view
-     */
-    keydown(e: ViewerEvent<KeyboardEvent>): void {
-        const { viewerContext, event } = e;
-        if (event.code === "Escape") {
-            viewerContext.initTransform();
-        }
-    }
 }

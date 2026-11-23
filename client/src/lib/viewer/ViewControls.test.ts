@@ -146,7 +146,7 @@ describe("ViewControls", () => {
         });
         await fireEvent.keyDown(trigger, { key: "Enter" });
         const options = await screen.findAllByRole("option");
-        expect(options[0]).toHaveTextContent("Original R");
+        expect(options[0]).toHaveTextContent("Original 1");
         const sharpened = options.find((o) =>
             o.textContent?.includes("Sharpened"),
         )!;

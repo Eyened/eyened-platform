@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mockWidth } from "./testUtils";
 import {
     readStripLocalizer,
+    readToolMode,
     readStripTracking,
     startStripOn,
     writeStripOn,
@@ -28,5 +29,15 @@ describe("strip settings", () => {
         expect(readStripLocalizer()).toBe("all");
         localStorage.setItem("eyened:viewer:stripLocalizer", "lines");
         expect(readStripLocalizer()).toBe("all");
+    });
+});
+
+describe("tool mode", () => {
+    it("starts in Browse and ignores a stored value it does not know", () => {
+        expect(readToolMode()).toBe("browse");
+        localStorage.setItem("eyened:viewer:toolMode", "segment");
+        expect(readToolMode()).toBe("browse");
+        localStorage.setItem("eyened:viewer:toolMode", "all");
+        expect(readToolMode()).toBe("all");
     });
 });

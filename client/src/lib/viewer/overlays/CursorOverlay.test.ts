@@ -34,6 +34,15 @@ describe("CursorOverlay", () => {
         expect(strokes(viewer, 70)).toBe(0);
     });
 
+    it("draws the crosshair under the pointer only while Cross-hair is armed", () => {
+        const workspace = new Workspace();
+        const viewer = viewerOf("grey", { workspace });
+        viewer.active = true;
+        expect(strokes(viewer, 0)).toBe(0);
+        workspace.arm("crosshair");
+        expect(strokes(viewer, 0)).toBe(1);
+    });
+
     it("draws none on a strip tile while Crosshair tracking is off", () => {
         const workspace = new Workspace();
         const tile = viewerOf("grey", { workspace, tile: true });

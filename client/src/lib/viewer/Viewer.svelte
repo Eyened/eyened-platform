@@ -84,6 +84,11 @@
         y: 0,
     };
 
+    // A press that closes an open popover, dropdown list or ⋯ list only closes it.
+    const OPEN_FLOATING =
+        '[data-slot="popover-content"], [data-slot="select-content"], [data-slot="overflow-menu"]:not([hidden])';
+    let dismissing = false;
+
     let pointerDown = false;
     let modifierState: ViewerModifiers = {
         shift: false,
@@ -177,6 +182,8 @@
     }
 
     function onpointerdown(e: PointerEvent) {
+        dismissing = !!document.querySelector(OPEN_FLOATING);
+        if (dismissing) return;
         // Capture the pointer to ensure we get all events even if the pointer moves outside the viewer until the pointer is released
         viewerElement.setPointerCapture(e.pointerId);
         pointerDown = true;
@@ -184,6 +191,10 @@
     }
 
     function onpointerup(e: PointerEvent) {
+        if (dismissing) {
+            dismissing = false;
+            return;
+        }
         // Release the pointer
         viewerElement.releasePointerCapture(e.pointerId);
         pointerDown = false;
@@ -222,6 +233,8 @@
 
     function onblur() {
         resetModifierState();
+        // The H keyup never arrives once focus has left, so end the hold here.
+        viewerContext.hideOverlays = false;
     }
 </script>
 

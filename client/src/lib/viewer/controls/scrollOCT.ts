@@ -10,14 +10,10 @@ export class ScrollOCT implements ViewerEventListener {
         const { event, viewerContext } = e;
         const { lockScroll, image, index } = viewerContext;
         if (lockScroll || viewerContext.sliceLocked) return;
-        if (event.code === "ArrowUp") {
-            const i = (index - 1 + image.depth) % image.depth;
-            viewerContext.setIndex(i);
-        }
-        if (event.code === "ArrowDown") {
-            const i = (index + 1) % image.depth;
-            viewerContext.setIndex(i);
-        }
+        if (event.code === "ArrowUp" && index > 0)
+            viewerContext.setIndex(index - 1);
+        if (event.code === "ArrowDown" && index < image.depth - 1)
+            viewerContext.setIndex(index + 1);
     }
 
     wheel(e: ViewerEvent<WheelEvent>) {

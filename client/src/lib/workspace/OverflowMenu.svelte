@@ -1,6 +1,6 @@
 <!--
 @component
-A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab order. Esc or an item closes it and returns focus to the button.
+A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab order. Esc or an item closes it and returns focus to the button. The palette's ⋯ More tools passes the armed tool's icon when one of its tools is armed.
 -->
 <script lang="ts">
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
@@ -11,18 +11,39 @@ A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab orde
         label,
         size = "icon",
         tabindex,
+        icon,
+        side = "bottom",
+        active = false,
+        stop,
         children,
     }: {
         label: string;
         size?: "icon" | "icon-xs";
         tabindex?: number;
+        /** Replaces the ⋯ icon. */
+        icon?: Snippet;
+        /** "end" opens the list beside the button, for the palette. */
+        side?: "bottom" | "end";
+        /** Shows the button selected, as for an armed tool. */
+        active?: boolean;
+        /** The palette's roving-focus key. */
+        stop?: string;
         children: Snippet<[close: () => void]>;
     } = $props();
 
-    // ASSUMPTION: a disclosure, not Carbon's overflow menu, since it holds one item (plan decision 11).
+    // ASSUMPTION: a disclosure, not Carbon's overflow menu, since its list is a few plain buttons.
     const uid = $props.id();
     let open = $state(false);
     let root: HTMLElement | undefined = $state();
+    let listStyle = $state("");
+
+    // A list beside the button is fixed at its right edge so a scrolling rail cannot clip it.
+    function toggle() {
+        const rect = root?.getBoundingClientRect();
+        if (!open && side === "end" && rect)
+            listStyle = `left: ${rect.right}px; top: ${rect.top}px`;
+        open = !open;
+    }
 
     /** Hides the list and returns focus to the ⋯ button. */
     function close() {
@@ -43,20 +64,32 @@ A ⋯ disclosure: the button shows or hides a short list of buttons, in Tab orde
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<span bind:this={root} class="relative inline-flex" {onfocusout} {onkeydown}>
+<span
+    bind:this={root}
+    class="relative inline-flex"
+    data-stop={stop}
+    {onfocusout}
+    {onkeydown}
+>
     <IconButton
         {label}
         {size}
         {tabindex}
+        class={active ? "bg-background-selected" : undefined}
         aria-expanded={open}
         aria-controls="{uid}-menu"
-        onclick={() => (open = !open)}
+        onclick={toggle}
     >
-        <OverflowMenuHorizontal />
+        {#if icon}{@render icon()}{:else}<OverflowMenuHorizontal />{/if}
     </IconButton>
     <div
         id="{uid}-menu"
-        class="absolute end-0 top-full z-50 flex min-w-max flex-col bg-layer-01 shadow-popover"
+        data-slot="overflow-menu"
+        class="z-50 flex min-w-max flex-col bg-layer-01 shadow-popover {side ===
+        'end'
+            ? 'fixed'
+            : 'absolute end-0 top-full'}"
+        style={side === "end" ? listStyle : undefined}
         hidden={!open}
     >
         {@render children(close)}
