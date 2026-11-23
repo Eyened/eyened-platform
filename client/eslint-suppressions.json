@@ -29,7 +29,7 @@
   },
   "src/lib/data-loading/imageLoader.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 7
+      "count": 5
     }
   },
   "src/lib/data-loading/utils.ts": {
@@ -326,11 +326,6 @@
   "src/routes/view/+page.svelte": {
     "svelte/prefer-svelte-reactivity": {
       "count": 1
-    }
-  },
-  "src/types/cornerstone-core.d.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 6
     }
   }
 }

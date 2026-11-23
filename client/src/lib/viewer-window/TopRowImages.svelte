@@ -33,16 +33,24 @@
 {:else}
     <div id="images">
         {#each viewerWindowContext.instanceIds as instanceId}
-            {#await viewerWindowContext.getImages(instanceId)}
+            {@const load = viewerWindowContext.imageLoads.get(instanceId)}
+            {#if load}
+                {#await load.promise}
+                    <div class="itemLoading">
+                        <div>{load.message} {instanceId}</div>
+                        <Spinner />
+                    </div>
+                {:then images}
+                    {#each images as image (image.image_id)}
+                        <TopViewer {image} />
+                    {/each}
+                {/await}
+            {:else}
                 <div class="itemLoading">
-                    <div>Loading {instanceId}</div>
+                    <div>Loading… {instanceId}</div>
                     <Spinner />
                 </div>
-            {:then images}
-                {#each images as image (image.image_id)}
-                    <TopViewer {image} />
-                {/each}
-            {/await}
+            {/if}
         {/each}
     </div>
     {#if taskContext}
