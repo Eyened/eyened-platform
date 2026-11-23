@@ -5,16 +5,27 @@
 import type { TaskContext } from "./TaskContext.svelte";
 
 /**
- * Navigates to a specific subtask index, preserving search params but removing
- * "annotation" and "instances" parameters.
+ * Opens another set of the task with a full page load. Only the `layout` and `arrange` params carry over.
  *
  * @param index - The subtask index to navigate to
  */
 export function navigateSubtaskIndex(index: number): void {
-    const currentUrl = window.location.href;
-    const lastSlashIndex = currentUrl.lastIndexOf("/");
-    const newUrl = currentUrl.substring(0, lastSlashIndex + 1) + index;
-    window.location.href = newUrl;
+    const { pathname, search } = window.location;
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- read once, never reactive state
+    const params = new URLSearchParams(search);
+    // ASSUMPTION: v= and page= name the last set's images, so only the grader's layout and order carry over (plan decision 26).
+    const query = ["layout", "arrange"]
+        .flatMap((key) => {
+            const value = params.get(key);
+            return value === null
+                ? []
+                : [`${key}=${encodeURIComponent(value)}`];
+        })
+        .join("&");
+    window.location.href =
+        pathname.substring(0, pathname.lastIndexOf("/") + 1) +
+        index +
+        (query ? `?${query}` : "");
 }
 
 export class TaskNavigation {

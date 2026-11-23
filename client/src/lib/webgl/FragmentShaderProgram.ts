@@ -93,7 +93,8 @@ export class BaseTextureShaderProgram extends FragmentShaderProgram {
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
         gl.viewport(left, bottom, width, height);
-        gl.scissor(left, bottom, width, height);
+        const scissor = renderTarget.scissor ?? { left, bottom, width, height };
+        gl.scissor(scissor.left, scissor.bottom, scissor.width, scissor.height);
 
         if (renderTarget.attachments) {
             gl.drawBuffers(renderTarget.attachments);
@@ -178,7 +179,8 @@ export class PixelShaderProgram extends FragmentShaderProgram {
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget.framebuffer);
         gl.viewport(left, bottom, width, height);
-        gl.scissor(left, bottom, width, height);
+        const scissor = renderTarget.scissor ?? { left, bottom, width, height };
+        gl.scissor(scissor.left, scissor.bottom, scissor.width, scissor.height);
 
         if (renderTarget.attachments) {
             gl.drawBuffers(renderTarget.attachments);

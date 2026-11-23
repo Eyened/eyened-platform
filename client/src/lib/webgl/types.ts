@@ -21,4 +21,6 @@ export interface RenderTarget {
     height: number;
     framebuffer: WebGLFramebuffer | null;
     attachments?: number[];
+    /** Scissor box when it is smaller than the viewport, e.g. a strip tile scrolled half out of view. */
+    scissor?: RenderBounds;
 }

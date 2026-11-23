@@ -29,8 +29,11 @@
     <Tooltip.Root disableCloseOnTriggerClick={!closeOnClick}>
         <Tooltip.Trigger>
             {#snippet child({ props })}
+                <!-- Set after the spread: the trigger's tabindex 0 would otherwise replace a passed tabindex. -->
                 <Button
                     {...mergeProps(restProps, props) as ButtonProps}
+                    tabindex={restProps.tabindex ??
+                        (props.tabindex as number | undefined)}
                     variant="ghost"
                     {size}
                     aria-label={label}

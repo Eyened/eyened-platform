@@ -65,3 +65,5 @@ To pick up an item: open an issue for it and delete the item and its row here in
 | Let favourites sort the Tagger, or drop stars from the API | [frontend](frontend.md) | open |
 | Add column names to external data sources | [frontend](frontend.md) | open |
 | Show the filter count and Clear filters on the Library type filter | [frontend](frontend.md) | open |
+| Match Carbon on Pagination's end buttons, or record the deviation | [frontend](frontend.md) | open |
+| Open the viewer workspace before every image has loaded | [frontend](frontend.md) | open |

@@ -7,6 +7,8 @@ export type QuickFormPanelConfig = {
 export type ClientConfigLayout = {
     hide: string[];
     prepend: QuickFormPanelConfig[];
+    /** The thumbnail strip above the viewport grid; on when missing. */
+    strip: boolean;
 };
 
 /** Viewer point-tool marker appearance (Form / Registration; ETDRS hardcodes its own). */
@@ -28,7 +30,7 @@ export type ClientConfig = {
 
 export const CLIENT_DEFAULTS: ClientConfig = {
     update_subtask_image_links: false,
-    layout: { hide: [], prepend: [] },
+    layout: { hide: [], prepend: [], strip: true },
     point_marker: {
         style: "cross",
         radius: 12,
@@ -63,6 +65,7 @@ export function mergeClientConfig(
             layout: {
                 hide: [...defaults.layout.hide],
                 prepend: [...defaults.layout.prepend],
+                strip: defaults.layout.strip,
             },
             point_marker: { ...defaults.point_marker },
         };
@@ -73,6 +76,7 @@ export function mergeClientConfig(
         layout: {
             hide: [...defaults.layout.hide],
             prepend: [...defaults.layout.prepend],
+            strip: defaults.layout.strip,
         },
         point_marker: { ...defaults.point_marker },
     };
@@ -93,6 +97,9 @@ export function mergeClientConfig(
         }
         if (Array.isArray(layout.prepend)) {
             next.layout.prepend = layout.prepend.filter(isQuickFormPanel);
+        }
+        if (typeof layout.strip === "boolean") {
+            next.layout.strip = layout.strip;
         }
     }
 
