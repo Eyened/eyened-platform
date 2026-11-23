@@ -51,6 +51,12 @@ export type PointToolOptions = {
     slotKeys?: readonly { index: number; key: string }[];
     enumExtras?: readonly PointEnumExtra[];
     /**
+     * Viewer-pixel movement before a press on an existing point becomes a drag.
+     * A shorter move stays a click and can cycle a grade. Default 4.
+     * Registration passes 0 so a short move still drags.
+     */
+    dragThresholdPx?: number;
+    /**
      * Fired after every local mutation of `points` (including drag moves).
      * Use for in-memory / UI sync. Prefer `onPersist` for server writes.
      */
@@ -82,6 +88,15 @@ export class PointTool implements Overlay {
     private hoverPointIndex: number | undefined;
     /** Press started on an existing point (not a placement). Click cycles its grade. */
     private pressedExisting = false;
+    /**
+     * Image position of the point and the cursor when the drag started.
+     * Later moves add the cursor delta to that point, so a grab away from
+     * the marker centre does not jump.
+     */
+    private dragAnchor:
+        | { cursorX: number; cursorY: number; x: number; y: number }
+        | undefined;
+    /** Viewer position where the press on an existing point started. */
     private pressOrigin: Position2D | undefined;
     private dragged = false;
 
@@ -102,6 +117,7 @@ export class PointTool implements Overlay {
     private readonly enumExtras: readonly PointEnumExtra[];
     private readonly onChange: ((points: PointList) => void) | undefined;
     private readonly onPersist: ((points: PointList) => void) | undefined;
+    private readonly dragThresholdPx: number;
     /** True while a place/drag gesture may need a persist on pointerup. */
     private persistOnRelease = false;
 
@@ -119,6 +135,8 @@ export class PointTool implements Overlay {
         this.enumExtras = options.enumExtras ?? [];
         this.onChange = options.onChange;
         this.onPersist = options.onPersist;
+        this.dragThresholdPx =
+            options.dragThresholdPx ?? CLICK_DRAG_THRESHOLD_PX;
     }
 
     destroy() {}
@@ -181,7 +199,15 @@ export class PointTool implements Overlay {
 
         this.setPoints(after);
         this.pressedExisting = false;
-        this.pressOrigin = undefined;
+        const placed = after[newIndex];
+        this.dragAnchor = placed
+            ? {
+                  cursorX: position.x,
+                  cursorY: position.y,
+                  x: placed.x,
+                  y: placed.y,
+              }
+            : undefined;
         this.persistOnRelease = true;
         // Restricted mode (ETDRS): keep sticking to the placement index.
         // Unrestricted (Registration): leave placementIndex undefined so the
@@ -235,6 +261,8 @@ export class PointTool implements Overlay {
     private endDrag(viewerContext: ViewerContext, cursor: Position2D) {
         const wasDragging = this.activePointIndex !== undefined;
         this.activePointIndex = undefined;
+        this.dragAnchor = undefined;
+        this.pressOrigin = undefined;
         this.hoverPointIndex = this.findHit(cursor, viewerContext);
         if (wasDragging) viewerContext.resetCursor();
         if (this.persistOnRelease) {
@@ -308,14 +336,21 @@ export class PointTool implements Overlay {
         if (!this.pressOrigin) return false;
         const dx = cursor.x - this.pressOrigin.x;
         const dy = cursor.y - this.pressOrigin.y;
-        return dx * dx + dy * dy > CLICK_DRAG_THRESHOLD_PX ** 2;
+        return dx * dx + dy * dy > this.dragThresholdPx ** 2;
     }
 
     private applyDrag(viewerContext: ViewerContext, cursor: Position2D) {
-        if (this.activePointIndex === undefined) return;
-        const position = viewerContext.viewerToImageCoordinates(cursor);
+        const anchor = this.dragAnchor;
+        if (this.activePointIndex === undefined || !anchor) return;
+        const image = viewerContext.viewerToImageCoordinates(cursor);
+        const dx = image.x - anchor.cursorX;
+        const dy = image.y - anchor.cursorY;
+        if (dx === 0 && dy === 0) return;
         this.setPoints(
-            movePointAt(this.points, this.activePointIndex, position),
+            movePointAt(this.points, this.activePointIndex, {
+                x: anchor.x + dx,
+                y: anchor.y + dy,
+            }),
         );
         this.persistOnRelease = true;
         this.dragged = true;
@@ -346,6 +381,16 @@ export class PointTool implements Overlay {
                     this.placementIndex = hit;
                 }
                 this.pressOrigin = { x: cursor.x, y: cursor.y };
+                const point = this.points[hit];
+                const image = viewerContext.viewerToImageCoordinates(cursor);
+                this.dragAnchor = point
+                    ? {
+                          cursorX: image.x,
+                          cursorY: image.y,
+                          x: point.x,
+                          y: point.y,
+                      }
+                    : undefined;
                 this.pressedExisting = true;
                 this.dragged = false;
                 this.persistOnRelease = true;
@@ -380,15 +425,13 @@ export class PointTool implements Overlay {
             !this.dragged &&
             this.activePointIndex !== undefined
         ) {
-            if (!this.pointerMoved(cursor)) {
-                this.cycleGradeAt(this.activePointIndex);
-            } else {
+            if (this.pointerMoved(cursor)) {
                 this.applyDrag(viewerContext, cursor);
             }
+            if (!this.dragged) this.cycleGradeAt(this.activePointIndex);
         }
 
         this.pressedExisting = false;
-        this.pressOrigin = undefined;
         this.endDrag(viewerContext, cursor);
     }
 

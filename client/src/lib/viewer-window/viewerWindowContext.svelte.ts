@@ -14,12 +14,16 @@ import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { Image3D } from "$lib/webgl/image3D";
 import type { WebGL } from "$lib/webgl/webgl";
-import { SvelteMap } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { ImageGET } from "../../types/openapi_types";
 import MainViewer from "./MainViewer.svelte";
 import { EnfaceProjectionManager } from "./enfaceProjectionManager.svelte";
 import type { ViewerViewStateController } from "./viewerViewState";
 import { instanceIdFromImageId } from "./viewerViewState";
+import type {
+    RegistrationEditorSession,
+    SeriesBlendSession,
+} from "./panelRegistration/registrationSession";
 
 export type MainPanelType = {
     component: any;
@@ -31,6 +35,11 @@ export class ViewerWindowContext {
     private bySOPInstanceUID = new Map<string, LoadedImages>();
 
     private viewers = new Set<ViewerContext>();
+    /** Paint these instead of `viewers` while the editor or series blend is open. */
+    private foregroundViewers = new SvelteSet<ViewerContext>();
+
+    public registrationEditor: RegistrationEditorSession | null = $state(null);
+    public seriesBlend: SeriesBlendSession | null = $state(null);
 
     public instanceIds: string[] = $state([]);
 
@@ -95,13 +104,35 @@ export class ViewerWindowContext {
             });
     }
 
-    addViewer(viewer: ViewerContext) {
-        this.viewers.add(viewer);
-        return () => this.viewers.delete(viewer);
+    addViewer(viewer: ViewerContext, foreground = false) {
+        const viewers = foreground ? this.foregroundViewers : this.viewers;
+        viewers.add(viewer);
+        return () => {
+            viewers.delete(viewer);
+        };
+    }
+
+    openRegistrationEditor(session: RegistrationEditorSession) {
+        this.seriesBlend = null;
+        this.registrationEditor = session;
+    }
+
+    closeRegistrationEditor() {
+        this.registrationEditor = null;
+    }
+
+    openSeriesBlend(session: SeriesBlendSession) {
+        this.registrationEditor = null;
+        this.seriesBlend = session;
+    }
+
+    closeSeriesBlend() {
+        this.seriesBlend = null;
     }
 
     removeViewer(viewer: ViewerContext) {
         this.viewers.delete(viewer);
+        this.foregroundViewers.delete(viewer);
     }
 
     repaint() {
@@ -111,7 +142,11 @@ export class ViewerWindowContext {
             width: this.webgl.canvas.width,
             height: this.webgl.canvas.height,
         });
-        this.viewers.forEach((viewer) => viewer.repaint());
+        const paint =
+            this.registrationEditor || this.seriesBlend
+                ? this.foregroundViewers
+                : this.viewers;
+        for (const viewer of paint) viewer.repaint();
     }
 
     async setInstanceIDs(ids: string[]) {
@@ -195,6 +230,7 @@ export class ViewerWindowContext {
         // Clear all maps and sets
         this.topViewers.clear();
         this.viewers.clear();
+        this.foregroundViewers.clear();
         this.imagesIndex.clear();
         this.bySOPInstanceUID.clear();
         this.photoLocators.clear();
@@ -367,7 +403,7 @@ export class ViewerWindowContext {
             if (!image) continue;
             const existing = prev.find((v) => v.id === image.image_id);
             if (image.is3D && image.depth > 1) {
-                const live = [...this.viewers].find(
+                const live = [...this.viewers, ...this.foregroundViewers].find(
                     (vc) => vc.image.image_id === image.image_id,
                 );
                 const index = live?.index ?? existing?.index;

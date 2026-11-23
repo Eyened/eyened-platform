@@ -6382,6 +6382,83 @@
           }
         }
       }
+    },
+    "/admin/users/{user_id}/email-link": {
+      "put": {
+        "summary": "Link User Email",
+        "description": "Link an email address; the first SSO login with it lands in this account.",
+        "operationId": "link_user_email_admin_users__user_id__email_link_put",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "jwt_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Jwt Token"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkEmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8629,6 +8706,21 @@
         ],
         "title": "Laterality"
       },
+      "LinkEmailRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "LinkEmailRequest",
+        "description": "The email address the account's first SSO login will match."
+      },
       "MemberGrantResponse": {
         "properties": {
           "project_id": {
@@ -10809,6 +10901,11 @@
             "type": "boolean",
             "title": "Api Client",
             "default": false
+          },
+          "remember_me": {
+            "type": "boolean",
+            "title": "Remember Me",
+            "default": true
           }
         },
         "type": "object",

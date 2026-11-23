@@ -38,6 +38,7 @@ export default defineConfig({
                     label: 'Guides',
                     items: [
                         { slug: 'guides/authentication' },
+                        { slug: 'guides/switching_to_sso' },
                         { slug: 'guides/access_control' },
                         { slug: 'guides/upgrading_to_v2026_09_0' },
                     ],

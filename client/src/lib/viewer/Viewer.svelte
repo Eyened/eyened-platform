@@ -13,8 +13,10 @@
 
     export interface Props {
         showInfo?: boolean;
+        /** Paint only while the registration editor or series blend is open. */
+        foreground?: boolean;
     }
-    let { showInfo = true }: Props = $props();
+    let { showInfo = true, foreground = false }: Props = $props();
 
     const viewerContext = getContext<ViewerContext>("viewerContext");
     const viewerWindowContext = getContext<ViewerWindowContext>(
@@ -23,7 +25,7 @@
 
     // add viewer to viewerWindowContext
     // this registers the viewerContext for repaint callbacks
-    onDestroy(viewerWindowContext.addViewer(viewerContext));
+    onDestroy(viewerWindowContext.addViewer(viewerContext, foreground));
 
     let viewerElement: HTMLDivElement;
 
