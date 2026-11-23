@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ImageGET } from "../../types/openapi_types";
 import { createVolumeImage } from "./createVolumeImage";
 import { Image3D } from "./image3D";
@@ -106,5 +106,25 @@ describe("OCTA flow volumes", () => {
         );
         expect(image).toBeInstanceOf(Image3D);
         expect(image.hasFlow).toBe(false);
+    });
+
+    it("does not upload a flow texture after dispose", () => {
+        const gl = fakeGl(64);
+        const createTexture = vi.fn(() => ({}));
+        gl.createTexture = createTexture;
+        const data = new Uint8Array(8);
+        const image = new Image3D(
+            instance,
+            { gl } as WebGL,
+            "oct",
+            data,
+            dimensions(2),
+            {},
+        );
+        createTexture.mockClear();
+        image.dispose();
+        image.attachFlow(data);
+        expect(createTexture).not.toHaveBeenCalled();
+        expect(image.flowAbort.signal.aborted).toBe(true);
     });
 });

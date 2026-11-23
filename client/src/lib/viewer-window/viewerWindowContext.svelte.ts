@@ -275,6 +275,13 @@ export class ViewerWindowContext {
                 this.imageLoader
                     .load(instance, progress)
                     .then((loadedImages) => {
+                        if (this.destroyed) {
+                            for (const image of loadedImages) {
+                                image.dispose();
+                            }
+                            return loadedImages;
+                        }
+
                         for (const image of loadedImages) {
                             this.importPhotoLocators(image);
                         }

@@ -70,6 +70,34 @@ describe("ViewerWindowContext registration editor paint", () => {
         expect(ctx.seriesBlend).toBeNull();
     });
 
+    it("disposes images that resolve after the viewer is closed", async () => {
+        let resolveLoad: (images: { dispose: () => void }[]) => void = () => {};
+        const pending = new Promise<{ dispose: () => void }[]>((resolve) => {
+            resolveLoad = resolve;
+        });
+        const flowAbort = new AbortController();
+        const image = {
+            image_id: "oct",
+            is3D: true,
+            dispose: vi.fn(() => flowAbort.abort()),
+            flowAbort,
+        };
+        ctx = createContext();
+        vi.spyOn(ctx.imageLoader, "load").mockReturnValue(pending as never);
+
+        const load = ctx.ensureImageLoad({
+            id: "instance",
+            sop_instance_uid: "1.2.3",
+        } as never);
+        ctx.destroy();
+        resolveLoad([image]);
+        await load.promise;
+
+        expect(image.dispose).toHaveBeenCalledOnce();
+        expect(flowAbort.signal.aborted).toBe(true);
+        expect(ctx.topViewers.size).toBe(0);
+    });
+
     it("keeps a window viewer out of the paint list while foreground is active", () => {
         const late = { repaint: vi.fn() };
         const foreground = { repaint: vi.fn() };
