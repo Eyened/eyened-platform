@@ -116,6 +116,7 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
         <li
             class="tile"
+            class:highlighted={workspace.highlightedImages.includes(imageId)}
             onclick={() => workspace.load(workspace.selected, imageId)}
         >
             <button
@@ -188,6 +189,10 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
         flex-direction: column;
         width: 132px;
         box-shadow: 0 0 0 1px var(--color-border-subtle-01);
+    }
+    .tile.highlighted {
+        outline: 2px dashed var(--color-border-interactive);
+        outline-offset: -2px;
     }
     .tile-title {
         display: flex;

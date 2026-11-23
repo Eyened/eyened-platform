@@ -17,6 +17,8 @@ The icons keep their space at rest and show on hover, on focus inside the row an
         selected = false,
         depth = 1,
         visible = false,
+        current = false,
+        pressed = true,
         onselect,
         swatch,
         tags,
@@ -33,6 +35,10 @@ The icons keep their space at rest and show on hover, on focus inside the row an
         /** 1 under a type, 2 under a group. Lines under the row can start at `ps-(--row-indent)`. */
         depth?: 1 | 2;
         visible?: boolean;
+        /** Holds the selected viewport's image: aria-current on the name. */
+        current?: boolean;
+        /** False where the bar isn't a toggle, so the name isn't read as pressed. */
+        pressed?: boolean;
         onselect?: () => void;
         swatch?: Snippet;
         tags?: Snippet;
@@ -71,7 +77,9 @@ The icons keep their space at rest and show on hover, on focus inside the row an
                                 type="button"
                                 class="min-h-6 min-w-0 flex-1 truncate px-1 text-start text-body-compact-01 text-text-primary hover:bg-layer-hover-01 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
                                 aria-label={nameLabel}
-                                aria-pressed={selected}>{name}</button
+                                aria-pressed={pressed ? selected : undefined}
+                                aria-current={current ? "true" : undefined}
+                                >{name}</button
                             >
                         {:else}
                             <!-- A definition-tooltip trigger: it takes focus so keyboard users can read a cut-off name, and does nothing else. -->
@@ -83,7 +91,10 @@ The icons keep their space at rest and show on hover, on focus inside the row an
                         {/if}
                     {/snippet}
                 </Tooltip.Trigger>
-                <Tooltip.Content>{tooltip ?? name}</Tooltip.Content>
+                <!-- A tooltip can hold several lines. -->
+                <Tooltip.Content class="whitespace-pre-line"
+                    >{tooltip ?? name}</Tooltip.Content
+                >
             </Tooltip.Root>
         </Tooltip.Provider>
         {@render tags?.()}

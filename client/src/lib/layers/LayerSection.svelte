@@ -1,6 +1,6 @@
 <!--
 @component
-A Layers section (level 3) or a group inside one (level 4): a 24 px disclosure button with a count (left out for settings sections), an optional action on the trailing edge, and the body while open.
+A Layers section (level 3) or a group inside one (level 4): a 24 px disclosure button with a count or a short text (left out for settings sections), an optional action on the trailing edge, and the body while open.
 A layer type or group (one with a count) draws a guide line down its open body under its chevron. With a count of 0 it shows `empty` as one hint line there. A closed body is not rendered, so its controls leave the Tab order.
 -->
 <script lang="ts">
@@ -18,7 +18,7 @@ A layer type or group (one with a count) draws a guide line down its open body u
         children,
     }: {
         title: string;
-        count?: number;
+        count?: number | string;
         open: boolean;
         ontoggle: () => void;
         level?: 3 | 4;
