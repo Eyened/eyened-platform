@@ -123,11 +123,11 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         overlay = "right";
         opener = byControls(`${uid}-right-panels`);
         await tick();
-        document
-            .querySelector<HTMLElement>(
+        (
+            document.querySelector<HTMLElement>(
                 '[data-set-footer] [data-set-control="primary"]',
-            )
-            ?.focus();
+            ) ?? document.getElementById(`${uid}-forms-title`)
+        )?.focus();
     }
     const layersSubtitle = $derived.by(() => {
         const position = workspace.selected;

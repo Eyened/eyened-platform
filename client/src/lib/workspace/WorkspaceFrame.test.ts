@@ -480,4 +480,14 @@ describe("below md, the Grading footer", () => {
             ),
         );
     });
+
+    it("arriving with no footer button focuses the Grading heading", async () => {
+        mockWidth({ md: false, xlg: false });
+        renderFrame(workspaceWith(1), taskHeader(), { startOnGrading: true });
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getByRole("heading", { name: "Grading" }),
+            ),
+        );
+    });
 });

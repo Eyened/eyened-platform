@@ -1,6 +1,6 @@
 <!--
 @component
-The set's move and its "Set status" menu as one combo button, in the header (and the narrow footer later).
+The set's move and its "Set status" menu as one combo button, in the header and, below md, in Grading's footer.
 Ready is picked only once everything else saved; a pick that can't save shows on the button and nothing stays queued.
 -->
 <script lang="ts">
@@ -79,7 +79,6 @@ Ready is picked only once everything else saved; a pick that can't save shows on
     });
     const pending = $derived(navigation.pending === "primary");
 
-    // aria-disabled keeps focus on the button while it is pending.
     const stacked = $derived(layout === "stacked");
 
     function go() {
@@ -123,7 +122,7 @@ Ready is picked only once everything else saved; a pick that can't save shows on
                 : ""}</span
         >
     {:else if main}
-        <!-- Status off: only "Go to next set", tertiary, no menu. -->
+        <!-- Status off: only "Go to next set", tertiary, no menu. aria-disabled keeps focus on the button while it is pending. -->
         <Button
             variant="outline"
             size="sm"
