@@ -49,6 +49,8 @@ export class SegmentationState {
 
     private isDrawing = Promise.resolve();
     private hasInitialCheckpoint = false;
+    /** The mask as it was at dispose, for a save that goes out after the mask is gone. */
+    private finalData?: DrawingArray;
     /** Sends the mask 2 s after the last change; the mask is exported when it is sent. */
     public readonly saver: DebouncedSaver<void>;
     public isEmptyForSlice = $state(false);
@@ -208,7 +210,7 @@ export class SegmentationState {
     }
 
     private async send(): Promise<void> {
-        const data = this.mask.exportData();
+        const data = this.finalData ?? this.mask.exportData();
         const { planeHeight, planeWidth } = this.mask;
         const expectedLen = planeHeight * planeWidth;
         if (data.length !== expectedLen && data.length !== expectedLen * 4) {
@@ -237,7 +239,8 @@ export class SegmentationState {
     }
 
     dispose() {
-        // The saver exports the mask as it sends, before the mask goes.
+        // A save still waiting behind one in flight goes out after the mask is gone, so it sends this copy.
+        this.finalData = this.mask.exportData();
         this.saver.dispose();
         this.mask.dispose();
         this.history.clear();
