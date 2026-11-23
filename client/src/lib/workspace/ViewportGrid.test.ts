@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { formWindow } from "$lib/forms/formWindow.svelte";
 import { IMAGE_MIME, SLOT_MIME } from "./dragTypes";
 import {
     expectNoAxeViolations,
@@ -29,6 +30,24 @@ function renderGrid(ws: Workspace) {
 }
 
 describe("ViewportGrid", () => {
+    describe("with a form in the window", () => {
+        afterEach(() => {
+            formWindow.imageIds = [];
+            formWindow.label = "";
+        });
+
+        it("puts the form window's chip only on the viewports of the open form's target", () => {
+            formWindow.imageIds = ["img01", "img03"];
+            formWindow.label = "Image quality grading #9188";
+            renderGrid(workspaceWith(3, { layout: "2x2" }));
+            expect(
+                screen.getAllByRole("button", {
+                    name: "Show form window: Image quality grading #9188",
+                }),
+            ).toHaveLength(2);
+        });
+    });
+
     it("says Loading… with no Choose button until the workspace has hydrated", async () => {
         const ws = new Workspace();
         renderGrid(ws);
