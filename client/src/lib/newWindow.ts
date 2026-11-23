@@ -2,7 +2,7 @@ import type { Component } from "svelte";
 
 import { mount, unmount } from "svelte";
 
-function windowFeatures(): string {
+export function windowFeatures(): string {
     const screenWidth = window.screen.availWidth;
     const screenHeight = window.screen.availHeight;
     const width = 0.5 * screenWidth; // 50% of screen width
@@ -28,6 +28,28 @@ export function openBlankWindow(): Window | null {
     const newWin = window.open("", "_blank", windowFeatures());
     if (!newWin) alert("Popup blocked! Please allow popups for this site.");
     return newWin;
+}
+
+/** Copies the page's stylesheets into another window's document, marked so a later copy can replace them. */
+export function copyStyles(doc: Document): void {
+    document
+        .querySelectorAll<
+            HTMLLinkElement | HTMLStyleElement
+        >("link[rel='stylesheet'], style")
+        .forEach((node) => {
+            let copy: HTMLElement;
+            if (node instanceof HTMLLinkElement) {
+                const link = doc.createElement("link");
+                link.rel = "stylesheet";
+                link.href = node.href;
+                copy = link;
+            } else {
+                copy = doc.createElement("style");
+                copy.textContent = node.textContent;
+            }
+            copy.dataset.eyenedStyle = "";
+            doc.head.append(copy);
+        });
 }
 
 /** Copies the page's styles into the window and mounts the component; it unmounts when the window goes. */

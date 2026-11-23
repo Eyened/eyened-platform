@@ -6,7 +6,7 @@ A group's wrapper outlines its target's viewports while the pointer or focus is 
 <script lang="ts">
     import { formSchemas } from "$lib/data/stores.svelte";
     import LayerSection from "$lib/layers/LayerSection.svelte";
-    import { openForm } from "$lib/viewer-window/panelForm/openForm.svelte";
+    import { formWindow } from "./formWindow.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import { getContext } from "svelte";
     import type { SvelteSet } from "svelte/reactivity";
@@ -74,7 +74,7 @@ A group's wrapper outlines its target's viewports while the pointer or focus is 
                                 {target}
                                 {form}
                                 completion={completion(form, schema)}
-                                open={openForm.id === form.id}
+                                open={formWindow.formId === form.id}
                                 current={selectedImageId !== null &&
                                     target.imageIds.includes(selectedImageId)}
                                 depth={level === 5 ? 3 : 2}

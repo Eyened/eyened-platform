@@ -7,7 +7,7 @@
     } from "$lib/data";
     import { dropFormAnnotationSaver } from "$lib/saving/formAnnotationSavers";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
-    import { closeFormWindowFor } from "./openFormInNewWindow";
+    import { formWindow } from "$lib/forms/formWindow.svelte";
 
     // Carbon danger modal for deleting a saved form. It lives in the list, because a delete unmounts the card.
     let {
@@ -26,7 +26,7 @@
     // The window and the saver go with the form, so no save is sent to the deleted id.
     async function remove(id: number) {
         await deleteFormAnnotation(id);
-        closeFormWindowFor(id);
+        formWindow.closeFor(id);
         dropFormAnnotationSaver(id);
     }
 

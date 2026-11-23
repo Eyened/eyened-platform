@@ -336,3 +336,37 @@ export function incompleteForms(
     }
     return lines;
 }
+
+/** What a form is about, under the form window's heading. */
+export const ABOUT: Record<FormEntityScope, string> = {
+    ImageInstance: "about this image",
+    StudyEye: "about this eye at this visit",
+    Study: "about this visit",
+    Eye: "about this eye",
+    Patient: "about this patient",
+};
+
+/** The form window's heading: the target in the viewport title's words, e.g. "P-0042 · OD · OCT · 2024-03-12" or "P-0042 · OD · visit 2024-03-12". */
+export function windowHeading(
+    scope: FormEntityScope,
+    parts: {
+        patient: string;
+        eye: string | null;
+        modality: string | null;
+        date: string | null;
+    },
+): string {
+    const { patient, eye, modality, date } = parts;
+    const visit = date ? `visit ${date}` : null;
+    const rest =
+        scope === "ImageInstance"
+            ? [eye, modality, date]
+            : scope === "StudyEye"
+              ? [eye, visit]
+              : scope === "Study"
+                ? [visit]
+                : scope === "Eye"
+                  ? [eye]
+                  : [];
+    return [patient, ...rest].filter(Boolean).join(" · ");
+}

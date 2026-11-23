@@ -15,11 +15,9 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import FormDeleteModal from "$lib/viewer-window/panelForm/FormDeleteModal.svelte";
     import { buildFormAnnotationCreatePayload } from "$lib/viewer-window/panelForm/formEntityScope";
-    import { openForm } from "$lib/viewer-window/panelForm/openForm.svelte";
-    import { openFormInNewWindow } from "$lib/viewer-window/panelForm/openFormInNewWindow";
     import type { ViewerWindowContext } from "$lib/viewer-window/viewerWindowContext.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
-    import { getContext } from "svelte";
+    import { getAllContexts, getContext } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
     import type {
         FormAnnotationGET,
@@ -30,6 +28,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     import CommentsField from "./CommentsField.svelte";
     import { focusAfterFormDelete } from "./focusAfterFormDelete";
     import { FormCreator } from "./formCreator.svelte";
+    import { formWindow } from "./formWindow.svelte";
     import FormGroups from "./FormGroups.svelte";
     import FormRow from "./FormRow.svelte";
     import {
@@ -109,7 +108,8 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
         images.find((image) => image.imageId === selectedImageId) ?? null,
     );
 
-    const creator = new FormCreator();
+    const contexts = getAllContexts();
+    const creator = new FormCreator(contexts);
     // Every header starts open; folds last for this page only.
     const folded = new SvelteSet<string>();
     let failure: HTMLElement | null = $state(null);
@@ -129,11 +129,14 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     }
 
     function open(form: FormAnnotationGET, target: FormTarget) {
-        openFormInNewWindow(
-            form,
-            globalContext.canEdit(form),
-            viewerFor(workspace, target),
-        );
+        formWindow.open(form, {
+            source: "panel",
+            canEdit: globalContext.canEdit(form),
+            viewerContext: viewerFor(workspace, target),
+            imageIds: target.imageIds,
+            from: "viewer",
+            contexts,
+        });
     }
 
     async function grade(target: FormTarget) {
@@ -141,6 +144,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
         const name = schemaName(taskSchema);
         const created = await creator.create({
             key: `grade:${target.key}`,
+            imageIds: target.imageIds,
             schemaName: name,
             message: `Added ${name} for ${targetText(target, matched.multiPatient)}`,
             payload: buildFormAnnotationCreatePayload({
@@ -159,6 +163,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
         const name = schemaName(schema);
         const created = await creator.create({
             key: "add",
+            imageIds: target.imageIds,
             schemaName: name,
             message: `Added ${name} for ${targetText(target, matched.multiPatient)}`,
             payload: buildFormAnnotationCreatePayload({
@@ -179,6 +184,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
             : `Form ${form.form_schema_id}`;
         const created = await creator.create({
             key: `copy:${form.id}`,
+            imageIds: target.imageIds,
             schemaName: name,
             message: `Copied ${name}`,
             payload: copyPayload(form, subTaskId),
@@ -220,7 +226,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
                     {target}
                     {form}
                     completion={form ? completion(form, schema) : null}
-                    open={form !== null && openForm.id === form.id}
+                    open={form !== null && formWindow.formId === form.id}
                     current={selectedImageId !== null &&
                         target.imageIds.includes(selectedImageId)}
                     {depth}
@@ -239,6 +245,16 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
 {/snippet}
 
 <div class="flex flex-col pb-4" data-forms-panel>
+    {#if formWindow.blocked === "panel"}
+        <!-- Focus stays on the row; clicking it again tries again. -->
+        <div class="px-4 pb-2">
+            <InlineNotification
+                title="Form window blocked"
+                subtitle="Allow pop-ups for this site in your browser, then open the form again."
+                onclose={() => formWindow.dismissBlocked()}
+            />
+        </div>
+    {/if}
     {#if creator.failed}
         <div class="px-4 pb-2">
             <InlineNotification

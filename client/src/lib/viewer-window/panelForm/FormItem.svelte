@@ -9,13 +9,14 @@
     import Copy from "carbon-icons-svelte/lib/Copy.svelte";
     import Launch from "carbon-icons-svelte/lib/Launch.svelte";
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
-    import { getContext } from "svelte";
+    import { getAllContexts, getContext } from "svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
-    import { openFormInNewWindow } from "./openFormInNewWindow";
+    import { formWindow } from "$lib/forms/formWindow.svelte";
 
     const taskContext = getContext<TaskContext>("taskContext");
     const globalContext = getContext<GlobalContext>("globalContext");
     const viewerContext = getContext<ViewerContext>("viewerContext");
+    const contexts = getAllContexts();
 
     interface Props {
         form: FormAnnotationGET;
@@ -45,7 +46,14 @@
     }
 
     function openInNewWindow(form: FormAnnotationGET) {
-        openFormInNewWindow(form, canEditForm, viewerContext);
+        formWindow.open(form, {
+            source: "browse",
+            canEdit: canEditForm,
+            viewerContext,
+            imageIds: [],
+            from: "browse",
+            contexts,
+        });
     }
 
     function formatDateTime(dateString: string) {

@@ -24,10 +24,6 @@ vi.mock("$lib/data", async (original) => ({
         formAnnotations.delete(id);
     }),
 }));
-vi.mock("$lib/newWindow", () => ({
-    openBlankWindow: vi.fn(() => null),
-    mountInWindow: vi.fn(),
-}));
 
 const ME = 5;
 const SET = 77;
@@ -132,6 +128,7 @@ function renderView() {
 }
 
 beforeEach(() => {
+    vi.spyOn(window, "open").mockReturnValue(null);
     formSchemas.clear();
     formSchemasByName.clear();
     formAnnotations.clear();
