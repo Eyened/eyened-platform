@@ -5,7 +5,7 @@ sidebar:
   order: 7
 ---
 
-Form annotations store structured JSON attached to patients, studies, or images. Each annotation references a **FormSchema** that defines the JSON Schema for validation and (for clinical forms) the fields shown in the Form panel.
+Form annotations store structured JSON attached to patients, studies, or images. Each annotation references a **FormSchema** that defines the JSON Schema for validation and (for clinical forms) the fields shown in the form window of the Grading and Forms panel.
 
 ## FormSchema and FormAnnotation
 
@@ -22,7 +22,7 @@ Clinical grading forms (AMD, glaucoma, naevi, etc.) are **site-specific** and ar
 
 These schemas are required for ETDRS and registration panels. They are defined in version-controlled JSON under `orm/eyened_orm/form_schemas/` and listed in `registry.py`.
 
-They are **hidden from the generic Form panel** in the viewer and managed through dedicated panels (ETDRS, Registration).
+They are **left out of the Add form list** in the viewer and managed through dedicated tools (ETDRS, Registration).
 
 | Schema name | Entity type | Purpose |
 |-------------|-------------|---------|
@@ -141,11 +141,9 @@ Task-specific form selection is configured on **`TaskDefinition.TaskConfig`**, n
 ```json
 {
   "form_schema_name": "Naevi grading",
-  "form_image_scope": true,
   "update_subtask_image_links": true,
   "task_panel": {
     "enabled": true,
-    "expanded": false,
     "sections": {
       "title": true,
       "nav": true,
@@ -155,7 +153,7 @@ Task-specific form selection is configured on **`TaskDefinition.TaskConfig`**, n
     }
   },
   "layout": {
-    "hide": ["Form"]
+    "hide": ["Measure"]
   }
 }
 ```
@@ -164,13 +162,11 @@ TaskConfig is merged over client defaults (`client/src/lib/config/clientDefaults
 
 | Field | Meaning |
 |-------|---------|
-| `form_schema_name` | `FormSchema.SchemaName` to pre-select in the Form panel when the task is active (clinical forms only; builtin ETDRS and registration schemas are excluded). |
-| `form_image_scope` | When `true`, list only form annotations for the current image |
+| `form_schema_name` | `FormSchema.SchemaName` of the task form: Grading lists one row per target of the open images for it, and Add form starts on it. If no schema has this name, Grading shows a warning. |
 | `update_subtask_image_links` | Default for the browser overlay “Update task image links” checkbox (overrides client default `false`). |
-| `task_panel.enabled` | When `false`, hide the grading task column. Default `true`. Hiding the panel removes in-app prev/next and status controls; graders must navigate another way |
-| `task_panel.expanded` | Default expanded vs collapsed when the grader has no stored preference. Default `false` (collapsed) |
-| `task_panel.sections.*` | Independently show `title`, `nav`, `status`, `comments`, `overview`. Each defaults to `true`. Missing `task_panel` means the panel is on with all sections, collapsed. Expand/collapse is stored in the browser per task. Hiding `nav` removes prev/next from the grading window |
-| `layout.hide` | Builtin sidebar panel names to omit (e.g. `"Form"`) |
+| `task_panel.enabled` | When `false`, hide all of the task items in the viewer header and in Grading (the sections below). Default `true`. Without them graders have no in-app prev/next or status controls and must navigate another way |
+| `task_panel.sections.*` | Independently show `title`, `nav`, `status`, `comments`, `overview`. Each defaults to `true`. Missing `task_panel` means all sections are shown. Hiding `nav` removes prev/next from the viewer |
+| `layout.hide` | Layers section names to hide: `"Segmentation"`, `"ETDRS"`, `"Registration"`, `"Measure"` (and `"Rendering"`, which removes the view bar and render-mode keys). A hidden section takes its tools with it: off the tool rail and ⋯ menu, and their keys do nothing. `"Segmentation"` also hides the en-face projection; `"Registration"` also hides Pointsets and Blend. Other names, such as the old `"Form"`, have no effect |
 | `layout.strip` | `false` hides the thumbnail strip above the viewports. Default `true` |
 
 Example task import row (see **[Importer — tasks](/eyened-platform/orm/importer)**):
@@ -182,7 +178,7 @@ ImportTaskRow(
         "form_schema_name": "Naevi grading",
         "update_subtask_image_links": True,
         "layout": {
-            "hide": ["Form"],
+            "hide": ["Measure"],
         },
     },
     task_name="Naevi batch 2025",

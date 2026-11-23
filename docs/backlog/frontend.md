@@ -54,9 +54,9 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 ### One date format across the client
 - **Status:** open
 - **Source:** client Carbon PR 4 (`ui/carbon-4-browser-search`) review, 2026-10-13
-- **Problem:** the date picker types and shows ISO yyyy-mm-dd (P4 spec decision D8: the stored format, unambiguous in Dutch and English). A dd-mm-yyyy input was requested as more intuitive, but the client already shows dates in mixed formats: ISO in `browser/StudyBlock.svelte` (study header), `viewer-window/panelVisits/PanelVisits.svelte` and the `browser/dataSources.ts` results; "3 Oct 2026" in `lib/utils.ts` (en-GB); "Oct 3, 2026" in `viewer-window/panelForm/FormItem.svelte` (en-US); the browser locale in `viewer-window/panelForm/FormItemContent.svelte`.
+- **Problem:** the date picker types and shows ISO yyyy-mm-dd (P4 spec decision D8: the stored format, unambiguous in Dutch and English). A dd-mm-yyyy input was requested as more intuitive, but the client already shows dates in mixed formats: ISO in `browser/StudyBlock.svelte` (study header) and the `browser/dataSources.ts` results; "3 Oct 2026" in `lib/utils.ts` (en-GB); "Oct 3, 2026" in `viewer-window/panelForm/FormItem.svelte` (en-US); the browser locale in `viewer-window/panelForm/FormItemContent.svelte`.
 - **Fix:** pick one display/input format: fixed dd-mm-yyyy, `Intl` locale-based, or unambiguous "13 Oct 2026" with lenient input. Amend D8 first. Keep ISO on the wire and in URLs; change only display and input. Show the format as visible helper text (Carbon date picker guidance), not only as a placeholder.
-- **Note:** about 5-8 files, plus the tests `StudyBlock.test.ts`, `PanelVisits.test.ts` and `patientStudies.test.ts`.
+- **Note:** about 5-8 files, plus the test `StudyBlock.test.ts`.
 
 ### Round-trip a comma inside an "is one of" value
 - **Status:** open
@@ -86,7 +86,7 @@ ESLint ratchet: after fixing a suppressed violation run `cd client && npx eslint
 ### Cycle viewer regions with F6
 - **Status:** open
 - **Source:** viewer skin-mapping brainstorm, 2026-10-29
-- **Problem:** to get from the form panel to the canvas, a keyboard user tabs back through about 20 tool and option controls; the viewer regions get landmarks but no shortcut between them.
+- **Problem:** to get from the Grading or Forms panel to the canvas, a keyboard user tabs back through about 20 tool and option controls; the viewer regions get landmarks but no shortcut between them.
 - **Fix:** F6 / Shift+F6 on the viewer root move focus to the next/previous region (header, tool rail, options bar, canvas, right panel, timeline), each region restoring its last-focused element and hidden regions skipped (S2 `foundations/app-frame/creating-bluelines-browsing-context.md`, "Support F6 key navigation").
 - **Note:** it needs an ADR 0006 deviation (viewer shortcuts work only while the image has focus), and a check that Chrome and Firefox let the page `preventDefault` F6.
 

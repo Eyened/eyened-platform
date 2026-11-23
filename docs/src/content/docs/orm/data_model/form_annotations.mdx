@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-**Form annotations** store structured JSON on a patient, study, image, or eye — clinical grading, ETDRS grids, and other site-specific fields. Each row references a **`FormSchema`** that defines validation and (for clinical forms) the fields shown in the viewer Form panel.
+**Form annotations** store structured JSON on a patient, study, image, or eye — clinical grading, ETDRS grids, and other site-specific fields. Each row references a **`FormSchema`** that defines validation and (for clinical forms) the fields shown in the viewer Grading and Forms panel.
 
 For **enface image registration** (separate storage paths, PublicID rules, viewer graph), see **[Registration](/eyened-platform/orm/registration)**.
 
@@ -19,7 +19,7 @@ A `FormSchema` is the **template** — it does not hold answers.
 | `Schema` | JSON Schema (Draft 7) |
 | `EntityType` | Attachment level: `ImageInstance`, `Study`, `StudyEye`, `Eye`, `Patient`, … |
 
-Builtin viewer schemas (ETDRS, registration) are seeded with `eorm seed-form-schemas` and edited in dedicated panels, not the generic Form panel. Details: **[Form schemas](/eyened-platform/orm/form_schemas)**.
+Builtin viewer schemas (ETDRS, registration) are seeded with `eorm seed-form-schemas` and edited in dedicated panels, not the generic Grading and Forms panel. Details: **[Form schemas](/eyened-platform/orm/form_schemas)**.
 
 ## Getting started
 
@@ -48,7 +48,7 @@ with db.get_session() as session:
 Pick `EntityType` to match scope: `ImageInstance` (per image), `Study` / `StudyEye` (visit), `Eye` (per eye — see **[Registration](/eyened-platform/orm/registration)**).
 
 :::note
-The JSON Schema drives the viewer Form panel: field types, required keys, and conditional show/hide. Clinical forms are **site-specific** and not included in the default seed.
+The JSON Schema drives the form window of the Grading and Forms panel: field types, required keys, and conditional show/hide. Clinical forms are **site-specific** and not included in the default seed.
 :::
 
 **2. Create and query annotations**
@@ -100,4 +100,4 @@ Set `TaskDefinition.TaskConfig` with `form_schema_name`. The schema must already
 - **[Form schemas](/eyened-platform/orm/form_schemas)**
 - **[Registration](/eyened-platform/orm/registration)**
 - **[API — Forms](/eyened-platform/api/forms)**
-- **[Form panel](/eyened-platform/client/panels/form)**
+- **[Grading and Forms panel](/eyened-platform/client/panels/form)**
