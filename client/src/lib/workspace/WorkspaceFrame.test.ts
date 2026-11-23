@@ -45,6 +45,8 @@ function taskHeader(): TaskHeader {
         prev: vi.fn(),
         next: vi.fn(),
         overview: vi.fn(),
+        show: { title: true, nav: true, overview: true },
+        pending: null,
     };
 }
 

@@ -12,6 +12,8 @@ import WorkspaceHeader, { type TaskHeader } from "./WorkspaceHeader.svelte";
 function taskHeader(over: Partial<TaskHeader> = {}): TaskHeader {
     return {
         label: "Set 2 of 5",
+        show: { title: true, nav: true, overview: true },
+        pending: null,
         prevDisabled: false,
         nextDisabled: false,
         prev: vi.fn(),

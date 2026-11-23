@@ -1,12 +1,22 @@
 <script module lang="ts">
-    /** Task-mode set navigation, built from today's TaskNavigation. */
+    import type { Snippet } from "svelte";
+
+    /** Task-mode set navigation and status. */
     export interface TaskHeader {
         label: string;
+        /** The task's `task_panel` sections: the set label, ◀ ▶ and Task overview. */
+        show: { title: boolean; nav: boolean; overview: boolean };
         prevDisabled: boolean;
         nextDisabled: boolean;
+        /** The control showing a pending move, 1 s into its saves. */
+        pending: "prev" | "next" | "primary" | null;
         prev(): void;
         next(): void;
         overview(): void;
+        /** Status ▾ and the primary button, when the task shows them. */
+        status?: Snippet;
+        /** After "Mark ready" on the last set; shown at the top of the canvas. */
+        notice?: { title: string; subtitle: string } | null;
     }
 </script>
 
@@ -15,8 +25,9 @@
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import ChevronLeft from "carbon-icons-svelte/lib/ChevronLeft.svelte";
     import ChevronRight from "carbon-icons-svelte/lib/ChevronRight.svelte";
+    import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
     import { ContentSwitcher } from "$lib/components/ui/content-switcher/index.js";
-    import { getContext, type Snippet } from "svelte";
+    import { getContext } from "svelte";
     import SaveStateSlot from "$lib/saving/SaveStateSlot.svelte";
     import { MediaQuery } from "svelte/reactivity";
     import LayoutPopover from "./LayoutPopover.svelte";
@@ -78,35 +89,59 @@
         {/if}
     </div>
     {#if task}
-        {#if narrow}
-            <!-- Below md "Set" is dropped from view to fit 320 px; ◀ ▶ still say "set". -->
-            <span class="sr-only">{task.label}</span>
-            <span
-                aria-hidden="true"
-                class="ps-2 text-body-compact-01 whitespace-nowrap text-text-primary"
-                >{task.label.replace(/^Set /, "")}</span
-            >
-        {:else}
-            <span
-                class="text-body-compact-01 whitespace-nowrap text-text-primary"
-                >{task.label}</span
-            >
+        {#if task.show.title}
+            {#if narrow}
+                <!-- Below md "Set" is dropped from view to fit 320 px; ◀ ▶ still say "set". -->
+                <span class="sr-only">{task.label}</span>
+                <span
+                    aria-hidden="true"
+                    class="ps-2 text-body-compact-01 whitespace-nowrap text-text-primary"
+                    >{task.label.replace(/^Set /, "")}</span
+                >
+            {:else}
+                <span
+                    class="text-body-compact-01 whitespace-nowrap text-text-primary"
+                    >{task.label}</span
+                >
+            {/if}
         {/if}
-        <IconButton
-            label="Previous set"
-            disabled={task.prevDisabled}
-            onclick={() => task.prev()}
-        >
-            <ChevronLeft />
-        </IconButton>
-        <IconButton
-            label="Next set"
-            disabled={task.nextDisabled}
-            onclick={() => task.next()}
-        >
-            <ChevronRight />
-        </IconButton>
-        {#if !narrow}
+        {#if task.show.nav}
+            <IconButton
+                label="Previous set"
+                data-set-control="prev"
+                disabled={task.prevDisabled}
+                aria-disabled={task.pending === "prev" || undefined}
+                onclick={() => task.prev()}
+            >
+                {#if task.pending === "prev"}
+                    <InlineLoading
+                        class="min-h-0 w-auto"
+                        status="active"
+                        live={false}
+                    />
+                {:else}
+                    <ChevronLeft />
+                {/if}
+            </IconButton>
+            <IconButton
+                label="Next set"
+                data-set-control="next"
+                disabled={task.nextDisabled}
+                aria-disabled={task.pending === "next" || undefined}
+                onclick={() => task.next()}
+            >
+                {#if task.pending === "next"}
+                    <InlineLoading
+                        class="min-h-0 w-auto"
+                        status="active"
+                        live={false}
+                    />
+                {:else}
+                    <ChevronRight />
+                {/if}
+            </IconButton>
+        {/if}
+        {#if !narrow && task.show.overview}
             <Button variant="ghost" size="sm" onclick={() => task.overview()}
                 >Task overview</Button
             >
@@ -119,7 +154,10 @@
         {#if !narrow}<SaveStateSlot iconOnly={!xlg.current} />{/if}
     </div>
     {#if task}
-        <div class="contents" data-header-slot="mark-ready"></div>
+        <div class="contents" data-header-slot="mark-ready">
+            <!-- Below md, Status and the primary button wait for the narrow footer. -->
+            {#if !narrow}{@render task.status?.()}{/if}
+        </div>
     {/if}
     {#if narrow}
         {@render end?.()}

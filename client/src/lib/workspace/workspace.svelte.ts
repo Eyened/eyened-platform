@@ -299,6 +299,14 @@ export class Workspace {
         this.maximised = position;
     }
 
+    /** The last set's selected and maximised viewports, by position; the first one when this set has fewer. */
+    restoreViewports(selected: number, maximised: number | null): void {
+        const fit = (position: number) =>
+            position < this.slots.length ? position : 0;
+        this.selected = fit(selected);
+        this.maximised = maximised === null ? null : fit(maximised);
+    }
+
     setTracks(axis: Axis, sizes: number[]): void {
         if (axis === "col") this.colSizes = sizes;
         else this.rowSizes = sizes;

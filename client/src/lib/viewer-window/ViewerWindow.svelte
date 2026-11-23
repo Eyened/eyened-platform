@@ -7,17 +7,31 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     import { instances, patients } from "$lib/data";
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
+    import { updateSubTask } from "$lib/data/api";
+    import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
+    import { saveTracker } from "$lib/saving/saveTracker.svelte";
+    import LeaveSetModal from "$lib/tasks/LeaveSetModal.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import { TaskNavigation } from "$lib/tasks/taskUtils.svelte";
+    import { takeHandoff } from "$lib/tasks/setHandoff";
+    import {
+        focusSetControl,
+        SetNavigation,
+    } from "$lib/tasks/setNavigation.svelte";
+    import {
+        navigateSubtaskIndex,
+        TaskNavigation,
+    } from "$lib/tasks/taskUtils.svelte";
     import { viewportTitle } from "$lib/workspace/imageMeta";
     import WorkspaceFrame from "$lib/workspace/WorkspaceFrame.svelte";
     import type { TaskHeader } from "$lib/workspace/WorkspaceHeader.svelte";
-    import { getContext, setContext } from "svelte";
+    import type { Workspace } from "$lib/workspace/workspace.svelte";
+    import { getContext, onMount, setContext } from "svelte";
     import BrowserOverlay from "./BrowserOverlay.svelte";
     import MainViewer from "./MainViewer.svelte";
     import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
     import StripViewer from "./StripViewer.svelte";
     import type { ViewerWindowContext } from "./viewerWindowContext.svelte";
+    import type { SubTaskState } from "../../types/openapi_types";
 
     interface Props {
         viewerWindowContext: ViewerWindowContext;
@@ -42,22 +56,63 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     });
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
+    const workspace = getContext<Workspace>("workspace");
     const navigation = taskContext ? new TaskNavigation(taskContext) : null;
     // subTaskIndex is 0-based; people read sets from 1.
+    const setNumber = (taskContext?.subTaskIndex ?? 0) + 1;
+    // The set's status saves like any other edit, so ◀ ▶ wait for it.
+    const statusSaver = taskContext
+        ? new DebouncedSaver<SubTaskState>({
+              kind: "status",
+              group: "status",
+              target: { to: "focus", focus: () => focusSetControl("status") },
+              delay: 0,
+              send: (state) =>
+                  updateSubTask(taskContext.subTask.id, { task_state: state }),
+          })
+        : null;
+    const setNavigation =
+        taskContext && statusSaver
+            ? new SetNavigation({
+                  tracker: saveTracker,
+                  status: statusSaver,
+                  index: taskContext.subTaskIndex,
+                  count: taskContext.task.num_tasks,
+                  navigate: navigateSubtaskIndex,
+                  handoff: () => ({
+                      selected: workspace.selected,
+                      maximised: workspace.maximised,
+                  }),
+                  focus: focusSetControl,
+              })
+            : null;
     const task: TaskHeader | null = $derived(
-        taskContext && navigation
+        taskContext && navigation && setNavigation
             ? {
-                  label: `Set ${taskContext.subTaskIndex + 1} of ${taskContext.task.num_tasks}`,
+                  label: `Set ${setNumber} of ${taskContext.task.num_tasks}`,
+                  show: { title: true, nav: true, overview: true },
                   prevDisabled: navigation.prevDisabled,
                   nextDisabled: navigation.nextDisabled,
-                  prev: () => navigation.prev(),
-                  next: () => navigation.next(),
+                  pending: setNavigation.pending,
+                  prev: () =>
+                      void setNavigation.move("prev", { markReady: false }),
+                  next: () =>
+                      void setNavigation.move("next", { markReady: false }),
                   overview: () => {
                       window.location.href = `/tasks/${taskContext.task.id}`;
                   },
               }
             : null,
     );
+
+    // The control that left the last set keeps focus here: ▶ when ◀ can't take it.
+    onMount(() => {
+        const control = takeHandoff()?.control;
+        if (!control || !navigation) return;
+        focusSetControl(
+            control === "prev" && navigation.prevDisabled ? "next" : control,
+        );
+    });
 
     let browserOpen = $state(false);
 
@@ -96,6 +151,14 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         {/if}
     {/snippet}
 </WorkspaceFrame>
+
+{#if setNavigation?.question}
+    <LeaveSetModal
+        {setNumber}
+        markReady={setNavigation.question.markReady}
+        onanswer={(leave) => setNavigation.answerLeave(leave)}
+    />
+{/if}
 
 {#if browserOpen}
     <!-- isolate keeps the overlay's z-index below menus portalled to <body>. -->

@@ -16,6 +16,7 @@ import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import { AbstractImage } from "$lib/webgl/abstractImage";
 import type { Image3D } from "$lib/webgl/image3D";
 import type { WebGL } from "$lib/webgl/webgl";
+import { takeHandoff } from "$lib/tasks/setHandoff";
 import { catalogueEntry, twinNumbers } from "$lib/workspace/imageMeta";
 import type { Workspace } from "$lib/workspace/workspace.svelte";
 import type { CatalogueEntry } from "$lib/workspace/workspaceRules";
@@ -145,6 +146,12 @@ export class ViewerWindowContext {
         if (this.destroyed) return;
         this.hydrated = true;
         this.workspace.hydrate(entries, this.initialUrl);
+        const handoff = takeHandoff();
+        if (handoff)
+            this.workspace.restoreViewports(
+                handoff.selected,
+                handoff.maximised,
+            );
     }
 
     /** Loads the instances and returns their catalogue entries, in opened order. */
