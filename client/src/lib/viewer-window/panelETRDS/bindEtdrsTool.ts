@@ -1,5 +1,6 @@
-import { formAnnotations, setFormAnnotationValue } from "$lib/data";
+import { formAnnotations } from "$lib/data";
 import type { ImagePoint, PointList } from "$lib/forms/pointSchema";
+import { formAnnotationSaver } from "$lib/saving/formAnnotationSavers";
 import { keepGridSize } from "$lib/layers/gridLayers.svelte";
 import { ETDRS_LANDMARK_COLOUR } from "$lib/viewer/overlays/ETDRSGridItemOverlay.svelte";
 import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
@@ -37,6 +38,13 @@ export function bindEtdrsTool(args: {
 } {
     // Every write of this tool, so a saved write coming back from the store is not taken back mid-drag.
     const written = new WeakSet<object>();
+    // A failed save shows on the grid's pane, where Retry sends it again.
+    const saver = formAnnotationSaver(args.gridId, "ETDRS grid", {
+        to: "layers",
+        section: "etdrs",
+        imageId: args.viewerContext.image.image_id,
+        item: { kind: "grid", id: args.gridId },
+    });
     const write = (points: PointList, persist: boolean) => {
         const grid = formAnnotations.get(args.gridId);
         if (!grid) return;
@@ -48,7 +56,7 @@ export function bindEtdrsTool(args: {
         });
         written.add(data);
         formAnnotations.set(args.gridId, { ...grid, form_data: data });
-        if (persist) void setFormAnnotationValue(args.gridId, data);
+        if (persist) saver.edit(data);
     };
     // The points before the latest change, so Keep grid size can move the disc edge by the fovea's step.
     let before: PointList = landmarksOf(

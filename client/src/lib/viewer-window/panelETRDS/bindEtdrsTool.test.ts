@@ -8,14 +8,20 @@ vi.mock("$lib/data", async () => {
     const stores = await import("$lib/data/stores.svelte");
     return {
         formAnnotations: stores.formAnnotations,
-        setFormAnnotationValue: vi.fn(async () => {}),
+        putFormAnnotationValue: vi.fn(async () => {}),
     };
 });
 
-const { setFormAnnotationValue } = await import("$lib/data");
+const { putFormAnnotationValue } = await import("$lib/data");
+const { formAnnotationSavers } = await import(
+    "$lib/saving/formAnnotationSavers"
+);
 const { bindEtdrsTool } = await import("./bindEtdrsTool");
 
-afterEach(() => formAnnotations.clear());
+afterEach(() => {
+    formAnnotations.clear();
+    formAnnotationSavers.clear();
+});
 
 const viewer = {
     image: { is2D: true, is3D: false, image_id: "inst-1", width: 100 },
@@ -40,7 +46,7 @@ function click(tool: PointTool, at: Position2D) {
 }
 
 describe("bindEtdrsTool", () => {
-    it("a click places the selected slot; Keep grid size takes the disc edge along; each release saves", () => {
+    it("a click places the selected slot; Keep grid size takes the disc edge along; each release saves", async () => {
         formAnnotations.set(12, {
             id: 12,
             form_data: { fovea: { x: 10, y: 10 }, disc_edge: { x: 40, y: 10 } },
@@ -60,12 +66,14 @@ describe("bindEtdrsTool", () => {
         keep = true;
         click(tool, { x: 150, y: 100 });
         // The fovea moved 50 px right, so the disc edge did too.
-        expect(setFormAnnotationValue).toHaveBeenLastCalledWith(
-            12,
-            expect.objectContaining({
-                fovea: expect.objectContaining({ x: 150, y: 100 }),
-                disc_edge: expect.objectContaining({ x: 90, y: 10 }),
-            }),
+        await vi.waitFor(() =>
+            expect(putFormAnnotationValue).toHaveBeenLastCalledWith(
+                12,
+                expect.objectContaining({
+                    fovea: expect.objectContaining({ x: 150, y: 100 }),
+                    disc_edge: expect.objectContaining({ x: 90, y: 10 }),
+                }),
+            ),
         );
     });
 
@@ -95,7 +103,7 @@ describe("bindEtdrsTool", () => {
         });
     });
 
-    it("an earlier save resolving mid-click does not take back the click being made", () => {
+    it("an earlier save resolving mid-click does not take back the click being made", async () => {
         formAnnotations.set(12, {
             id: 12,
             form_data: { fovea: { x: 10, y: 10 }, disc_edge: { x: 40, y: 10 } },
@@ -107,7 +115,7 @@ describe("bindEtdrsTool", () => {
         });
         tool.placementIndex = 0;
         click(tool, { x: 100, y: 100 });
-        const firstSaved = vi.mocked(setFormAnnotationValue).mock.lastCall![1];
+        const firstSaved = vi.mocked(putFormAnnotationValue).mock.lastCall![1];
         tool.placementIndex = 1;
         const e = {
             event: { shiftKey: false, button: 0 } as PointerEvent,
@@ -124,9 +132,11 @@ describe("bindEtdrsTool", () => {
             fovea: { x: 100, y: 100 },
             disc_edge: { x: 200, y: 200 },
         });
-        expect(setFormAnnotationValue).toHaveBeenLastCalledWith(
-            12,
-            expect.objectContaining({ disc_edge: { x: 200, y: 200 } }),
+        await vi.waitFor(() =>
+            expect(putFormAnnotationValue).toHaveBeenLastCalledWith(
+                12,
+                expect.objectContaining({ disc_edge: { x: 200, y: 200 } }),
+            ),
         );
     });
 });

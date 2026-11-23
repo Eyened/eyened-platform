@@ -98,6 +98,9 @@
     --color-tag-background-gray: #525252;
     --color-tag-color-gray: #f4f4f4;
     --color-tag-hover-gray: #636363;
+    /* Carbon Tag specs: dark themes use step 70 for backgrounds and step 20 for text (red 70, red 20). */
+    --color-tag-background-red: #a2191f;
+    --color-tag-color-red: #ffd7d9;
 
     /* Type: @carbon/type 11.69.0, productive set */
     --font-*: initial;

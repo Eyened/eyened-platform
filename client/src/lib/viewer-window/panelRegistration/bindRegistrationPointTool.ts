@@ -1,4 +1,5 @@
-import { formAnnotations, setFormAnnotationValue } from "$lib/data";
+import { formAnnotations } from "$lib/data";
+import { formAnnotationSaver } from "$lib/saving/formAnnotationSavers";
 import {
     analyzePointSchema,
     getPointsForImage,
@@ -7,7 +8,6 @@ import {
 import type { JSONSchema } from "$lib/forms/schemaType";
 import type { PointMarkerStyle } from "$lib/config/clientDefaults";
 import { PointTool } from "$lib/viewer/tools/PointTool.svelte";
-import type { SyncState } from "$lib/webgl/segmentationState.svelte";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 
 const REGISTRATION_POINTS: JSONSchema = {
@@ -51,7 +51,6 @@ export function bindRegistrationPointTool(args: {
     schema: JSONSchema;
     canEdit: boolean;
     pointMarker: { style: PointMarkerStyle; radius: number; color: string };
-    onSync?: (sync: SyncState) => void;
 }): {
     tool: PointTool | undefined;
     dispose: () => void;
@@ -62,18 +61,15 @@ export function bindRegistrationPointTool(args: {
         return { tool: undefined, dispose: () => {}, sync: () => {} };
     const publicId = args.viewerContext.image.instance.id;
     const annotationId = args.annotationId;
-    // A failed save shows on the registration's row; the next move saves the whole set again.
+    // A failed save shows on the pointset's pane; Retry or the next move saves the whole set again.
+    const saver = formAnnotationSaver(annotationId, "registration", {
+        to: "layers",
+        section: "pointsets",
+        imageId: args.viewerContext.image.image_id,
+        item: { kind: "pointset", id: annotationId },
+    });
     // This tool's own last write, so its echo from the store is not taken back in mid-drag.
     let lastWritten: unknown;
-    const save = async (formData: unknown) => {
-        args.onSync?.("saving");
-        try {
-            await setFormAnnotationValue(annotationId, formData);
-            args.onSync?.("synced");
-        } catch {
-            args.onSync?.("error");
-        }
-    };
     const write = (
         points: ReturnType<typeof getPointsForImage>,
         persist: boolean,
@@ -88,7 +84,7 @@ export function bindRegistrationPointTool(args: {
         );
         lastWritten = next;
         formAnnotations.set(annotationId, { ...existing, form_data: next });
-        if (persist) void save(next);
+        if (persist) saver.edit(next);
     };
     const tool = new PointTool({
         canEdit: args.canEdit,

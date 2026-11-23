@@ -519,10 +519,10 @@ const annotation = formAnnotations.get(123);
 // Get form data (may trigger separate API call)
 const formData = await getFormAnnotationValue(123);
 
-// Update form data
-await setFormAnnotationValue(123, newFormData);
+// Update form data: through the annotation's saver, which puts the saved value in the store
+formAnnotationSaver(123, "form", target).edit(newFormData);
 
-// Store is updated automatically
+// Store is updated once the save comes back
 const updated = formAnnotations.get(123);
 console.log(updated.form_data); // Updated value
 ```
@@ -675,7 +675,7 @@ await createFormAnnotation({
 });
 await deleteFormAnnotation(id);
 await getFormAnnotationValue(id);
-await setFormAnnotationValue(id, form_data);
+await putFormAnnotationValue(id, form_data); // the saver calls this; see formAnnotationSaver
 ```
 
 **Feature operations:**
@@ -859,7 +859,7 @@ def image_instance_to_get(
 
 - `FormAnnotationGET.form_data` may be `null` or `undefined`
 - Use `getFormAnnotationValue(id)` to fetch form data separately
-- Use `setFormAnnotationValue(id, data)` to update form data
+- Use `formAnnotationSaver(id, kind, target).edit(data)` (`$lib/saving/formAnnotationSavers`) to update form data; it calls `putFormAnnotationValue` one request at a time
 - Use `patient_id` / `study_id` / `image_id` on the DTO (not `image_instance_id`); resolve `patient.identifier` via `patients` or `instances.get(form.image_id)?.patient`
 
 ### Segmentation Data Requires Separate Fetch

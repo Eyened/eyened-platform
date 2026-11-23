@@ -5,7 +5,6 @@ import {
     groupKey,
     type EyeLaterality,
 } from "$lib/viewer-window/panelRegistration/groupOpenImages";
-import type { SyncState } from "$lib/webgl/segmentationState.svelte";
 import {
     imageName,
     type ImageMeta,
@@ -239,10 +238,9 @@ export function pointBinding(input: {
     };
 }
 
-/** Window-wide: each eye's registration in use (Display › Registration), and each registration's last point save. */
+/** Window-wide: each eye's registration in use (Display › Registration). */
 export class PointsetState {
     private readonly currentIds = new SvelteMap<string, number>();
-    readonly sync = new SvelteMap<number, SyncState>();
 
     /** The id of the eye's registration in use; undefined when unset or deleted. */
     currentId(eye: string): number | undefined {

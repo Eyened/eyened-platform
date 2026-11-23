@@ -362,8 +362,6 @@
                 schema: schema as JSONSchema,
                 canEdit,
                 pointMarker: clientConfig.point_marker,
-                onSync: (sync) =>
-                    viewerWindowContext.pointsets.sync.set(id, sync),
             }),
         );
         pointTool = binding;

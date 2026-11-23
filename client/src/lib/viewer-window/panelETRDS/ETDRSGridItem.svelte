@@ -5,6 +5,7 @@ One ETDRS grid on this image in Layers: the creator's name (sets or unsets the c
 <script lang="ts">
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { Tag } from "$lib/components/ui/tag/index.js";
+    import { formAnnotationSavers } from "$lib/saving/formAnnotationSavers";
     import LayerRow from "$lib/layers/LayerRow.svelte";
     import { isThisTask } from "$lib/layers/gridLayers.svelte";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
@@ -43,6 +44,10 @@ One ETDRS grid on this image in Layers: the creator's name (sets or unsets the c
     const thisTask = $derived(
         isThisTask(formAnnotation, taskContext?.subTask?.id),
     );
+    // A failed save marks the row until it saves; Retry sits in the grid's pane.
+    const saveFailed = $derived(
+        formAnnotationSavers.get(formAnnotation.id)?.state === "error",
+    );
 </script>
 
 <LayerRow
@@ -57,6 +62,7 @@ One ETDRS grid on this image in Layers: the creator's name (sets or unsets the c
     {#snippet tags()}
         {#if thisTask}<Tag>This task</Tag>{/if}
         {#if scale}<Tag>Scale</Tag>{/if}
+        {#if saveFailed}<Tag type="red">Couldn't save</Tag>{/if}
     {/snippet}
     {#snippet icons()}
         <IconButton

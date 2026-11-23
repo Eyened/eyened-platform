@@ -6,12 +6,14 @@ The Selected pane for an ETDRS grid: creator, fovea and disc edge as text, and "
     import EditWith from "./EditWith.svelte";
     import { Tag } from "$lib/components/ui/tag/index.js";
     import { formAnnotations } from "$lib/data";
+    import { formAnnotationSavers } from "$lib/saving/formAnnotationSavers";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
     import type { Position2D } from "$lib/types";
     import { getContext, type Snippet } from "svelte";
     import { isThisTask } from "../gridLayers.svelte";
     import PaneFields from "./PaneFields.svelte";
     import PaneHeader from "./PaneHeader.svelte";
+    import SyncStatus from "../SyncStatus.svelte";
 
     let {
         id,
@@ -21,6 +23,8 @@ The Selected pane for an ETDRS grid: creator, fovea and disc edge as text, and "
     const taskContext = getContext<TaskContext | undefined>("taskContext");
     // SelectedPane mounts this only while the grid exists.
     const grid = $derived(formAnnotations.get(gridId)!);
+    // A grid's saver exists once G is bound to it in a viewport on this page.
+    const saver = $derived(formAnnotationSavers.get(gridId));
     const data = $derived(
         (grid.form_data ?? {}) as Record<string, Position2D | undefined>,
     );
@@ -42,6 +46,12 @@ The Selected pane for an ETDRS grid: creator, fovea and disc edge as text, and "
     {#snippet status()}
         {#if isThisTask(grid, taskContext?.subTask?.id)}
             <Tag>This task</Tag>
+        {/if}
+        {#if saver}
+            <SyncStatus
+                sync={saver.state}
+                onretry={() => void saver?.flush()}
+            />
         {/if}
     {/snippet}
 </PaneHeader>

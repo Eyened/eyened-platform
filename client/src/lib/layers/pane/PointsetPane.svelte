@@ -5,6 +5,7 @@ The Selected pane for a pointset: its save state, then its points per image. Edi
 <script lang="ts">
     import EditWith from "./EditWith.svelte";
     import { formAnnotations } from "$lib/data";
+    import { formAnnotationSavers } from "$lib/saving/formAnnotationSavers";
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import { getContext, type Snippet } from "svelte";
@@ -26,11 +27,16 @@ The Selected pane for a pointset: its save state, then its points per image. Edi
     const row = $derived(formAnnotations.get(pointsetId)!);
     const loaded = $derived(loadedEyeImages(workspace.catalogue, win, eye));
     const lines = $derived(imageLines(row.form_data, instance.id, loaded));
+    // A pointset's saver exists once P is bound to it in a viewport on this page.
+    const saver = $derived(formAnnotationSavers.get(pointsetId));
 </script>
 
 <PaneHeader {id} name="Registration [{pointsetId}]" type="Pointset" {remove}>
     {#snippet status()}
-        <SyncStatus sync={win.pointsets.sync.get(pointsetId) ?? "synced"} />
+        <SyncStatus
+            sync={saver?.state ?? "synced"}
+            onretry={() => void saver?.flush()}
+        />
     {/snippet}
 </PaneHeader>
 <div class="min-h-0 flex-1 overflow-y-auto px-4 py-2">
