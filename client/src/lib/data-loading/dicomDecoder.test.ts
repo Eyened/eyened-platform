@@ -145,6 +145,19 @@ describe("decodeDicomBuffer", () => {
         expect(decoded.volume[12]).toBe(66);
     });
 
+    it("decodes JPEG Lossless (.70) RGB interleaved", async () => {
+        const decoded = await decodeDicomBuffer(
+            loadFixture("jpeg_lossless_rgb_2frames.dcm"),
+        );
+        expect(decoded.transferSyntax).toBe(TRANSFER_SYNTAX.JPEGLossless);
+        expect(decoded.photometricInterpretation).toBe("RGB");
+        expect(decoded.volume.length).toBe(4 * 3 * 3 * 2);
+        expect(Array.from(decoded.volume.subarray(0, 3))).toEqual([10, 20, 30]);
+        expect(Array.from(decoded.volume.subarray(36, 39))).toEqual([
+            40, 50, 60,
+        ]);
+    });
+
     it("rejects a frame whose decoded length does not match", async () => {
         await expect(
             decodeDicomBuffer(loadFixture("jpeg_baseline_2frames.dcm"), {
