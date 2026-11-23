@@ -68,18 +68,23 @@ export class SaveTracker {
 
     readonly text = $derived.by(() => {
         if (!this.edited) return "";
-        const failed = new Map<string, SaveKind>();
-        for (const saver of this.savers) {
-            if (saver.state === "error") failed.set(saver.group, saver.kind);
-        }
-        if (failed.size === 0)
+        // One entry per group, so a segmentation's B-scans count once.
+        const failed = this.savers
+            .filter((saver) => saver.state === "error")
+            .filter(
+                (saver, i, all) =>
+                    all.findIndex((other) => other.group === saver.group) === i,
+            );
+        if (failed.length === 0)
             return this.worst === "saving" ? "Saving…" : "Saved";
-        const kinds = [...new Set(failed.values())];
-        if (kinds.length > 1) return `${failed.size} items couldn't save`;
+        const kinds = failed
+            .map((saver) => saver.kind)
+            .filter((kind, i, all) => all.indexOf(kind) === i);
+        if (kinds.length > 1) return `${failed.length} items couldn't save`;
         const kind = kinds[0]!;
         if (kind === "status") return "Status couldn't save";
         const [one, many] = NOUNS[kind];
-        return `${failed.size} ${failed.size === 1 ? one : many} couldn't save`;
+        return `${failed.length} ${failed.length === 1 ? one : many} couldn't save`;
     });
 
     join(saver: Saver): () => void {
