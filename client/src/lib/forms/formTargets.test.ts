@@ -239,4 +239,18 @@ describe("incompleteForms", () => {
             "Visit notes for 2024-05-02: not complete",
         ]);
     });
+
+    it("an older empty task form is superseded by my newer complete one", () => {
+        const older = form({ form_data: {} });
+        const newer = form({ form_data: { quality: "good" } });
+        const matched = matchForms({
+            forms: [older, newer],
+            images: [image("img-a")],
+            schemas,
+            taskSchemaId: 1,
+            userId: ME,
+            subTaskId: SET,
+        });
+        expect(incompleteForms(matched, schemas, ME, SET)).toEqual([]);
+    });
 });

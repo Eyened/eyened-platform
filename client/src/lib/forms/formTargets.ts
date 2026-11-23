@@ -299,10 +299,12 @@ export function incompleteForms(
     for (const { target, forms } of matched.other) {
         for (const form of forms) {
             const schema = schemas.get(form.form_schema_id);
+            // My other forms of the task schema in this set are superseded by the row's newest one.
             if (
                 schema &&
                 form.creator.id === userId &&
                 form.sub_task_id === subTaskId &&
+                form.form_schema_id !== taskSchema?.id &&
                 completion(form, schema) === "incomplete"
             )
                 lines.push(
