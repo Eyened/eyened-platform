@@ -21,7 +21,11 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import { getContext } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
-    import type { FormAnnotationGET } from "../../types/openapi_types";
+    import type {
+        FormAnnotationGET,
+        FormSchemaGET,
+    } from "../../types/openapi_types";
+    import AddForm from "./AddForm.svelte";
     import { focusAfterFormDelete } from "./focusAfterFormDelete";
     import { FormCreator } from "./formCreator.svelte";
     import FormGroups from "./FormGroups.svelte";
@@ -91,6 +95,9 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     const selectedImageId = $derived(
         workspace.slots[workspace.selected]?.imageId ?? null,
     );
+    const selectedImage = $derived(
+        images.find((image) => image.imageId === selectedImageId) ?? null,
+    );
 
     const creator = new FormCreator();
     // Every header starts open; folds last for this page only.
@@ -128,6 +135,24 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
             message: `Added ${name} for ${target.name}`,
             payload: buildFormAnnotationCreatePayload({
                 formSchemaId: taskSchema.id,
+                scope: target.scope,
+                ctx: target.ctx,
+                subTaskId,
+            }),
+            viewerContext: viewerFor(workspace, target),
+        });
+        unfold(created, target);
+    }
+
+    // In a task the new form joins the set, as Grade's does.
+    async function add(schema: FormSchemaGET, target: FormTarget) {
+        const name = schemaName(schema);
+        const created = await creator.create({
+            key: "add",
+            schemaName: name,
+            message: `Added ${name} for ${target.name}`,
+            payload: buildFormAnnotationCreatePayload({
+                formSchemaId: schema.id,
                 scope: target.scope,
                 ctx: target.ctx,
                 subTaskId,
@@ -175,6 +200,10 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     />
 {/snippet}
 
+{#snippet addForm()}
+    <AddForm {selectedImage} taskSchemaId={taskSchema?.id} onadd={add} />
+{/snippet}
+
 <div class="flex flex-col pb-4" data-forms-panel>
     {#if creator.failed}
         <div class="px-4 pb-2">
@@ -187,6 +216,10 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     {/if}
     <!-- Always mounted, so each message is announced; focus stays on the button pressed. -->
     <p role="status" class="sr-only">{creator.message}</p>
+    {#if !taskContext}
+        <!-- /view: Add form is the main way forms are made, so it comes first. -->
+        {@render addForm()}
+    {/if}
     {#if taskContext}
         {#if taskName && !taskSchema}
             <div class="px-4 pb-2">
@@ -273,6 +306,9 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
                 No forms for these images yet.
             </p>
         {/if}
+    {/if}
+    {#if taskContext}
+        {@render addForm()}
     {/if}
 </div>
 <FormDeleteModal

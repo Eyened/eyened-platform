@@ -25,6 +25,7 @@ const LAYER_SECTIONS_KEY = "eyened:viewer:layerSections";
 const PANE_HEIGHT_KEY = "eyened:viewer:paneHeight";
 const MAGNIFIER_KEY = "eyened:viewer:magnifier";
 const PAINT_KEY = "eyened:viewer:paint";
+const LAST_FORM_KEY = "eyened:viewer:lastFormSchema";
 
 export type LeftPanel = "images" | "info" | "help";
 const PANELS: readonly string[] = ["images", "info", "help"];
@@ -145,6 +146,25 @@ export function writeToolMode(mode: ToolMode): void {
         localStorage.setItem(TOOL_MODE_KEY, mode);
     } catch {
         // Private mode or quota: the choice lasts this session only.
+    }
+}
+
+/** The schema Add form made last; null when none or storage fails. */
+export function readLastFormSchema(): number | null {
+    try {
+        const raw = localStorage.getItem(LAST_FORM_KEY);
+        const id = raw === null ? NaN : Number(raw);
+        return Number.isInteger(id) ? id : null;
+    } catch {
+        return null;
+    }
+}
+
+export function writeLastFormSchema(id: number): void {
+    try {
+        localStorage.setItem(LAST_FORM_KEY, String(id));
+    } catch {
+        // Private mode or quota: the next page starts on the first form.
     }
 }
 
