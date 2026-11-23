@@ -84,6 +84,10 @@ _UNSCOPED_METHODS = {
     "FormAnnotationRepository.project_ids": "resolves the projects a write is "
     "judged on",
     "StudyRepository.project_ids": "resolves the projects a write is judged on",
+    # Not a row read. The study was already resolved in scope; the property
+    # only hands that request's session to the extension callback.
+    "StudyRepository.session": "the request session for an extension, after the "
+    "study was resolved in scope; it returns no row",
     "ImageInstanceRepository.project_ids": "resolves the projects a write is "
     "judged on",
     "ImageInstanceRepository.project_ids_for_images": "resolves the projects a "
