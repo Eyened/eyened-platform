@@ -13,7 +13,11 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
     import { Workspace } from "$lib/workspace/workspace.svelte";
-    import { startStripOn } from "$lib/workspace/workspacePrefs";
+    import {
+        readStripLocalizer,
+        readStripTracking,
+        startStripOn,
+    } from "$lib/workspace/workspacePrefs";
     import {
         createWorkspaceUrlWriter,
         parseWorkspaceParams,
@@ -67,7 +71,12 @@ Creates the viewer window: the WebGL canvas, its ViewerWindowContext and the Wor
             );
         },
     });
-    const workspace = new Workspace({ writeUrl: urlWriter.write, strip });
+    const workspace = new Workspace({
+        writeUrl: urlWriter.write,
+        strip,
+        stripTracking: readStripTracking(),
+        stripLocalizer: readStripLocalizer(),
+    });
     setContext("workspace", workspace);
 
     const { promise, resolve, reject } = new Deferred<ViewerWindowContext>();

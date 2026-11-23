@@ -7,14 +7,23 @@ Arrow keys move focus only; Enter, Space or a click applies.
     import { Button } from "$lib/components/ui/button/index.js";
     import * as Popover from "$lib/components/ui/popover/index.js";
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
-    import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+    import { Toggle } from "$lib/components/ui/toggle/index.js";
+    import { ToggleGroup } from "$lib/components/ui/toggle-group/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
     import { getContext, tick, untrack } from "svelte";
     import { PRESET_ROWS, smallestRowFor } from "./presets";
     import { rovingIndex } from "./rovingIndex";
     import type { Workspace } from "./workspace.svelte";
-    import { ARRANGE_ORDERS, type ArrangeOrder } from "./workspaceRules";
-    import { writeStripOn } from "./workspacePrefs";
+    import {
+        ARRANGE_ORDERS,
+        type ArrangeOrder,
+        type LocalizerMode,
+    } from "./workspaceRules";
+    import {
+        writeStripLocalizer,
+        writeStripOn,
+        writeStripTracking,
+    } from "./workspacePrefs";
 
     let {
         stripToggle = false,
@@ -35,6 +44,11 @@ Arrow keys move focus only; Enter, Space or a click applies.
         eye: "By eye",
         modality: "By modality",
     };
+    const LOCALIZER_ITEMS = [
+        { value: "off", text: "Off", label: "Off" },
+        { value: "current", text: "Current", label: "Current slice" },
+        { value: "all", text: "All", label: "All slices" },
+    ];
     const flat = PRESET_ROWS.flatMap((row, r) =>
         row.presets.map((preset, c) => ({ preset, r, c })),
     );
@@ -112,6 +126,16 @@ Arrow keys move focus only; Enter, Space or a click applies.
     function setStrip(on: boolean) {
         workspace.strip = on;
         writeStripOn(on);
+    }
+
+    function setTracking(on: boolean) {
+        workspace.stripTracking = on;
+        writeStripTracking(on);
+    }
+
+    function setLocalizer(mode: LocalizerMode) {
+        workspace.stripLocalizer = mode;
+        writeStripLocalizer(mode);
     }
 
     // Carbon Popover: Tab out of the last control closes it.
@@ -232,20 +256,64 @@ Arrow keys move focus only; Enter, Space or a click applies.
                 </button>
             {/each}
         </div>
+        <!-- ASSUMPTION: Carbon small toggles; a task sets the strip in its config, so there the strip is a plain label. -->
         {#if stripToggle}
-            <!-- ASSUMPTION: a checkbox is the toggle (plan decision 19); a task sets the strip in its config. -->
-            <Field.Field orientation="horizontal" class="mt-3 px-2">
-                <Checkbox
+            <Field.Field orientation="horizontal" class="mt-3 min-h-6 px-2">
+                <Toggle
                     id="{uid}-strip"
                     bind:checked={() => workspace.strip, setStrip}
                 />
                 <Field.Label
+                    id="{uid}-strip-label"
                     for="{uid}-strip"
                     class="text-body-compact-01 text-text-primary"
                 >
                     Thumbnail strip
                 </Field.Label>
             </Field.Field>
+        {:else if workspace.strip}
+            <h2
+                id="{uid}-strip-label"
+                class="mt-3 mb-1 px-2 text-label-01 text-text-secondary"
+            >
+                Thumbnail strip
+            </h2>
+        {/if}
+        {#if workspace.strip}
+            <div
+                role="group"
+                aria-labelledby="{uid}-strip-label"
+                class="flex flex-col gap-1 ps-6 pe-2 pt-1"
+            >
+                <Field.Field orientation="horizontal" class="min-h-6">
+                    <Toggle
+                        id="{uid}-tracking"
+                        bind:checked={
+                            () => workspace.stripTracking, setTracking
+                        }
+                    />
+                    <Field.Label
+                        for="{uid}-tracking"
+                        class="text-body-compact-01 text-text-primary"
+                    >
+                        Crosshair tracking
+                    </Field.Label>
+                </Field.Field>
+                {#if workspace.hasLocalizers}
+                    <div class="flex min-h-6 items-center gap-2">
+                        <span
+                            class="text-body-compact-01 text-text-primary"
+                            aria-hidden="true">Localizer lines</span
+                        >
+                        <ToggleGroup
+                            label="Localizer lines"
+                            value={workspace.stripLocalizer}
+                            onchange={(v) => setLocalizer(v as LocalizerMode)}
+                            items={LOCALIZER_ITEMS}
+                        />
+                    </div>
+                {/if}
+            </div>
         {/if}
     </Popover.Content>
 </Popover.Root>

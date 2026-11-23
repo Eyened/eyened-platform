@@ -81,22 +81,16 @@ describe("UpdatePosition", () => {
         expect(setPosition).not.toHaveBeenCalled();
     });
 
-    it("does not update the linked cursor while dragging a top-row viewer", () => {
+    it("updates the linked cursor while dragging or drawing in the main viewer", () => {
         const { event, setPosition } = makeEvent({
-            shift: true,
-            buttons: 1,
-            isTopViewer: true,
-        });
-        control.pointermove(event);
-        expect(setPosition).not.toHaveBeenCalled();
-    });
-
-    it("does not update the linked cursor while dragging the main viewer", () => {
-        const { event, setPosition } = makeEvent({
-            shift: true,
+            shift: false,
             buttons: 1,
         });
         control.pointermove(event);
-        expect(setPosition).not.toHaveBeenCalled();
+        expect(setPosition).toHaveBeenCalledWith("img-1", {
+            x: 3,
+            y: 4,
+            index: 7,
+        });
     });
 });

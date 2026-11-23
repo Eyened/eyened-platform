@@ -37,7 +37,7 @@
         <ToggleGroupPrimitive.Item
             value={item.value}
             aria-label={item.label}
-            class="flex size-6 cursor-pointer items-center justify-center text-label-01 text-text-secondary hover:bg-content-switcher-background-hover hover:text-text-primary data-[state=on]:bg-content-switcher-selected data-[state=on]:text-text-primary data-[state=on]:shadow-content-switcher-selected"
+            class="flex h-6 min-w-6 cursor-pointer items-center justify-center px-1 text-label-01 text-text-secondary hover:bg-content-switcher-background-hover hover:text-text-primary data-[state=on]:bg-content-switcher-selected data-[state=on]:text-text-primary data-[state=on]:shadow-content-switcher-selected"
         >
             {item.text}
         </ToggleGroupPrimitive.Item>

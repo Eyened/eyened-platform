@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import LayoutPopover from "./LayoutPopover.svelte";
 import {
@@ -6,7 +12,11 @@ import {
     workspaceContext,
     workspaceWith,
 } from "./testUtils";
-import { readStripOn } from "./workspacePrefs";
+import {
+    readStripLocalizer,
+    readStripOn,
+    readStripTracking,
+} from "./workspacePrefs";
 
 async function open(ws = workspaceWith(20)) {
     const result = render(LayoutPopover, { context: workspaceContext(ws) });
@@ -74,8 +84,8 @@ describe("LayoutPopover", () => {
     });
 });
 
-describe("LayoutPopover strip toggle", () => {
-    it("on /view turns the strip off and remembers it per browser", async () => {
+describe("LayoutPopover strip settings", () => {
+    it("on /view turns the strip off and remembers it per browser; its settings hide with it", async () => {
         localStorage.clear();
         const ws = workspaceWith(3);
         render(LayoutPopover, {
@@ -83,12 +93,48 @@ describe("LayoutPopover strip toggle", () => {
             context: workspaceContext(ws),
         });
         await fireEvent.click(screen.getByRole("button", { name: "Layout" }));
-        const toggle = await screen.findByRole("checkbox", {
+        const strip = await screen.findByRole("switch", {
             name: "Thumbnail strip",
         });
-        expect(toggle).toHaveAttribute("aria-checked", "true");
-        await fireEvent.click(toggle);
+        expect(strip).toHaveAttribute("aria-checked", "true");
+        expect(
+            screen.getByRole("switch", { name: "Crosshair tracking" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("group", { name: "Localizer lines" }),
+        ).toBeNull();
+        await fireEvent.click(strip);
         expect(ws.strip).toBe(false);
         expect(readStripOn()).toBe(false);
+        expect(
+            screen.queryByRole("switch", { name: "Crosshair tracking" }),
+        ).toBeNull();
+    });
+
+    it("in a task, shows the settings under a plain Thumbnail strip label and remembers them", async () => {
+        localStorage.clear();
+        const ws = workspaceWith(3);
+        ws.hasLocalizers = true;
+        const { container } = render(LayoutPopover, {
+            context: workspaceContext(ws),
+        });
+        await fireEvent.click(screen.getByRole("button", { name: "Layout" }));
+        const group = await screen.findByRole("group", {
+            name: "Thumbnail strip",
+        });
+        expect(
+            screen.queryByRole("switch", { name: "Thumbnail strip" }),
+        ).toBeNull();
+        await fireEvent.click(
+            within(group).getByRole("switch", { name: "Crosshair tracking" }),
+        );
+        expect(ws.stripTracking).toBe(false);
+        expect(readStripTracking()).toBe(false);
+        await fireEvent.click(
+            within(group).getByRole("radio", { name: "Current slice" }),
+        );
+        expect(ws.stripLocalizer).toBe("current");
+        expect(readStripLocalizer()).toBe("current");
+        await expectNoAxeViolations(container);
     });
 });

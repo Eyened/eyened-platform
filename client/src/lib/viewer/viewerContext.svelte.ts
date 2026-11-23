@@ -244,6 +244,35 @@ export class ViewerContext {
         }
     }
 
+    /** True for a thumbnail strip tile. */
+    get isStripTile(): boolean {
+        return this.viewerWindowContext.topViewers.get(this.image) === this;
+    }
+
+    /** True while the grader's Lock holds this image's B-scan. */
+    get sliceLocked(): boolean {
+        return (
+            this.viewerWindowContext.viewState?.isLocked(this.image.image_id) ??
+            false
+        );
+    }
+
+    /** Strip tiles follow the crosshair while tracking is on; other viewers unless locked. */
+    followsCrosshair(): boolean {
+        if (this.isStripTile)
+            return this.viewerWindowContext.viewState?.stripTracking ?? true;
+        return !this.sliceLocked;
+    }
+
+    /** Takes the crosshair's slice unless this viewer keeps its own. */
+    syncIndex(): void {
+        if (!this.followsCrosshair()) return;
+        const p = this.viewerWindowContext.registration.getPosition(
+            this.image.image_id,
+        );
+        if (p) this.index = p.index;
+    }
+
     cycleEnfaceProjectionModeForOct(octPublicId: string): void {
         const modes: EnfaceProjectionMode[] = ["off", "binary", "heatmap"];
         const current =
@@ -467,13 +496,8 @@ export class ViewerContext {
         if (!renderBounds) {
             return;
         }
-        const p = this.viewerWindowContext.registration.getPosition(
-            this.image.image_id,
-        );
-        if (p) {
-            this.index = p.index;
-        }
-        // else keep this.index (mid-slice / restored pending / last setIndex)
+        // Without a crosshair, keep this.index (mid-slice, restored, or the last setIndex).
+        this.syncIndex();
 
         const renderTarget = { ...renderBounds, framebuffer: null, scissor };
 

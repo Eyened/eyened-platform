@@ -22,6 +22,13 @@ export class CursorOverlay implements Overlay {
         // const position = registration.pointer[image.image_id];
         const position = registration.getPosition(image.image_id);
         if (!position) return;
+        // A still tile shows no crosshair; a locked B-scan shows none while the crosshair is on another slice.
+        if (
+            !viewerContext.followsCrosshair() &&
+            (viewerContext.isStripTile ||
+                position.index !== viewerContext.index)
+        )
+            return;
 
         context2D.lineWidth = this.lineWidth;
         context2D.strokeStyle = this.strokeStyle;

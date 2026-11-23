@@ -9,7 +9,7 @@ export class ScrollOCT implements ViewerEventListener {
     keydown(e: ViewerEvent<KeyboardEvent>) {
         const { event, viewerContext } = e;
         const { lockScroll, image, index } = viewerContext;
-        if (lockScroll) return;
+        if (lockScroll || viewerContext.sliceLocked) return;
         if (event.code === "ArrowUp") {
             const i = (index - 1 + image.depth) % image.depth;
             viewerContext.setIndex(i);
@@ -24,7 +24,7 @@ export class ScrollOCT implements ViewerEventListener {
         const { viewerContext, wheel } = e;
         const { image, lockScroll, index } = viewerContext;
         if (wheel?.zoomIntent) return;
-        if (lockScroll) return;
+        if (lockScroll || viewerContext.sliceLocked) return;
         const delta = wheel?.primaryDeltaPx ?? 0;
 
         let i = index + Math.sign(delta);

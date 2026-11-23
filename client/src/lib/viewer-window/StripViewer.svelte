@@ -9,6 +9,7 @@
     import type { AbstractImage } from "$lib/webgl/abstractImage";
     import { resolveEnfaceOverlaySources } from "$lib/registration/resolveEnfaceOverlaySources";
     import { instances } from "$lib/data/stores.svelte";
+    import type { Workspace } from "$lib/workspace/workspace.svelte";
 
     interface Props {
         image: AbstractImage;
@@ -19,6 +20,8 @@
     const viewerWindowContext = getContext<ViewerWindowContext>(
         "viewerWindowContext",
     );
+
+    const workspace = getContext<Workspace>("workspace");
 
     const viewerContext = viewerWindowContext.topViewers.get(image)!;
     setContext("viewerContext", viewerContext);
@@ -72,7 +75,12 @@
 
     $effect(() => {
         if (hasLocators) {
-            return viewerContext.addOverlay(new OCTLinesOverlay(photoLocators));
+            return viewerContext.addOverlay(
+                new OCTLinesOverlay(
+                    photoLocators,
+                    () => workspace.stripLocalizer,
+                ),
+            );
         }
     });
 

@@ -81,14 +81,14 @@ describe("SliceScrollbar", () => {
         expect(viewerContext.index).toBe(127);
     });
 
-    it("Lock toggles", async () => {
+    it("Lock sets the image's lock and is not pressed by a drawing tool", async () => {
         const { viewerContext } = await renderEdge("bscan");
-        const lock = screen.getByRole("button", {
-            name: "Lock slice scrolling",
-        });
+        viewerContext.lockScroll = true;
+        await tick();
+        const lock = screen.getByRole("button", { name: "Lock slice" });
         expect(lock).toHaveAttribute("aria-pressed", "false");
         await fireEvent.click(lock);
-        expect(viewerContext.lockScroll).toBe(true);
+        expect(viewerContext.sliceLocked).toBe(true);
         expect(lock).toHaveAttribute("aria-pressed", "true");
     });
 

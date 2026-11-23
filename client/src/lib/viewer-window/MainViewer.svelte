@@ -11,7 +11,7 @@
     import Viewer from "$lib/viewer/Viewer.svelte";
     import { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import type { AbstractImage } from "$lib/webgl/abstractImage";
-    import { getContext, onDestroy, setContext } from "svelte";
+    import { getContext, onDestroy, setContext, untrack } from "svelte";
     import { ViewerWindowContext } from "./viewerWindowContext.svelte";
 
     import { MainViewerContext } from "$lib/viewer/overlays/MainViewerContext.svelte";
@@ -67,6 +67,7 @@
 
     const followCursor = {
         pointermove(e: ViewerEvent<PointerEvent>) {
+            if (!viewerWindowContext.viewState.stripTracking) return;
             const p = e.viewerContext.viewerToImageCoordinates(e.cursor);
             topViewer.focusFromFit(p.x, p.y, TWIN_ZOOM);
         },
@@ -76,6 +77,12 @@
     };
 
     onDestroy(viewerContext.addOverlay(followCursor));
+
+    // Switching Crosshair tracking off returns the tile to its fit.
+    $effect(() => {
+        if (!viewerWindowContext.viewState.stripTracking)
+            untrack(() => topViewer.initTransform());
+    });
     onDestroy(() => {
         topViewer.initTransform();
     });

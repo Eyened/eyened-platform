@@ -292,3 +292,6 @@ export function setSplit(
     next[line] = total - a;
     return next;
 }
+
+/** Which localizer lines strip tiles draw. */
+export type LocalizerMode = "off" | "current" | "all";
