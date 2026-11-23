@@ -161,21 +161,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/panelForm/PanelForm.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelHelp/SegmentationPanelHelp.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelInfo/panelInfo.svelte": {
-    "svelte/require-each-key": {
-      "count": 1
-    }
-  },
   "src/lib/viewer-window/viewerWindowContext.svelte.ts": {
     "svelte/prefer-svelte-reactivity": {
       "count": 5

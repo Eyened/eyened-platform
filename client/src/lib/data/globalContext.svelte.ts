@@ -16,7 +16,6 @@ export class GlobalContext {
     public userManager: UserManager;
     public passwordEnabled: boolean = $state(false);
 
-    public formShortcut: string | null = $state("WARMGS");
     public config: any = $state({
         showOtherAnnotationsHuman: true,
         showOtherAnnotationsMachine: true,
