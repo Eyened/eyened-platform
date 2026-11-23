@@ -5,6 +5,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 -->
 <script lang="ts">
     import { resolve } from "$app/paths";
+    import FormsPanel from "$lib/forms/FormsPanel.svelte";
     import { instances, patients } from "$lib/data";
     import type { RegistrationSet } from "$lib/registration/registrationItem";
     import { collectPatientRegistrationSets } from "$lib/registration/registrationItem";
@@ -195,6 +196,9 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         {#if image}
             <StripViewer {image} />
         {/if}
+    {/snippet}
+    {#snippet forms()}
+        <FormsPanel />
     {/snippet}
 </WorkspaceFrame>
 

@@ -52,6 +52,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         onaddimages,
         task = null,
         emptyMessage = null,
+        forms,
     }: {
         viewer: Snippet<[string]>;
         tile: Snippet<[string]>;
@@ -59,6 +60,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         onaddimages: () => void;
         task?: TaskHeader | null;
         emptyMessage?: string | null;
+        /** The Grading or Forms panel's content. */
+        forms?: Snippet;
     } = $props();
 
     const workspace = getContext<Workspace>("workspace");
@@ -588,6 +591,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 >
                     {formsName}
                 </h2>
+                {@render forms?.()}
             </section>
         </div>
     </aside>
