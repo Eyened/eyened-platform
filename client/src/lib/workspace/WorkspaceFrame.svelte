@@ -381,24 +381,6 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 nowNarrow ? `${uid}-right-panels` : `${uid}-${panel}`,
             )?.focus();
     }
-
-    // ASSUMPTION: the root <Toaster> reads these (plan decision 16): bottom right of the canvas, above the pager
-    // and the bottom-right viewport's 32 px view bar, with an 8 px gap.
-    $effect(() => {
-        const style = document.body.style;
-        style.setProperty(
-            "--viewer-toast-right",
-            `${narrow ? 16 : (rightOpen ? RIGHT_OPEN_PX : RAIL_PX) + 16}px`,
-        );
-        style.setProperty(
-            "--viewer-toast-bottom",
-            `${workspace.showPager ? 72 : 40}px`,
-        );
-        return () => {
-            style.removeProperty("--viewer-toast-right");
-            style.removeProperty("--viewer-toast-bottom");
-        };
-    });
 </script>
 
 {#snippet tools(orientation: "vertical" | "horizontal")}

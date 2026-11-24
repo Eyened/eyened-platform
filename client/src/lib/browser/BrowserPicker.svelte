@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { Snippet } from "svelte";
     import { Modal } from "$lib/components/ui/modal/index.js";
     import Browser from "./Browser.svelte";
     import { BrowserContext, type Condition } from "./browserContext.svelte";
@@ -15,6 +16,12 @@
         onConfirm: (ids: string[]) => Promise<void>;
         modalLabel?: string;
         errorTitle: string;
+        modalHeading?: string;
+        primaryButtonText?: string;
+        primaryButtonLoadingDescription?: string;
+        successDescription?: string;
+        /** Above the browser, e.g. the viewer's "Save to the set's images". */
+        top?: Snippet;
     }
     let {
         open = $bindable(false),
@@ -23,6 +30,11 @@
         onConfirm,
         modalLabel,
         errorTitle,
+        modalHeading = "Browse images",
+        primaryButtonText = "Save images",
+        primaryButtonLoadingDescription = "Saving images…",
+        successDescription = "Images saved",
+        top,
     }: Props = $props();
 
     // The picker owns the context so it can read the selection back out.
@@ -34,14 +46,15 @@
     bind:open
     size="lg"
     hasScrollingContent
-    modalHeading="Browse images"
+    {modalHeading}
     {modalLabel}
-    primaryButtonText="Save images"
-    primaryButtonLoadingDescription="Saving images…"
-    successDescription="Images saved"
+    {primaryButtonText}
+    {primaryButtonLoadingDescription}
+    {successDescription}
     {errorTitle}
     onsubmit={() => onConfirm([...context.selectedIds])}
 >
+    {@render top?.()}
     <Browser
         {context}
         mode="overlay"

@@ -110,11 +110,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/BrowserOverlay.svelte": {
-    "svelte/prefer-svelte-reactivity": {
-      "count": 1
-    }
-  },
   "src/lib/viewer-window/HelpOverlay.svelte": {
     "svelte/require-each-key": {
       "count": 2

@@ -199,9 +199,6 @@ describe("WorkspaceFrame", () => {
         for (const el of underOverlay(container))
             expect(el).not.toHaveAttribute("inert");
         expect(localStorage.getItem("eyened:viewer:rightOpen")).toBeNull();
-        expect(
-            document.body.style.getPropertyValue("--viewer-toast-right"),
-        ).toBe("16px");
     });
 
     it("below md the menu holds Task overview, Layout…, the tools and Images; Esc closes it; nothing is stored", async () => {
