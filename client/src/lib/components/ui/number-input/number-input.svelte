@@ -67,6 +67,7 @@
         />
         {#if invalidText}
             <WarningFilled
+                aria-hidden="true"
                 class="absolute end-4 top-1/2 -translate-y-1/2 text-support-error"
             />
         {/if}
