@@ -6,6 +6,7 @@
     } from "$lib/components/ui/button/index.js";
     import * as Tooltip from "$lib/components/ui/tooltip/index.js";
     import type { Snippet } from "svelte";
+    import type { ResolvedPathname } from "$app/types";
     import type { HTMLButtonAttributes } from "svelte/elements";
 
     // Carbon IconButton: ghost, secondary or primary, 40 px (`icon-xs` 24 px); `label` is both the tooltip and the accessible name, `shortcut` follows it in the tooltip.
@@ -32,6 +33,10 @@
         tooltip?: string;
         /** A second tooltip line, e.g. what a tool does; also the button's accessible description. */
         description?: string;
+        /** A link instead of a button, e.g. Task overview opening another tab. */
+        href?: ResolvedPathname;
+        target?: string;
+        rel?: string;
     } = $props();
     const uid = $props.id();
 </script>

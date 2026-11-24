@@ -5,6 +5,8 @@ Arrow keys move focus only; Enter, Space or a click applies.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import Grid from "carbon-icons-svelte/lib/Grid.svelte";
     import * as Popover from "$lib/components/ui/popover/index.js";
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
     import { Toggle } from "$lib/components/ui/toggle/index.js";
@@ -18,10 +20,13 @@ Arrow keys move focus only; Enter, Space or a click applies.
 
     let {
         stripToggle = false,
+        iconOnly = false,
         anchor,
         open = $bindable(false),
     }: {
         stripToggle?: boolean;
+        /** Below lg in a task: the Grid icon, with "Layout" as its name and tooltip. */
+        iconOnly?: boolean;
         /** CSS selector of an outside element to hang from; no trigger is rendered. */
         anchor?: string;
         open?: boolean;
@@ -132,9 +137,15 @@ Arrow keys move focus only; Enter, Space or a click applies.
         <span bind:this={triggerWrap} class="contents">
             <Popover.Trigger>
                 {#snippet child({ props })}
-                    <Button {...props} variant="ghost" size="sm"
-                        >Layout <ChevronDown /></Button
-                    >
+                    {#if iconOnly}
+                        <IconButton {...props} label="Layout"
+                            ><Grid /></IconButton
+                        >
+                    {:else}
+                        <Button {...props} variant="ghost" size="sm"
+                            >Layout <ChevronDown /></Button
+                        >
+                    {/if}
                 {/snippet}
             </Popover.Trigger>
         </span>
