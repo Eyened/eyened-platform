@@ -10,10 +10,13 @@ One question: its control by kind, " (required)", helper text, the error once it
     import { FOCUSABLE, formContext } from "./formContext";
     import CheckboxGroupField from "./fields/CheckboxGroupField.svelte";
     import DropdownField from "./fields/DropdownField.svelte";
+    import GroupListField from "./fields/GroupListField.svelte";
     import MultiSelectField from "./fields/MultiSelectField.svelte";
     import NumberField from "./fields/NumberField.svelte";
     import RadioField from "./fields/RadioField.svelte";
+    import SectionField from "./fields/SectionField.svelte";
     import TextField from "./fields/TextField.svelte";
+    import ValueListField from "./fields/ValueListField.svelte";
     import PointField from "./PointField.svelte";
     import { deref } from "./schemaType";
 
@@ -172,6 +175,40 @@ One question: its control by kind, " (required)", helper text, the error once it
                 />
             {:else if kind === "text"}
                 <TextField
+                    {value}
+                    {onchange}
+                    {label}
+                    {helperText}
+                    {invalidText}
+                    {readonly}
+                />
+            {:else if kind === "section"}
+                <SectionField
+                    {node}
+                    {value}
+                    {path}
+                    {depth}
+                    {label}
+                    {invalidText}
+                    {onchange}
+                />
+            {:else if kind === "group-list"}
+                <GroupListField
+                    {node}
+                    {path}
+                    {depth}
+                    {value}
+                    {onchange}
+                    {label}
+                    {helperText}
+                    {invalidText}
+                    {readonly}
+                />
+            {:else if kind === "value-list"}
+                <ValueListField
+                    {node}
+                    {path}
+                    {depth}
                     {value}
                     {onchange}
                     {label}

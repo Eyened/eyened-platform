@@ -144,4 +144,130 @@ describe("SchemaForm", () => {
             ),
         ).toBeInTheDocument();
     });
+
+    it("says how many answers a folded section misses", async () => {
+        const sections = {
+            type: "object",
+            properties: {
+                eye: {
+                    type: "object",
+                    description: "Left eye",
+                    required: ["a", "b"],
+                    properties: {
+                        a: { description: "A", type: "string" },
+                        b: { description: "B", type: "string" },
+                    },
+                },
+            },
+        } as JSONSchema;
+        renderForm({ schema: sections, value: { eye: {} } });
+        const trigger = screen.getByRole("button", { name: /Left eye/ });
+        expect(trigger).not.toHaveTextContent("not answered");
+        await fireEvent.click(trigger);
+        expect(trigger).toHaveTextContent("2 not answered");
+    });
+
+    it("keeps focus in a list's text row while typing", async () => {
+        const list = {
+            type: "object",
+            properties: {
+                notes: {
+                    type: "array",
+                    description: "Notes",
+                    items: { type: "string", description: "Note" },
+                },
+            },
+        } as JSONSchema;
+        const { onchange, rerender } = renderForm({
+            schema: list,
+            value: { notes: ["a"] },
+        });
+        const row = screen.getByLabelText("Note 1");
+        row.focus();
+        await fireEvent.input(row, { target: { value: "ab" } });
+        expect(onchange).toHaveBeenLastCalledWith({ notes: ["ab"] });
+        await rerender({ value: { notes: ["ab"] } });
+        expect(screen.getByLabelText("Note 1")).toBe(row);
+        expect(row).toHaveFocus();
+    });
+
+    it("deletes an empty entry at once and asks before deleting one with answers", async () => {
+        const group = {
+            type: "object",
+            properties: {
+                naevi: {
+                    type: "array",
+                    description: "Naevi",
+                    items: {
+                        type: "object",
+                        description: "Naevus",
+                        properties: {
+                            size: { description: "Size", type: "number" },
+                        },
+                    },
+                },
+            },
+        } as JSONSchema;
+        const { onchange } = renderForm({
+            schema: group,
+            value: { naevi: [{ size: 1 }, { size: 2 }, {}] },
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Delete Naevus 3" }),
+        );
+        expect(onchange).toHaveBeenLastCalledWith({
+            naevi: [{ size: 1 }, { size: 2 }],
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Delete Naevus 2" }),
+        );
+        const dialog = await screen.findByRole("dialog", {
+            name: "Delete Naevus 2",
+        });
+        expect(onchange).toHaveBeenCalledTimes(1);
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Delete" }),
+        );
+        await vi.waitFor(() =>
+            expect(onchange).toHaveBeenLastCalledWith({
+                naevi: [{ size: 1 }, {}],
+            }),
+        );
+    });
+
+    it("keeps an emptied list entry in its place", async () => {
+        const lists = {
+            type: "object",
+            properties: {
+                notes: {
+                    type: "array",
+                    description: "Notes",
+                    items: { type: "string", description: "Note" },
+                },
+                sizes: {
+                    type: "array",
+                    description: "Sizes",
+                    items: { type: "number", description: "Size" },
+                },
+            },
+        } as JSONSchema;
+        const { onchange } = renderForm({
+            schema: lists,
+            value: { notes: ["a", "b"], sizes: [1, 2] },
+        });
+        await fireEvent.input(screen.getByLabelText("Note 1"), {
+            target: { value: "" },
+        });
+        expect(onchange).toHaveBeenLastCalledWith({
+            notes: ["", "b"],
+            sizes: [1, 2],
+        });
+        await fireEvent.input(screen.getByLabelText("Size 1"), {
+            target: { value: "" },
+        });
+        expect(onchange).toHaveBeenLastCalledWith({
+            notes: ["a", "b"],
+            sizes: [null, 2],
+        });
+    });
 });
