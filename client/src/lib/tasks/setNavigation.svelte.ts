@@ -64,7 +64,7 @@ export class SetNavigation {
     pending: SetControl | null = $state(null);
     /** Set by "Mark ready" on the last set. */
     lastReady = $state(false);
-    /** Decision 10's notification once "Mark ready" left nowhere to go. */
+    /** The notification once "Mark ready" left nowhere to go. */
     get readyNotice(): { title: string; subtitle: string } | null {
         if (!this.lastReady) return null;
         const { index, count } = this.deps;
