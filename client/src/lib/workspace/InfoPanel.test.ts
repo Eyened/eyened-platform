@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import InfoPanel from "./InfoPanel.svelte";
 import { instance, workspaceContext, workspaceWith } from "./testUtils";
 
+vi.mock("./patientStudies", () => ({
+    loadPatientStudies: vi.fn(),
+    PATIENT_STUDY_LIMIT: 200,
+}));
 vi.mock("$lib/utils/copyToClipboard", () => ({
     copyToClipboard: vi.fn(async () => true),
 }));

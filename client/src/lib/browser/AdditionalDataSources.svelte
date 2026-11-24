@@ -13,8 +13,14 @@
     interface Props {
         context: any;
         additional_data_sources: AdditionalDataSource[];
+        /** The source titles' heading level: 5 inside a visit in Info. */
+        headingLevel?: 3 | 5;
     }
-    let { context, additional_data_sources }: Props = $props();
+    let {
+        context,
+        additional_data_sources,
+        headingLevel = 3,
+    }: Props = $props();
 
     type AdditionalDataSource = {
         name: string;
@@ -51,7 +57,9 @@
             <!-- The await depends on the URL string only, so a study update that leaves the URL alone does not reload. -->
             {@const url = resolveURL(source.url, context)}
             <Accordion.Item value={source.name}>
-                <Accordion.Trigger>{source.name}</Accordion.Trigger>
+                <Accordion.Trigger level={headingLevel}
+                    >{source.name}</Accordion.Trigger
+                >
                 <Accordion.Content>
                     {#await loadDataSource(url)}
                         <InlineLoading status="active" description="Loading…" />

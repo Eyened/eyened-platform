@@ -11,6 +11,7 @@ Info: the selected viewport's image, as label-over-value rows with a copy button
     import { getContext, onDestroy, tick } from "svelte";
     import type { ImageGET } from "../../types/openapi_types";
     import { ageAt, eyeLabel } from "./imageMeta";
+    import VisitsList from "./VisitsList.svelte";
     import type { Workspace } from "./workspace.svelte";
 
     let {
@@ -124,6 +125,7 @@ Info: the selected viewport's image, as label-over-value rows with a copy button
             onclick={() => (dialogOpen = true)}>View all properties…</Button
         >
         <InstanceInfoDialog instanceId={image.id} bind:open={dialogOpen} />
+        <VisitsList instance={image} active={shown} />
     {:else}
         <p class="px-4 text-body-compact-01 text-text-secondary">
             Select a viewport with an image to see its information.
