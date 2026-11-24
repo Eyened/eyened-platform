@@ -258,7 +258,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                                     >{shownTitle.patient}{#if shownTitle.demographics}&nbsp;·
                                         {shownTitle.demographics}{/if}</span
                                 >
-                                <span class="body"
+                                <span class="title-body"
                                     >{#if shownTitle.eye}<span class="eye"
                                             >{shownTitle.eye}{#if shownTitle.rest}&nbsp;·&nbsp;{/if}</span
                                         >{/if}<span class="rest"
@@ -412,7 +412,7 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
         color: var(--color-text-primary);
     }
     /* The eye never shortens (BIR 4.16.4.2.2.6.7); the rest ends in an ellipsis from the device end. */
-    .body {
+    .title-body {
         display: flex;
         flex: 0 1 auto;
         min-width: 0;
