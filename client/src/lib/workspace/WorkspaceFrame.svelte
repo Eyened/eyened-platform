@@ -106,8 +106,10 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     const overlayOpen = $derived(narrow && overlay !== null);
     const formsName = $derived(task ? "Grading" : "Forms");
     const footer = $derived(
-        narrow && task !== null && !!(task.tag || task.status),
+        narrow && task !== null && !!(task.tag || task.holder || task.status),
     );
+    // Closing the holder notice lasts for this set; the next set is a page load.
+    let holderNoticeClosed = $state(false);
     let footerHeight = $state(0);
     // The header's words on the narrow panels button while something couldn't save.
     const saveFailure = $derived(
@@ -581,6 +583,18 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                     </div>
                 {/if}
             </div>
+            <!-- Outside the live region: on arrival it is just there; after a lost Claim it is an alert. -->
+            {#if task?.holderNotice && !holderNoticeClosed}
+                <div class="px-4 pt-2">
+                    <InlineNotification
+                        kind="warning"
+                        title={task.holderNotice.title}
+                        subtitle={task.holderNotice.subtitle}
+                        role={task.holderNotice.alert ? "alert" : "none"}
+                        onclose={() => (holderNoticeClosed = true)}
+                    />
+                </div>
+            {/if}
             {#if workspace.strip}
                 <ThumbnailStrip {tile} {titleFor} />
             {/if}
@@ -653,7 +667,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                     >
                         <!-- At 320 px a tag and "1 form couldn't save" don't fit on one line, so it wraps. -->
                         <div class="flex min-h-6 flex-wrap items-center gap-2">
-                            {@render task.tag?.()}
+                            {@render task.tag?.()}{@render task.holder?.()}
                             <div class="ms-auto">
                                 <SaveStateSlot
                                     iconOnly={false}

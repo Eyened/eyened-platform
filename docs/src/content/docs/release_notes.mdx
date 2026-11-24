@@ -243,6 +243,7 @@ database.
   draw again.
 - Viewer: Grading and Forms list the forms of the open images by image, visit or eye; a row opens its form, "Grade" and Add form make one. The set's comments are back in Grading, "Mark ready" warns about forms that aren't complete, and on a narrow screen the set's status and button sit at the bottom of Grading. `layout.prepend` (quick-form panels) is removed and Grading replaces it; task configs that still set it load, and the key is ignored. `layout.hide` now names Layers sections (`hide: ["Form"]` does nothing), and `task_panel.expanded` has no effect.
 - Viewer: the form window stays open from set to set: it shows "Loading set 13…", then your form for the selected viewport's image, or Grade. Its header names the image, visit or eye; a blue button on each viewport of that image brings the window to the front, and clicking a point in a form goes to it. While a form's point field is armed the tool bar shows it. A blocked pop-up shows a notice instead of an alert; /browse uses the same window.
+- Viewer: the header shows who holds the set ("Yours", "Unclaimed" or "Held by ‹name›") with Claim or Give back; on someone else's set a notice says so, and when you may not change a set its status menu is gone and its comments are read-only. "Mark ready and next" and "Go to next set" skip sets someone else holds and sets already Ready; ◀ ▶ still step by one. From 672 to 1055 px wide the header hides the product name and shows Task overview and Layout as icons.
 
 ## v2026.09.0
 

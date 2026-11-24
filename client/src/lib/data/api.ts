@@ -30,6 +30,7 @@ import {
     ingestTags,
     ingestTasks,
     segmentations,
+    subtasks,
 } from "./stores.svelte";
 
 // ===== Helper Functions =====
@@ -290,6 +291,17 @@ export async function getStudiesSignature(): Promise<any[]> {
 
 // ===== Segmentation Creation (specialized) =====
 
+/** A create on an unclaimed set claims it on the server; re-read the set so its holder shows. */
+async function refreshHolder(subTaskId: number | null | undefined) {
+    if (subTaskId == null || subtasks.get(subTaskId)?.creator_id != null)
+        return;
+    try {
+        await fetchSubTask(subTaskId);
+    } catch {
+        // The create itself worked; the tag catches up on the next set GET.
+    }
+}
+
 export async function createSegmentation(
     item: any,
     np_array?: any,
@@ -313,6 +325,7 @@ export async function createSegmentation(
     );
 
     ingestSegmentations([data]);
+    await refreshHolder(item.subtask_id);
 
     return data;
 }
@@ -410,6 +423,7 @@ export async function createFormAnnotation(data: {
         body: data as any,
     });
     ingestFormAnnotations([result]);
+    await refreshHolder(data.sub_task_id);
     return result;
 }
 

@@ -12,8 +12,16 @@ The set's comments: one line when empty, at most 5 lines unfocused, all of it wh
     import type { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
     import { untrack } from "svelte";
 
-    let { saver, initial }: { saver: DebouncedSaver<string>; initial: string } =
-        $props();
+    let {
+        saver,
+        initial,
+        readonly = false,
+    }: {
+        saver: DebouncedSaver<string>;
+        initial: string;
+        /** I may not change this set's comments: still focusable and read. */
+        readonly?: boolean;
+    } = $props();
 
     let value = $state(untrack(() => initial));
     let focused = $state(false);
@@ -28,6 +36,7 @@ The set's comments: one line when empty, at most 5 lines unfocused, all of it wh
         bind:value
         rows={focused ? lines : Math.min(lines, 5)}
         resize={false}
+        {readonly}
         oninput={(e) => saver.edit(e.currentTarget.value)}
         onfocus={() => (focused = true)}
         onblur={() => {

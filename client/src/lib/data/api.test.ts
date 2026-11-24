@@ -18,9 +18,12 @@ vi.mock("../api/client", async (importOriginal) => {
 });
 
 const { api, ApiError } = await import("../api/client");
-const { fetchSubTasks, fetchSubTaskAssignees, updateSubTask } = await import(
-    "./api"
-);
+const {
+    createFormAnnotation,
+    fetchSubTasks,
+    fetchSubTaskAssignees,
+    updateSubTask,
+} = await import("./api");
 
 function ok<T>(data: T) {
     return { data, error: undefined, response: { status: 200 } as Response };
@@ -115,6 +118,35 @@ describe("subtask API helpers", () => {
             expect(apiError.message).toBe("SubTask is already assigned");
             expect(apiError.code).toBe("subtask_already_claimed");
         }
+    });
+});
+
+describe("the holder after a create", () => {
+    beforeEach(() => {
+        vi.mocked(api.POST).mockReset();
+        vi.mocked(api.GET).mockReset();
+        subtasks.clear();
+    });
+
+    it("a form created on an unclaimed set re-reads the set once, so its holder shows", async () => {
+        subtasks.set(9, { id: 9, creator_id: null } as never);
+        vi.mocked(api.POST).mockResolvedValue(ok({ id: 50, sub_task_id: 9 }));
+        vi.mocked(api.GET).mockResolvedValue(
+            ok({ id: 9, creator_id: 4, creator: { id: 4, name: "Kim" } }),
+        );
+        const form = {
+            form_schema_id: 1,
+            patient_id: 1,
+            sub_task_id: 9,
+            form_data: {},
+        };
+
+        await createFormAnnotation(form);
+        expect(subtasks.get(9)?.creator_id).toBe(4);
+
+        // Now held: the next create reads nothing.
+        await createFormAnnotation(form);
+        expect(api.GET).toHaveBeenCalledTimes(1);
     });
 });
 

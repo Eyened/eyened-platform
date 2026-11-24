@@ -29,6 +29,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
     import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import LeaveSetModal from "$lib/tasks/LeaveSetModal.svelte";
+    import HolderControl from "$lib/tasks/HolderControl.svelte";
     import SetStatusControl from "$lib/tasks/SetStatusControl.svelte";
     import { SetHolder } from "$lib/tasks/holder.svelte";
     import SetStatusTag from "$lib/tasks/SetStatusTag.svelte";
@@ -208,6 +209,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                       taskid: String(taskContext.task.id),
                   }),
                   tag: shows.status ? statusTag : undefined,
+                  holder: holderControl,
                   // A set I may change keeps its menu; otherwise only "Go to next set", when an open set follows.
                   status:
                       (shows.status && (holder.canEdit || nextOpen !== null)) ||
@@ -215,6 +217,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                           ? setStatus
                           : undefined,
                   notice: setNavigation.readyNotice,
+                  holderNotice: holder.notice,
               }
             : null,
     );
@@ -301,6 +304,12 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
             {holder}
             {layout}
         />
+    {/if}
+{/snippet}
+
+{#snippet holderControl()}
+    {#if holder && shows}
+        <HolderControl {holder} showStatus={shows.status} />
     {/if}
 {/snippet}
 
