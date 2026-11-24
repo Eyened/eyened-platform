@@ -61,42 +61,6 @@ export type JSONSchema = {
     "x-eyened-widget"?: "keypoint" | (string & {});
 };
 
-export function resolveRefs(
-    schema: JSONSchema,
-    rootSchema: JSONSchema = schema,
-): JSONSchema {
-    // Preserve arrays: resolve recursively without converting them into objects
-    if (Array.isArray(schema as any)) {
-        return (schema as unknown[]).map((item) =>
-            resolveRefs(item as any, rootSchema),
-        ) as unknown as JSONSchema;
-    }
-
-    if (schema !== null && typeof schema === "object") {
-        let base: any = {};
-
-        // If $ref is present, resolve it first so that local keys override the referenced schema
-        if ((schema as any).$ref && typeof (schema as any).$ref === "string") {
-            const ref = (schema as any).$ref as string;
-            const parts = ref.split("/");
-            let refSchema: any = rootSchema;
-            for (const part of parts.slice(1)) {
-                if (part) refSchema = refSchema[part];
-            }
-            base = resolveRefs(refSchema, rootSchema);
-        }
-
-        for (const [key, value] of Object.entries(schema as any)) {
-            if (key === "$ref") continue;
-            base[key] = resolveRefs(value as any, rootSchema);
-        }
-
-        return base as JSONSchema;
-    }
-
-    return schema;
-}
-
 export function getDefault(schema: JSONSchema) {
     if (schema.type === "object") {
         return {};

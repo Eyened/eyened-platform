@@ -1,384 +1,88 @@
+<!--
+@component
+A form from its JSON Schema: the root's questions on Carbon controls; a question's error shows once focus has left it, or for all after a Mark ready attempt.
+-->
 <script lang="ts">
-    import SchemaForm from "./SchemaForm.svelte";
-    import PointField from "./PointField.svelte";
-    import { type JSONSchema } from "./schemaType";
-    import { isPointWidget } from "./pointSchema";
-    import MainIcon from "$lib/viewer-window/icons/MainIcon.svelte";
-    import { Trash } from "$lib/viewer-window/icons/icons";
-    import { SchemaValidator } from "./schemaValidator.svelte";
-    import { Button } from "$lib/components/ui/button";
-    import { Input } from "$lib/components/ui/input";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
+    import { SvelteSet } from "svelte/reactivity";
+    import { fieldErrors, NOT_APPLICABLE } from "./fieldErrors";
+    import FieldList from "./FieldList.svelte";
+    import { fieldKind } from "./fieldKind";
+    import { setFormContext } from "./formContext";
+    import { checkForm } from "./formValidator";
+    import SchemaField from "./SchemaField.svelte";
+    import { deref, type JSONSchema } from "./schemaType";
 
-    // creates a globally unique id for grouping the radio input field (only needed if enum)
-    // can use $props.id() in svelte 5.20
-    const fieldID = [...Array(10)]
-        .map(() => Math.random().toString(36)[2])
-        .join("");
-
-    let collapsed = $state(false);
-
-    interface Props {
-        schema: JSONSchema;
-        value: any;
-        onchange: (value: any) => void;
-        max_radio_options?: number;
-        vertical?: boolean;
-        canEdit?: boolean;
-        collapse?: boolean;
-        requiredAbsent?: boolean;
-        entityType?: string | null;
-        fieldPath?: string;
-    }
     let {
         schema,
         value,
         onchange,
-        max_radio_options = 8,
-        vertical = true,
-        collapse = true,
         canEdit = true,
-        requiredAbsent = false,
-        entityType = null,
-        fieldPath = "",
-    }: Props = $props();
+        vertical = true,
+        markReadyAttempted = false,
+    }: {
+        /** The form schema as stored; `$ref`s are followed where they are drawn. */
+        schema: JSONSchema;
+        value: unknown;
+        onchange: (value: unknown) => void;
+        canEdit?: boolean;
+        vertical?: boolean;
+        /** "Go back" in "n forms aren't complete" was pressed in this set. */
+        markReadyAttempted?: boolean;
+    } = $props();
 
-    const title = schema.title || "?";
-    const schemaValidator = new SchemaValidator(schema, value);
+    const check = $derived(checkForm(schema, value));
+    const messages = $derived(fieldErrors(check.errors, value));
+    const touched = new SvelteSet<string>();
+    let reveal = $state<{ path: string } | null>(null);
+    const rootNode = $derived(deref(schema, schema));
 
-    function update() {
-        onchange(schemaValidator.value);
-    }
+    const shown = (path: string) => touched.has(path) || markReadyAttempted;
 
-    // local variable used to bind input fields to
-    // takes care of type conversion and setting undefined values
-    const val = {
-        get value() {
-            return schemaValidator.value;
+    setFormContext({
+        get root() {
+            return schema;
         },
-        set value(val: any) {
-            if (val !== undefined) {
-                if (schema.type == "integer") {
-                    val = parseInt(val);
-                } else if (schema.type == "number") {
-                    val = parseFloat(val);
-                }
-            }
-            schemaValidator.setValue(val);
-            update();
+        get canEdit() {
+            return canEdit;
         },
-    };
-
-    function clear(e: MouseEvent) {
-        e.preventDefault();
-        val.value = undefined;
-    }
-
-    function keyUpdate(key: string, value: any) {
-        schemaValidator.setProperty(key, value);
-        update();
-    }
-
-    function addArrayValue() {
-        schemaValidator.addArrayValue();
-        update();
-    }
-    function setArray(i: number, v: any) {
-        schemaValidator.setArrayValue(i, v);
-        update();
-    }
-    function removeArrayValue(i: number) {
-        schemaValidator.removeArrayValue(i);
-        update();
-    }
-
-    let errorKeys = $derived.by(() => {
-        return schemaValidator.errors
-            .filter((error) => error.path.startsWith("."))
-            .map((error) => error.path.slice(1));
+        get vertical() {
+            return vertical;
+        },
+        get reveal() {
+            return reveal;
+        },
+        // Another answer made this one not apply, so it shows at once.
+        message: (path) => {
+            const text = messages.get(path);
+            return text === NOT_APPLICABLE || shown(path) ? text : undefined;
+        },
+        shown,
+        ruledOut: (path) => check.ruledOut.has(path),
+        requiredNow: (path) => check.requiredNow.has(path),
+        missing: (path) =>
+            check.errors.filter(
+                (e) => e.type === "required" && e.path.startsWith(`${path}/`),
+            ).length,
+        touch: (path) => touched.add(path),
     });
-
-    let inputVisible = $derived.by(() => {
-        if (!canEdit) return false;
-        if (collapse) {
-            if (val.value === undefined) {
-                return true;
-            }
-            return false;
-        }
-        return true;
-    });
-
-    // hide if the key is required absent, and no value has been set
-    let hidden = $derived.by(() => {
-        if (requiredAbsent) {
-            if (val.value === undefined) {
-                return true;
-            }
-        }
-        return false;
-    });
-
-    let textFocus = $state(false);
 </script>
 
-{#snippet query(showValue = true)}
-    <div class="query">
-        {schema.description}:
-        {#if showValue && schemaValidator.value !== undefined}
-            <span class="value">
-                {schemaValidator.value}
-                {#if canEdit}
-                    <MainIcon
-                        onclick={clear}
-                        theme="light"
-                        Icon={Trash}
-                        size="1em"
-                        hoverColor="red"
-                    />
-                {/if}
-            </span>
+<div class="flex flex-col gap-6">
+    {#if check.schemaError}
+        <InlineNotification
+            role="status"
+            title="This form's schema has an error, so answers aren't checked"
+        />
+    {/if}
+    {#if rootNode && fieldKind(rootNode, schema) === "section"}
+        {#if messages.get("") && shown("")}
+            <p class="text-helper-text-01 text-text-error">
+                {messages.get("")}
+            </p>
         {/if}
-    </div>
-{/snippet}
-
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="main" class:hidden>
-    <div class="content" class:valid={schemaValidator.isValid}>
-        {#if isPointWidget(schema)}
-            <PointField
-                {schema}
-                {value}
-                {onchange}
-                {canEdit}
-                fieldPath={fieldPath || schema.title || "point"}
-            />
-        {:else if schema.type == "object"}
-            <header onclick={() => (collapsed = !collapsed)}>
-                {#if collapsed}▶{:else}▼{/if}
-                {title}
-            </header>
-            <div class="object" class:collapsed>
-                {#each schemaValidator.keysSorted as key}
-                    <div
-                        class="key"
-                        class:error={errorKeys.includes(key)}
-                        class:absent={schemaValidator.requiredAbsent.includes(
-                            key,
-                        )}
-                    >
-                        <SchemaForm
-                            schema={schema.properties![key]}
-                            value={schemaValidator.value?.[key]}
-                            onchange={(value) => keyUpdate(key, value)}
-                            {vertical}
-                            {collapse}
-                            requiredAbsent={schemaValidator.requiredAbsent.includes(
-                                key,
-                            )}
-                            {canEdit}
-                            {entityType}
-                            fieldPath={fieldPath ? `${fieldPath}.${key}` : key}
-                        />
-                    </div>
-                {/each}
-            </div>
-        {:else if schema.type == "array" && schema.items !== undefined}
-            {@render query(false)}
-            <ol class="array">
-                {#each schemaValidator.value ?? [] as sub_value, i (i + "_" + JSON.stringify(sub_value))}
-                    <li>
-                        <span>{i}</span>
-                        <SchemaForm
-                            value={sub_value}
-                            schema={schema.items}
-                            onchange={(v) => setArray(i, v)}
-                            {vertical}
-                            {collapse}
-                            {canEdit}
-                            {entityType}
-                            fieldPath={fieldPath
-                                ? `${fieldPath}[${i}]`
-                                : `[${i}]`}
-                        />
-                        <div class="icon">
-                            {#if canEdit}
-                                <MainIcon
-                                    onclick={() => removeArrayValue(i)}
-                                    theme="light"
-                                    Icon={Trash}
-                                    size="1.5em"
-                                    hoverColor="red"
-                                />
-                            {/if}
-                        </div>
-                    </li>
-                {/each}
-            </ol>
-            <div class="input">
-                <Button
-                    onclick={addArrayValue}
-                    disabled={!canEdit}
-                    variant="outline"
-                    size="sm"
-                >
-                    {`Add ${schema.items.title}`}
-                </Button>
-            </div>
-        {:else if schema.type == "string" || schema.type == "number" || schema.type == "integer"}
-            {#if schema.description}
-                {@render query(
-                    !(schema.enum && schema.enum.length > max_radio_options),
-                )}
-            {/if}
-
-            {#if schema.enum}
-                {#if schema.enum.length <= max_radio_options}
-                    {#if inputVisible}
-                        <ol class:vertical>
-                            {#each schema.enum as option}
-                                <li>
-                                    <label>
-                                        <input
-                                            type="radio"
-                                            value={option}
-                                            name={fieldID}
-                                            bind:group={val.value}
-                                        />
-                                        <span>{option}</span>
-                                    </label>
-                                </li>
-                            {/each}
-                        </ol>
-                    {/if}
-                {:else}
-                    <div class="input">
-                        <select bind:value={val.value}>
-                            {#each schema.enum as option}
-                                <option value={option}>{option}</option>
-                            {/each}
-                        </select>
-                    </div>
-                {/if}
-            {:else if inputVisible || textFocus}
-                <div class="input">
-                    <Input
-                        onfocus={() => (textFocus = true)}
-                        onblur={() => (textFocus = false)}
-                        type={schemaValidator.inputType}
-                        bind:value={val.value}
-                        class={schemaValidator.inputType == "text"
-                            ? "min-w-[300px]"
-                            : "w-20"}
-                    />
-                </div>
-            {/if}
-        {/if}
-    </div>
+        <FieldList schema={rootNode} {value} path="" depth={0} {onchange} />
+    {:else}
+        <SchemaField {schema} {value} path="" name="Answer" {onchange} />
+    {/if}
 </div>
-
-<style>
-    div.hidden {
-        display: none;
-    }
-    div.query {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 0.5em;
-    }
-    div.absent {
-        opacity: 0.3;
-    }
-    div.key {
-        display: flex;
-        flex-direction: row;
-    }
-    div.key.error {
-        background-color: rgba(255, 0, 0, 0.1);
-    }
-    span.value {
-        margin-left: 1em;
-        padding: 0.2em 0.5em;
-        border-radius: 0.25rem;
-        background-color: var(--color-layer-01);
-        color: var(--color-text-primary);
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5em;
-    }
-    div.content {
-        border-left: 0.2em solid red;
-    }
-    div.content.valid {
-        border-left: 0.2em solid green;
-    }
-    div {
-        display: flex;
-        flex-direction: column;
-    }
-    div.input {
-        flex-direction: row;
-    }
-    div.content {
-        padding-left: 0.2em;
-        overflow: auto;
-    }
-    ol {
-        padding: 0;
-        padding-left: 0.5em;
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 0.1em;
-        margin: 0;
-    }
-    ol.vertical {
-        flex-direction: column;
-        gap: 0.1em;
-    }
-    ol.array {
-        flex-direction: column;
-    }
-    li {
-        padding-left: 0.2 em;
-        display: flex;
-        align-items: center;
-        flex: 0 0 auto;
-    }
-    div.object {
-        flex-direction: column;
-    }
-    li {
-        display: flex;
-        align-items: center;
-    }
-    div.icon {
-        flex: 0;
-    }
-    div.main {
-        flex-direction: column;
-        flex: 1;
-        padding: 0.1em;
-        border-radius: 2px;
-        border: 1px solid black;
-        margin: 0.2em;
-
-        border-radius: 2px;
-        box-shadow: rgba(149, 157, 165, 0.1) 0px 3px 6px;
-    }
-
-    div.query {
-        font-weight: bold;
-    }
-    header {
-        font-weight: bold;
-        padding: 0.2em;
-        cursor: pointer;
-    }
-
-    div.collapsed {
-        display: none;
-    }
-</style>
