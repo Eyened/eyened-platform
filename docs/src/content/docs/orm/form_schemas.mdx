@@ -184,7 +184,7 @@ TaskConfig is merged over client defaults (`client/src/lib/config/clientDefaults
 | Field | Meaning |
 |-------|---------|
 | `form_schema_name` | `FormSchema.SchemaName` of the task form: Grading lists one row per target of the open images for it, and Add form starts on it. If no schema has this name, Grading shows a warning. |
-| `update_subtask_image_links` | Default for the browser overlay “Update task image links” checkbox (overrides client default `false`). |
+| `update_subtask_image_links` | Default for the “Save to the set’s images” checkbox in Add images (overrides client default `false`). |
 | `task_panel.enabled` | When `false`, hide all of the task items in the viewer header and in Grading (the sections below). Default `true`. Without them graders have no in-app prev/next or status controls and must navigate another way |
 | `task_panel.sections.*` | Independently show `title`, `nav`, `status`, `comments`, `overview`. Each defaults to `true`. Missing `task_panel` means all sections are shown. Hiding `nav` removes prev/next from the viewer |
 | `layout.hide` | Layers section names to hide: `"Segmentation"`, `"ETDRS"`, `"Registration"`, `"Measure"` (and `"Rendering"`, which removes the view bar and render-mode keys). A hidden section takes its tools with it: off the tool rail and ⋯ menu, and their keys do nothing. `"Segmentation"` also hides the en-face projection; `"Registration"` also hides Pointsets and Blend. Other names, such as the old `"Form"`, have no effect |
