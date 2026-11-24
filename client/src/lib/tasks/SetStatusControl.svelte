@@ -103,7 +103,7 @@ Ready is picked only once everything else saved; a pick that can't save shows on
               };
     });
     // Below lg a failed Claim or Give back shows on the combo button, as a failed status save does.
-    const claimFailed = $derived(claimInMenu && holder.failed !== null);
+    const claimFailed = $derived(claimInMenu && holder.failText !== "");
     const failText = $derived(
         navigation.statusFailed
             ? "Status couldn't save. Pick it again."

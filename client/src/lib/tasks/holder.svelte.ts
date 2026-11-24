@@ -53,7 +53,9 @@ export class SetHolder {
         return this.holderId === this.deps.userId ? "giveBack" : null;
     }
 
+    /** Shown only while the failed action is still the one on offer. */
     get failText(): string {
+        if (this.failed !== this.action) return "";
         if (this.failed === "claim") return "Couldn't claim. Try again.";
         if (this.failed === "giveBack") return "Couldn't give back. Try again.";
         return "";

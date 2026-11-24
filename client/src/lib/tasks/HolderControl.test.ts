@@ -122,4 +122,22 @@ describe("HolderControl", () => {
         );
         expect(tag()).toHaveTextContent("Unclaimed");
     });
+
+    it("drops the failed Claim text once the set becomes mine", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        vi.mocked(updateSubTask).mockRejectedValue(new Error("offline"));
+        setup();
+
+        await fireEvent.click(screen.getByRole("button", { name: "Claim" }));
+        await waitFor(() =>
+            expect(screen.getByRole("alert")).toHaveTextContent(
+                "Couldn't claim. Try again.",
+            ),
+        );
+
+        storeSet({ creator_id: ME, creator: { id: ME, name: "Kim" } });
+
+        await waitFor(() => expect(tag()).toHaveTextContent("Yours"));
+        expect(screen.queryByText("Couldn't claim. Try again.")).toBeNull();
+    });
 });
