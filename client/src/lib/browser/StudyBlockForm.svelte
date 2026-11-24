@@ -10,6 +10,8 @@
     import FormItem from "$lib/viewer-window/panelForm/FormItem.svelte";
     import FormDeleteModal from "$lib/viewer-window/panelForm/FormDeleteModal.svelte";
     import { Button } from "$lib/components/ui/button";
+    import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
+    import { formWindow } from "$lib/forms/formWindow.svelte";
     import Add from "carbon-icons-svelte/lib/Add.svelte";
     import { getContext } from "svelte";
 
@@ -27,6 +29,9 @@
         formSchema,
         create_new,
     }: Props = $props();
+
+    // This block's key for the blocked-window notice.
+    const source = $derived(`study:${study.id}:${formSchema.id}`);
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
 
@@ -87,7 +92,7 @@
 
     {#each forms as form (form.id)}
         <div class="flex w-full max-w-80 flex-col">
-            <FormItem {form} ondelete={openDelete} />
+            <FormItem {form} {source} ondelete={openDelete} />
         </div>
     {/each}
 {/snippet}
@@ -97,6 +102,13 @@
     <h3 bind:this={heading} tabindex="-1" class="text-heading-compact-01">
         {title}
     </h3>
+    {#if formWindow.blocked === source}
+        <InlineNotification
+            title="Form window blocked"
+            subtitle="Allow pop-ups for this site in your browser, then open the form again."
+            onclose={() => formWindow.dismissBlocked()}
+        />
+    {/if}
     {#if split_laterality}
         <div class="flex gap-4 max-md:flex-col">
             <div class="flex flex-1 flex-col gap-2">

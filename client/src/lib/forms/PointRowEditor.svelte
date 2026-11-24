@@ -1,7 +1,9 @@
 <script lang="ts">
+    import * as Field from "$lib/components/ui/field/index.js";
     import { Input } from "$lib/components/ui/input";
     import type { ImagePoint, PointEnumExtra } from "$lib/forms/pointSchema";
     import { Trash } from "$lib/viewer-window/icons/icons";
+    import WarningFilled from "carbon-icons-svelte/lib/WarningFilled.svelte";
 
     export type PointRow = { publicId: string; index: number; pt: ImagePoint };
 
@@ -12,9 +14,11 @@
         enumExtras: readonly PointEnumExtra[];
         stringExtraKeys: string[];
         indexApplicable: (pt: ImagePoint) => boolean;
-        /** When false (volume schemas), blanking i is rejected upstream. */
+        /** When false (volume schemas), the editor rejects a blank i with the B-scan error. */
         allowNullIndex?: boolean;
         coordLabel: string;
+        /** Why the viewer didn't move to this point. */
+        hint?: string | null;
         onUpdateCoord: (
             pid: string,
             index: number,
@@ -40,14 +44,22 @@
         indexApplicable,
         allowNullIndex = true,
         coordLabel,
+        hint = null,
         onUpdateCoord,
         onUpdateExtra,
         onRemove,
         onCollapse,
     }: Props = $props();
+
+    const uid = $props.id();
+    // A volume point needs its B-scan; nothing is saved while the box is empty.
+    let bscanEmpty = $state(false);
 </script>
 
 <div class="editor">
+    {#if hint}
+        <p class="text-helper-text-01 text-text-secondary">{hint}</p>
+    {/if}
     <div class="editor-header">
         <span class="editor-label" title={coordLabel}>{coordLabel}</span>
         <div class="editor-actions">
@@ -108,24 +120,46 @@
                     : "B-scan index (required)"}
             >
                 i
-                <Input
-                    type="number"
-                    step="1"
-                    disabled={!canEdit}
-                    value={typeof row.pt.index === "number"
-                        ? Math.round(row.pt.index)
-                        : ""}
-                    placeholder={allowNullIndex ? "null" : undefined}
-                    required={!allowNullIndex}
-                    oninput={(e) =>
-                        onUpdateCoord(
-                            row.publicId,
-                            row.index,
-                            "index",
-                            (e.currentTarget as HTMLInputElement).value,
-                        )}
-                />
+                <span class="relative block">
+                    <Input
+                        type="number"
+                        step="1"
+                        class={bscanEmpty ? "pe-10" : undefined}
+                        disabled={!canEdit}
+                        value={typeof row.pt.index === "number"
+                            ? Math.round(row.pt.index)
+                            : ""}
+                        placeholder={allowNullIndex ? "null" : undefined}
+                        required={!allowNullIndex}
+                        oninput={(e) => {
+                            const raw = (e.currentTarget as HTMLInputElement)
+                                .value;
+                            bscanEmpty = !allowNullIndex && raw.trim() === "";
+                            if (!bscanEmpty)
+                                onUpdateCoord(
+                                    row.publicId,
+                                    row.index,
+                                    "index",
+                                    raw,
+                                );
+                        }}
+                        aria-invalid={bscanEmpty ? "true" : undefined}
+                        aria-describedby={bscanEmpty
+                            ? `${uid}-bscan`
+                            : undefined}
+                    />
+                    {#if bscanEmpty}
+                        <WarningFilled
+                            class="absolute end-4 top-1/2 -translate-y-1/2 text-support-error"
+                        />
+                    {/if}
+                </span>
             </label>
+            {#if bscanEmpty}
+                <Field.Error id="{uid}-bscan" role="alert" class="basis-full"
+                    >Enter a B-scan number.</Field.Error
+                >
+            {/if}
         {/if}
     </div>
 

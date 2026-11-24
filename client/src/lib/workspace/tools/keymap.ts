@@ -7,6 +7,7 @@ import {
 } from "$lib/viewer/viewer-utils";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
 import type { WorkspaceView } from "$lib/viewer-window/viewerWindowContext.svelte";
+import { pointArming } from "$lib/forms/pointArming.svelte";
 import { SIZE_STEP, sizeKey } from "../paint";
 import { toolForKey } from "./registry";
 
@@ -136,6 +137,12 @@ export class Keymap implements ViewerEventListener {
         }
         if (key === "[" || key === "]") {
             const delta = key === "]" ? 1 : -1;
+            // An armed form point field steps its own points.
+            if (pointArming.session) {
+                const layers = view?.selectedViewport?.layers;
+                layers?.formPointTool?.step(delta, layers.viewerContext);
+                return;
+            }
             const armed = view?.armedTool;
             if (!view || !armed) return;
             if (SIZED.includes(armed)) {

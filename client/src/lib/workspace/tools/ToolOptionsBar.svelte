@@ -1,10 +1,12 @@
 <!--
 @component
-The tool options bar: the armed tool's icon and name, its target or why it can't act there, its options, then Keys, which lists the keys without a button. When the bar is short the keyboard cursor's keys cut first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first; Keys never folds.
+The tool options bar: the armed tool's icon and name, its target or why it can't act there, its options, then Keys, which lists the keys without a button. When the bar is short the keyboard cursor's keys cut first, then the segmentation name cuts with …, then trailing options move into ⋯ one at a time, last first; Keys never folds. A form's armed point field takes the bar instead of the armed tool.
 -->
 <script lang="ts">
     import { getContext, tick, untrack } from "svelte";
     import { MediaQuery } from "svelte/reactivity";
+    import { pointArming } from "$lib/forms/pointArming.svelte";
+    import { canPlaceOnViewer } from "$lib/forms/pointSchema";
     import WarningAltFilled from "carbon-icons-svelte/lib/WarningAltFilled.svelte";
     import OverflowMenu from "../OverflowMenu.svelte";
     import KeysPopover from "./KeysPopover.svelte";
@@ -25,6 +27,19 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
     );
     const viewport = $derived(workspace.selectedViewport);
     const layers = $derived(viewport?.layers ?? null);
+    // An armed form point field takes the bar: its field and form, or why it can't place on this image.
+    // ASSUMPTION: the form session wins over a palette tool armed at the same time.
+    const formSession = $derived(pointArming.session);
+    const formReason = $derived.by(() => {
+        const image = layers?.viewerContext.image;
+        if (!formSession || !image) return null;
+        const gate = canPlaceOnViewer(
+            formSession.analysis.coordinateSpace,
+            image,
+        );
+        return gate.ok ? null : gate.message;
+    });
+    const shownTool = $derived(formSession ? toolById("point") : tool);
     // P names its pointset; without one selected, the reason says what to do first.
     const point = $derived(
         tool?.id === "point" ? (layers?.pointTarget ?? null) : null,
@@ -38,12 +53,14 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
         tool?.id === "etdrs" ? (layers?.etdrsTarget ?? null) : null,
     );
     const reason = $derived(
-        point?.reason ??
-            draw?.reason ??
-            etdrs?.reason ??
-            (tool?.id === "circle" && layers && !layers.scale
-                ? "Set the image resolution, or show a grid in ETDRS grids."
-                : null),
+        formSession
+            ? formReason
+            : (point?.reason ??
+                  draw?.reason ??
+                  etdrs?.reason ??
+                  (tool?.id === "circle" && layers && !layers.scale
+                      ? "Set the image resolution, or show a grid in ETDRS grids."
+                      : null)),
     );
     const fullName = $derived(
         draw?.name
@@ -53,17 +70,19 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
             : "",
     );
     const hasTarget = $derived(
-        !!draw?.name ||
-            !!etdrs?.name ||
-            (point !== null && point.id !== null && !point.reason),
+        formSession
+            ? !formReason
+            : !!draw?.name ||
+                  !!etdrs?.name ||
+                  (point !== null && point.id !== null && !point.reason),
     );
     const cursorOn = $derived(layers?.viewerContext.keyboardCursor.on ?? false);
     // The armed tool's keys, or the keyboard cursor's while it is on, then those that work without a tool.
     const keyLists = $derived([
         ...(cursorOn
             ? [{ title: "Keyboard cursor", rows: KEYBOARD_CURSOR_KEYS }]
-            : tool && tool.keys.length > 0
-              ? [{ title: tool.name, rows: tool.keys }]
+            : shownTool && shownTool.keys.length > 0
+              ? [{ title: shownTool.name, rows: shownTool.keys }]
               : []),
         { title: "Without a tool", rows: NO_TOOL_KEYS },
     ]);
@@ -113,15 +132,19 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
     }
     // A reason replaces the options, but the circle keeps its scale and Place ETDRS its fraction, so they can be set here. Size shows nothing without an image, so it is left out.
     const options = $derived<OptionId[]>(
-        reason
-            ? tool?.id === "circle"
-                ? ["scale"]
-                : tool?.id === "etdrs"
-                  ? ["radiusFraction"]
-                  : []
-            : optionsFor(tool?.id).filter(
-                  (id) => id !== "size" || layers?.viewerContext.image,
-              ),
+        formSession
+            ? formReason
+                ? []
+                : ["pointStep"]
+            : reason
+              ? tool?.id === "circle"
+                  ? ["scale"]
+                  : tool?.id === "etdrs"
+                    ? ["radiusFraction"]
+                    : []
+              : optionsFor(tool?.id).filter(
+                    (id) => id !== "size" || layers?.viewerContext.image,
+                ),
     );
     const isHistory = (id: OptionId) => id === "undo" || id === "redo";
 
@@ -186,13 +209,17 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
             aria-hidden="true"
             class="flex w-12 shrink-0 justify-center self-stretch border-e border-border-subtle-01"
         >
-            {#if tool}<span
+            {#if shownTool}<span
                     class="flex w-10 items-center justify-center selected-look"
-                    ><tool.icon /></span
+                    ><shownTool.icon /></span
                 >{/if}
         </span>
     {/if}
-    {#if tool}
+    {#if formSession}
+        <span class="shrink-0 text-heading-compact-01 text-text-primary"
+            >Form points</span
+        >
+    {:else if tool}
         <span class="shrink-0 text-heading-compact-01 text-text-primary"
             >{tool.name}</span
         >
@@ -203,7 +230,16 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
     {/if}
     {#if hasTarget}
         {@render divider()}
-        {#if draw?.name}
+        {#if formSession}
+            {@const formTarget = [formSession.label, formSession.form]
+                .filter(Boolean)
+                .join(" · ")}
+            <!-- Cuts with …, like the segmentation name. -->
+            <span
+                class="min-w-8 truncate text-body-compact-01 text-text-primary"
+                title={formTarget}>{formTarget}</span
+            >
+        {:else if draw?.name}
             <!-- The segmentation name cuts with …; the class stays whole. -->
             <span class="flex min-w-0 items-center gap-2">
                 {#if draw.color}

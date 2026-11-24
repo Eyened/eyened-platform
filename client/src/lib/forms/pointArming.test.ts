@@ -22,6 +22,7 @@ function makeSession(
         pointStyle: "circle",
         radius: 8,
         color: "#0f0",
+        form: "Lesion points #1",
         analysis,
         initialValue,
         setFieldValue,

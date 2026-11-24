@@ -52,10 +52,17 @@ export interface GridTarget {
 export function gridBinding(input: {
     grid: FormAnnotationGET | undefined;
     instanceId: string | number;
+    is3D?: boolean;
     userId: number;
     canEdit: (grid: FormAnnotationGET) => boolean;
 }): GridTarget {
     const { grid } = input;
+    // First: a B-scan lists no grids, so asking for one would never get past this.
+    if (input.is3D)
+        return {
+            name: null,
+            reason: "Place ETDRS goes on a fundus or en-face image. Select one.",
+        };
     if (!grid)
         return {
             name: null,

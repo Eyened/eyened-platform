@@ -50,7 +50,9 @@ describe("StudyBlockForm", () => {
                 study,
                 create_new: false,
             },
-            context: new Map([["globalContext", { canEdit: () => true }]]),
+            context: new Map([
+                ["globalContext", { canEdit: () => true, user: { id: 7 } }],
+            ]),
         });
 
         await fireEvent.click(

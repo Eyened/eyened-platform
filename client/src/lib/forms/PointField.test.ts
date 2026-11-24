@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/svelte";
 import PointField from "./PointField.svelte";
 import { pointArming } from "./pointArming.svelte";
 import type { JSONSchema } from "./schemaType";
+import { workspaceWith } from "$lib/workspace/testUtils";
 
 vi.mock("svelte-sonner", () => ({
     toast: { warning: vi.fn(), success: vi.fn(), error: vi.fn() },
@@ -32,6 +33,36 @@ const viewerContext = {
         width: 100,
     },
 };
+
+const volumeSchema = {
+    "x-eyened-widget": "keypoint",
+    title: "Volume",
+    type: "object",
+    properties: {
+        x: { type: "number" },
+        y: { type: "number" },
+        index: { type: "integer" },
+    },
+    required: ["x", "y", "index"],
+} as JSONSchema;
+
+/** A workspace whose only viewport shows `instanceId` as a volume. */
+function workspaceShowing(instanceId: string) {
+    const ws = workspaceWith(1);
+    const viewer = {
+        image: { instance: { id: instanceId }, is3D: true, width: 100 },
+        viewerSize: { width: 100 },
+        setIndex: vi.fn(),
+        focusPoint: vi.fn(),
+    };
+    ws.attachViewport(0, {
+        zoomPercent: 100,
+        zoomBy: vi.fn(),
+        reset: vi.fn(),
+        layers: { viewerContext: viewer } as never,
+    });
+    return { ws, viewer };
+}
 
 function renderField(
     props: Record<string, unknown>,
@@ -147,27 +178,68 @@ describe("PointField", () => {
         expect(onchange).toHaveBeenCalled();
     });
 
-    it("warns when blanking a required volume index", async () => {
+    it("an empty B-scan on a volume field says so and saves nothing", async () => {
+        const onchange = vi.fn();
         renderField({
-            schema: {
-                "x-eyened-widget": "keypoint",
-                title: "Volume",
-                type: "object",
-                properties: {
-                    x: { type: "number" },
-                    y: { type: "number" },
-                    index: { type: "integer" },
-                },
-                required: ["x", "y", "index"],
-            },
+            schema: volumeSchema,
             value: { x: 1, y: 2, index: 4 },
-            onchange: vi.fn(),
+            onchange,
         });
-
         await fireEvent.click(screen.getByText("[1,2,4]"));
-        const i = screen.getByLabelText("i") as HTMLInputElement;
+        const i = screen.getByLabelText("i");
         await fireEvent.input(i, { target: { value: "" } });
-        expect(toast.warning).toHaveBeenCalled();
+        expect(screen.getByText("Enter a B-scan number.")).toBeInTheDocument();
+        expect(i).toHaveAttribute("aria-invalid", "true");
+        expect(onchange).not.toHaveBeenCalled();
+        expect(toast.warning).not.toHaveBeenCalled();
+    });
+
+    it("a chip click goes to its point in the viewport showing its image and opens the editor", async () => {
+        const { ws, viewer } = workspaceShowing("img1");
+        renderField(
+            {
+                schema: volumeSchema,
+                value: { x: 30, y: 20, index: 4 },
+                onchange: vi.fn(),
+            },
+            new Map<string, unknown>([
+                ["viewerContext", viewerContext],
+                ["workspace", ws],
+            ]),
+        );
+        const chip = screen.getByRole("button", {
+            name: "Point 1, [30,20,4]: go to it and edit",
+        });
+        await fireEvent.click(chip);
+        expect(viewer.setIndex).toHaveBeenCalledWith(4);
+        expect(viewer.focusPoint).toHaveBeenCalledWith(30, 20, 1);
+        expect(chip).toHaveAttribute("aria-expanded", "true");
+        expect(screen.getByLabelText("i")).toBeInTheDocument();
+    });
+
+    it("with the point's image not open, only the editor opens, with a hint", async () => {
+        const { ws, viewer } = workspaceShowing("other");
+        renderField(
+            {
+                schema: volumeSchema,
+                value: { x: 30, y: 20, index: 4 },
+                onchange: vi.fn(),
+            },
+            new Map<string, unknown>([
+                ["viewerContext", viewerContext],
+                ["workspace", ws],
+            ]),
+        );
+        await fireEvent.click(screen.getByText("[30,20,4]"));
+        expect(viewer.focusPoint).not.toHaveBeenCalled();
+        // Once in the editor, once in the live region.
+        expect(
+            screen.getAllByText("Open this image in the viewer first."),
+        ).toHaveLength(2);
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "Open this image in the viewer first.",
+        );
+        expect(screen.getByLabelText("i")).toBeInTheDocument();
     });
 
     it("writes null index for oct space when the field is blanked", async () => {

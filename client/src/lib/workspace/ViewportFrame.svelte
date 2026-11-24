@@ -7,7 +7,9 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
     import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+    import { formWindow } from "$lib/forms/formWindow.svelte";
     import Close from "carbon-icons-svelte/lib/Close.svelte";
+    import Document from "carbon-icons-svelte/lib/Document.svelte";
     import Maximize from "carbon-icons-svelte/lib/Maximize.svelte";
     import Minimize from "carbon-icons-svelte/lib/Minimize.svelte";
     import { getContext, setContext, tick, type Snippet } from "svelte";
@@ -274,7 +276,19 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
             </Tooltip.Root>
         </Tooltip.Provider>
         <span class="controls">
-            <!-- Sub-project 2 adds the link chip here. Maximise never folds; below 260 px only Close does. -->
+            <!-- Maximise never folds; below 260 px only Close does. -->
+            {#if slot.imageId !== null && formWindow.imageIds.includes(slot.imageId)}
+                <!-- Primary, so it stands out in a full grid; it brings the form window to the front. -->
+                <IconButton
+                    size="icon-xs"
+                    variant="primary"
+                    label="Show form window: {formWindow.label}"
+                    tabindex={tab}
+                    onclick={() => formWindow.focusWindow()}
+                >
+                    <Document />
+                </IconButton>
+            {/if}
             <IconButton
                 size="icon-xs"
                 label="Maximise"

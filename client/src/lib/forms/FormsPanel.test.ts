@@ -16,6 +16,7 @@ import { entry, NO_URL } from "$lib/workspace/testUtils";
 import { Workspace } from "$lib/workspace/workspace.svelte";
 import type { FormAnnotationGET } from "../../types/openapi_types";
 import FormsPanel from "./FormsPanel.svelte";
+import { formWindow } from "./formWindow.svelte";
 
 vi.mock("$lib/data", async (original) => ({
     ...(await original<typeof import("$lib/data")>()),
@@ -23,10 +24,6 @@ vi.mock("$lib/data", async (original) => ({
     deleteFormAnnotation: vi.fn(async (id: number) => {
         formAnnotations.delete(id);
     }),
-}));
-vi.mock("$lib/newWindow", () => ({
-    openBlankWindow: vi.fn(() => null),
-    mountInWindow: vi.fn(),
 }));
 
 const ME = 5;
@@ -132,6 +129,8 @@ function renderView() {
 }
 
 beforeEach(() => {
+    formWindow.dismissBlocked();
+    vi.spyOn(window, "open").mockReturnValue(null);
     formSchemas.clear();
     formSchemasByName.clear();
     formAnnotations.clear();

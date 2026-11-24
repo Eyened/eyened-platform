@@ -72,6 +72,18 @@ describe("gridBinding", () => {
             reason: null,
         });
     });
+
+    it("on an OCT volume it says Place ETDRS goes on a fundus or en-face image, though a B-scan has no grid to select", () => {
+        expect(
+            gridBinding({
+                grid: undefined,
+                instanceId: "inst-1",
+                is3D: true,
+                userId: 5,
+                canEdit: () => true,
+            }).reason,
+        ).toBe("Place ETDRS goes on a fundus or en-face image. Select one.");
+    });
 });
 
 describe("keepGridSize", () => {

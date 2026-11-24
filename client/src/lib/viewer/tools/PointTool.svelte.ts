@@ -18,7 +18,6 @@ import type { Position2D } from "$lib/types";
 import type { RenderTarget } from "$lib/webgl/types";
 import type { Overlay, ToolName, ViewerEvent } from "../viewer-utils";
 import { CursorPriority, type ViewerContext } from "../viewerContext.svelte";
-import { toast } from "svelte-sonner";
 import { cased, casedText } from "../overlays/casing";
 
 const defaultStroke = "rgba(0, 255, 0, 1)";
@@ -66,6 +65,16 @@ export type PointToolOptions = {
      */
     onPersist?: (points: PointList) => void;
 };
+
+/** Sets the point's B-scan and centres it at 100 %. */
+export function goToPoint(
+    point: ImagePoint,
+    viewerContext: ViewerContext,
+): void {
+    if (typeof point.index === "number") viewerContext.setIndex(point.index);
+    const w = viewerContext.viewerSize.width;
+    viewerContext.focusPoint(point.x, point.y, viewerContext.image.width / w);
+}
 
 /**
  * Viewer overlay that edits an in-memory point list.
@@ -161,10 +170,8 @@ export class PointTool implements Overlay {
                 this.coordinateSpace,
                 viewerContext.image,
             );
-            if (!gate.ok) {
-                toast.warning(gate.message);
-                return;
-            }
+            // The tool bar says why; a click here does nothing.
+            if (!gate.ok) return;
         }
         const position = viewerContext.viewerToImageCoordinates(cursor);
         const before = this.points;
@@ -334,14 +341,7 @@ export class PointTool implements Overlay {
             const point = this.points[i];
             if (!point) continue;
             this.current = i;
-            if (typeof point.index === "number")
-                viewerContext.setIndex(point.index);
-            const w = viewerContext.viewerSize.width;
-            viewerContext.focusPoint(
-                point.x,
-                point.y,
-                viewerContext.image.width / w,
-            );
+            goToPoint(point, viewerContext);
             return;
         }
     }

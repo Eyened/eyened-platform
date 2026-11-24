@@ -140,6 +140,9 @@
         get pointTool() {
             return pointTool?.tool;
         },
+        get formPointTool() {
+            return formPointTool;
+        },
         blend,
     };
 
@@ -397,6 +400,7 @@
                     ? undefined
                     : formAnnotations.get(grids.currentId),
             instanceId: image.instance.id,
+            is3D: image.is3D,
             userId: globalContext.user.id,
             canEdit: (grid) => globalContext.canEdit(grid),
         }),
@@ -467,6 +471,7 @@
         });
     });
 
+    let formPointTool = $state.raw<PointTool>();
     // Form PointField: mount PointTool while a session is armed. Live SoT is
     // session.fieldValue — do not remount when it changes (only on session key).
     $effect(() => {
@@ -498,6 +503,7 @@
         });
 
         const remove = viewerContext.addOverlay(tool);
+        formPointTool = tool;
 
         // Keep tool.points in sync with session (PointField edits, other viewers).
         const stopSync = $effect.root(() => {
@@ -507,6 +513,7 @@
         });
 
         return () => {
+            if (formPointTool === tool) formPointTool = undefined;
             stopSync();
             tool.destroy();
             remove();

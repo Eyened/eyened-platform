@@ -42,6 +42,7 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
     import ZoomIn from "carbon-icons-svelte/lib/ZoomIn.svelte";
     import ZoomOut from "carbon-icons-svelte/lib/ZoomOut.svelte";
     import { getContext } from "svelte";
+    import { pointArming } from "$lib/forms/pointArming.svelte";
     import { SIZE_MAX, SIZE_MIN, sizeKey } from "../paint";
     import type { ViewportHandle, Workspace } from "../workspace.svelte";
 
@@ -61,6 +62,10 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
 
     const workspace = getContext<Workspace>("workspace");
     const layers = $derived(viewport?.layers);
+    // An armed form point field steps its own points.
+    const stepper = $derived(
+        pointArming.session ? layers?.formPointTool : layers?.pointTool,
+    );
     const image = $derived(layers?.viewerContext.image);
     const size = $derived(image ? workspace.paint[sizeKey(image)] : null);
     const index = $derived(layers?.viewerContext.index ?? 0);
@@ -290,8 +295,8 @@ One options-bar control by id. The bar shows it in its row, or in ⋯ when the r
             done();
         }}>Delete</Button
     >
-{:else if id === "pointStep" && layers?.pointTool}
-    {@const points = layers.pointTool}
+{:else if id === "pointStep" && stepper && layers}
+    {@const points = stepper}
     {@const viewer = layers.viewerContext}
     <div role="group" aria-label="Points" class="flex items-center gap-1">
         <IconButton

@@ -231,7 +231,10 @@ describe("canPlaceOnViewer", () => {
     it("rejects OCT volumes for enface2d", () => {
         const r = canPlaceOnViewer("enface2d", { is3D: true });
         expect(r.ok).toBe(false);
-        if (!r.ok) expect(r.message).toMatch(/2D-only/);
+        if (!r.ok)
+            expect(r.message).toBe(
+                "These points go on a fundus or en-face image. Select one.",
+            );
     });
 
     it("allows 2D / enface for enface2d", () => {
@@ -246,7 +249,10 @@ describe("canPlaceOnViewer", () => {
     it("rejects non-volumes for volume-only", () => {
         const r = canPlaceOnViewer("volume", { is3D: false });
         expect(r.ok).toBe(false);
-        if (!r.ok) expect(r.message).toMatch(/OCT B-scan volume/);
+        if (!r.ok)
+            expect(r.message).toBe(
+                "These points go on an OCT volume. Select one.",
+            );
     });
 
     it("allows OCT volumes for volume-only", () => {

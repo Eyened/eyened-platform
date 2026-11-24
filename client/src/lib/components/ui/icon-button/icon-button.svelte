@@ -8,7 +8,7 @@
     import type { Snippet } from "svelte";
     import type { HTMLButtonAttributes } from "svelte/elements";
 
-    // Carbon IconButton: ghost or secondary, 40 px (`icon-xs` 24 px); `label` is both the tooltip and the accessible name, `shortcut` follows it in the tooltip.
+    // Carbon IconButton: ghost, secondary or primary, 40 px (`icon-xs` 24 px); `label` is both the tooltip and the accessible name, `shortcut` follows it in the tooltip.
     // Its own Provider (Carbon's 100 ms enter delay) so it works outside Main.
     // closeOnClick=false keeps the tooltip open after a click, for Carbon's "Copied!" feedback.
     let {
@@ -24,7 +24,7 @@
     }: Omit<HTMLButtonAttributes, "aria-label" | "children"> & {
         label: string;
         size?: "icon" | "icon-xs";
-        variant?: "ghost" | "secondary";
+        variant?: "ghost" | "secondary" | "primary";
         children: Snippet;
         closeOnClick?: boolean;
         shortcut?: string;
@@ -45,7 +45,7 @@
                     {...mergeProps(restProps, props) as ButtonProps}
                     tabindex={restProps.tabindex ??
                         (props.tabindex as number | undefined)}
-                    {variant}
+                    variant={variant === "primary" ? "default" : variant}
                     {size}
                     aria-label={label}
                     aria-describedby={description

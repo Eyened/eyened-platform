@@ -5,30 +5,39 @@
     import { createFormAnnotation } from "$lib/data";
     import { formSchemas } from "$lib/data/stores.svelte";
     import type { TaskContext } from "$lib/tasks/TaskContext.svelte";
-    import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import Copy from "carbon-icons-svelte/lib/Copy.svelte";
     import Launch from "carbon-icons-svelte/lib/Launch.svelte";
     import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
-    import { getContext } from "svelte";
+    import { getAllContexts, getContext } from "svelte";
     import type { FormAnnotationGET } from "../../../types/openapi_types";
-    import { openFormInNewWindow } from "./openFormInNewWindow";
+    import { formWindow } from "$lib/forms/formWindow.svelte";
+    import { Tag } from "$lib/components/ui/tag/index.js";
+    import { openImages, targetOf } from "$lib/forms/formTargets";
+    import { viewerFor } from "$lib/forms/formViewer";
+    import type { ViewerWindowContext } from "$lib/viewer-window/viewerWindowContext.svelte";
+    import type { Workspace } from "$lib/workspace/workspace.svelte";
 
     const taskContext = getContext<TaskContext>("taskContext");
     const globalContext = getContext<GlobalContext>("globalContext");
-    const viewerContext = getContext<ViewerContext>("viewerContext");
+    // Set only in the viewer, where this card sits in the Add images overlay.
+    const workspace = getContext<Workspace | undefined>("workspace");
+    const viewerWindowContext = getContext<ViewerWindowContext | undefined>(
+        "viewerWindowContext",
+    );
+    const contexts = getAllContexts();
 
     interface Props {
         form: FormAnnotationGET;
+        /** Where a blocked window's notice shows. */
+        source: string;
         ondelete: (form: FormAnnotationGET) => void;
     }
 
-    let { form, ondelete }: Props = $props();
+    let { form, source, ondelete }: Props = $props();
 
     const formSchema = $derived(formSchemas.get(form.form_schema_id)!);
 
     const canEditForm = globalContext.canEdit(form);
-
-    const date = form.date_inserted ?? "";
 
     async function duplicate() {
         await createFormAnnotation({
@@ -45,27 +54,41 @@
     }
 
     function openInNewWindow(form: FormAnnotationGET) {
-        openFormInNewWindow(form, canEditForm, viewerContext);
-    }
-
-    function formatDateTime(dateString: string) {
-        const date = new Date(dateString);
-        return date.toLocaleString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
+        // In the viewer the form's point fields get the viewport showing its target, as Grading's rows do.
+        const target =
+            workspace && viewerWindowContext
+                ? targetOf(
+                      form,
+                      formSchema,
+                      openImages(
+                          workspace.catalogue,
+                          viewerWindowContext.images,
+                      ),
+                  )
+                : null;
+        formWindow.open(form, {
+            source,
+            canEdit: canEditForm,
+            viewerContext:
+                workspace && target ? viewerFor(workspace, target) : undefined,
+            imageIds: target?.imageIds ?? [],
+            from: workspace ? "viewer" : "browse",
+            contexts,
         });
     }
 
     const meta = $derived(
         [
+            `#${form.id}`,
             form.form_annotation_reference_id
-                ? `${form.form_annotation_reference_id} → ${form.id}`
-                : `${form.id}`,
-            form.creator?.name,
-            formatDateTime(date),
+                ? `copy of #${form.form_annotation_reference_id}`
+                : null,
+            form.creator?.id === globalContext.user.id
+                ? "yours"
+                : form.creator
+                  ? `${form.creator.name}'s`
+                  : null,
+            form.date_inserted?.slice(0, 10),
         ]
             .filter(Boolean)
             .join(" · "),
@@ -99,5 +122,9 @@
             <TrashCan />
         </IconButton>
     </div>
-    <p class="px-4 pb-2 text-label-01 text-text-secondary">{meta}</p>
+    <p
+        class="flex items-center gap-2 px-4 pb-2 text-label-01 text-text-secondary"
+    >
+        {#if !canEditForm}<Tag>Read-only</Tag>{/if}{meta}
+    </p>
 </div>

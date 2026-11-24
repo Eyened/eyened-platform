@@ -392,7 +392,8 @@ export class BrowserContext {
     openTab(imageIds: string[]) {
         const suffix_string = `?instances=${imageIds.join(",")}`;
         const url = `${window.location.origin}/view${suffix_string}`;
-        window.open(url, "_blank")?.focus();
+        // noopener: each viewer tab gets its own form window.
+        window.open(url, "_blank", "noopener");
     }
 
     private async runSearch() {

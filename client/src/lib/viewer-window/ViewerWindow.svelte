@@ -48,7 +48,15 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     import WorkspaceFrame from "$lib/workspace/WorkspaceFrame.svelte";
     import type { TaskHeader } from "$lib/workspace/WorkspaceHeader.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
-    import { getContext, onMount, setContext } from "svelte";
+    import {
+        getAllContexts,
+        getContext,
+        onMount,
+        setContext,
+        untrack,
+    } from "svelte";
+    import { adoptFormWindow } from "$lib/forms/adoptFormWindow";
+    import { formWindow } from "$lib/forms/formWindow.svelte";
     import BrowserOverlay from "./BrowserOverlay.svelte";
     import MainViewer from "./MainViewer.svelte";
     import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
@@ -81,6 +89,8 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     const taskContext = getContext<TaskContext | undefined>("taskContext");
     const workspace = getContext<Workspace>("workspace");
     const globalContext = getContext<GlobalContext>("globalContext");
+    // The form window's form sees this page's contexts.
+    const contexts = getAllContexts();
     const navigation = taskContext ? new TaskNavigation(taskContext) : null;
     // subTaskIndex is 0-based; people read sets from 1.
     const setNumber = (taskContext?.subTaskIndex ?? 0) + 1;
@@ -109,7 +119,10 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                   status: statusSaver,
                   index: taskContext.subTaskIndex,
                   count: taskContext.task.num_tasks,
-                  navigate: navigateSubtaskIndex,
+                  navigate: (index) => {
+                      formWindow.leaving(`Loading set ${index + 1}…`);
+                      navigateSubtaskIndex(index);
+                  },
                   handoff: () => ({
                       selected: workspace.selected,
                       maximised: workspace.maximised,
@@ -202,6 +215,47 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         if (!control || !navigation) return;
         focusSetControl(
             control === "prev" && navigation.prevDisabled ? "next" : control,
+        );
+    });
+
+    // After a page load the hand-back gives the form window to this page; it fills once the set has loaded.
+    let adopting: Window | null = $state.raw(null);
+    onMount(() => {
+        window.adoptFormWindow = (win) => (adopting = win);
+        return () => {
+            delete window.adoptFormWindow;
+            // Left without a page load (an in-app link): no live form stays tied to this viewer.
+            formWindow.release();
+        };
+    });
+    $effect(() => {
+        const win = adopting;
+        if (!win) return;
+        // The grader opened a form while the set loaded; that one stays.
+        if (win.document.documentElement.dataset.mounted) {
+            adopting = null;
+            return;
+        }
+        if (!workspace.loaded) return;
+        // The selected viewport's viewer must be up, so the form's point fields get it.
+        if (
+            workspace.slots[workspace.selected]?.imageId &&
+            !workspace.handleAt(workspace.selected)?.layers
+        )
+            return;
+        adopting = null;
+        untrack(() =>
+            adoptFormWindow(win, {
+                workspace,
+                images: openImages(
+                    workspace.catalogue,
+                    viewerWindowContext.images,
+                ),
+                userId: globalContext.user.id,
+                subTaskId: taskContext?.subTask.id,
+                canEdit: (form) => globalContext.canEdit(form),
+                contexts,
+            }),
         );
     });
 

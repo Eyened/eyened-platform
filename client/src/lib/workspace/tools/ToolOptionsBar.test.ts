@@ -1,4 +1,5 @@
 import type { PointTarget } from "$lib/layers/pointsets";
+import { pointArming } from "$lib/forms/pointArming.svelte";
 import {
     cleanup,
     fireEvent,
@@ -473,5 +474,66 @@ describe("ToolOptionsBar when short", () => {
         await vi.waitFor(() =>
             expect(inRow(circle.container)).toEqual(["scale"]),
         );
+    });
+});
+
+describe("ToolOptionsBar with a form's point field armed", () => {
+    afterEach(() => {
+        pointArming.session = null;
+    });
+
+    function renderFormPoints(is3D: boolean) {
+        const ws = workspaceWith(1);
+        const tool = new PointTool({ coordinateSpace: "volume" });
+        tool.points = [
+            { x: 1, y: 2, index: 4 },
+            { x: 5, y: 6, index: 7 },
+        ];
+        ws.attachViewport(0, {
+            zoomPercent: 100,
+            zoomBy: vi.fn(),
+            reset: vi.fn(),
+            layers: {
+                viewerContext: {
+                    image: { is3D },
+                    keyboardCursor: { on: false },
+                    returnFocus: vi.fn(),
+                },
+                formPointTool: tool,
+            } as never,
+        });
+        pointArming.session = {
+            key: "form:9101:lesions",
+            label: "Lesion points",
+            form: "AMD lesion points #9101",
+            analysis: { coordinateSpace: "volume" },
+        } as never;
+        return render(ToolOptionsBar, { context: workspaceContext(ws) });
+    }
+
+    it("on the wrong kind of image says why in place of the field, with no stepper", () => {
+        renderFormPoints(false);
+        expect(screen.getByText("Form points")).toBeInTheDocument();
+        expect(
+            screen.getByText("These points go on an OCT volume. Select one."),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText("Lesion points · AMD lesion points #9101"),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole("group", { name: "Points" }),
+        ).not.toBeInTheDocument();
+    });
+
+    it("on the right image names the field and its form and shows the stepper", () => {
+        renderFormPoints(true);
+        expect(
+            screen.getByText("Lesion points · AMD lesion points #9101"),
+        ).toBeInTheDocument();
+        expect(
+            within(screen.getByRole("group", { name: "Points" })).getByText(
+                "Point – / 2",
+            ),
+        ).toBeInTheDocument();
     });
 });

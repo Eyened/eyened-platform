@@ -103,6 +103,8 @@ export interface LayersTarget {
     readonly etdrsTool: PointTool | undefined;
     /** P's tool for the eye's current registration, when there is one. */
     readonly pointTool: PointTool | undefined;
+    /** The armed form point field's tool in this viewport. */
+    readonly formPointTool?: PointTool;
     /** This viewport's blend, kept while it is mounted. */
     readonly blend: ViewportBlend;
 }

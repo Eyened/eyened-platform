@@ -1,12 +1,8 @@
 import { createFormAnnotation } from "$lib/data";
 import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
-import {
-    closeFormWindow,
-    fillFormWindow,
-    openBlankFormWindow,
-} from "$lib/viewer-window/panelForm/openFormInNewWindow";
 import { tick } from "svelte";
 import type { FormAnnotationGET } from "../../types/openapi_types";
+import { formWindow } from "./formWindow.svelte";
 
 export interface CreateRequest {
     /** One create per key at a time: "grade:<target>", "add", "copy:<form id>". */
@@ -16,6 +12,8 @@ export interface CreateRequest {
     message: string;
     payload: Parameters<typeof createFormAnnotation>[0];
     viewerContext?: ViewerContext;
+    /** The strip images of the target, for the viewport chips. */
+    imageIds: string[];
 }
 
 /** Grade, Add form and Copy: open the window inside the click, create, then fill the window. */
@@ -28,6 +26,9 @@ export class FormCreator {
     private readonly running = new Set<string>();
     private failedControl: HTMLElement | null = null;
 
+    /** The panel's contexts, which the form in the window sees. */
+    constructor(private readonly contexts: Map<unknown, unknown>) {}
+
     async create(request: CreateRequest): Promise<FormAnnotationGET | null> {
         if (this.running.has(request.key)) return null;
         this.running.add(request.key);
@@ -36,12 +37,14 @@ export class FormCreator {
                 ? document.activeElement
                 : null;
         // Before the first await, so the browser counts the click and doesn't block the window.
-        const win = openBlankFormWindow();
+        const win = formWindow.begin("panel");
         let form: FormAnnotationGET;
         try {
             form = await createFormAnnotation(request.payload);
         } catch {
-            if (win) closeFormWindow(win);
+            // The shared window may have held another form, so it stays open and says what happened.
+            if (win)
+                formWindow.showView(win, { kind: "failed" }, this.contexts);
             this.failed = request.schemaName;
             this.failedControl = control;
             return null;
@@ -49,7 +52,14 @@ export class FormCreator {
             this.running.delete(request.key);
         }
         this.failed = null;
-        if (win) fillFormWindow(win, form, true, request.viewerContext);
+        if (win)
+            formWindow.showForm(win, form, {
+                canEdit: true,
+                viewerContext: request.viewerContext,
+                imageIds: request.imageIds,
+                from: "viewer",
+                contexts: this.contexts,
+            });
         const opened = win !== null && !win.closed;
         // Cleared first, so the same message twice (two copies) is announced twice.
         this.message = "";
