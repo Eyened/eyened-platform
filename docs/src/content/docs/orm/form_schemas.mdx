@@ -105,6 +105,27 @@ with db.get_session() as session:
 
 The JSON file must be a valid JSON Schema (Draft 7). Use `eorm validate-forms` to check schemas and existing annotation data.
 
+## How questions render
+
+The viewer's form window picks one control per property. The question's words are its `title`, else its `description`, else its key; `required` adds "(required)", and so does a `then`/`else` `required` at the root while its condition holds.
+
+| Schema | Control |
+|---|---|
+| `enum` with 2–5 options | Radio buttons |
+| `enum` with 6 or more options | Dropdown |
+| `type: "boolean"` | "Yes" / "No" radio buttons |
+| `type: "integer"` / `"number"` | Number input |
+| `type: "string"` | Text input |
+| `type: "object"` with `properties` | A folding section |
+| `type: "array"`, items with `enum` (≤5 / 6+) | Checkboxes / a filterable multi-select |
+| `type: "array"` of objects | Repeating group: Add, Delete per entry |
+| `type: "array"` of numbers or strings | A list of inputs: Add, Remove per entry |
+| `x-eyened-widget: "keypoint"` | Point field (below) |
+
+A type array such as `["string", "null"]` renders its non-null type. Anything else shows "This question can't be shown." A `then`/`else` that sets a property to `false` hides that question while it is empty.
+
+Answers are checked with the draft the schema's `$schema` names: draft-07 or 2020-12; a schema without `$schema` is read as 2020-12, as the server reads it.
+
 ## Point widgets (`x-eyened-widget`)
 
 The viewer understands an optional vendor extension on field (or root) schemas:
@@ -113,7 +134,7 @@ The viewer understands an optional vendor extension on field (or root) schemas:
 "x-eyened-widget": "keypoint"
 ```
 
-When present, SchemaForm shows a **PointField** with an Activate control that arms a shared viewer `PointTool` (place with LMB, delete with RMB). Click a point without dragging, or press **C** while hovering it, to cycle its grade (the first string enum). A grade listed in the point object's `required` array starts on the first enum value; an optional grade stays unset until that click or **C**. On a list of points, Ctrl-click places another point on top of an existing marker without cycling or dragging. A single landmark stays one point. Behavior comes from ordinary JSON Schema shape:
+When present, the form shows a **PointField** with a **Place points** control that arms a shared viewer `PointTool` (place with LMB, delete with RMB). Click a point without dragging, or press **C** while hovering it, to cycle its grade (the first string enum). A grade listed in the point object's `required` array starts on the first enum value; an optional grade stays unset until that click or **C**. On a list of points, Ctrl-click places another point on top of an existing marker without cycling or dragging. A single landmark stays one point. Behavior comes from ordinary JSON Schema shape:
 
 | Schema shape | Meaning |
 |--------------|---------|
@@ -126,7 +147,7 @@ Validators ignore `x-eyened-*` keys. See [point-widget-schema-examples.md](../..
 
 On **OCT volumes** (B-scans), the tool stores a numbered slice `index`. On the volume's **enface projection** (`*_proj`), it stores `index: null` so enface landmarks stay distinct from B-scan points (they share the same ImageInstance PublicID). Plain 2D images omit `index`. Visibility follows that tag: enface shows `index == null`, each B-scan shows only its slice number. If the point object schema uses `additionalProperties: false`, declare `index` as a number-or-null property so validation accepts both.
 
-Form **Activate** publishes an armed field on a shared bridge (`pointArming`). Each open **MainViewer** mounts its own `PointTool` against that session, so placement works on every main panel.
+**Place points** publishes an armed field on a shared bridge (`pointArming`). Each open **MainViewer** mounts its own `PointTool` against that session, so placement works on every main panel.
 
 After changing builtin JSON, refresh DB rows with:
 
