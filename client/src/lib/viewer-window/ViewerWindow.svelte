@@ -10,6 +10,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         formAnnotations,
         formSchemas,
         formSchemasByName,
+        subtasks,
     } from "$lib/data/stores.svelte";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import {
@@ -94,9 +95,12 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     const navigation = taskContext ? new TaskNavigation(taskContext) : null;
     // subTaskIndex is 0-based; people read sets from 1.
     const setNumber = (taskContext?.subTaskIndex ?? 0) + 1;
-    const lastSet = taskContext
-        ? taskContext.subTaskIndex >= taskContext.task.num_tasks - 1
-        : false;
+    // From the set's GET: the index the primary move goes to, or null.
+    const nextOpen = $derived(
+        taskContext
+            ? (subtasks.get(taskContext.subTask.id)?.next_open_index ?? null)
+            : null,
+    );
     // The set's status saves like any other edit, so ◀ ▶ wait for it.
     const statusSaver = taskContext
         ? new DebouncedSaver<SubTaskState>({
@@ -119,6 +123,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                   status: statusSaver,
                   index: taskContext.subTaskIndex,
                   count: taskContext.task.num_tasks,
+                  nextOpen: () => nextOpen,
                   navigate: (index) => {
                       formWindow.leaving(`Loading set ${index + 1}…`);
                       navigateSubtaskIndex(index);
@@ -192,17 +197,12 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                       taskid: String(taskContext.task.id),
                   }),
                   tag: shows.status ? statusTag : undefined,
-                  // With Status off the last set has no move, so nothing to show.
+                  // With Status off and no open set after this one there is no move, so nothing to show.
                   status:
-                      shows.status || (shows.goToNext && !lastSet)
+                      shows.status || (shows.goToNext && nextOpen !== null)
                           ? setStatus
                           : undefined,
-                  notice: setNavigation.lastReady
-                      ? {
-                            title: `Set ${setNumber} marked ready`,
-                            subtitle: "This was the last set in this task.",
-                        }
-                      : null,
+                  notice: setNavigation.readyNotice,
               }
             : null,
     );
@@ -333,7 +333,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     <IncompleteFormsModal
         {setNumber}
         lines={setNavigation.readyQuestion}
-        last={lastSet}
+        last={nextOpen === null}
         onanswer={(go) => setNavigation.answerReady(go)}
     />
 {/if}

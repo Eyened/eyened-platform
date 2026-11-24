@@ -30,6 +30,7 @@ function setup(send: (state: SubTaskState) => Promise<void>) {
         status,
         index: 4,
         count: 10,
+        nextOpen: () => 5,
         navigate: vi.fn(),
         handoff: () => ({ selected: 0, maximised: null }),
         focus: vi.fn(),

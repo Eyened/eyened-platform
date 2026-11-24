@@ -2,15 +2,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
 import { SaveTracker, type RevealTarget } from "$lib/saving/saveTracker.svelte";
 import type { SubTaskState } from "../../types/openapi_types";
-import { SetNavigation } from "./setNavigation.svelte";
+import { focusSetControl, SetNavigation } from "./setNavigation.svelte";
 
 function setup(
     send: (value: number) => Promise<void>,
     {
         index = 4,
         count = 10,
+        nextOpen = index + 1 < count ? index + 1 : null,
         incomplete,
-    }: { index?: number; count?: number; incomplete?: () => string[] } = {},
+    }: {
+        index?: number;
+        count?: number;
+        nextOpen?: number | null;
+        incomplete?: () => string[];
+    } = {},
 ) {
     const tracker = new SaveTracker();
     const revealed: RevealTarget[] = [];
@@ -49,6 +55,7 @@ function setup(
         status,
         index,
         count,
+        nextOpen: () => nextOpen,
         navigate,
         handoff: () => ({ selected: 0, maximised: null }),
         focus: vi.fn(),
@@ -217,5 +224,54 @@ describe("Mark ready with forms that aren't complete", () => {
         await other.navigation.move("primary", { markReady: false });
         expect(other.navigation.readyQuestion).toBeNull();
         expect(other.navigate).toHaveBeenCalledWith(5);
+    });
+});
+
+describe("Next open set", () => {
+    it("the main move goes to the next open set", async () => {
+        const s = setup(async () => {}, { nextOpen: 7 });
+        void s.navigation.move("primary", { markReady: true });
+        await vi.waitFor(() => expect(s.navigate).toHaveBeenCalledWith(7));
+        expect(s.statusSend).toHaveBeenCalledWith("Ready");
+    });
+
+    it("▶ still goes to the next set when the next open set is further on", async () => {
+        const s = setup(async () => {}, { nextOpen: 7 });
+        void s.navigation.move("next", { markReady: false });
+        await vi.waitFor(() => expect(s.navigate).toHaveBeenCalledWith(5));
+    });
+
+    it("with no open set after this one, Mark ready stays and says so", async () => {
+        const s = setup(async () => {}, {
+            index: 4,
+            count: 10,
+            nextOpen: null,
+        });
+        void s.navigation.move("primary", { markReady: true });
+        await vi.waitFor(() => expect(s.navigation.lastReady).toBe(true));
+        expect(s.statusSend).toHaveBeenCalledWith("Ready");
+        expect(s.navigate).not.toHaveBeenCalled();
+        expect(s.navigation.readyNotice).toEqual({
+            title: "Set 5 marked ready",
+            subtitle: "No open sets after this one.",
+        });
+    });
+
+    it("on the last set by index the notification says it was the last", async () => {
+        const s = setup(async () => {}, { index: 9, count: 10 });
+        void s.navigation.move("primary", { markReady: true });
+        await vi.waitFor(() => expect(s.navigation.lastReady).toBe(true));
+        expect(s.navigation.readyNotice?.subtitle).toBe(
+            "This was the last set in this task.",
+        );
+    });
+
+    it("focus meant for the main button goes to ▶ when there is none", () => {
+        document.body.innerHTML = `<button data-set-control="next">Next set</button>`;
+        focusSetControl("primary");
+        expect(document.activeElement).toBe(
+            document.querySelector('[data-set-control="next"]'),
+        );
+        document.body.innerHTML = "";
     });
 });
