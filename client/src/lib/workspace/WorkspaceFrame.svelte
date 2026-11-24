@@ -569,32 +569,32 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 {emptyMessage}
             </p>
         {:else}
-            <!-- Always mounted, so screen readers announce the notice when it appears. -->
-            <div role="status">
-                {#if task?.notice}
-                    <!-- Carbon: an action's inline notification sits at the top of the content it is about. -->
-                    <div class="px-4 pt-2">
+            <!-- Over the bottom of the canvas, above the bottom viewports' view bars, so the images don't move. -->
+            <div class="notices">
+                <!-- Always mounted, so screen readers announce the notice when it appears. -->
+                <div role="status">
+                    {#if task?.notice}
                         <InlineNotification
                             kind="success"
+                            class="shadow-popover"
                             title={task.notice.title}
                             subtitle={task.notice.subtitle}
                             role="none"
                         />
-                    </div>
-                {/if}
-            </div>
-            <!-- Outside the live region: on arrival it is just there; after a lost Claim it is an alert. -->
-            {#if task?.holderNotice && !holderNoticeClosed}
-                <div class="px-4 pt-2">
+                    {/if}
+                </div>
+                <!-- Outside the live region: on arrival it is just there; after a lost Claim it is an alert. -->
+                {#if task?.holderNotice && !holderNoticeClosed}
                     <InlineNotification
                         kind="warning"
+                        class="shadow-popover"
                         title={task.holderNotice.title}
                         subtitle={task.holderNotice.subtitle}
                         role={task.holderNotice.alert ? "alert" : "none"}
                         onclose={() => (holderNoticeClosed = true)}
                     />
-                </div>
-            {/if}
+                {/if}
+            </div>
             {#if workspace.strip}
                 <ThumbnailStrip {tile} {titleFor} />
             {/if}
@@ -739,6 +739,19 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         flex-direction: column;
         min-width: 0;
         min-height: 0;
+    }
+    .notices {
+        position: absolute;
+        inset-inline: 16px;
+        bottom: 40px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+    }
+    .notices > :global(*) {
+        pointer-events: auto;
     }
     .pager {
         grid-area: pager;
