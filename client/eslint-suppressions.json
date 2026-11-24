@@ -110,11 +110,6 @@
       "count": 1
     }
   },
-  "src/lib/viewer-window/HelpOverlay.svelte": {
-    "svelte/require-each-key": {
-      "count": 2
-    }
-  },
   "src/lib/viewer-window/MapSelect.svelte": {
     "@typescript-eslint/no-explicit-any": {
       "count": 4

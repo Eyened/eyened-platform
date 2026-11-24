@@ -28,6 +28,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     } from "$lib/saving/saveTracker.svelte";
     import { titleText, type ViewportTitle } from "./imageMeta";
     import type { ImageGET } from "../../types/openapi_types";
+    import HelpPanel from "./HelpPanel.svelte";
     import InfoPanel from "./InfoPanel.svelte";
     import ImagesPanel from "./ImagesPanel.svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
@@ -547,6 +548,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                         subtitle={layersSubtitle}
                         shown={leftShown === "info"}
                     />
+                {:else if panel.id === "help"}
+                    <HelpPanel shown={leftShown === "help"} />
                 {/if}
             </section>
         {/each}
