@@ -1,6 +1,6 @@
 <!--
 @component
-The form in the window: a header naming its target, its save state and whose it is; a bar with tags, Vertical and Collapse; then the form.
+The form in the window: a header naming its target, its save state and whose it is; a bar with tags and Vertical; then the form.
 -->
 <script lang="ts">
     import { browser } from "$app/environment";
@@ -18,11 +18,7 @@ The form in the window: a header naming its target, its save state and whose it 
     } from "$lib/data";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import { updateTagFormAnnotation } from "$lib/data/helpers";
-    import {
-        getDefault,
-        resolveRefs,
-        type JSONSchema,
-    } from "$lib/forms/schemaType";
+    import { getDefault, type JSONSchema } from "$lib/forms/schemaType";
     import SchemaForm from "$lib/forms/SchemaForm.svelte";
     import SyncStatus from "$lib/layers/SyncStatus.svelte";
     import { formAnnotationSaver } from "$lib/saving/formAnnotationSavers";
@@ -37,6 +33,7 @@ The form in the window: a header naming its target, its save state and whose it 
     } from "$lib/workspace/imageMeta";
     import { getContext, onMount, setContext } from "svelte";
     import type { FormAnnotationGET } from "../../types/openapi_types";
+    import { READY_ATTEMPTED } from "./formContext";
     import { ABOUT, schemaName, windowHeading } from "./formTargets";
 
     let {
@@ -55,11 +52,14 @@ The form in the window: a header naming its target, its save state and whose it 
     if (form.image_id) setContext("pointBoundImageId", form.image_id);
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
+    const readyAttempted = getContext<(() => boolean) | undefined>(
+        READY_ATTEMPTED,
+    );
     const userId = getContext<GlobalContext | undefined>("globalContext")?.user
         .id;
 
     const formSchema = $derived(formSchemas.get(form.form_schema_id)!);
-    const schema = $derived(resolveRefs(formSchema.schema as JSONSchema));
+    const schema = $derived(formSchema.schema as JSONSchema);
     const scope = $derived(resolveFormEntityScope(formSchema.entity_type));
     const meta = $derived(
         form.image_id ? instances.get(form.image_id) : undefined,
@@ -142,14 +142,8 @@ The form in the window: a header naming its target, its save state and whose it 
     let vertical = $state(
         readLocalStorageBoolean("form-item-content-vertical", true),
     );
-    let collapse = $state(
-        readLocalStorageBoolean("form-item-content-collapse", false),
-    );
     $effect(() => {
         localStorage.setItem("form-item-content-vertical", vertical.toString());
-    });
-    $effect(() => {
-        localStorage.setItem("form-item-content-collapse", collapse.toString());
     });
 </script>
 
@@ -198,16 +192,8 @@ The form in the window: a header naming its target, its save state and whose it 
                 >Vertical</Field.Label
             >
         </Field.Field>
-        <Field.Field orientation="horizontal" class="w-auto">
-            <Checkbox id="{uid}-collapse" bind:checked={collapse} />
-            <Field.Label
-                for="{uid}-collapse"
-                class="text-body-compact-01 text-text-primary"
-                >Collapse</Field.Label
-            >
-        </Field.Field>
     </div>
-    <div class="flex flex-1 flex-col overflow-auto p-2">
+    <div class="flex flex-1 flex-col overflow-auto p-4">
         {#if loaded}
             <SchemaForm
                 {schema}
@@ -215,8 +201,7 @@ The form in the window: a header naming its target, its save state and whose it 
                 {onchange}
                 {canEdit}
                 {vertical}
-                {collapse}
-                entityType={formSchema.entity_type}
+                markReadyAttempted={readyAttempted?.() ?? false}
             />
         {/if}
     </div>

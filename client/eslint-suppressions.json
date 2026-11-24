@@ -55,24 +55,6 @@
       "count": 64
     }
   },
-  "src/lib/forms/SchemaForm.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    },
-    "svelte/require-each-key": {
-      "count": 3
-    }
-  },
-  "src/lib/forms/schemaType.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 9
-    }
-  },
-  "src/lib/forms/schemaValidator.svelte.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 16
-    }
-  },
   "src/lib/forms/utils.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
@@ -152,11 +134,6 @@
     }
   },
   "src/lib/viewer-window/RegistrationItemLoader.svelte": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/lib/viewer-window/panelForm/FormItemContent.svelte": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     }

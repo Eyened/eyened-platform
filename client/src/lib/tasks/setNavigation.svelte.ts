@@ -82,6 +82,8 @@ export class SetNavigation {
     question: { markReady: boolean } | null = $state(null);
     /** The open "n forms aren't complete"; answerReady answers it. */
     readyQuestion: string[] | null = $state(null);
+    /** "Go back" in "n forms aren't complete" was pressed; the form window then shows every error. A new set is a new page, so it starts false. */
+    readyAttempted = $state(false);
     /** A move is running, or the page load it started; Set status ▾ waits for it. */
     moving = $state(false);
     private answer: ((leave: boolean) => void) | null = null;
@@ -122,7 +124,10 @@ export class SetNavigation {
             if (markReady) {
                 // After the flush, so answers typed a moment ago count.
                 const lines = this.deps.incomplete?.() ?? [];
-                if (lines.length > 0 && !(await this.askReady(lines))) return;
+                if (lines.length > 0 && !(await this.askReady(lines))) {
+                    this.readyAttempted = true;
+                    return;
+                }
                 // A failure shows on the combo button; the grader stays.
                 if (!(await this.saveStatus("Ready"))) return;
                 // Work that became unsaved during the status save keeps the grader here.

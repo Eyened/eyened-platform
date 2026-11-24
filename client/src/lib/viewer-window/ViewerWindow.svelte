@@ -6,6 +6,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 <script lang="ts">
     import { resolve } from "$app/paths";
     import FormsPanel from "$lib/forms/FormsPanel.svelte";
+    import { READY_ATTEMPTED } from "$lib/forms/formContext";
     import {
         formAnnotations,
         formSchemas,
@@ -172,6 +173,8 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                   },
               })
             : null;
+    // getAllContexts() above returns this component's own map, so the form window sees this too.
+    setContext(READY_ATTEMPTED, () => setNavigation?.readyAttempted ?? false);
     const shows = taskContext
         ? taskHeaderShows(
               parseTaskPanelConfig(taskContext.task.task_definition.config),

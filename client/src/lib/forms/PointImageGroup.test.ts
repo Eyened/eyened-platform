@@ -11,7 +11,7 @@ const group = {
 };
 
 describe("PointImageGroup", () => {
-    it("renders by-image chips and expands an editor", async () => {
+    it("renders rows under the image heading and expands an editor", async () => {
         const onGoTo = vi.fn();
         const onRemovePoint = vi.fn();
         const onCollapse = vi.fn();
@@ -19,20 +19,18 @@ describe("PointImageGroup", () => {
         render(PointImageGroup, {
             props: {
                 group,
-                addressing: "byImage",
-                cardinality: "list",
+                heading: "OD · CF · 2024-03-12",
                 expandedKey: "img-abc:1",
                 canEdit: true,
                 hasExtras: true,
                 enumExtras: [],
                 stringExtraKeys: ["note"],
-                formatCoord: (pt) => `[${pt.x},${pt.y}]`,
+                rowKey: (row) => `${row.publicId}:${row.index}`,
+                bscanText: () => null,
                 extraPreview: (pt) =>
                     typeof pt.note === "string" ? ` ${pt.note}` : "",
-                rowKey: (row) => `${row.publicId}:${row.index}`,
                 indexApplicable: () => false,
                 onGoTo,
-                chipName: () => "Point",
                 hint: null,
                 onUpdateCoord: vi.fn(),
                 onUpdateExtra: vi.fn(),
@@ -41,58 +39,33 @@ describe("PointImageGroup", () => {
             },
         });
 
-        expect(screen.getByText("img-abc")).toBeInTheDocument();
-        expect(screen.getByText("2 pts")).toBeInTheDocument();
-        expect(screen.getByText("[1,2]")).toBeInTheDocument();
+        expect(screen.getByTitle("img-abc")).toHaveTextContent(
+            "OD · CF · 2024-03-12",
+        );
+        expect(screen.getByText("2 points")).toBeInTheDocument();
         expect(screen.getByText("n")).toBeInTheDocument();
         expect(
-            screen.getByRole("button", { name: "Done" }),
+            screen.getByRole("button", { name: /^Point\s?2 x\s?3 y\s?4/ }),
+        ).toHaveAttribute("aria-expanded", "true");
+        expect(
+            screen.getByRole("group", { name: "Point 2" }),
         ).toBeInTheDocument();
 
-        await fireEvent.click(screen.getByText("[1,2]"));
-        expect(onGoTo).toHaveBeenCalled();
+        await fireEvent.click(
+            screen.getByRole("button", { name: /^Point\s?1 x\s?1/ }),
+        );
+        expect(onGoTo).toHaveBeenCalledWith({
+            publicId: "img-abc",
+            index: 0,
+            pt: { x: 1, y: 2 },
+        });
 
         await fireEvent.click(
-            screen.getByRole("button", { name: "Remove point" }),
+            screen.getByRole("button", { name: "Delete point" }),
         );
         expect(onRemovePoint).toHaveBeenCalledWith("img-abc", 1);
 
         await fireEvent.click(screen.getByRole("button", { name: "Done" }));
         expect(onCollapse).toHaveBeenCalled();
-    });
-
-    it("omits the public id for bare addressing", () => {
-        render(PointImageGroup, {
-            props: {
-                group: {
-                    publicId: "img-abc",
-                    rows: [
-                        { publicId: "img-abc", index: 0, pt: { x: 8, y: 9 } },
-                    ],
-                },
-                addressing: "bare",
-                cardinality: "single",
-                expandedKey: null,
-                canEdit: false,
-                hasExtras: false,
-                enumExtras: [],
-                stringExtraKeys: [],
-                formatCoord: (pt) => `[${pt.x},${pt.y}]`,
-                extraPreview: () => "",
-                rowKey: (row) => `${row.publicId}:${row.index}`,
-                indexApplicable: () => false,
-                onGoTo: vi.fn(),
-                chipName: () => "Point",
-                hint: null,
-                onUpdateCoord: vi.fn(),
-                onUpdateExtra: vi.fn(),
-                onRemovePoint: vi.fn(),
-                onCollapse: vi.fn(),
-            },
-        });
-
-        expect(screen.queryByText("img-abc")).not.toBeInTheDocument();
-        expect(screen.queryByText(/pts/)).not.toBeInTheDocument();
-        expect(screen.getByText("[8,9]")).toBeInTheDocument();
     });
 });

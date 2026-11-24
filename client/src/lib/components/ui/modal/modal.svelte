@@ -63,6 +63,8 @@
     let primary = $state<HTMLElement | null>(null);
     let cancel = $state<HTMLElement | null>(null);
     let form = $state<HTMLFormElement | null>(null);
+    // bits-ui reads the global document.activeElement, which is the wrong document in a popup window.
+    let opener: HTMLElement | null = null;
     const busy = $derived(status !== "inactive");
 
     // Every close path (Esc, the X, Cancel) comes through here, so none closes a busy modal.
@@ -112,6 +114,8 @@
         class={cn("gap-0 p-0", modalSizeClasses[size])}
         interactOutsideBehavior="ignore"
         onOpenAutoFocus={(e) => {
+            const active = form?.ownerDocument.activeElement;
+            opener = active instanceof HTMLElement ? active : null;
             // Carbon: a danger modal focuses Cancel; others the element marked data-modal-primary-focus, else their first field.
             // focusSecondary (ours) focuses the secondary button, as a danger modal does.
             const first =
@@ -125,7 +129,12 @@
                 first.focus();
             }
         }}
-        {onCloseAutoFocus}
+        onCloseAutoFocus={(e) => {
+            onCloseAutoFocus?.(e);
+            if (e.defaultPrevented || !opener?.isConnected) return;
+            e.preventDefault();
+            opener.focus();
+        }}
     >
         <form
             class="flex min-h-0 flex-1 flex-col"

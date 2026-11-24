@@ -1,14 +1,23 @@
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import { Modal } from "$lib/components/ui/modal/index.js";
+    import Close from "carbon-icons-svelte/lib/Close.svelte";
+    import Location from "carbon-icons-svelte/lib/Location.svelte";
     import {
         CLIENT_DEFAULTS,
         mergeClientConfig,
     } from "$lib/config/clientDefaults";
-    import { formAnnotations } from "$lib/data";
+    import { formAnnotations, instances } from "$lib/data";
+    import { eyeLabel, modalityField } from "$lib/workspace/imageMeta";
     import { formSchemas } from "$lib/data/stores.svelte";
     import { schemaName } from "$lib/forms/formTargets";
-    import PointImageGroup from "$lib/forms/PointImageGroup.svelte";
-    import PointRowEditor from "$lib/forms/PointRowEditor.svelte";
+    import PointImageGroup, {
+        type PointSlot,
+    } from "$lib/forms/PointImageGroup.svelte";
+    import PointRowEditor, {
+        type PointRow,
+    } from "$lib/forms/PointRowEditor.svelte";
     import {
         pointArming,
         FormPointSession,
@@ -36,6 +45,11 @@
         onchange: (value: unknown) => void;
         canEdit?: boolean;
         fieldPath?: string;
+        /** The question's words; defaults to the schema's title. */
+        title?: string;
+        required?: boolean;
+        helperText?: string;
+        invalidText?: string;
     }
 
     let {
@@ -44,7 +58,19 @@
         onchange,
         canEdit = true,
         fieldPath = "point",
+        title,
+        required = false,
+        helperText,
+        invalidText,
     }: Props = $props();
+
+    const uid = $props.id();
+    const question = $derived(title ?? (schema.title || fieldPath));
+    const note = $derived(invalidText ?? helperText);
+    let fieldElement = $state<HTMLElement | null>(null);
+    // Carbon: deleting more than one thing asks first.
+    let removeAllOpen = $state(false);
+    let placeButton = $state<HTMLElement | null>(null);
 
     const seedViewerContext = getContext<ViewerContext | undefined>(
         "viewerContext",
@@ -85,15 +111,18 @@
     /** Prefer live session value while armed so chips/labels track the tool. */
     const displayValue = $derived(liveSession ? liveSession.fieldValue : value);
 
-    type PointRow = { publicId: string; index: number; pt: ImagePoint };
-
-    const pointRows = $derived.by((): PointRow[] => {
+    // Null slots stay, so numbers line up across the images of a matched-landmark list.
+    const pointRows = $derived.by((): PointSlot[] => {
         if (!analysis) return [];
         if (analysis.addressing === "bare") {
             const pid = publicId || boundImageId || "";
             if (!pid) return [];
-            return getPointsForImage(displayValue, pid, analysis).flatMap(
-                (pt, index) => (pt ? [{ publicId: pid, index, pt }] : []),
+            return getPointsForImage(displayValue, pid, analysis).map(
+                (pt, index) => ({
+                    publicId: pid,
+                    index,
+                    pt,
+                }),
             );
         }
         const ids: string[] = [];
@@ -109,31 +138,44 @@
             }
         }
         if (publicId && !ids.includes(publicId)) ids.push(publicId);
-        const rows: PointRow[] = [];
+        const rows: PointSlot[] = [];
         for (const id of ids.sort()) {
             for (const [index, pt] of getPointsForImage(
                 displayValue,
                 id,
                 analysis,
             ).entries()) {
-                if (pt) rows.push({ publicId: id, index, pt });
+                rows.push({ publicId: id, index, pt });
             }
         }
         return rows;
     });
 
-    type ImageGroup = { publicId: string; rows: PointRow[] };
+    const pointCount = $derived(pointRows.filter((r) => r.pt).length);
 
+    type ImageGroup = { publicId: string; rows: PointSlot[] };
+
+    // An image without a point yet gets no heading.
     const imageGroups = $derived.by((): ImageGroup[] => {
-        const byId: Record<string, PointRow[]> = {};
+        const byId: Record<string, PointSlot[]> = {};
         for (const row of pointRows) {
             (byId[row.publicId] ??= []).push(row);
         }
-        return Object.entries(byId).map(([pid, rows]) => ({
-            publicId: pid,
-            rows,
-        }));
+        return Object.entries(byId)
+            .filter(([, rows]) => rows.some((r) => r.pt))
+            .map(([pid, rows]) => ({ publicId: pid, rows }));
     });
+
+    /** The image in viewer words; its public ID when the viewer doesn't know it. */
+    function imageHeading(pid: string): string {
+        const meta = instances.get(pid);
+        if (!meta) return pid;
+        return (
+            [eyeLabel(meta.laterality), modalityField(meta), meta.study.date]
+                .filter(Boolean)
+                .join(" · ") || pid
+        );
+    }
 
     /** Show i only for oct-space fields that carry an OCT index (number or null). */
     function indexApplicable(pt: ImagePoint): boolean {
@@ -144,14 +186,12 @@
     /** Volume schemas require a numeric index; only `oct` allows blank → null. */
     const allowNullIndex = $derived(analysis?.coordinateSpace === "oct");
 
-    function formatCoord(pt: ImagePoint): string {
-        const x = Math.round(pt.x);
-        const y = Math.round(pt.y);
-        if (!indexApplicable(pt)) return `[${x},${y}]`;
-        if (typeof pt.index === "number") {
-            return `[${x},${y},${Math.round(pt.index)}]`;
-        }
-        return `[${x},${y},null]`;
+    function bscanText(pt: ImagePoint): string | null {
+        if (!indexApplicable(pt)) return null;
+        // Shown from 1 like the viewer's slice counter; stored from 0.
+        return typeof pt.index === "number"
+            ? `B-scan ${Math.round(pt.index) + 1}`
+            : "en-face";
     }
 
     function extraPreview(pt: ImagePoint): string {
@@ -201,13 +241,28 @@
 
     let expandedKey = $state<string | null>(null);
 
-    function rowKey(row: PointRow) {
+    function rowKey(row: { publicId: string; index: number }) {
         return `${row.publicId}:${row.index}`;
+    }
+
+    /** Closes the editor and puts focus back on its row. */
+    function collapse() {
+        const key = expandedKey;
+        expandedKey = null;
+        queueMicrotask(() =>
+            [
+                ...(fieldElement?.querySelectorAll<HTMLElement>(
+                    "[data-row-key]",
+                ) ?? []),
+            ]
+                .find((b) => b.dataset.rowKey === key)
+                ?.focus(),
+        );
     }
 
     let hint = $state<string | null>(null);
 
-    /** A chip opens its editor and goes to the point in the viewport showing its image. */
+    /** A row opens its editor and goes to the point in the viewport showing its image. */
     function goTo(row: PointRow) {
         expandedKey = rowKey(row);
         // On /browse there is no viewer to go to, so no hint either.
@@ -225,11 +280,6 @@
             layers.formPointTool.current = row.index;
     }
 
-    /** Holds the chip's visible text, so voice control can say what it sees. */
-    function chipName(row: PointRow): string {
-        return `Point ${row.index + 1}, ${formatCoord(row.pt)}${extraPreview(row.pt)}: go to it and edit`;
-    }
-
     const canActivate = $derived(!!(canEdit && analysis && seedViewerContext));
 
     function toggleActivate() {
@@ -241,7 +291,7 @@
                 pointStyle: pointMarker.style,
                 radius: pointMarker.radius,
                 color: pointMarker.color,
-                label: schema.title || fieldPath,
+                label: question,
                 form: formName,
                 analysis,
                 initialValue: value,
@@ -363,75 +413,101 @@
     }
 </script>
 
-<div class="point-field">
+<div
+    bind:this={fieldElement}
+    role="group"
+    aria-labelledby="{uid}-legend"
+    aria-describedby={note ? `${uid}-note` : undefined}
+    class="flex flex-col gap-3"
+>
     <!-- Always mounted, so a new hint is announced. -->
     <p role="status" class="sr-only">{hint ?? ""}</p>
-    <div class="header">
-        <span class="title">{schema.title || fieldPath}</span>
-        {#if schema.description}
-            <span class="desc">{schema.description}</span>
+    <div class="flex items-start gap-2">
+        <div class="min-w-0 flex-1">
+            <p id="{uid}-legend" class="text-label-01 text-text-secondary">
+                {required ? `${question} (required)` : question}
+            </p>
+            {#if note}
+                <p
+                    id="{uid}-note"
+                    class="mt-1 text-helper-text-01 {invalidText
+                        ? 'text-text-error'
+                        : 'text-text-helper'}"
+                >
+                    {note}
+                </p>
+            {/if}
+        </div>
+        {#if canEdit && fieldPresent}
+            <IconButton
+                size="icon-xs"
+                label="Clear answer: {question}"
+                data-clear
+                onclick={removeField}><Close /></IconButton
+            >
         {/if}
     </div>
 
     {#if !isPointWidget(schema) || !analysis}
-        <p class="warn">Point widget misconfigured for this schema.</p>
+        <p class="text-helper-text-01 text-text-error">
+            Point widget misconfigured for this schema.
+        </p>
     {:else}
-        <div class="actions">
-            {#if seedViewerContext}
-                <Button
-                    variant={armed ? "default" : "outline"}
-                    size="sm"
-                    disabled={!canActivate}
-                    onclick={toggleActivate}
-                >
-                    {armed ? "Deactivate tool" : "Activate tool"}
-                </Button>
-            {:else}
-                <span class="hint">No viewer — tool unavailable</span>
-            {/if}
-            {#if canEdit}
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onclick={clear}
-                    disabled={pointRows.length === 0}
-                >
-                    Clear
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onclick={removeField}
-                    disabled={!fieldPresent}
-                    title="Omit this field from the grading (absent, not an empty list)"
-                >
-                    Remove
-                </Button>
-            {/if}
-        </div>
-
-        {#if imageGroups.length === 0}
-            <div class="empty">
-                {analysis.cardinality === "single" ? "no point" : "no points"}
+        {@const single = analysis.cardinality === "single"}
+        {#if canEdit}
+            <div class="flex flex-wrap items-center gap-2">
+                {#if seedViewerContext}
+                    <Button
+                        bind:ref={placeButton}
+                        size="sm"
+                        variant={armed ? "default" : "outline"}
+                        aria-pressed={armed}
+                        disabled={!canActivate}
+                        onclick={toggleActivate}
+                        >{armed
+                            ? "Stop placing"
+                            : single
+                              ? pointCount
+                                  ? "Move"
+                                  : "Place"
+                              : "Place points"}<Location /></Button
+                    >
+                {:else}
+                    <p class="text-helper-text-01 text-text-helper">
+                        No viewer — tool unavailable
+                    </p>
+                {/if}
+                {#if !single && pointCount >= 2}
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onclick={() => (removeAllOpen = true)}
+                        >Remove all</Button
+                    >
+                {/if}
             </div>
-        {:else if analysis.cardinality === "single" && analysis.addressing === "bare"}
-            {@const row = imageGroups[0]!.rows[0]!}
-            <div class="single-point">
+        {/if}
+
+        {#if single && analysis.addressing === "bare"}
+            {@const slot = pointRows.find((r) => r.pt)}
+            {#if slot?.pt}
+                {@const row: PointRow = { publicId: slot.publicId, index: slot.index, pt: slot.pt }}
                 <button
                     type="button"
-                    class="coord-chip"
-                    class:expanded={expandedKey === rowKey(row)}
-                    aria-label={chipName(row)}
+                    data-row-key={rowKey(row)}
                     aria-expanded={expandedKey === rowKey(row)}
+                    class="self-start text-body-compact-01 text-link-primary hover:underline"
                     onclick={() => goTo(row)}
+                    >{Math.round(row.pt.x)}, {Math.round(row.pt.y)}{bscanText(
+                        row.pt,
+                    )
+                        ? ` · ${bscanText(row.pt)}`
+                        : ""}</button
                 >
-                    {formatCoord(row.pt)}{#if extraPreview(row.pt)}<span
-                            class="extra-preview">{extraPreview(row.pt)}</span
-                        >{/if}
-                </button>
                 {#if expandedKey === rowKey(row)}
                     <PointRowEditor
                         {row}
+                        number={1}
                         {canEdit}
                         {hasExtras}
                         enumExtras={analysis.enumExtras}
@@ -439,111 +515,64 @@
                         {indexApplicable}
                         {allowNullIndex}
                         {hint}
-                        coordLabel={formatCoord(row.pt) + extraPreview(row.pt)}
                         onUpdateCoord={updatePointCoord}
                         onUpdateExtra={updatePointExtra}
                         onRemove={() => removePoint(row.publicId, row.index)}
-                        onCollapse={() => (expandedKey = null)}
+                        onCollapse={collapse}
                     />
                 {/if}
-            </div>
+            {:else}
+                <p class="text-body-compact-01 text-text-secondary">
+                    Not placed
+                </p>
+            {/if}
+        {:else if imageGroups.length === 0}
+            <p class="text-body-compact-01 text-text-secondary">No points</p>
         {:else}
             {#each imageGroups as group (group.publicId)}
                 <PointImageGroup
                     {group}
-                    addressing={analysis.addressing}
-                    cardinality={analysis.cardinality}
+                    heading={imageHeading(group.publicId)}
                     {expandedKey}
                     {canEdit}
                     {hasExtras}
                     enumExtras={analysis.enumExtras}
                     {stringExtraKeys}
-                    {formatCoord}
-                    {extraPreview}
                     {rowKey}
+                    {bscanText}
+                    {extraPreview}
                     {indexApplicable}
                     {allowNullIndex}
-                    onGoTo={goTo}
-                    {chipName}
                     {hint}
+                    onGoTo={goTo}
                     onUpdateCoord={updatePointCoord}
                     onUpdateExtra={updatePointExtra}
                     onRemovePoint={removePoint}
-                    onCollapse={() => (expandedKey = null)}
+                    onCollapse={collapse}
                 />
             {/each}
         {/if}
     {/if}
 </div>
 
-<style>
-    .point-field {
-        display: flex;
-        flex-direction: column;
-        gap: 0.4em;
-        padding: 0.25em;
-    }
-    .header {
-        display: flex;
-        flex-direction: column;
-        gap: 0.15em;
-    }
-    .title {
-        font-weight: bold;
-    }
-    .desc {
-        font-size: 0.9em;
-        opacity: 0.8;
-    }
-    .actions {
-        display: flex;
-        flex-direction: row;
-        gap: 0.5em;
-        align-items: center;
-    }
-    .hint,
-    .warn,
-    .empty {
-        font-size: 0.85em;
-        color: #a60;
-    }
-    .warn {
-        color: #a00;
-    }
-    .empty {
-        font-family: monospace;
-        opacity: 0.7;
-        color: inherit;
-    }
-    .single-point {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35em;
-        font-family: monospace;
-        font-size: 0.9em;
-    }
-    .coord-chip {
-        appearance: none;
-        align-self: flex-start;
-        background: transparent;
-        border: 1px solid transparent;
-        border-radius: 0.35em;
-        color: inherit;
-        cursor: pointer;
-        font: inherit;
-        padding: 0.05em 0.3em;
-        margin: 0;
-    }
-    .coord-chip:hover {
-        background: color-mix(in srgb, currentColor 8%, transparent);
-        border-color: color-mix(in srgb, currentColor 35%, transparent);
-    }
-    .coord-chip.expanded {
-        background: rgba(255, 255, 255, 0.07);
-        border-color: rgba(255, 255, 255, 0.3);
-    }
-    .extra-preview {
-        opacity: 0.65;
-        font-size: 0.9em;
-    }
-</style>
+<Modal
+    bind:open={removeAllOpen}
+    danger
+    size="xs"
+    modalHeading="Remove all points"
+    modalLabel={question}
+    primaryButtonText="Remove all"
+    primaryButtonLoadingDescription="Removing…"
+    successDescription="Removed"
+    errorTitle="Points could not be removed"
+    onsubmit={async () => clear()}
+    onCloseAutoFocus={(event) => {
+        // Remove all is gone with the points, so focus goes to Place points.
+        if (pointCount === 0) {
+            event.preventDefault();
+            placeButton?.focus();
+        }
+    }}
+>
+    <p>Removes every point of this question. This can't be undone.</p>
+</Modal>

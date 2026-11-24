@@ -2,6 +2,17 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import PointRowEditor from "./PointRowEditor.svelte";
 
+/** Opens a Dropdown trigger and picks the option starting with `text`. */
+async function pick(trigger: HTMLElement, text: string) {
+    trigger.focus();
+    await fireEvent.keyDown(trigger, { key: "Enter" });
+    const option = (await screen.findAllByRole("option")).find((o) =>
+        o.textContent?.trim().startsWith(text),
+    )!;
+    await fireEvent.pointerDown(option, { button: 0, pointerType: "mouse" });
+    await fireEvent.pointerUp(option, { button: 0, pointerType: "mouse" });
+}
+
 const row = {
     publicId: "img1",
     index: 0,
@@ -24,7 +35,7 @@ describe("PointRowEditor", () => {
                 stringExtraKeys: ["note"],
                 indexApplicable: () => true,
                 allowNullIndex: true,
-                coordLabel: "[10,21,3]",
+                number: 1,
                 onUpdateCoord,
                 onUpdateExtra,
                 onRemove,
@@ -32,7 +43,7 @@ describe("PointRowEditor", () => {
             },
         });
 
-        expect(screen.getByText("[10,21,3]")).toBeInTheDocument();
+        expect(screen.getByText("Point 1")).toBeInTheDocument();
 
         const x = screen.getByLabelText("x") as HTMLInputElement;
         await fireEvent.input(x, { target: { value: "15" } });
@@ -42,13 +53,13 @@ describe("PointRowEditor", () => {
         await fireEvent.input(y, { target: { value: "25" } });
         expect(onUpdateCoord).toHaveBeenCalledWith("img1", 0, "y", "25");
 
-        const i = screen.getByLabelText("i") as HTMLInputElement;
+        const i = screen.getByLabelText("B-scan") as HTMLInputElement;
         await fireEvent.input(i, { target: { value: "" } });
         expect(onUpdateCoord).toHaveBeenCalledWith("img1", 0, "index", "");
 
-        const select = screen.getByDisplayValue("mild") as HTMLSelectElement;
-        expect(select.querySelector('option[value=""]')).not.toBeNull();
-        await fireEvent.change(select, { target: { value: "severe" } });
+        const trigger = screen.getByLabelText("severity");
+        expect(trigger).toHaveTextContent("mild");
+        await pick(trigger, "severe");
         expect(onUpdateExtra).toHaveBeenCalledWith(
             "img1",
             0,
@@ -61,7 +72,7 @@ describe("PointRowEditor", () => {
         expect(onUpdateExtra).toHaveBeenCalledWith("img1", 0, "note", "disc");
 
         await fireEvent.click(
-            screen.getByRole("button", { name: "Remove point" }),
+            screen.getByRole("button", { name: "Delete point" }),
         );
         expect(onRemove).toHaveBeenCalled();
 
@@ -69,10 +80,11 @@ describe("PointRowEditor", () => {
         expect(onCollapse).toHaveBeenCalled();
     });
 
-    it("omits the blank grade when the enum is required", () => {
+    it("omits None when the enum is required", async () => {
         render(PointRowEditor, {
             props: {
                 row,
+                number: 1,
                 canEdit: true,
                 hasExtras: true,
                 enumExtras: [
@@ -84,7 +96,6 @@ describe("PointRowEditor", () => {
                 ],
                 stringExtraKeys: [],
                 indexApplicable: () => false,
-                coordLabel: "[10,21]",
                 onUpdateCoord: vi.fn(),
                 onUpdateExtra: vi.fn(),
                 onRemove: vi.fn(),
@@ -92,16 +103,21 @@ describe("PointRowEditor", () => {
             },
         });
 
-        const select = screen.getByDisplayValue("mild") as HTMLSelectElement;
-        expect(select.querySelector('option[value=""]')).toBeNull();
-        expect(select.querySelectorAll("option")).toHaveLength(2);
+        const trigger = screen.getByLabelText("severity");
+        trigger.focus();
+        await fireEvent.keyDown(trigger, { key: "Enter" });
+        const names = (await screen.findAllByRole("option")).map((o) =>
+            o.textContent?.trim(),
+        );
+        expect(names).toEqual(["mild", "severe"]);
     });
 
-    it("shows a blank required grade when the saved value is missing", async () => {
+    it("shows no grade when a required one is missing, and saves the pick", async () => {
         const onUpdateExtra = vi.fn();
         render(PointRowEditor, {
             props: {
                 row: { publicId: "img1", index: 0, pt: { x: 10, y: 20 } },
+                number: 1,
                 canEdit: true,
                 hasExtras: true,
                 enumExtras: [
@@ -113,7 +129,6 @@ describe("PointRowEditor", () => {
                 ],
                 stringExtraKeys: [],
                 indexApplicable: () => false,
-                coordLabel: "[10,20]",
                 onUpdateCoord: vi.fn(),
                 onUpdateExtra,
                 onRemove: vi.fn(),
@@ -121,15 +136,9 @@ describe("PointRowEditor", () => {
             },
         });
 
-        const select = screen.getByLabelText("severity") as HTMLSelectElement;
-        const blank = select.querySelector(
-            'option[value=""]',
-        ) as HTMLOptionElement;
-        expect(blank).not.toBeNull();
-        expect(blank.disabled).toBe(true);
-        expect(select.value).toBe("");
-
-        await fireEvent.change(select, { target: { value: "mild" } });
+        const trigger = screen.getByLabelText("severity");
+        expect(trigger).toHaveTextContent("Choose an option");
+        await pick(trigger, "mild");
         expect(onUpdateExtra).toHaveBeenCalledWith(
             "img1",
             0,
@@ -147,7 +156,7 @@ describe("PointRowEditor", () => {
                 enumExtras: [],
                 stringExtraKeys: [],
                 indexApplicable: () => false,
-                coordLabel: "[1,2]",
+                number: 1,
                 onUpdateCoord: vi.fn(),
                 onUpdateExtra: vi.fn(),
                 onRemove: vi.fn(),
@@ -156,11 +165,11 @@ describe("PointRowEditor", () => {
         });
 
         expect(
-            screen.queryByRole("button", { name: "Remove point" }),
+            screen.queryByRole("button", { name: "Delete point" }),
         ).not.toBeInTheDocument();
         expect(
             screen.getByRole("button", { name: "Done" }),
         ).toBeInTheDocument();
-        expect(screen.queryByLabelText("i")).not.toBeInTheDocument();
+        expect(screen.queryByLabelText("B-scan")).not.toBeInTheDocument();
     });
 });

@@ -96,7 +96,7 @@ describe("FormCreator", () => {
         create.reject(new Error("403"));
         await done;
         expect(win.close).not.toHaveBeenCalled();
-        expect(vi.mocked(mount).mock.lastCall?.[1].props).toEqual({
+        expect(vi.mocked(mount).mock.lastCall?.[1].props).toMatchObject({
             view: { kind: "failed" },
         });
         expect(formWindow.formId).toBeNull();

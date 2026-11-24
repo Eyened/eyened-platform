@@ -21,6 +21,8 @@
                 secondary:
                     "bg-button-secondary text-text-on-color hover:bg-button-secondary-hover active:bg-button-secondary-active disabled:border-button-disabled disabled:bg-button-disabled disabled:text-text-on-color-disabled aria-disabled:border-button-disabled aria-disabled:bg-button-disabled aria-disabled:text-text-on-color-disabled",
                 ghost: "bg-transparent pr-3.75 text-link-primary hover:bg-background-hover hover:text-link-primary-hover active:bg-background-active active:text-link-primary-hover disabled:bg-transparent disabled:text-text-disabled aria-disabled:bg-transparent aria-disabled:text-text-disabled [&_svg]:text-icon-primary disabled:[&_svg]:text-icon-disabled aria-disabled:[&_svg]:text-icon-disabled [&>svg]:static",
+                "danger-ghost":
+                    "bg-transparent pr-3.75 text-button-danger-secondary hover:bg-button-danger-hover hover:text-text-on-color active:bg-button-danger-active active:text-text-on-color disabled:bg-transparent disabled:text-text-disabled [&>svg]:static",
                 link: "text-link-primary hover:text-link-primary-hover hover:underline disabled:text-text-disabled aria-disabled:text-text-disabled",
             },
             size: {

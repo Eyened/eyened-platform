@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import {
+    render,
+    screen,
+    fireEvent,
+    within,
+    waitFor,
+} from "@testing-library/svelte";
 import PointField from "./PointField.svelte";
 import { pointArming } from "./pointArming.svelte";
 import type { JSONSchema } from "./schemaType";
@@ -107,7 +113,7 @@ describe("PointField", () => {
         expect(
             screen.getByText("No viewer — tool unavailable"),
         ).toBeInTheDocument();
-        expect(screen.getByText("no point")).toBeInTheDocument();
+        expect(screen.getByText("Not placed")).toBeInTheDocument();
     });
 
     it("arms, edits, clears, and removes a single point", async () => {
@@ -124,30 +130,70 @@ describe("PointField", () => {
         });
 
         expect(screen.getByText("Fovea")).toBeInTheDocument();
-        expect(screen.getByText("center")).toBeInTheDocument();
-        expect(screen.getByText("[10,20]")).toBeInTheDocument();
-        expect(screen.getByText("mild, n")).toBeInTheDocument();
-
-        await fireEvent.click(
-            screen.getByRole("button", { name: "Activate tool" }),
-        );
-        expect(pointArming.isArmed("form:unknown:point")).toBe(true);
         expect(
-            screen.getByRole("button", { name: "Deactivate tool" }),
+            screen.getByRole("button", { name: "10, 20" }),
         ).toBeInTheDocument();
 
-        await fireEvent.click(screen.getByText("[10,20]"));
+        await fireEvent.click(screen.getByRole("button", { name: "Move" }));
+        expect(pointArming.isArmed("form:unknown:point")).toBe(true);
+        expect(
+            screen.getByRole("button", { name: "Stop placing" }),
+        ).toBeInTheDocument();
+
+        await fireEvent.click(screen.getByRole("button", { name: "10, 20" }));
         const x = screen.getByLabelText("x") as HTMLInputElement;
         await fireEvent.input(x, { target: { value: "11" } });
         expect(onchange).toHaveBeenCalled();
 
         await fireEvent.click(
-            screen.getByRole("button", { name: "Remove point" }),
+            screen.getByRole("button", { name: "Delete point" }),
         );
         expect(onchange).toHaveBeenCalled();
 
-        await fireEvent.click(screen.getByRole("button", { name: "Clear" }));
-        await fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+        expect(onchange).toHaveBeenCalledWith(undefined);
+    });
+
+    it("Remove all asks first, then empties the list", async () => {
+        const onchange = vi.fn();
+        renderField({
+            schema: {
+                "x-eyened-widget": "keypoint",
+                title: "Landmarks",
+                type: "array",
+                items: pointObject,
+            },
+            value: [
+                { x: 1, y: 2 },
+                { x: 3, y: 4 },
+            ],
+            onchange,
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Remove all" }),
+        );
+        expect(onchange).not.toHaveBeenCalled();
+        const dialog = await screen.findByRole("dialog");
+        expect(dialog).toHaveTextContent("Remove all points");
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Remove all" }),
+        );
+        await waitFor(() => expect(onchange).toHaveBeenCalledWith([]));
+    });
+
+    it("Clear answer omits the field", async () => {
+        const onchange = vi.fn();
+        renderField({
+            schema: {
+                "x-eyened-widget": "keypoint",
+                title: "Fovea",
+                ...pointObject,
+            },
+            value: { x: 10, y: 20 },
+            onchange,
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Clear answer: Fovea" }),
+        );
         expect(onchange).toHaveBeenCalledWith(undefined);
     });
 
@@ -170,11 +216,23 @@ describe("PointField", () => {
             onchange,
         });
 
-        expect(screen.getByText("img1")).toBeInTheDocument();
-        expect(screen.getByText("img2")).toBeInTheDocument();
-        await fireEvent.click(screen.getByText("[1,2]"));
-        const select = screen.getByDisplayValue("mild") as HTMLSelectElement;
-        await fireEvent.change(select, { target: { value: "severe" } });
+        expect(screen.getByTitle("img1")).toBeInTheDocument();
+        expect(screen.getByTitle("img2")).toBeInTheDocument();
+        await fireEvent.click(
+            screen.getByRole("button", { name: /^Point\s?1 x\s?1 y\s?2/ }),
+        );
+        const trigger = screen.getByLabelText("severity");
+        expect(trigger).toHaveTextContent("mild");
+        trigger.focus();
+        await fireEvent.keyDown(trigger, { key: "Enter" });
+        const option = (await screen.findAllByRole("option")).find((o) =>
+            o.textContent?.trim().startsWith("severe"),
+        )!;
+        await fireEvent.pointerDown(option, {
+            button: 0,
+            pointerType: "mouse",
+        });
+        await fireEvent.pointerUp(option, { button: 0, pointerType: "mouse" });
         expect(onchange).toHaveBeenCalled();
     });
 
@@ -185,8 +243,10 @@ describe("PointField", () => {
             value: { x: 1, y: 2, index: 4 },
             onchange,
         });
-        await fireEvent.click(screen.getByText("[1,2,4]"));
-        const i = screen.getByLabelText("i");
+        await fireEvent.click(
+            screen.getByRole("button", { name: "1, 2 · B-scan 5" }),
+        );
+        const i = screen.getByLabelText("B-scan");
         await fireEvent.input(i, { target: { value: "" } });
         expect(screen.getByText("Enter a B-scan number.")).toBeInTheDocument();
         expect(i).toHaveAttribute("aria-invalid", "true");
@@ -194,7 +254,25 @@ describe("PointField", () => {
         expect(toast.warning).not.toHaveBeenCalled();
     });
 
-    it("a chip click goes to its point in the viewport showing its image and opens the editor", async () => {
+    it("typing B-scan 7 stores index 6", async () => {
+        const onchange = vi.fn();
+        renderField({
+            schema: volumeSchema,
+            value: { x: 1, y: 2, index: 4 },
+            onchange,
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "1, 2 · B-scan 5" }),
+        );
+        await fireEvent.input(screen.getByLabelText("B-scan"), {
+            target: { value: "7" },
+        });
+        expect(onchange).toHaveBeenCalledWith(
+            expect.objectContaining({ index: 6 }),
+        );
+    });
+
+    it("a row click goes to its point in the viewport showing its image and opens the editor", async () => {
         const { ws, viewer } = workspaceShowing("img1");
         renderField(
             {
@@ -208,13 +286,13 @@ describe("PointField", () => {
             ]),
         );
         const chip = screen.getByRole("button", {
-            name: "Point 1, [30,20,4]: go to it and edit",
+            name: "30, 20 · B-scan 5",
         });
         await fireEvent.click(chip);
         expect(viewer.setIndex).toHaveBeenCalledWith(4);
         expect(viewer.focusPoint).toHaveBeenCalledWith(30, 20, 1);
         expect(chip).toHaveAttribute("aria-expanded", "true");
-        expect(screen.getByLabelText("i")).toBeInTheDocument();
+        expect(screen.getByLabelText(/^B-scan/)).toBeInTheDocument();
     });
 
     it("with the point's image not open, only the editor opens, with a hint", async () => {
@@ -230,7 +308,9 @@ describe("PointField", () => {
                 ["workspace", ws],
             ]),
         );
-        await fireEvent.click(screen.getByText("[30,20,4]"));
+        await fireEvent.click(
+            screen.getByRole("button", { name: "30, 20 · B-scan 5" }),
+        );
         expect(viewer.focusPoint).not.toHaveBeenCalled();
         // Once in the editor, once in the live region.
         expect(
@@ -239,7 +319,35 @@ describe("PointField", () => {
         expect(screen.getByRole("status")).toHaveTextContent(
             "Open this image in the viewer first.",
         );
-        expect(screen.getByLabelText("i")).toBeInTheDocument();
+        expect(screen.getByLabelText(/^B-scan/)).toBeInTheDocument();
+    });
+
+    it("draws a deleted slot of a sparse list as a muted numbered row", () => {
+        const sparse = {
+            "x-eyened-widget": "keypoint",
+            title: "Landmarks",
+            type: "array",
+            items: {
+                oneOf: [
+                    {
+                        type: "object",
+                        properties: {
+                            x: { type: "number" },
+                            y: { type: "number" },
+                        },
+                        required: ["x", "y"],
+                    },
+                    { type: "null" },
+                ],
+            },
+        } as JSONSchema;
+        renderField({
+            schema: sparse,
+            value: [{ x: 1, y: 2 }, null, { x: 5, y: 6 }],
+            onchange: vi.fn(),
+        });
+        expect(screen.getByText("2 · deleted")).toBeInTheDocument();
+        expect(screen.getByText("2 points")).toBeInTheDocument();
     });
 
     it("writes null index for oct space when the field is blanked", async () => {
@@ -260,8 +368,10 @@ describe("PointField", () => {
             onchange,
         });
 
-        await fireEvent.click(screen.getByText("[1,2,4]"));
-        const i = screen.getByLabelText("i") as HTMLInputElement;
+        await fireEvent.click(
+            screen.getByRole("button", { name: "1, 2 · B-scan 5" }),
+        );
+        const i = screen.getByLabelText("B-scan") as HTMLInputElement;
         await fireEvent.input(i, { target: { value: "" } });
         expect(onchange).toHaveBeenCalledWith(
             expect.objectContaining({ index: null }),

@@ -5,6 +5,7 @@
     import { cn } from "$lib/utils.js";
     import { Combobox, Select as SelectPrimitive } from "bits-ui";
     import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
+    import WarningFilled from "carbon-icons-svelte/lib/WarningFilled.svelte";
     import { flushSync, tick } from "svelte";
 
     // Carbon FilterableMultiSelect, md (40 px); field values as ui/combo-box, strings from Carbon React
@@ -16,6 +17,7 @@
         values = $bindable([]),
         placeholder,
         helperText,
+        invalidText,
         id = uid,
     }: {
         titleText: string;
@@ -23,6 +25,8 @@
         values?: string[];
         placeholder?: string;
         helperText?: string;
+        /** Carbon invalid: a red outline, the warning icon and the error in place of the helper. */
+        invalidText?: string;
         id?: string;
     } = $props();
 
@@ -39,7 +43,10 @@
     const helperId = $derived(`${id}-helper`);
     const selectionId = $derived(`${id}-selection`);
     const describedBy = $derived(
-        [helperText ? helperId : "", values.length ? selectionId : ""]
+        [
+            invalidText || helperText ? helperId : "",
+            values.length ? selectionId : "",
+        ]
             .filter(Boolean)
             .join(" ") || undefined,
     );
@@ -94,6 +101,7 @@
                 {id}
                 {placeholder}
                 aria-describedby={describedBy}
+                aria-invalid={invalidText ? "true" : undefined}
                 oninput={(e) => {
                     filter = e.currentTarget.value;
                     open = true;
@@ -101,10 +109,17 @@
                 }}
                 {onkeydown}
                 class={cn(
-                    "h-10 w-full border-0 border-b border-border-strong-01 bg-field-01 pe-12 text-body-compact-01 text-text-primary placeholder:text-text-placeholder hover:bg-field-hover-01 in-dialog:border-border-strong-02 in-dialog:bg-field-02 in-dialog:hover:bg-field-hover-02",
+                    "h-10 w-full border-0 border-b border-border-strong-01 bg-field-01 pe-12 text-body-compact-01 text-text-primary placeholder:text-text-placeholder hover:bg-field-hover-01 aria-invalid:pe-16 aria-invalid:outline-2 aria-invalid:-outline-offset-2 aria-invalid:outline-support-error in-dialog:border-border-strong-02 in-dialog:bg-field-02 in-dialog:hover:bg-field-hover-02",
                     values.length ? "ps-16" : "ps-4",
                 )}
             />
+            {#if invalidText}
+                <!-- Carbon puts the warning icon just before the chevron. -->
+                <WarningFilled
+                    aria-hidden="true"
+                    class="pointer-events-none absolute end-10 top-1/2 -translate-y-1/2 text-support-error"
+                />
+            {/if}
             <Combobox.Trigger
                 tabindex={-1}
                 aria-label={open ? "Close" : "Open"}
@@ -155,7 +170,11 @@
             {/each}
         </Select.Content>
     </Combobox.Root>
-    {#if helperText}
+    {#if invalidText}
+        <p id={helperId} class="text-helper-text-01 text-text-error">
+            {invalidText}
+        </p>
+    {:else if helperText}
         <p id={helperId} class="text-helper-text-01 text-text-helper">
             {helperText}
         </p>

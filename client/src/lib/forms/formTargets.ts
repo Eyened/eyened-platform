@@ -1,10 +1,6 @@
 import { HIDE_FROM_FORM_PANEL_NAMES } from "$lib/config/builtinFormSchemas";
-import {
-    getDefault,
-    resolveRefs,
-    type JSONSchema,
-} from "$lib/forms/schemaType";
-import { validateSchema } from "$lib/forms/schemaValidator.svelte";
+import { validateSchema } from "$lib/forms/formValidator";
+import { getDefault, type JSONSchema } from "$lib/forms/schemaType";
 import {
     matchesFormEntityScope,
     resolveFormEntityScope,
@@ -275,16 +271,14 @@ export function matchForms(input: {
 
 export type Completion = "complete" | "incomplete";
 
-/** Complete when the form window would show no errors: the same value, after resolving refs. */
+/** Complete when the form window would show no errors: the same value and the same checker. */
 export function completion(
     form: FormAnnotationGET,
     schema: FormSchemaGET,
 ): Completion {
-    const resolved = resolveRefs(schema.schema as JSONSchema);
-    const value = form.form_data || getDefault(resolved);
-    return validateSchema(resolved, value).length === 0
-        ? "complete"
-        : "incomplete";
+    const root = schema.schema as JSONSchema;
+    const value = form.form_data || getDefault(root);
+    return validateSchema(root, value).length === 0 ? "complete" : "incomplete";
 }
 
 /** Rows with a complete form: the task section's "n of m complete". */
