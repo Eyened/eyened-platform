@@ -32,6 +32,7 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
     } = $props();
 
     const workspace = getContext<Workspace>("workspace");
+    const uid = $props.id();
     let strip: HTMLElement | undefined = $state();
     /** The last focused tile; the tab stop falls back to the first tile. */
     let focusId: string | null = $state(null);
@@ -123,6 +124,9 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
                 type="button"
                 draggable="true"
                 class="tile-title"
+                aria-describedby={title?.demographicsText
+                    ? `${uid}-demographics-${i}`
+                    : undefined}
                 data-tile-index={i}
                 tabindex={imageId === tabStop ? 0 : -1}
                 onfocus={() => (focusId = imageId)}
@@ -138,15 +142,15 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
                     >
                 {/if}
                 <span class="title"
-                    >{title
-                        ? titleText({
-                              patient: title.patient,
-                              rest: title.rest,
-                          })
-                        : imageId}</span
+                    >{title ? titleText({ ...title, twin: "" }) : imageId}</span
                 >
                 {#if title?.twin}
                     <span class="twin">{title.twin}</span>
+                {/if}
+                {#if title?.demographicsText}
+                    <span id="{uid}-demographics-{i}" hidden
+                        >{title.demographicsText}</span
+                    >
                 {/if}
             </button>
             <div class="tile-body">

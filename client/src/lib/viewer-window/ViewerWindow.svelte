@@ -48,7 +48,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         navigateSubtaskIndex,
         TaskNavigation,
     } from "$lib/tasks/taskUtils.svelte";
-    import { viewportTitle } from "$lib/workspace/imageMeta";
+    import { octPart, viewportTitle } from "$lib/workspace/imageMeta";
     import WorkspaceFrame from "$lib/workspace/WorkspaceFrame.svelte";
     import type { TaskHeader } from "$lib/workspace/WorkspaceHeader.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
@@ -283,7 +283,11 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         const image = viewerWindowContext.images.get(imageId);
         return image
             ? {
-                  ...viewportTitle(image.instance),
+                  ...viewportTitle(image.instance, {
+                      oct: octPart(imageId, (id) =>
+                          viewerWindowContext.images.has(id),
+                      ),
+                  }),
                   twin: viewerWindowContext.twins.get(imageId) ?? "",
               }
             : null;

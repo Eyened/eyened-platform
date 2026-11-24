@@ -136,7 +136,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         const imageId = workspace.slots[position]?.imageId ?? null;
         const title = imageId ? titleFor(imageId) : null;
         const what = title
-            ? titleText(title)
+            ? titleText({ ...title, demographics: "" })
             : imageId || !workspace.loaded
               ? "Loading…"
               : "Empty";

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+    ageAt,
     catalogueEntry,
+    imageName,
+    imageRowName,
+    octPart,
     titleText,
     twinNumbers,
     viewportTitle,
@@ -95,6 +99,95 @@ describe("twinNumbers", () => {
         };
         expect(twinNumbers(Object.keys(loaded), (id) => loaded[id]).size).toBe(
             0,
+        );
+    });
+});
+
+describe("ageAt", () => {
+    it("counts whole years, one less until the birthday", () => {
+        expect(ageAt("1951-06-15", "2024-06-14")).toBe(72);
+        expect(ageAt("1951-06-15", "2024-06-15")).toBe(73);
+        expect(ageAt("2000-02-29", "2023-02-28")).toBe(22);
+    });
+
+    it("is unknown without a birth date or when the birth is after the visit", () => {
+        expect(ageAt(null, "2024-06-14")).toBeNull();
+        expect(ageAt("2025-01-01", "2024-06-14")).toBeNull();
+    });
+});
+
+describe("viewportTitle demographics", () => {
+    it("puts sex and age at the visit after the ID, and says them in words", () => {
+        const title = viewportTitle({
+            ...meta,
+            patient: {
+                id: 1,
+                identifier: "P-000417",
+                birth_date: "1951-06-15",
+                sex: "F",
+            },
+            study: { id: 1, date: "2024-03-12" },
+        });
+        expect(title.demographics).toBe("F · 72 y");
+        expect(title.demographicsText).toBe("female, 72 years");
+        expect(titleText(title)).toBe(
+            "P-000417 · F · 72 y OD · CF F1 · 2024-03-12 · Topcon TRC-NW8",
+        );
+    });
+
+    it("keeps the sex alone when the birth date is unknown", () => {
+        const title = viewportTitle({
+            ...meta,
+            patient: {
+                id: 1,
+                identifier: "P-000417",
+                birth_date: null,
+                sex: "F",
+            },
+        });
+        expect([title.demographics, title.demographicsText]).toEqual([
+            "F",
+            "female",
+        ]);
+    });
+
+    it('says "0 y" under a year', () => {
+        const title = viewportTitle({
+            ...meta,
+            patient: {
+                id: 1,
+                identifier: "P-000417",
+                birth_date: "2024-01-10",
+                sex: "F",
+            },
+            study: { id: 1, date: "2024-06-14" },
+        });
+        expect(title.demographics).toBe("F · 0 y");
+    });
+});
+
+describe("an OCT's two images", () => {
+    const open = new Set(["oct-1", "oct-1_proj", "oct-2"]);
+    const isOpen = (id: string) => open.has(id);
+
+    it("tells the en-face from the B-scans, and leaves a lone volume as OCT", () => {
+        expect(octPart("oct-1_proj", isOpen)).toBe("enface");
+        expect(octPart("oct-1", isOpen)).toBe("bscans");
+        expect(octPart("oct-2", isOpen)).toBeUndefined();
+    });
+
+    it("uses the same words in viewport titles, Images rows and Layers names", () => {
+        const oct = {
+            ...meta,
+            modality: "OCT",
+            etdrs_field: null,
+        } as ImageMeta;
+        expect(viewportTitle(oct, { oct: "enface" }).rest).toBe(
+            "OCT en-face · 2023-05-04 · Topcon TRC-NW8",
+        );
+        expect(imageRowName(oct, "bscans")).toBe("OD · OCT B-scans");
+        expect(imageName(oct, "", "enface").name).toBe(
+            "OCT en-face · 2023-05-04",
         );
     });
 });
