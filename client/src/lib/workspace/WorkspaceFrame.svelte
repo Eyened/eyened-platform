@@ -149,6 +149,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         return `Viewport ${position + 1} · ${what}`;
     });
     let opener: HTMLElement | null = null;
+    /** Where focus was before a docked left panel opened; right-panel icons don't change it. */
+    let leftOpener: HTMLElement | null = null;
     // The palette gets what the rail leaves after the bottom group and one gap.
     let railHeight = $state(0);
     let bottomHeight = $state(0);
@@ -241,6 +243,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
 
     function toggleLeft(panel: LeftPanel, e: MouseEvent) {
         opener = e.currentTarget as HTMLElement;
+        leftOpener = opener;
         left = left === panel ? null : panel;
         writeLeftPanel(left);
         if (left) void focusPanel(left);
@@ -283,9 +286,38 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     }
 
     function onkeydown(e: KeyboardEvent) {
-        if (e.key !== "Escape" || !overlayOpen) return;
+        if (e.key !== "Escape") return;
+        if (overlayOpen) {
+            e.preventDefault();
+            void dismiss();
+            return;
+        }
+        // Wide: Esc inside a docked left panel closes it. A field with text, or an open menu, takes Esc first.
+        if (left === null || e.defaultPrevented) return;
+        if (!document.getElementById(`${uid}-left`)?.contains(e.target as Node))
+            return;
+        // An open tooltip takes Esc first (bits-ui closes it on the document); only the next Esc closes the panel.
+        if (
+            document.querySelector(
+                '[data-slot="tooltip-content"]:not([data-state="closed"]):not([data-viewport-title])',
+            )
+        )
+            return;
         e.preventDefault();
-        void dismiss();
+        void closeLeft(left);
+    }
+
+    /** Back to where focus was before the panel opened; when that has gone or sat in the panel, to the panel's icon. */
+    async function closeLeft(closing: LeftPanel) {
+        const column = document.getElementById(`${uid}-left`);
+        const back =
+            leftOpener?.isConnected && !column?.contains(leftOpener)
+                ? leftOpener
+                : byControls(`${uid}-${closing}`);
+        left = null;
+        writeLeftPanel(left);
+        await tick();
+        back?.focus();
     }
 
     // F1 opens Help from anywhere but a text field, a dialog or an open ⋯ list.
@@ -313,6 +345,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
             document.getElementById(`${uid}-help-title`)?.focus();
             return;
         }
+        leftOpener = opener;
         left = "help";
         writeLeftPanel(left);
         void focusPanel("help");
@@ -329,6 +362,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
             overlay = "menu";
             menuTab = "images";
         } else {
+            leftOpener = opener;
             left = "images";
             writeLeftPanel(left);
         }

@@ -347,6 +347,42 @@ describe("WorkspaceFrame", () => {
         await fireEvent.keyDown(help, { key: "Escape" });
         await waitFor(() => expect(menu).toHaveFocus());
     });
+
+    it("at md, Esc inside a left panel closes it and returns focus to where it was; Esc in a viewport leaves the panel open", async () => {
+        mockWidth({ md: true, xlg: true });
+        // With the strip on, Images starts closed.
+        const ws = workspaceWith(2);
+        ws.strip = false;
+        renderFrame(ws);
+        expect(
+            screen.getByRole("region", { name: "Images" }),
+        ).toBeInTheDocument();
+        const control = document.querySelector<HTMLElement>(
+            '[aria-current="true"] [tabindex="0"]',
+        )!;
+        control.focus();
+        await fireEvent.keyDown(control, { key: "Escape" });
+        expect(
+            screen.getByRole("region", { name: "Images" }),
+        ).toBeInTheDocument();
+
+        await fireEvent.keyDown(control, { key: "F1" });
+        const heading = await screen.findByRole("heading", { name: "Help" });
+        await waitFor(() => expect(heading).toHaveFocus());
+        // A right panel's icon pressed meanwhile is not where Esc returns.
+        await fireEvent.click(screen.getByRole("button", { name: "Layers" }));
+        const box = screen.getByRole("searchbox", { name: "Search keys" });
+        box.focus();
+        await fireEvent.input(box, { target: { value: "space" } });
+        await fireEvent.keyDown(box, { key: "Escape" });
+        expect(box).toHaveValue("");
+        expect(
+            screen.getByRole("region", { name: "Help" }),
+        ).toBeInTheDocument();
+        await fireEvent.keyDown(box, { key: "Escape" });
+        await waitFor(() => expect(control).toHaveFocus());
+        expect(screen.queryByRole("region", { name: "Help" })).toBeNull();
+    });
 });
 
 describe("Right panels", () => {
