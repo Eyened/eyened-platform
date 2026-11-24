@@ -137,6 +137,14 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
             ) ?? document.getElementById(`${uid}-forms-title`)
         )?.focus();
     }
+    // Every patient in the catalogue, in view or not.
+    const patients = $derived(
+        new Set(
+            workspace.catalogue
+                .map((id) => instanceFor(id)?.patient.id)
+                .filter((id) => id !== undefined),
+        ).size,
+    );
     const layersSubtitle = $derived.by(() => {
         const position = workspace.selected;
         const imageId = workspace.slots[position]?.imageId ?? null;
@@ -485,7 +493,13 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
           : `${RAIL_PX}px`};"
     {onkeydown}
 >
-    <WorkspaceHeader {task} {narrow} start={headerStart} end={headerEnd} />
+    <WorkspaceHeader
+        {task}
+        {narrow}
+        {patients}
+        start={headerStart}
+        end={headerEnd}
+    />
     {#if !narrow}
         <nav
             class="rail"

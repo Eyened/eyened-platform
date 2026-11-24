@@ -48,16 +48,20 @@
     import type { ToolMode } from "./tools/registry";
     import type { Workspace } from "./workspace.svelte";
     import { writeToolMode } from "./workspacePrefs";
+    import PatientsOpen from "./PatientsOpen.svelte";
 
     // Below md the frame supplies the menu button (start) and the right-column button (end).
     let {
         task,
         narrow,
+        patients = 1,
         start,
         end,
     }: {
         task: TaskHeader | null;
         narrow: boolean;
+        /** Distinct patients in the catalogue, in view or not. */
+        patients?: number;
         start?: Snippet;
         end?: Snippet;
     } = $props();
@@ -100,8 +104,7 @@
             >EyeNED</span
         >
     {/if}
-    <!-- ASSUMPTION: reserved slots in the overview's order (plan decision 23). Patient context: 6; mode: 3. -->
-    <div class="contents" data-header-slot="patient-context"></div>
+    <!-- ASSUMPTION: reserved slots in the overview's order. Mode: 3. -->
     <div class="contents" data-header-slot="mode">
         {#if !task}
             <!-- A task is always All tools and shows no switcher. -->
@@ -204,7 +207,9 @@
         {/if}
     {/if}
     <div class="min-w-0 flex-1"></div>
-    <div class="contents" data-header-slot="patients-open"></div>
+    <div class="contents" data-header-slot="patients-open">
+        <PatientsOpen count={patients} />
+    </div>
     <!-- Save state: 4 and 5; "Mark ready and next": 5. -->
     <div class="contents" data-header-slot="save-state">
         {#if narrow}

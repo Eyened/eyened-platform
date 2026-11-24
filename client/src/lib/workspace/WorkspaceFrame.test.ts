@@ -527,4 +527,18 @@ describe("below md, the Grading footer", () => {
             ),
         );
     });
+
+    it("the header counts every open patient, in view or not", () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(3, { layout: "1x1" }), null, {
+            instanceFor: (id: string) =>
+                instance(id, {
+                    patient:
+                        id === "img03"
+                            ? { id: 2, identifier: "P-000502" }
+                            : { id: 1, identifier: "P-000417" },
+                }),
+        });
+        expect(screen.getByText("2 patients open")).toBeInTheDocument();
+    });
 });

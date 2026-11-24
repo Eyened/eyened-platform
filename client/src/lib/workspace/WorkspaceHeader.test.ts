@@ -55,7 +55,9 @@ describe("WorkspaceHeader", () => {
             await saver.flush();
             renderHeader(taskHeader(), true);
             expect(
-                document.querySelector('header [role="status"].sr-only'),
+                document.querySelector(
+                    '[data-header-slot="save-state"] [role="status"]',
+                ),
             ).toHaveTextContent("1 form couldn't save");
         } finally {
             // The tracker is page-wide; leave it clean for the next test.
