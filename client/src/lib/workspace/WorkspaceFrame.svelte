@@ -577,6 +577,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                         <InlineNotification
                             kind="success"
                             class="shadow-popover"
+                            highContrast
                             title={task.notice.title}
                             subtitle={task.notice.subtitle}
                             role="none"
@@ -588,6 +589,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                     <InlineNotification
                         kind="warning"
                         class="shadow-popover"
+                        highContrast
                         title={task.holderNotice.title}
                         subtitle={task.holderNotice.subtitle}
                         role={task.holderNotice.alert ? "alert" : "none"}

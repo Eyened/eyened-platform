@@ -69,6 +69,10 @@
     --color-toggle-off: #6f6f6f;
     --color-icon-on-color: #ffffff;
     --color-support-warning: #f1c21b;
+    --color-support-error-inverse: #da1e28;
+    --color-support-success-inverse: #24a148;
+    --color-support-warning-inverse: #f1c21b;
+    --color-focus-inverse: #0f62fe;
     --color-notification-background-error: #262626;
     --color-notification-background-success: #262626;
     --color-notification-background-warning: #262626;
