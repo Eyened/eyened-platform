@@ -394,12 +394,14 @@ describe("Layers", () => {
         mockWidth({ md: true, xlg: true });
         const ws = workspaceWith(2, { layout: "1x2" });
         renderFrame(ws);
+        // Info repeats the line in its hidden section.
+        const layers = within(screen.getByRole("region", { name: "Layers" }));
         expect(
-            screen.getByText("Viewport 1 · P-000417 OD · CF F1 · img01"),
+            layers.getByText("Viewport 1 · P-000417 OD · CF F1 · img01"),
         ).toBeInTheDocument();
         ws.select(1);
         expect(
-            await screen.findByText("Viewport 2 · P-000417 OD · CF F1 · img02"),
+            await layers.findByText("Viewport 2 · P-000417 OD · CF F1 · img02"),
         ).toBeInTheDocument();
     });
 });
