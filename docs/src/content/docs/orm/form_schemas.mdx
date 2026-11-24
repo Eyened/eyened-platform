@@ -103,7 +103,7 @@ with db.get_session() as session:
     session.commit()
 ```
 
-The JSON file must be a valid JSON Schema (Draft 7). Use `eorm validate-forms` to check schemas and existing annotation data.
+The schema itself is checked against Draft 7; answers are checked by the draft its `$schema` names, else 2020-12. Use `eorm validate-forms` to check schemas and existing annotation data.
 
 ## How questions render
 

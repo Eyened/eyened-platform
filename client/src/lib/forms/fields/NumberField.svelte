@@ -29,7 +29,7 @@
     $effect.pre(() => {
         const next = value;
         untrack(() => {
-            if (draftError && next === undefined) return;
+            if (draftError && next == null) return;
             if (parse(text) !== next) {
                 text = asText(next);
                 draftError = undefined;

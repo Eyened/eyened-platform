@@ -191,6 +191,31 @@ describe("SchemaForm", () => {
         expect(row).toHaveFocus();
     });
 
+    it("keeps 2.7 in a whole-number list entry when the saved null comes back", async () => {
+        const list = {
+            type: "object",
+            properties: {
+                nums: {
+                    type: "array",
+                    description: "Counts",
+                    items: { type: "integer" },
+                },
+            },
+        } as JSONSchema;
+        const { onchange, rerender } = renderForm({
+            schema: list,
+            value: { nums: [3] },
+        });
+        const box = screen.getByRole("spinbutton") as HTMLInputElement;
+        await fireEvent.input(box, { target: { value: "2.7" } });
+        await fireEvent.focusOut(box);
+        await rerender({ value: onchange.mock.lastCall![0] });
+        expect((screen.getByRole("spinbutton") as HTMLInputElement).value).toBe(
+            "2.7",
+        );
+        expect(screen.getByText("Enter a whole number.")).toBeInTheDocument();
+    });
+
     it("deletes an empty entry at once and asks before deleting one with answers", async () => {
         const group = {
             type: "object",
