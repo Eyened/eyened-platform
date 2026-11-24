@@ -30,6 +30,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import LeaveSetModal from "$lib/tasks/LeaveSetModal.svelte";
     import SetStatusControl from "$lib/tasks/SetStatusControl.svelte";
+    import { SetHolder } from "$lib/tasks/holder.svelte";
     import SetStatusTag from "$lib/tasks/SetStatusTag.svelte";
     import {
         parseTaskPanelConfig,
@@ -101,6 +102,16 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
             ? (subtasks.get(taskContext.subTask.id)?.next_open_index ?? null)
             : null,
     );
+    const holder = taskContext
+        ? new SetHolder({
+              subTaskId: taskContext.subTask.id,
+              taskId: taskContext.task.id,
+              index: taskContext.subTaskIndex,
+              userId: globalContext.user.id,
+              tracker: saveTracker,
+              focusAfterRace: () => focusSetControl("primary"),
+          })
+        : null;
     // The set's status saves like any other edit, so ◀ ▶ wait for it.
     const statusSaver = taskContext
         ? new DebouncedSaver<SubTaskState>({
@@ -182,7 +193,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
               })
             : null;
     const task: TaskHeader | null = $derived(
-        taskContext && navigation && setNavigation && shows
+        taskContext && navigation && setNavigation && shows && holder
             ? {
                   label: `Set ${setNumber} of ${taskContext.task.num_tasks}`,
                   show: shows,
@@ -197,9 +208,10 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                       taskid: String(taskContext.task.id),
                   }),
                   tag: shows.status ? statusTag : undefined,
-                  // With Status off and no open set after this one there is no move, so nothing to show.
+                  // A set I may change keeps its menu; otherwise only "Go to next set", when an open set follows.
                   status:
-                      shows.status || (shows.goToNext && nextOpen !== null)
+                      (shows.status && (holder.canEdit || nextOpen !== null)) ||
+                      (shows.goToNext && nextOpen !== null)
                           ? setStatus
                           : undefined,
                   notice: setNavigation.readyNotice,
@@ -279,14 +291,14 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 {/snippet}
 
 {#snippet setStatus(layout: "header" | "stacked")}
-    {#if taskContext && setNavigation && statusSaver && shows}
+    {#if taskContext && setNavigation && statusSaver && shows && holder}
         <SetStatusControl
             subTaskId={taskContext.subTask.id}
             index={taskContext.subTaskIndex}
-            count={taskContext.task.num_tasks}
             showStatus={shows.status}
             navigation={setNavigation}
             status={statusSaver}
+            {holder}
             {layout}
         />
     {/if}

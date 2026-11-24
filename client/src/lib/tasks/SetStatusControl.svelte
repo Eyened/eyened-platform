@@ -12,6 +12,7 @@ Ready is picked only once everything else saved; a pick that can't save shows on
     import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import { MediaQuery } from "svelte/reactivity";
     import type { SubTaskState } from "../../types/openapi_types";
+    import type { SetHolder } from "./holder.svelte";
     import {
         flushWithin,
         STATUS_ID,
@@ -22,16 +23,17 @@ Ready is picked only once everything else saved; a pick that can't save shows on
     let {
         subTaskId,
         index,
-        count,
         showStatus,
         navigation,
+        holder,
         layout = "header",
     }: {
         subTaskId: number;
+        /** This set's 0-based index. */
         index: number;
-        count: number;
         showStatus: boolean;
         navigation: SetNavigation;
+        holder: SetHolder;
         /** "stacked" in the narrow footer: full width, the failure in words under it. */
         layout?: "header" | "stacked";
         status: DebouncedSaver<SubTaskState>;
@@ -45,13 +47,20 @@ Ready is picked only once everything else saved; a pick that can't save shows on
     const saved = $derived<SubTaskState>(
         subtasks.get(subTaskId)?.task_state ?? "NotStarted",
     );
-    const last = $derived(index >= count - 1);
+    // "Last" for the primary move: no open set after this one.
+    const last = $derived(
+        (subtasks.get(subTaskId)?.next_open_index ?? null) === null,
+    );
+    const canEdit = $derived(holder.canEdit);
     // ASSUMPTION: words from xlg (82rem), as the header save state; below it the failure text is for screen readers.
     const xlg = new MediaQuery("min-width: 82rem");
+    // Below lg (66rem), Claim / Give back are the menu's last item; the narrow footer is always below lg.
+    const lg = new MediaQuery("min-width: 66rem");
+    const claimInMenu = $derived(showStatus && !lg.current);
     const invalidId = `${STATUS_ID}-invalid`;
     let picking = $state(false);
     // One pick at a time, and none once a move has started: its Ready or the page load would overtake it.
-    const menuDisabled = $derived(picking || navigation.moving);
+    const menuDisabled = $derived(picking || navigation.moving || holder.busy);
 
     async function pick(id: string) {
         if (menuDisabled) return;
@@ -68,9 +77,9 @@ Ready is picked only once everything else saved; a pick that can't save shows on
         }
     }
 
-    // A Ready set only moves on; the last set has nowhere to move to.
+    // A Ready set, or one I may not change, only moves on; with no open set after it there is nowhere to move to.
     const main = $derived.by(() => {
-        if (!showStatus || saved === "Ready")
+        if (!showStatus || !canEdit || saved === "Ready")
             return last ? null : { label: "Go to next set", markReady: false };
         return {
             label: last ? "Mark ready" : "Mark ready and next",
@@ -78,6 +87,30 @@ Ready is picked only once everything else saved; a pick that can't save shows on
         };
     });
     const pending = $derived(navigation.pending === "primary");
+    const action = $derived.by(() => {
+        if (!claimInMenu || !holder.action) return undefined;
+        const onselect = () => void holder.run();
+        return holder.action === "claim"
+            ? {
+                  label: `Claim set ${index + 1}`,
+                  description: "Others see that you hold it.",
+                  onselect,
+              }
+            : {
+                  label: `Give back set ${index + 1}`,
+                  description: "Anyone on the task can then claim it.",
+                  onselect,
+              };
+    });
+    // Below lg a failed Claim or Give back shows on the combo button, as a failed status save does.
+    const claimFailed = $derived(claimInMenu && holder.failed !== null);
+    const failText = $derived(
+        navigation.statusFailed
+            ? "Status couldn't save. Pick it again."
+            : claimFailed
+              ? holder.failText
+              : "",
+    );
 
     const stacked = $derived(layout === "stacked");
 
@@ -91,7 +124,7 @@ Ready is picked only once everything else saved; a pick that can't save shows on
 </script>
 
 <div class={stacked ? "flex flex-col" : "contents"}>
-    {#if showStatus}
+    {#if showStatus && canEdit}
         <ComboButton
             label={main?.label}
             onclick={go}
@@ -104,27 +137,25 @@ Ready is picked only once everything else saved; a pick that can't save shows on
             selectedId={saved}
             onselect={pick}
             {menuDisabled}
-            invalid={navigation.statusFailed}
+            invalid={navigation.statusFailed || claimFailed}
             describedBy={invalidId}
             fullWidth={stacked}
+            {action}
         />
         <!-- Always mounted, so the text is announced when it appears. -->
         <span
             id={invalidId}
             role="alert"
             class="text-helper-text-01 text-text-error {stacked
-                ? navigation.statusFailed
+                ? failText
                     ? 'mt-2'
                     : ''
                 : xlg.current
                   ? 'whitespace-nowrap'
-                  : 'sr-only'}"
-            >{navigation.statusFailed
-                ? "Status couldn't save. Pick it again."
-                : ""}</span
+                  : 'sr-only'}">{failText}</span
         >
     {:else if main}
-        <!-- Status off: only "Go to next set", tertiary, no menu. aria-disabled keeps focus on the button while it is pending. -->
+        <!-- Status off, or a set I may not change: only "Go to next set", tertiary, no menu. aria-disabled keeps focus on the button while it is pending. -->
         <Button
             variant="outline"
             size="sm"

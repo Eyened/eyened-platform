@@ -28,6 +28,7 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
         invalid = false,
         describedBy,
         fullWidth = false,
+        action,
         ...mainProps
     }: Omit<
         ButtonProps,
@@ -54,9 +55,13 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
         describedBy?: string;
         /** Fills its container, as in the narrow footer; the main part takes the room and its label wraps. */
         fullWidth?: boolean;
+        /** One action after the status group, under a divider (Carbon Menu mixes select and non-select items). */
+        action?: { label: string; description: string; onselect: () => void };
     } = $props();
 
     let open = $state(false);
+    const itemClass =
+        "flex cursor-pointer items-start gap-2 px-4 py-2 text-body-compact-01 text-text-secondary outline-none select-none hover:bg-layer-hover-01 hover:text-text-primary data-highlighted:bg-layer-hover-01 data-highlighted:text-text-primary data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-focus";
     const selectedLabel = $derived(
         items.find((i) => i.id === selectedId)?.label ?? "",
     );
@@ -142,7 +147,7 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
                         <DropdownMenu.RadioItem
                             value={item.id}
                             textValue={item.label}
-                            class="flex cursor-pointer items-start gap-2 px-4 py-2 text-body-compact-01 text-text-secondary outline-none select-none hover:bg-layer-hover-01 hover:text-text-primary data-highlighted:bg-layer-hover-01 data-highlighted:text-text-primary data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-focus"
+                            class={itemClass}
                         >
                             {#snippet children({ checked })}
                                 <!-- Carbon Menu, single-select: the checkmark in front of the item. -->
@@ -161,6 +166,25 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
                         </DropdownMenu.RadioItem>
                     {/each}
                 </DropdownMenu.RadioGroup>
+                {#if action}
+                    <DropdownMenu.Separator
+                        class="my-1 h-px bg-border-subtle-01"
+                    />
+                    <DropdownMenu.Item
+                        textValue={action.label}
+                        onSelect={action.onselect}
+                        class={itemClass}
+                    >
+                        <!-- Lines up with the status labels, after their checkmark column. -->
+                        <span class="size-4 shrink-0"></span>
+                        <span class="flex min-w-0 flex-col gap-0.5">
+                            <span>{action.label}</span>
+                            <span class="text-helper-text-01"
+                                >{action.description}</span
+                            >
+                        </span>
+                    </DropdownMenu.Item>
+                {/if}
             </DropdownMenu.Content>
         </DropdownMenu.Portal>
     </DropdownMenu.Root>
