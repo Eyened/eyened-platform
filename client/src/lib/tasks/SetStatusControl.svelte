@@ -54,9 +54,8 @@ Ready is picked only once everything else saved; a pick that can't save shows on
     const canEdit = $derived(holder.canEdit);
     // ASSUMPTION: words from xlg (82rem), as the header save state; below it the failure text is for screen readers.
     const xlg = new MediaQuery("min-width: 82rem");
-    // Below lg (66rem), Claim / Give back are the menu's last item; the narrow footer is always below lg.
-    const lg = new MediaQuery("min-width: 66rem");
-    const claimInMenu = $derived(showStatus && !lg.current);
+    // Below xlg, Claim / Give back are the menu's last item; the narrow footer is always below xlg.
+    const claimInMenu = $derived(showStatus && !xlg.current);
     const invalidId = `${STATUS_ID}-invalid`;
     let picking = $state(false);
     // One pick at a time, and none once a move has started: its Ready or the page load would overtake it.
@@ -102,7 +101,7 @@ Ready is picked only once everything else saved; a pick that can't save shows on
                   onselect,
               };
     });
-    // Below lg a failed Claim or Give back shows on the combo button, as a failed status save does.
+    // Below xlg a failed Claim or Give back shows on the combo button, as a failed status save does.
     const claimFailed = $derived(claimInMenu && holder.failText !== "");
     const failText = $derived(
         navigation.statusFailed

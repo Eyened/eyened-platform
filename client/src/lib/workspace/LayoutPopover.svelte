@@ -25,7 +25,7 @@ Arrow keys move focus only; Enter, Space or a click applies.
         open = $bindable(false),
     }: {
         stripToggle?: boolean;
-        /** Below lg in a task: the Grid icon, with "Layout" as its name and tooltip. */
+        /** Below xlg in a task: the Grid icon, with "Layout" as its name and tooltip. */
         iconOnly?: boolean;
         /** CSS selector of an outside element to hang from; no trigger is rendered. */
         anchor?: string;

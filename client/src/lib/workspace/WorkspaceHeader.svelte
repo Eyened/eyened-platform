@@ -65,9 +65,10 @@
     const workspace = getContext<Workspace>("workspace");
     // ASSUMPTION: words from xlg (82rem); below it the save state is an icon.
     const xlg = new MediaQuery("min-width: 82rem");
-    // Below lg (66rem) a task header shrinks in place: no product name, short label, icon-only links.
+    // Below xlg a task header shrinks in place: no product name, short label, icon-only links.
+    const compact = $derived(task !== null && !xlg.current);
+    // Below lg (66rem) there is no room for the status tag either; ▾ still names the status.
     const lg = new MediaQuery("min-width: 66rem");
-    const compact = $derived(task !== null && !lg.current);
     const MODES = [
         { id: "browse", text: "Browse" },
         { id: "all", text: "All tools" },
@@ -120,7 +121,7 @@
         {/if}
         {#if task.show.title}
             {#if narrow || compact}
-                <!-- Below lg "Set" is dropped from view to fit; ◀ ▶ still say "set". -->
+                <!-- Below xlg "Set" is dropped from view to fit; ◀ ▶ still say "set". -->
                 <span class="sr-only">{task.label}</span>
                 <span
                     aria-hidden="true"
@@ -135,7 +136,7 @@
             {/if}
         {/if}
         <!-- Below md the set's status waits for the narrow footer. -->
-        {#if !narrow}{@render task.tag?.()}{/if}
+        {#if lg.current}{@render task.tag?.()}{/if}
         {#if task.show.nav}
             <IconButton
                 label="Previous set"

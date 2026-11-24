@@ -15,27 +15,24 @@ Who holds the set, as a read-only Tag, and beside it Claim or Give back as a gho
         showStatus,
     }: {
         holder: SetHolder;
-        /** The task shows the status menu; below lg Claim / Give back are its last item. */
+        /** The task shows the status menu; below xlg Claim / Give back are its last item. */
         showStatus: boolean;
     } = $props();
 
-    // Below lg (66rem) the tag shrinks to fit, and with status on the action moves into ▾.
-    const lg = new MediaQuery("min-width: 66rem");
-    const compact = $derived(!lg.current);
-    const claimInMenu = $derived(showStatus && compact);
+    // Below xlg (82rem), with status on, the action moves into ▾.
+    const xlg = new MediaQuery("min-width: 82rem");
+    const claimInMenu = $derived(showStatus && !xlg.current);
 
     const LABELS = { claim: "Claim", giveBack: "Give back" } as const;
 </script>
 
-<!-- No min-w-0: the tag's minimum holds the wrapper's, so the header can't squeeze the tag below it. -->
-<div class="flex items-center gap-1">
+<!-- The header squeezes the tag first; it stops at 80 px and cuts the name, which its title shows. -->
+<!-- ASSUMPTION: min-w-20 (80 px) is the smallest the tag gets. -->
+<div class="flex min-w-0 items-center gap-1">
     <!-- A live region: quiet on load, it reads the new holder after Claim, Give back or a save that claims. -->
-    <span role="status" class="flex">
-        <!-- ASSUMPTION: min-w-20 (80 px) is the smallest the tag gets below lg. -->
-        <Tag
-            icon={User}
-            title={holder.text}
-            class={compact ? "min-w-20" : undefined}>{holder.text}</Tag
+    <span role="status" class="flex min-w-20">
+        <Tag icon={User} title={holder.text} class="max-w-[min(13rem,100%)]"
+            >{holder.text}</Tag
         >
     </span>
     {#if holder.action && !claimInMenu}
