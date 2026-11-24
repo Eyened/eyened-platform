@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import Select, case, exists, func, select, update
+from sqlalchemy import Select, case, exists, func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from eyened_orm import (
@@ -365,6 +365,33 @@ class SubTaskRepository:
             stmt = stmt.where(SubTask.CreatorID == creator_id)
         stmt = apply_scope(stmt, SubTask, self._scope)
         return self._session.scalar(stmt) or 0
+
+    def next_open_index(
+        self, task_id: int, after_subtask_id: int, creator_id: int
+    ) -> int | None:
+        """Index of the first subtask after ``after_subtask_id`` that is unclaimed
+        or ``creator_id``'s and not Ready, or None; indexes count in SubTaskID order."""
+        next_id = self._session.scalar(
+            apply_scope(
+                select(SubTask.SubTaskID)
+                .where(
+                    SubTask.TaskID == task_id,
+                    SubTask.SubTaskID > after_subtask_id,
+                    or_(SubTask.CreatorID.is_(None), SubTask.CreatorID == creator_id),
+                    SubTask.TaskState != SubTaskState.Ready,
+                )
+                .order_by(SubTask.SubTaskID)
+                .limit(1),
+                SubTask,
+                self._scope,
+            )
+        )
+        if next_id is None:
+            return None
+        before = select(func.count()).select_from(SubTask).where(
+            SubTask.TaskID == task_id, SubTask.SubTaskID < next_id
+        )
+        return self._session.scalar(apply_scope(before, SubTask, self._scope)) or 0
 
     def list_for_task(
         self,

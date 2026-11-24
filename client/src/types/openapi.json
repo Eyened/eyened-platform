@@ -9936,6 +9936,28 @@
                 "type": "null"
               }
             ]
+          },
+          "next_open_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Open Index"
+          },
+          "can_edit_status_and_comments": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Can Edit Status And Comments"
           }
         },
         "type": "object",
@@ -10058,6 +10080,28 @@
                 "type": "null"
               }
             ]
+          },
+          "next_open_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Open Index"
+          },
+          "can_edit_status_and_comments": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Can Edit Status And Comments"
           },
           "images": {
             "items": {

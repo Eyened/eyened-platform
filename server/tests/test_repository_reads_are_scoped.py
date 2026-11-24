@@ -142,7 +142,8 @@ _WRITE_PREFIXES = ("add", "save", "delete", "upsert", "remove", "replace", "clai
 # among these two: CreatorRepository is in _UNSCOPED_REPOSITORIES and the walk
 # `continue`s on the class before inspecting a method.
 # 45 -> 46 for ProjectRepository.get_by_id, scoped like get_by_name.
-_EXPECTED_SCANNED_READS = 46
+# 46 -> 47 for SubTaskRepository.next_open_index, scoped through apply_scope.
+_EXPECTED_SCANNED_READS = 47
 
 # Read methods allowed to scope themselves by consuming ``self._scope`` instead
 # of calling ``apply_scope``/``scoped_one``. Set equality, like every other

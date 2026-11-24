@@ -179,7 +179,15 @@ def get_subtask(
         if with_images
         else DTOConverter.subtask_to_get
     )
-    main_dto = convert(main).copy(update={"index": subtask_index})
+    main_dto = convert(main).copy(
+        update={
+            "index": subtask_index,
+            "next_open_index": service.next_open_index(task_id, main.SubTaskID),
+            "can_edit_status_and_comments": service.can_edit_set(
+                task_id, main.CreatorID
+            ),
+        }
+    )
     if nxt is not None:
         next_dto = convert(nxt).copy(update={"index": subtask_index + 1})
         main_dto = main_dto.copy(update={"next_task": next_dto})

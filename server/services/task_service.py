@@ -338,6 +338,16 @@ class TaskService:
         nxt = rows[1] if (with_next and len(rows) > 1) else None
         return rows[0], nxt
 
+    def next_open_index(self, task_id: int, subtask_id: int) -> int | None:
+        """Index of the next set after ``subtask_id`` the actor may take, or None."""
+        return self.subtasks.next_open_index(task_id, subtask_id, self.scope.actor_id)
+
+    def can_edit_set(self, task_id: int, holder_id: int | None) -> bool:
+        """Whether the actor may change status and comments of a set held by ``holder_id``."""
+        return can_edit_status_and_comments(
+            self.scope, self.tasks.project_ids(task_id), holder_id
+        )
+
 
 class SubTaskService:
     """Business logic for individual subtasks and their image links."""

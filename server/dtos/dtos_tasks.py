@@ -83,6 +83,9 @@ class SubTaskGET(SubTaskBase):
     # New optional metadata
     index: Optional[int] = None
     next_task: Optional["SubTaskGET"] = None
+    # Filled only on the set GET /task/{id}/subtask/{index} returns.
+    next_open_index: Optional[int] = None
+    can_edit_status_and_comments: Optional[bool] = None
 
 
 class SubTaskConflictDetail(BaseModel):
