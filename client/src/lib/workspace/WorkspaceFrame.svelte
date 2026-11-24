@@ -353,7 +353,9 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
             document.getElementById(`${uid}-help-title`)?.focus();
             return;
         }
-        leftOpener = opener;
+        // A repeat F1 from inside the panel would otherwise lose the real opener.
+        if (!document.getElementById(`${uid}-left`)?.contains(opener))
+            leftOpener = opener;
         left = "help";
         writeLeftPanel(left);
         void focusPanel("help");

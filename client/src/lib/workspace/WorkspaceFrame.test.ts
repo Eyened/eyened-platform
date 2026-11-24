@@ -379,6 +379,9 @@ describe("WorkspaceFrame", () => {
         expect(
             screen.getByRole("region", { name: "Help" }),
         ).toBeInTheDocument();
+        // A second F1 with focus inside Help keeps the original opener.
+        heading.focus();
+        await fireEvent.keyDown(heading, { key: "F1" });
         await fireEvent.keyDown(box, { key: "Escape" });
         await waitFor(() => expect(control).toHaveFocus());
         expect(screen.queryByRole("region", { name: "Help" })).toBeNull();
