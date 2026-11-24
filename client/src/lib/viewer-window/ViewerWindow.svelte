@@ -292,6 +292,10 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
               }
             : null;
     }
+
+    function instanceFor(imageId: string) {
+        return viewerWindowContext.images.get(imageId)?.instance ?? null;
+    }
 </script>
 
 {#snippet statusTag()}
@@ -325,6 +329,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 
 <WorkspaceFrame
     {titleFor}
+    {instanceFor}
     {task}
     startOnGrading={handoff?.reopenPanel === "forms"}
     onaddimages={() => (browserOpen = true)}

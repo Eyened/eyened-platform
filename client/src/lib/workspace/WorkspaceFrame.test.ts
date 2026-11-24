@@ -20,6 +20,7 @@ import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
 import { saveTracker } from "$lib/saving/saveTracker.svelte";
 import {
     expectNoAxeViolations,
+    instance,
     mockWidth,
     workspaceContext,
     workspaceWith,
@@ -71,6 +72,7 @@ function renderFrame(
             viewer,
             tile,
             titleFor,
+            instanceFor: (id: string) => instance(id),
             onaddimages: vi.fn(),
             emptyMessage: null,
             task,
@@ -277,7 +279,7 @@ describe("WorkspaceFrame", () => {
         choose.focus();
         await fireEvent.click(choose);
         const panel = await screen.findByRole("region", { name: "Images" });
-        await fireEvent.click(panel.querySelectorAll("li button")[2]);
+        await fireEvent.click(panel.querySelectorAll('[role="option"]')[2]);
         await waitFor(() =>
             expect(screen.getByRole("main")).not.toHaveAttribute("inert"),
         );

@@ -27,7 +27,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         type RevealTarget,
     } from "$lib/saving/saveTracker.svelte";
     import { titleText, type ViewportTitle } from "./imageMeta";
-    import ImagesListShell from "./ImagesListShell.svelte";
+    import type { ImageGET } from "../../types/openapi_types";
+    import ImagesPanel from "./ImagesPanel.svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
     import MagnifierPanel from "./MagnifierPanel.svelte";
     import Pager from "./Pager.svelte";
@@ -50,6 +51,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         viewer,
         tile,
         titleFor,
+        instanceFor,
         onaddimages,
         task = null,
         emptyMessage = null,
@@ -59,6 +61,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         viewer: Snippet<[string]>;
         tile: Snippet<[string]>;
         titleFor: (imageId: string) => ViewportTitle | null;
+        /** The image's metadata; for an OCT's `_proj`, its OCT's. */
+        instanceFor: (imageId: string) => ImageGET | null;
         onaddimages: () => void;
         task?: TaskHeader | null;
         emptyMessage?: string | null;
@@ -329,7 +333,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         await tick();
         document
             .getElementById(`${uid}-images`)
-            ?.querySelector<HTMLElement>("li button")
+            ?.querySelector<HTMLElement>('[role="option"][tabindex="0"]')
             ?.focus();
     }
 
@@ -548,8 +552,9 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                     {panel.label}
                 </h2>
                 {#if panel.id === "images"}
-                    <ImagesListShell
+                    <ImagesPanel
                         {titleFor}
+                        {instanceFor}
                         {onaddimages}
                         onloaded={imageLoaded}
                     />

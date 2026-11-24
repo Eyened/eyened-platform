@@ -1,5 +1,6 @@
 import axe from "axe-core";
 import { expect, vi } from "vitest";
+import type { ImageGET } from "../../types/openapi_types";
 import { Workspace } from "./workspace.svelte";
 import type { CatalogueEntry } from "./workspaceRules";
 import type { WorkspaceUrlState } from "./workspaceUrl";
@@ -100,4 +101,19 @@ export function mockWidth(widths: { md: boolean; lg?: boolean; xlg: boolean }) {
             for (const listener of listeners) listener(new Event("change"));
         },
     });
+}
+
+/** A synthetic image's metadata: enough for titles, the Images and Info panels. */
+export function instance(id: string, over: Partial<ImageGET> = {}): ImageGET {
+    return {
+        id,
+        patient: { id: 1, identifier: "P-000417" },
+        study: { id: 10, date: "2023-05-04" },
+        modality: "ColorFundus",
+        etdrs_field: "F1",
+        laterality: "R",
+        device: { manufacturer: "Topcon", model: "TRC-NW8" },
+        scan: { mode: "" },
+        ...over,
+    } as ImageGET;
 }
