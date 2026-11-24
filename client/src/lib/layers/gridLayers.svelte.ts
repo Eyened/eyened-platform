@@ -57,16 +57,16 @@ export function gridBinding(input: {
     canEdit: (grid: FormAnnotationGET) => boolean;
 }): GridTarget {
     const { grid } = input;
-    if (!grid)
-        return {
-            name: null,
-            reason: "Select an ETDRS grid to place",
-        };
-    // ASSUMPTION: this reason comes before the grid's own (editable, image) reasons.
+    // First: a B-scan lists no grids, so asking for one would never get past this.
     if (input.is3D)
         return {
             name: null,
             reason: "Place ETDRS goes on a fundus or en-face image. Select one.",
+        };
+    if (!grid)
+        return {
+            name: null,
+            reason: "Select an ETDRS grid to place",
         };
     const name =
         grid.creator.id === input.userId

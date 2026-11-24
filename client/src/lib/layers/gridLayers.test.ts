@@ -73,10 +73,10 @@ describe("gridBinding", () => {
         });
     });
 
-    it("on an OCT volume it says Place ETDRS goes on a fundus or en-face image", () => {
+    it("on an OCT volume it says Place ETDRS goes on a fundus or en-face image, though a B-scan has no grid to select", () => {
         expect(
             gridBinding({
-                grid: grid(12, 5, "inst-1"),
+                grid: undefined,
                 instanceId: "inst-1",
                 is3D: true,
                 userId: 5,
