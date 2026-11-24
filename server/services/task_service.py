@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Set as AbstractSet
 
 from eyened_orm import Creator, SubTask, Task, TaskProject
 from eyened_orm.task import SubTaskState, TaskState
@@ -19,6 +20,26 @@ from .exceptions import (
     NotFoundError,
     OutOfDeclarationError,
 )
+
+
+def can_edit_status_and_comments(
+    scope: AccessScope, project_ids: AbstractSet[int], holder_id: int | None
+) -> bool:
+    """Whether the actor may change a set's status and comments.
+
+    Grader in every declared project, and the set is unclaimed, the actor's,
+    or the actor is project admin in every declared project. A task declaring
+    no projects is closed to non-admins, as ``AccessScope.require`` is.
+    """
+    if not project_ids:
+        return scope.is_admin
+    # ASSUMPTION: project admin in every declared project, not any, to match AccessScope.require.
+    floor = (
+        ProjectRole.grader
+        if holder_id in (None, scope.actor_id)
+        else ProjectRole.project_admin
+    )
+    return all((scope.effective_role(p) or 0) >= floor for p in project_ids)
 
 
 class TaskService:
