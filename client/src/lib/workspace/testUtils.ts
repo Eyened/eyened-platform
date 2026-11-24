@@ -61,15 +61,17 @@ export async function expectNoAxeViolations(container: Element): Promise<void> {
 }
 
 /** Makes svelte's MediaQuery see a window at least `md` and/or `xlg` wide; `resize` changes it and fires `change`. */
-export function mockWidth(widths: { md: boolean; xlg: boolean }) {
+export function mockWidth(widths: { md: boolean; lg?: boolean; xlg: boolean }) {
     const current = { ...widths };
     const listeners = new Set<(e: Event) => void>();
     const matches = (query: string) =>
         query.includes("82rem")
             ? current.xlg
-            : query.includes("42rem")
-              ? current.md
-              : false;
+            : query.includes("66rem")
+              ? (current.lg ?? current.xlg)
+              : query.includes("42rem")
+                ? current.md
+                : false;
     const spy = vi.spyOn(window, "matchMedia").mockImplementation(
         (query: string) =>
             ({
@@ -92,7 +94,7 @@ export function mockWidth(widths: { md: boolean; xlg: boolean }) {
             }) as unknown as MediaQueryList,
     );
     return Object.assign(spy, {
-        resize(next: { md: boolean; xlg: boolean }) {
+        resize(next: { md: boolean; lg?: boolean; xlg: boolean }) {
             Object.assign(current, next);
             // Svelte's event wrapper reads event.type, so pass a real Event.
             for (const listener of listeners) listener(new Event("change"));

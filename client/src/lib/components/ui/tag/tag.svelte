@@ -21,15 +21,24 @@
         children,
         type = "gray",
         icon: Icon,
+        class: className,
+        title,
     }: {
         children: Snippet;
         type?: keyof typeof typeClasses;
         /** Carbon's renderIcon; decorative, the text names the tag. */
         icon?: Component<CarbonIconProps>;
+        class?: string;
+        /** The full text on hover, when the tag may cut it. */
+        title?: string;
     } = $props();
 </script>
 
-<span data-slot="tag" class={cn(typeClasses[type], Icon && "ps-1")}>
+<span
+    data-slot="tag"
+    {title}
+    class={cn(typeClasses[type], Icon && "ps-1", className)}
+>
     {#if Icon}
         <Icon aria-hidden="true" class="me-1 shrink-0" />
     {/if}
