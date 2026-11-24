@@ -4,16 +4,32 @@ import { subtasks } from "$lib/data/stores.svelte";
 import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
 import { SaveTracker } from "$lib/saving/saveTracker.svelte";
 import type { SubTaskState } from "../../types/openapi_types";
+import { SetHolder } from "./holder.svelte";
 import { SetNavigation } from "./setNavigation.svelte";
 import SetStatusControl from "./SetStatusControl.svelte";
 import SetStatusTag from "./SetStatusTag.svelte";
 
 const SUBTASK_ID = 41;
 
-function setup(send: (state: SubTaskState) => Promise<void>) {
+const ME = 7;
+
+function setup(
+    send: (state: SubTaskState) => Promise<void> = async () => {},
+    {
+        showStatus = true,
+        set = {},
+    }: {
+        showStatus?: boolean;
+        set?: Record<string, unknown>;
+    } = {},
+) {
     subtasks.set(SUBTASK_ID, {
         id: SUBTASK_ID,
         task_state: "NotStarted",
+        creator_id: null,
+        can_edit_status_and_comments: true,
+        next_open_index: 5,
+        ...set,
     } as never);
     const tracker = new SaveTracker();
     const statusSend = vi.fn(send);
@@ -30,19 +46,28 @@ function setup(send: (state: SubTaskState) => Promise<void>) {
         status,
         index: 4,
         count: 10,
+        nextOpen: () => 5,
         navigate: vi.fn(),
         handoff: () => ({ selected: 0, maximised: null }),
         focus: vi.fn(),
+    });
+    const holder = new SetHolder({
+        subTaskId: SUBTASK_ID,
+        taskId: 3,
+        index: 4,
+        userId: ME,
+        tracker,
+        focusAfterRace: vi.fn(),
     });
     render(SetStatusTag, { props: { subTaskId: SUBTASK_ID } });
     render(SetStatusControl, {
         props: {
             subTaskId: SUBTASK_ID,
             index: 4,
-            count: 10,
-            showStatus: true,
+            showStatus,
             navigation,
             status,
+            holder,
         },
     });
     return { statusSend, navigation };
@@ -92,5 +117,80 @@ describe("SetStatusControl", () => {
         await fireEvent.keyDown(trigger(), { key: "Enter" });
         expect(screen.queryByRole("menu")).toBeNull();
         expect(statusSend).not.toHaveBeenCalled();
+    });
+
+    // The label table's cells that today's code gets wrong; the other three already hold.
+    it.each([
+        [
+            "can edit, not Ready, none after",
+            true,
+            true,
+            "NotStarted",
+            null,
+            "Mark ready",
+            true,
+        ],
+        ["can edit, Ready, none after", true, true, "Ready", null, null, true],
+        [
+            "can't edit, an open set after",
+            true,
+            false,
+            "NotStarted",
+            5,
+            "Go to next set",
+            false,
+        ],
+        [
+            "can't edit, none after",
+            true,
+            false,
+            "NotStarted",
+            null,
+            null,
+            false,
+        ],
+        [
+            "status off, none after",
+            false,
+            true,
+            "NotStarted",
+            null,
+            null,
+            false,
+        ],
+    ] as const)(
+        "%s",
+        (_name, showStatus, canEdit, state, nextOpen, main, menu) => {
+            setup(undefined, {
+                showStatus,
+                set: {
+                    task_state: state,
+                    can_edit_status_and_comments: canEdit,
+                    next_open_index: nextOpen,
+                },
+            });
+            const primary = document.querySelector(
+                '[data-set-control="primary"]',
+            );
+            if (main) expect(primary?.textContent?.trim()).toBe(main);
+            else expect(primary).toBeNull();
+            expect(
+                screen.queryByRole("button", { name: /^Set status/ }) !== null,
+            ).toBe(menu);
+        },
+    );
+
+    it.each([
+        [{ creator_id: null }, "Claim set 5"],
+        [{ creator_id: ME }, "Give back set 5"],
+    ])("below lg, ▾ ends with the holder action: %#", async (set, name) => {
+        // Tests run below lg: the test setup's matchMedia answers false.
+        setup(undefined, { set });
+        await fireEvent.keyDown(trigger(), { key: "Enter" });
+        expect(
+            await screen.findByRole("menuitem", {
+                name: new RegExp(`^${name}`),
+            }),
+        ).toBeInTheDocument();
     });
 });

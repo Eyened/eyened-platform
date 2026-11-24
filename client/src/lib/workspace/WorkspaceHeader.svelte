@@ -17,10 +17,18 @@
         overviewHref: ResolvedPathname;
         /** The set's status, right after the set label. */
         tag?: Snippet;
+        /** Who holds the set, with Claim / Give back, right after ◀ ▶. */
+        holder?: Snippet;
         /** The set's move and its Set status menu, in the header or the narrow footer; unset when there is nothing to show. */
         status?: Snippet<["header" | "stacked"]>;
         /** After "Mark ready" on the last set; shown at the top of the canvas. */
         notice?: { title: string; subtitle: string } | null;
+        /** While someone else holds the set; shown at the top of the canvas until closed. */
+        holderNotice?: {
+            title: string;
+            subtitle: string;
+            alert: boolean;
+        } | null;
     }
 </script>
 
@@ -57,6 +65,10 @@
     const workspace = getContext<Workspace>("workspace");
     // ASSUMPTION: words from xlg (82rem); below it the save state is an icon.
     const xlg = new MediaQuery("min-width: 82rem");
+    // Below xlg a task header shrinks in place: no product name, short label, icon-only links.
+    const compact = $derived(task !== null && !xlg.current);
+    // Below lg (66rem) there is no room for the status tag either; ▾ still names the status.
+    const lg = new MediaQuery("min-width: 66rem");
     const MODES = [
         { id: "browse", text: "Browse" },
         { id: "all", text: "All tools" },
@@ -83,7 +95,7 @@
 >
     {#if narrow}
         {@render start?.()}
-    {:else}
+    {:else if !compact}
         <span class="px-4 text-heading-compact-01 text-text-primary"
             >EyeNED</span
         >
@@ -104,12 +116,12 @@
         {/if}
     </div>
     {#if task}
-        {#if !narrow && (task.show.title || task.show.nav || task.show.overview || task.tag)}
+        {#if !narrow && (task.show.title || task.show.nav || task.show.overview || task.tag || task.holder)}
             {@render divider()}
         {/if}
         {#if task.show.title}
-            {#if narrow}
-                <!-- Below md "Set" is dropped from view to fit 320 px; ◀ ▶ still say "set". -->
+            {#if narrow || compact}
+                <!-- Below xlg "Set" is dropped from view to fit; ◀ ▶ still say "set". -->
                 <span class="sr-only">{task.label}</span>
                 <span
                     aria-hidden="true"
@@ -124,7 +136,7 @@
             {/if}
         {/if}
         <!-- Below md the set's status waits for the narrow footer. -->
-        {#if !narrow}{@render task.tag?.()}{/if}
+        {#if lg.current}{@render task.tag?.()}{/if}
         {#if task.show.nav}
             <IconButton
                 label="Previous set"
@@ -161,20 +173,34 @@
                 {/if}
             </IconButton>
         {/if}
+        <!-- Below md the holder waits for the narrow footer. -->
+        {#if !narrow}{@render task.holder?.()}{/if}
         {#if !narrow && task.show.overview}
-            <!-- Carbon standalone Link with Launch: it opens another tab, so the set stays open. -->
-            <!-- eslint-disable svelte/no-navigation-without-resolve -- overviewHref is a ResolvedPathname from resolve() -->
-            <a
-                href={task.overviewHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Task overview, opens in a new tab"
-                class="inline-flex items-center gap-2 px-2 text-body-compact-01 whitespace-nowrap text-link-primary hover:text-link-primary-hover hover:underline"
-            >
-                Task overview
-                <Launch aria-hidden="true" />
-            </a>
-            <!-- eslint-enable svelte/no-navigation-without-resolve -->
+            {#if compact}
+                <IconButton
+                    label="Task overview, opens in a new tab"
+                    tooltip="Task overview"
+                    href={task.overviewHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    <Launch />
+                </IconButton>
+            {:else}
+                <!-- Carbon standalone Link with Launch: it opens another tab, so the set stays open. -->
+                <!-- eslint-disable svelte/no-navigation-without-resolve -- overviewHref is a ResolvedPathname from resolve() -->
+                <a
+                    href={task.overviewHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Task overview, opens in a new tab"
+                    class="inline-flex items-center gap-2 px-2 text-body-compact-01 whitespace-nowrap text-link-primary hover:text-link-primary-hover hover:underline"
+                >
+                    Task overview
+                    <Launch aria-hidden="true" />
+                </a>
+                <!-- eslint-enable svelte/no-navigation-without-resolve -->
+            {/if}
         {/if}
     {/if}
     <div class="min-w-0 flex-1"></div>
@@ -202,6 +228,6 @@
     {:else}
         {@render divider()}
         <!-- In a task, the task config sets the strip. -->
-        <LayoutPopover stripToggle={task === null} />
+        <LayoutPopover stripToggle={task === null} iconOnly={compact} />
     {/if}
 </header>

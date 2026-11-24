@@ -21,6 +21,6 @@ The set's saved status as a read-only Tag beside "Set n of N". A pick that didn'
     );
 </script>
 
-<Tag type={TYPES[state]} icon={SUBTASK_STATUS[state].icon}
+<Tag class="shrink-0" type={TYPES[state]} icon={SUBTASK_STATUS[state].icon}
     >{SUBTASK_STATUS[state].label}</Tag
 >

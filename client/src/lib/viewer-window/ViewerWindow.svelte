@@ -10,6 +10,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         formAnnotations,
         formSchemas,
         formSchemasByName,
+        subtasks,
     } from "$lib/data/stores.svelte";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import {
@@ -28,7 +29,9 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
     import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import LeaveSetModal from "$lib/tasks/LeaveSetModal.svelte";
+    import HolderControl from "$lib/tasks/HolderControl.svelte";
     import SetStatusControl from "$lib/tasks/SetStatusControl.svelte";
+    import { SetHolder } from "$lib/tasks/holder.svelte";
     import SetStatusTag from "$lib/tasks/SetStatusTag.svelte";
     import {
         parseTaskPanelConfig,
@@ -94,9 +97,22 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     const navigation = taskContext ? new TaskNavigation(taskContext) : null;
     // subTaskIndex is 0-based; people read sets from 1.
     const setNumber = (taskContext?.subTaskIndex ?? 0) + 1;
-    const lastSet = taskContext
-        ? taskContext.subTaskIndex >= taskContext.task.num_tasks - 1
-        : false;
+    // From the set's GET: the index the primary move goes to, or null.
+    const nextOpen = $derived(
+        taskContext
+            ? (subtasks.get(taskContext.subTask.id)?.next_open_index ?? null)
+            : null,
+    );
+    const holder = taskContext
+        ? new SetHolder({
+              subTaskId: taskContext.subTask.id,
+              taskId: taskContext.task.id,
+              index: taskContext.subTaskIndex,
+              userId: globalContext.user.id,
+              tracker: saveTracker,
+              focusAfterRace: () => focusSetControl("primary"),
+          })
+        : null;
     // The set's status saves like any other edit, so ◀ ▶ wait for it.
     const statusSaver = taskContext
         ? new DebouncedSaver<SubTaskState>({
@@ -119,6 +135,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                   status: statusSaver,
                   index: taskContext.subTaskIndex,
                   count: taskContext.task.num_tasks,
+                  nextOpen: () => nextOpen,
                   navigate: (index) => {
                       formWindow.leaving(`Loading set ${index + 1}…`);
                       navigateSubtaskIndex(index);
@@ -177,7 +194,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
               })
             : null;
     const task: TaskHeader | null = $derived(
-        taskContext && navigation && setNavigation && shows
+        taskContext && navigation && setNavigation && shows && holder
             ? {
                   label: `Set ${setNumber} of ${taskContext.task.num_tasks}`,
                   show: shows,
@@ -192,17 +209,15 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
                       taskid: String(taskContext.task.id),
                   }),
                   tag: shows.status ? statusTag : undefined,
-                  // With Status off the last set has no move, so nothing to show.
+                  holder: holderControl,
+                  // A set I may change keeps its menu; otherwise only "Go to next set", when an open set follows.
                   status:
-                      shows.status || (shows.goToNext && !lastSet)
+                      (shows.status && (holder.canEdit || nextOpen !== null)) ||
+                      (shows.goToNext && nextOpen !== null)
                           ? setStatus
                           : undefined,
-                  notice: setNavigation.lastReady
-                      ? {
-                            title: `Set ${setNumber} marked ready`,
-                            subtitle: "This was the last set in this task.",
-                        }
-                      : null,
+                  notice: setNavigation.readyNotice,
+                  holderNotice: holder.notice,
               }
             : null,
     );
@@ -279,16 +294,22 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 {/snippet}
 
 {#snippet setStatus(layout: "header" | "stacked")}
-    {#if taskContext && setNavigation && statusSaver && shows}
+    {#if taskContext && setNavigation && statusSaver && shows && holder}
         <SetStatusControl
             subTaskId={taskContext.subTask.id}
             index={taskContext.subTaskIndex}
-            count={taskContext.task.num_tasks}
             showStatus={shows.status}
             navigation={setNavigation}
             status={statusSaver}
+            {holder}
             {layout}
         />
+    {/if}
+{/snippet}
+
+{#snippet holderControl()}
+    {#if holder && shows}
+        <HolderControl {holder} showStatus={shows.status} />
     {/if}
 {/snippet}
 
@@ -333,7 +354,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     <IncompleteFormsModal
         {setNumber}
         lines={setNavigation.readyQuestion}
-        last={lastSet}
+        last={nextOpen === null}
         onanswer={(go) => setNavigation.answerReady(go)}
     />
 {/if}

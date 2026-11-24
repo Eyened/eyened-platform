@@ -5,15 +5,16 @@ import { writeHandoff, type SetControl } from "./setHandoff";
 
 export const STATUS_ID = "set-status";
 
-/** Focus on the header's ◀, ▶, primary button or Set status ▾, when it is there. */
+/** Focus on the header's ◀, ▶, primary button or Set status ▾; without a primary button, an enabled ▶. */
 export function focusSetControl(control: SetControl | "status"): void {
-    const element =
-        control === "status"
+    const find = (c: SetControl | "status") =>
+        c === "status"
             ? document.getElementById(STATUS_ID)
-            : document.querySelector<HTMLElement>(
-                  `[data-set-control="${control}"]`,
-              );
-    element?.focus();
+            : document.querySelector<HTMLElement>(`[data-set-control="${c}"]`);
+    // After a lost Claim, or arriving by the primary move on a set that has none.
+    const element =
+        find(control) ?? (control === "primary" ? find("next") : null);
+    if (element && !element.matches(":disabled")) element.focus();
 }
 
 /** True when everything saved within `ms`; false on a failure or when a save is still running. */
@@ -46,6 +47,8 @@ export interface SetNavigationDeps {
     /** This set's 0-based index and the task's set count. */
     index: number;
     count: number;
+    /** The 0-based index the primary move goes to: the next open set, or null when none follows. */
+    nextOpen: () => number | null;
     /** A page load to the set at this 0-based index. */
     navigate: (index: number) => void;
     /** The viewports the next set restores. */
@@ -61,6 +64,18 @@ export class SetNavigation {
     pending: SetControl | null = $state(null);
     /** Set by "Mark ready" on the last set. */
     lastReady = $state(false);
+    /** The notification once "Mark ready" left nowhere to go. */
+    get readyNotice(): { title: string; subtitle: string } | null {
+        if (!this.lastReady) return null;
+        const { index, count } = this.deps;
+        return {
+            title: `Set ${index + 1} marked ready`,
+            subtitle:
+                index >= count - 1
+                    ? "This was the last set in this task."
+                    : "No open sets after this one.",
+        };
+    }
     /** The last status save failed; the combo button shows it until a pick saves. */
     statusFailed = $state(false);
     /** The open "Leave set n without saving"; answerLeave answers it. */
@@ -84,7 +99,13 @@ export class SetNavigation {
         if (this.moving) return;
         this.moving = true;
         const { tracker, index, count } = this.deps;
-        const to = control === "prev" ? index - 1 : index + 1;
+        // ◀ ▶ step by one; the primary move skips to the next open set.
+        const to =
+            control === "prev"
+                ? index - 1
+                : control === "next"
+                  ? index + 1
+                  : (this.deps.nextOpen() ?? count);
         const last = to >= count;
         const pendingTimer = setTimeout(() => (this.pending = control), 1000);
         try {

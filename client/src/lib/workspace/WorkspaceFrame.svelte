@@ -106,8 +106,10 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     const overlayOpen = $derived(narrow && overlay !== null);
     const formsName = $derived(task ? "Grading" : "Forms");
     const footer = $derived(
-        narrow && task !== null && !!(task.tag || task.status),
+        narrow && task !== null && !!(task.tag || task.holder || task.status),
     );
+    // Closing the holder notice lasts for this set; the next set is a page load.
+    let holderNoticeClosed = $state(false);
     let footerHeight = $state(0);
     // The header's words on the narrow panels button while something couldn't save.
     const saveFailure = $derived(
@@ -567,18 +569,32 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 {emptyMessage}
             </p>
         {:else}
-            <!-- Always mounted, so screen readers announce the notice when it appears. -->
-            <div role="status">
-                {#if task?.notice}
-                    <!-- Carbon: an action's inline notification sits at the top of the content it is about. -->
-                    <div class="px-4 pt-2">
+            <!-- Over the bottom of the canvas, above the bottom viewports' view bars, so the images don't move. -->
+            <div class="notices">
+                <!-- Always mounted, so screen readers announce the notice when it appears. -->
+                <div role="status">
+                    {#if task?.notice}
                         <InlineNotification
                             kind="success"
+                            class="shadow-popover"
+                            highContrast
                             title={task.notice.title}
                             subtitle={task.notice.subtitle}
                             role="none"
                         />
-                    </div>
+                    {/if}
+                </div>
+                <!-- Outside the live region: on arrival it is just there; after a lost Claim it is an alert. -->
+                {#if task?.holderNotice && !holderNoticeClosed}
+                    <InlineNotification
+                        kind="warning"
+                        class="shadow-popover"
+                        highContrast
+                        title={task.holderNotice.title}
+                        subtitle={task.holderNotice.subtitle}
+                        role={task.holderNotice.alert ? "alert" : "none"}
+                        onclose={() => (holderNoticeClosed = true)}
+                    />
                 {/if}
             </div>
             {#if workspace.strip}
@@ -653,7 +669,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                     >
                         <!-- At 320 px a tag and "1 form couldn't save" don't fit on one line, so it wraps. -->
                         <div class="flex min-h-6 flex-wrap items-center gap-2">
-                            {@render task.tag?.()}
+                            {@render task.tag?.()}{@render task.holder?.()}
                             <div class="ms-auto">
                                 <SaveStateSlot
                                     iconOnly={false}
@@ -725,6 +741,19 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         flex-direction: column;
         min-width: 0;
         min-height: 0;
+    }
+    .notices {
+        position: absolute;
+        inset-inline: 16px;
+        bottom: 40px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+    }
+    .notices > :global(*) {
+        pointer-events: auto;
     }
     .pager {
         grid-area: pager;

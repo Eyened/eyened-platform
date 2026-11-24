@@ -8,7 +8,7 @@
     import WarningFilled from "carbon-icons-svelte/lib/WarningFilled.svelte";
     import type { HTMLAttributes } from "svelte/elements";
 
-    // Carbon InlineNotification API, low contrast, error, warning and success kinds, an optional close button.
+    // Carbon InlineNotification API: error, warning and success kinds, low contrast unless highContrast, an optional close button.
     type InlineNotificationProps = Omit<
         WithElementRef<HTMLAttributes<HTMLDivElement>>,
         "title" | "role" | "children"
@@ -20,6 +20,8 @@
         role?: "alert" | "status" | "none";
         /** Shows Carbon's close button; the caller hides the notification. */
         onclose?: () => void;
+        /** Carbon's high contrast: a light box on our dark theme. */
+        highContrast?: boolean;
     };
 
     let {
@@ -28,6 +30,7 @@
         subtitle,
         role,
         onclose,
+        highContrast = false,
         class: className,
         ref = $bindable(null),
         ...restProps
@@ -41,6 +44,7 @@
 <Alert.Root
     bind:ref
     variant={kind === "error" ? "destructive" : kind}
+    contrast={highContrast ? "high" : "low"}
     role={resolvedRole === "none" ? undefined : resolvedRole}
     class={onclose ? `pr-12 ${className ?? ""}` : className}
     {...restProps}

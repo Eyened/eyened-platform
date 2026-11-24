@@ -131,6 +131,7 @@ export async function createSegmentationFromDialog(
             feature.id,
             type,
             creatorId,
+            subtaskId,
         );
         return;
     }
@@ -170,6 +171,7 @@ export async function createMultiFeatureSegmentation(
     featureId: number,
     dataRepresentation: "MultiLabel" | "MultiClass",
     creatorId: number,
+    subtaskId?: number,
 ) {
     await runCreate(async () => {
         const segmentation = await createSegmentationFrom(
@@ -179,6 +181,7 @@ export async function createMultiFeatureSegmentation(
             "R8UI",
             0.5,
             axis,
+            subtaskId,
         );
         activateCreated(segmentationContext, segmentation, creatorId);
     });

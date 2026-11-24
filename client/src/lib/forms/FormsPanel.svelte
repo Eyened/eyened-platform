@@ -9,6 +9,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
         formAnnotations,
         formSchemas,
         formSchemasByName,
+        subtasks,
     } from "$lib/data/stores.svelte";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
     import LayerSection from "$lib/layers/LayerSection.svelte";
@@ -275,6 +276,8 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
             <CommentsField
                 saver={comments}
                 initial={taskContext.subTask.comments ?? ""}
+                readonly={subtasks.get(taskContext.subTask.id)
+                    ?.can_edit_status_and_comments !== true}
             />
         {/if}
         {#if taskName && !taskSchema}

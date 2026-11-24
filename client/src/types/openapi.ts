@@ -2573,6 +2573,10 @@ export interface components {
             /** Index */
             index?: number | null;
             next_task?: components["schemas"]["SubTaskGET"] | null;
+            /** Next Open Index */
+            next_open_index?: number | null;
+            /** Can Edit Status And Comments */
+            can_edit_status_and_comments?: boolean | null;
         };
         /** SubTaskPATCH */
         SubTaskPATCH: {
@@ -2605,6 +2609,10 @@ export interface components {
             /** Index */
             index?: number | null;
             next_task?: components["schemas"]["SubTaskGET"] | null;
+            /** Next Open Index */
+            next_open_index?: number | null;
+            /** Can Edit Status And Comments */
+            can_edit_status_and_comments?: boolean | null;
             /** Images */
             images: components["schemas"]["ImageGET"][];
         };

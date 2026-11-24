@@ -128,4 +128,22 @@ describe("WorkspaceHeader", () => {
         renderHeader(taskHeader());
         expect(screen.queryByRole("tablist", { name: "Mode" })).toBeNull();
     });
+
+    it("from md to lg: no product name, the short set label, Task overview and Layout as icons", () => {
+        mockWidth({ md: true, lg: false, xlg: false });
+        render(WorkspaceHeader, {
+            props: { task: taskHeader(), narrow: false, start, end },
+            context: workspaceContext(workspaceWith(2)),
+        });
+        expect(screen.queryByText("EyeNED")).toBeNull();
+        expect(screen.getByText("Set 2 of 5")).toHaveClass("sr-only");
+        expect(
+            screen.getByRole("link", {
+                name: "Task overview, opens in a new tab",
+            }),
+        ).not.toHaveTextContent("Task overview");
+        expect(
+            screen.getByRole("button", { name: "Layout" }),
+        ).not.toHaveTextContent("Layout");
+    });
 });

@@ -196,6 +196,12 @@ export function ingestSubTasks(subtasksData: SubTaskWithImagesGET[]) {
             if (subtask.index == null && existing.index != null) {
                 merged.index = existing.index;
             }
+            // Only the set's own GET fills these two; every other reply has them null.
+            if (subtask.can_edit_status_and_comments == null) {
+                merged.next_open_index = existing.next_open_index;
+                merged.can_edit_status_and_comments =
+                    existing.can_edit_status_and_comments;
+            }
             subtasks.set(subtask.id, merged);
         } else {
             subtasks.set(subtask.id, subtask);
