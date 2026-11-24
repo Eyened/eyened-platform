@@ -7,6 +7,7 @@
         TextInput,
     } from "$lib/components/ui/text-input/index.js";
     import type { GlobalContext } from "$lib/data/globalContext.svelte";
+    import { theme } from "$lib/theme.svelte";
     import { getContext, tick } from "svelte";
     import AuthPage from "./AuthPage.svelte";
 
@@ -57,7 +58,11 @@
 <AuthPage>
     <div class="mb-8">
         <img
-            src={asset("/eyened-mark-light.png")}
+            src={asset(
+                theme.forPath(location.pathname) === "light"
+                    ? "/eyened-mark-dark.png"
+                    : "/eyened-mark-light.png",
+            )}
             alt=""
             width="96"
             height="99"

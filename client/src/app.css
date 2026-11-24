@@ -4,7 +4,7 @@
 
 @import "@fontsource-variable/ibm-plex-sans";
 
-/* Design tokens: Carbon Gray 100. Names and rules: client/DESIGN.md. */
+/* Design tokens: Carbon Gray 100, and Gray 10 under [data-theme="light"]. Names and rules: client/DESIGN.md. */
 
 @theme {
     /* Colours: @carbon/themes 11.83.0, theme g100 */
@@ -40,6 +40,7 @@
     --color-border-inverse: #f4f4f4;
     --color-border-disabled: rgba(141, 141, 141, 0.5);
     --color-overlay: rgba(0, 0, 0, 0.6);
+    --color-shadow: rgba(0, 0, 0, 0.8);
     --color-skeleton-background: #292929;
     --color-skeleton-element: #393939;
     --color-text-primary: #f4f4f4;
@@ -143,7 +144,7 @@
     --breakpoint-cds-max: 99rem;
     --container-*: initial;
 
-    /* Shapes: Carbon corners are square; shadow from @carbon/styles (g100) */
+    /* Shapes: Carbon corners are square; menu shadow from @carbon/styles, in the shadow colour */
     --radius-*: initial;
     --radius-checkbox: 2px;
     --radius-tooltip: 2px;
@@ -151,7 +152,7 @@
     --radius-tag: 1rem;
     --radius-popover: 2px;
     --shadow-*: initial;
-    --shadow-popover: 0 2px 6px rgba(0, 0, 0, 0.8);
+    --shadow-popover: 0 2px 6px var(--color-shadow);
     --shadow-button-focus:
         inset 0 0 0 1px var(--color-focus),
         inset 0 0 0 2px var(--color-focus-inset);
@@ -214,6 +215,96 @@
             transform-origin: left;
         }
     }
+}
+
+/* Light theme: @carbon/themes 11.83.0, theme g10, same tokens. app.html sets data-theme before first paint;
+   the viewer pages stay Gray 100. */
+:root[data-theme="light"] {
+    color-scheme: light;
+    --color-background: #f4f4f4;
+    --color-background-hover: rgba(141, 141, 141, 0.12);
+    --color-background-active: rgba(141, 141, 141, 0.5);
+    --color-background-inverse: #393939;
+    --color-background-selected: rgba(141, 141, 141, 0.2);
+    --color-layer-01: #ffffff;
+    --color-layer-02: #f4f4f4;
+    --color-layer-hover-01: #e8e8e8;
+    --color-layer-hover-02: #e8e8e8;
+    --color-layer-selected-01: #e0e0e0;
+    --color-layer-selected-hover-01: #d1d1d1;
+    --color-layer-selected-02: #e0e0e0;
+    --color-layer-selected-hover-02: #d1d1d1;
+    --color-layer-03: #ffffff;
+    --color-layer-hover-03: #e8e8e8;
+    --color-layer-selected-inverse: #161616;
+    --color-layer-active-01: #c6c6c6;
+    --color-layer-accent-01: #e0e0e0;
+    --color-field-01: #ffffff;
+    --color-field-hover-01: #e8e8e8;
+    --color-field-02: #f4f4f4;
+    --color-field-hover-02: #e8e8e8;
+    --color-border-subtle-00: #c6c6c6;
+    --color-border-subtle-01: #e0e0e0;
+    --color-border-subtle-02: #c6c6c6;
+    --color-border-strong-01: #8d8d8d;
+    --color-border-strong-02: #8d8d8d;
+    --color-border-interactive: #0f62fe;
+    --color-border-inverse: #161616;
+    --color-border-disabled: #c6c6c6;
+    --color-overlay: rgba(0, 0, 0, 0.6);
+    --color-shadow: rgba(0, 0, 0, 0.3);
+    --color-skeleton-background: #e8e8e8;
+    --color-skeleton-element: #c6c6c6;
+    --color-text-primary: #161616;
+    --color-text-secondary: #525252;
+    --color-text-helper: #6f6f6f;
+    --color-text-placeholder: rgba(22, 22, 22, 0.4);
+    --color-text-on-color: #ffffff;
+    --color-text-on-color-disabled: #8d8d8d;
+    --color-text-inverse: #ffffff;
+    --color-text-disabled: rgba(22, 22, 22, 0.25);
+    --color-text-error: #da1e28;
+    --color-link-primary: #0f62fe;
+    --color-link-primary-hover: #0043ce;
+    --color-link-secondary: #0043ce;
+    --color-icon-primary: #161616;
+    --color-icon-secondary: #525252;
+    --color-icon-inverse: #ffffff;
+    --color-icon-disabled: rgba(22, 22, 22, 0.25);
+    --color-interactive: #0f62fe;
+    --color-background-brand: #0f62fe;
+    --color-focus: #0f62fe;
+    --color-focus-inset: #ffffff;
+    --color-support-error: #da1e28;
+    --color-support-success: #24a148;
+    --color-support-warning: #f1c21b;
+    --color-notification-background-error: #fff1f1;
+    --color-notification-background-success: #defbe6;
+    --color-notification-background-warning: #fcf4d6;
+    --color-button-primary: #0f62fe;
+    --color-button-primary-hover: #0050e6;
+    --color-button-primary-active: #002d9c;
+    --color-button-secondary: #393939;
+    --color-button-secondary-hover: #474747;
+    --color-button-secondary-active: #6f6f6f;
+    --color-button-tertiary: #0f62fe;
+    --color-button-tertiary-hover: #0050e6;
+    --color-button-tertiary-active: #002d9c;
+    --color-button-danger-primary: #da1e28;
+    --color-button-danger-hover: #b81921;
+    --color-button-danger-active: #750e13;
+    --color-button-danger-secondary: #da1e28;
+    --color-button-disabled: #c6c6c6;
+    --color-status-gray: #6f6f6f;
+    --color-status-blue: #0043ce;
+    --color-status-green: #24a148;
+    --color-status-red: #da1e28;
+    --color-status-purple: #8a3ffc;
+    --color-content-switcher-background-hover: #d1d1d1;
+    --color-content-switcher-selected: #ffffff;
+    --color-tag-background-gray: #e0e0e0;
+    --color-tag-color-gray: #161616;
+    --color-tag-hover-gray: #d1d1d1;
 }
 
 /* Carbon Layer: inside a dialog, a ConditionBuilder popover, a tag popover or a filter popover, surfaces and fields use the 02 set. */

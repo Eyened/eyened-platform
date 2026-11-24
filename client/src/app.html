@@ -4,6 +4,27 @@
         <meta charset="utf-8" />
         <link rel="icon" href="%sveltekit.assets%/favicon.png" />
         <meta name="viewport" content="width=device-width" />
+        <!-- Sets the theme before first paint, as resolveTheme in src/lib/theme.svelte.ts does. -->
+        <script>
+            (function () {
+                var choice = null;
+                try {
+                    choice = localStorage.getItem("eyened:theme");
+                } catch (e) {}
+                var viewer = /^\/(view|tasks\/[^/]+\/grade\/[^/]+)\/?$/.test(
+                    location.pathname,
+                );
+                var light =
+                    !viewer &&
+                    (choice === "light" ||
+                        (choice !== "dark" &&
+                            matchMedia("(prefers-color-scheme: light)")
+                                .matches));
+                document.documentElement.dataset.theme = light
+                    ? "light"
+                    : "dark";
+            })();
+        </script>
         %sveltekit.head%
     </head>
 
