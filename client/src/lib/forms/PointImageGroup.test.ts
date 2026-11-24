@@ -43,15 +43,16 @@ describe("PointImageGroup", () => {
             "OD · CF · 2024-03-12",
         );
         expect(screen.getByText("2 points")).toBeInTheDocument();
+        expect(screen.getByText("n")).toBeInTheDocument();
         expect(
-            screen.getByRole("button", { name: /^Point2 x3 y4/ }),
+            screen.getByRole("button", { name: /^Point\s?2 x\s?3 y\s?4/ }),
         ).toHaveAttribute("aria-expanded", "true");
         expect(
             screen.getByRole("group", { name: "Point 2" }),
         ).toBeInTheDocument();
 
         await fireEvent.click(
-            screen.getByRole("button", { name: /^Point1 x1/ }),
+            screen.getByRole("button", { name: /^Point\s?1 x\s?1/ }),
         );
         expect(onGoTo).toHaveBeenCalledWith({
             publicId: "img-abc",

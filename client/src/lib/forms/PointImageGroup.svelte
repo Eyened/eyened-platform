@@ -95,7 +95,7 @@
                         pt: slot.pt,
                     }}
                     {@const open = expandedKey === rowKey(slot)}
-                    <!-- The name is the visible text, so voice control can say what it sees. -->
+                    <!-- The name contains the visible words, so voice control can say what it sees. -->
                     <button
                         type="button"
                         data-row-key={rowKey(slot)}

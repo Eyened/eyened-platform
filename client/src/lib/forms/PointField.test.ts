@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import {
+    render,
+    screen,
+    fireEvent,
+    within,
+    waitFor,
+} from "@testing-library/svelte";
 import PointField from "./PointField.svelte";
 import { pointArming } from "./pointArming.svelte";
 import type { JSONSchema } from "./schemaType";
@@ -147,6 +153,33 @@ describe("PointField", () => {
         expect(onchange).toHaveBeenCalledWith(undefined);
     });
 
+    it("Remove all asks first, then empties the list", async () => {
+        const onchange = vi.fn();
+        renderField({
+            schema: {
+                "x-eyened-widget": "keypoint",
+                title: "Landmarks",
+                type: "array",
+                items: pointObject,
+            },
+            value: [
+                { x: 1, y: 2 },
+                { x: 3, y: 4 },
+            ],
+            onchange,
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Remove all" }),
+        );
+        expect(onchange).not.toHaveBeenCalled();
+        const dialog = await screen.findByRole("dialog");
+        expect(dialog).toHaveTextContent("Remove all points");
+        await fireEvent.click(
+            within(dialog).getByRole("button", { name: "Remove all" }),
+        );
+        await waitFor(() => expect(onchange).toHaveBeenCalledWith([]));
+    });
+
     it("Clear answer omits the field", async () => {
         const onchange = vi.fn();
         renderField({
@@ -186,7 +219,7 @@ describe("PointField", () => {
         expect(screen.getByTitle("img1")).toBeInTheDocument();
         expect(screen.getByTitle("img2")).toBeInTheDocument();
         await fireEvent.click(
-            screen.getByRole("button", { name: /^Point1 x1 y2/ }),
+            screen.getByRole("button", { name: /^Point\s?1 x\s?1 y\s?2/ }),
         );
         const trigger = screen.getByLabelText("severity");
         expect(trigger).toHaveTextContent("mild");
