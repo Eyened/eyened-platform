@@ -9,6 +9,8 @@ const NOT_APPLIED = "Earlier changes were saved; the rest were not applied.";
 export interface AddImagesTarget {
     /** The set whose image links to save; null outside a task or with "Save to the set's images" off. */
     subTaskId: number | null;
+    /** The images that were open when the picker opened; only these can be unlinked. */
+    opened: readonly string[];
     setInstanceIDs: (ids: string[]) => unknown;
     /** /view: the address keeps the open images in instances=. */
     rewriteUrl: boolean;
@@ -19,7 +21,8 @@ export async function addImages(
     ids: string[],
     target: AddImagesTarget,
 ): Promise<void> {
-    if (target.subTaskId !== null) await saveLinks(target.subTaskId, ids);
+    if (target.subTaskId !== null)
+        await saveLinks(target.subTaskId, ids, target.opened);
     void target.setInstanceIDs(ids);
     if (target.rewriteUrl) {
         // history.replaceState (view-state) is not mirrored into page.url.
@@ -31,13 +34,19 @@ export async function addImages(
 }
 
 // One request at a time: each reply is the set's whole image list, so parallel replies would arrive out of order.
-async function saveLinks(subTaskId: number, ids: string[]): Promise<void> {
-    // Against the server's list, so a retry after a partial save resends nothing that succeeded.
+async function saveLinks(
+    subTaskId: number,
+    ids: string[],
+    opened: readonly string[],
+): Promise<void> {
+    // Against the server's list, so a retry after a partial save resends nothing that succeeded. A link is removed only if the picker started with it ticked.
     const saved = (subtasks.get(subTaskId)?.images ?? []).map((image) =>
         String(image.id),
     );
     try {
-        for (const id of saved.filter((id) => !ids.includes(id)))
+        for (const id of saved.filter(
+            (id) => opened.includes(id) && !ids.includes(id),
+        ))
             await removeSubTaskImage(subTaskId, id);
         for (const id of ids.filter((id) => !saved.includes(id)))
             await addSubTaskImage(subTaskId, id);

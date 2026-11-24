@@ -53,8 +53,9 @@ beforeEach(() => {
         );
 });
 
-const inTask = (setInstanceIDs = vi.fn()) => ({
+const inTask = (opened: string[], setInstanceIDs = vi.fn()) => ({
     subTaskId: SET,
+    opened,
     setInstanceIDs,
     rewriteUrl: false,
 });
@@ -62,7 +63,7 @@ const inTask = (setInstanceIDs = vi.fn()) => ({
 describe("addImages", () => {
     it("removes, then adds, one request at a time, then shows the images", async () => {
         serverHas(["a", "b"]);
-        const target = inTask();
+        const target = inTask(["a", "b"]);
         await addImages(["b", "c", "d"], target);
         expect(order).toEqual(["-a", "+c", "+d"]);
         expect(mostInFlight).toBe(1);
@@ -78,7 +79,7 @@ describe("addImages", () => {
                 return Promise.reject(new Error("Network down"));
             return request(`+${id}`, () => [...linked(), id]);
         });
-        const target = inTask();
+        const target = inTask(["a"]);
         await expect(addImages(["b", "c"], target)).rejects.toThrow(
             /^Earlier changes were saved; the rest were not applied\. Try again\.$/,
         );
@@ -102,15 +103,28 @@ describe("addImages", () => {
                 declared_projects: [3, 5],
             }),
         );
-        await expect(addImages(["x"], inTask())).rejects.toThrow(
+        await expect(addImages(["x"], inTask([]))).rejects.toThrow(
             /^Image project 7; task declares 3, 5\. Earlier changes were saved; the rest were not applied\.$/,
         );
+    });
+
+    it("keeps a link the picker did not start with", async () => {
+        serverHas(["a", "b", "c"]);
+        await addImages(["a", "b", "d"], inTask(["a", "b"]));
+        expect(order).toEqual(["+d"]);
+    });
+
+    it("removes nothing when the picker started empty", async () => {
+        serverHas(["a", "b"]);
+        await addImages(["x"], inTask([]));
+        expect(order).toEqual(["+x"]);
     });
 
     it("on /view saves nothing and writes instances= in the address", async () => {
         const setInstanceIDs = vi.fn();
         await addImages(["a", "b"], {
             subTaskId: null,
+            opened: [],
             setInstanceIDs,
             rewriteUrl: true,
         });

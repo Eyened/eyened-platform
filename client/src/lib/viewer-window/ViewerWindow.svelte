@@ -292,7 +292,11 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     ).update_subtask_image_links;
     let saveLinks = $state(saveLinksDefault);
 
+    // The images open when the picker opened, kept fixed while it is open.
+    let opened = $state<string[]>([]);
+
     function openAddImages() {
+        opened = viewerWindowContext.instanceIds.slice();
         saveLinks = saveLinksDefault;
         browserOpen = true;
     }
@@ -400,12 +404,13 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         errorTitle={taskContext
             ? `Images for set ${setNumber} could not be saved`
             : "Images could not be added"}
-        initialConditions={patientConditions(viewerWindowContext.instanceIds)}
-        initialSelectedIds={viewerWindowContext.instanceIds.slice()}
+        initialConditions={patientConditions(opened)}
+        initialSelectedIds={opened}
         onConfirm={(ids) =>
             addImages(ids, {
                 subTaskId:
                     taskContext && saveLinks ? taskContext.subTask.id : null,
+                opened,
                 setInstanceIDs: (next) =>
                     viewerWindowContext.setInstanceIDs(next),
                 rewriteUrl: !taskContext,
