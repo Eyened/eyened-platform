@@ -4,10 +4,17 @@
     import { Toaster } from "$lib/components/ui/sonner";
     import { GlobalContext } from "$lib/data/globalContext.svelte";
     import Dialogue from "$lib/Dialogue.svelte";
+    import { theme } from "$lib/theme.svelte";
     import { setContext, type Snippet } from "svelte";
     import "../app.css";
 
     let { children }: { children: Snippet } = $props();
+
+    // Keeps the first-paint theme in step with the choice, the OS and the page.
+    const pageTheme = $derived(theme.forPath(page.url.pathname));
+    $effect(() => {
+        document.documentElement.dataset.theme = pageTheme;
+    });
 
     function closeDialogue() {
         globalContext.dialogue = null;
@@ -34,7 +41,7 @@
         />
     </div>
 {/await}
-<Toaster />
+<Toaster theme={pageTheme} />
 
 <style>
     :global(body) {

@@ -42,6 +42,17 @@ if (typeof ResizeObserver === "undefined") {
     };
 }
 
+// svelte/reactivity MediaQuery calls matchMedia; jsdom has none. Nothing matches.
+if (typeof window.matchMedia === "undefined") {
+    window.matchMedia = (query: string) =>
+        ({
+            matches: false,
+            media: query,
+            addEventListener() {},
+            removeEventListener() {},
+        }) as unknown as MediaQueryList;
+}
+
 // Unmount any component rendered by a test so DOM state never leaks between tests.
 afterEach(() => {
     cleanup();
