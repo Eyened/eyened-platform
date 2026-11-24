@@ -199,6 +199,7 @@ describe("Mark ready with forms that aren't complete", () => {
         await move;
         expect(statusSend).not.toHaveBeenCalled();
         expect(navigate).not.toHaveBeenCalled();
+        expect(navigation.readyAttempted).toBe(true);
     });
 
     it("Mark ready and next in the modal saves Ready and moves", async () => {

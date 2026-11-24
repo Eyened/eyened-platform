@@ -6,6 +6,7 @@
     import Close from "carbon-icons-svelte/lib/Close.svelte";
     import ErrorFilled from "carbon-icons-svelte/lib/ErrorFilled.svelte";
     import WarningFilled from "carbon-icons-svelte/lib/WarningFilled.svelte";
+    import type { Snippet } from "svelte";
     import type { HTMLAttributes } from "svelte/elements";
 
     // Carbon InlineNotification API: error, warning and success kinds, low contrast unless highContrast, an optional close button.
@@ -13,6 +14,8 @@
         WithElementRef<HTMLAttributes<HTMLDivElement>>,
         "title" | "role" | "children"
     > & {
+        /** Below the subtitle, e.g. links to the fields with errors. */
+        children?: Snippet;
         kind?: "error" | "warning" | "success";
         title: string; // no trailing period
         subtitle?: string;
@@ -31,6 +34,7 @@
         role,
         onclose,
         highContrast = false,
+        children,
         class: className,
         ref = $bindable(null),
         ...restProps
@@ -60,6 +64,7 @@
     {#if subtitle}
         <Alert.Description>{subtitle}</Alert.Description>
     {/if}
+    {@render children?.()}
     {#if onclose}
         <IconButton
             label="Close"

@@ -270,4 +270,26 @@ describe("SchemaForm", () => {
             sizes: [null, 2],
         });
     });
+
+    it("after a Mark ready attempt, names each missing answer with a link", () => {
+        const twoRequired = {
+            type: "object",
+            required: ["grade", "note"],
+            properties: {
+                grade: { description: "Grade", enum: ["A", "B"] },
+                note: { description: "Note", type: "string" },
+            },
+        } as JSONSchema;
+        renderForm({ schema: twoRequired, markReadyAttempted: true });
+        // The status line announces the notice title; the notice shows it too.
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "2 required questions aren't answered",
+        );
+        expect(
+            screen.getByRole("button", { name: "Grade" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Note" }),
+        ).toBeInTheDocument();
+    });
 });

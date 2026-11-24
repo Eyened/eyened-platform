@@ -3,12 +3,14 @@
 A form from its JSON Schema: the root's questions on Carbon controls; a question's error shows once focus has left it, or for all after a Mark ready attempt.
 -->
 <script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
+    import { tick } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
-    import { fieldErrors, NOT_APPLICABLE } from "./fieldErrors";
+    import { fieldErrors, MISSING, NOT_APPLICABLE } from "./fieldErrors";
     import FieldList from "./FieldList.svelte";
-    import { fieldKind } from "./fieldKind";
-    import { setFormContext } from "./formContext";
+    import { fieldKind, titleAt } from "./fieldKind";
+    import { FOCUSABLE, setFormContext } from "./formContext";
     import { checkForm } from "./formValidator";
     import SchemaField from "./SchemaField.svelte";
     import { deref, type JSONSchema } from "./schemaType";
@@ -39,6 +41,44 @@ A form from its JSON Schema: the root's questions on Carbon controls; a question
 
     const shown = (path: string) => touched.has(path) || markReadyAttempted;
 
+    let element = $state<HTMLElement | null>(null);
+
+    // One link per question with a message; the notice goes when none are left.
+    const links = $derived(
+        markReadyAttempted
+            ? [...messages].map(([path, message]) => ({
+                  path,
+                  message,
+                  title: titleAt(schema, path),
+              }))
+            : [],
+    );
+    const noticeTitle = $derived.by(() => {
+        const n = links.length;
+        if (links.every((l) => l.message === MISSING)) {
+            return n === 1
+                ? "1 required question isn't answered"
+                : `${n} required questions aren't answered`;
+        }
+        return n === 1
+            ? "1 answer needs attention"
+            : `${n} answers need attention`;
+    });
+
+    /** Unfolds the sections holding the question, then focuses it. */
+    async function go(path: string) {
+        reveal = { path };
+        await tick();
+        requestAnimationFrame(() => {
+            const field = [
+                ...(element?.querySelectorAll<HTMLElement>(
+                    "[data-field-path]",
+                ) ?? []),
+            ].find((f) => f.dataset.fieldPath === path);
+            field?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+        });
+    }
+
     setFormContext({
         get root() {
             return schema;
@@ -68,7 +108,22 @@ A form from its JSON Schema: the root's questions on Carbon controls; a question
     });
 </script>
 
-<div class="flex flex-col gap-6">
+<div bind:this={element} class="flex flex-col gap-6">
+    <!-- The title alone is announced on each change; an alert would re-read every link while the grader fixes answers. -->
+    <p role="status" class="sr-only">{links.length > 0 ? noticeTitle : ""}</p>
+    {#if links.length > 0}
+        <InlineNotification kind="error" role="none" title={noticeTitle}>
+            <ul class="mt-2 flex flex-col gap-1">
+                {#each links as link (link.path)}
+                    <li>
+                        <Button variant="link" onclick={() => go(link.path)}
+                            >{link.title}</Button
+                        >
+                    </li>
+                {/each}
+            </ul>
+        </InlineNotification>
+    {/if}
     {#if check.schemaError}
         <InlineNotification
             role="status"

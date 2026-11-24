@@ -33,6 +33,7 @@ The form in the window: a header naming its target, its save state and whose it 
     } from "$lib/workspace/imageMeta";
     import { getContext, onMount, setContext } from "svelte";
     import type { FormAnnotationGET } from "../../types/openapi_types";
+    import { READY_ATTEMPTED } from "./formContext";
     import { ABOUT, schemaName, windowHeading } from "./formTargets";
 
     let {
@@ -51,6 +52,9 @@ The form in the window: a header naming its target, its save state and whose it 
     if (form.image_id) setContext("pointBoundImageId", form.image_id);
 
     const taskContext = getContext<TaskContext | undefined>("taskContext");
+    const readyAttempted = getContext<(() => boolean) | undefined>(
+        READY_ATTEMPTED,
+    );
     const userId = getContext<GlobalContext | undefined>("globalContext")?.user
         .id;
 
@@ -191,7 +195,14 @@ The form in the window: a header naming its target, its save state and whose it 
     </div>
     <div class="flex flex-1 flex-col overflow-auto p-4">
         {#if loaded}
-            <SchemaForm {schema} {value} {onchange} {canEdit} {vertical} />
+            <SchemaForm
+                {schema}
+                {value}
+                {onchange}
+                {canEdit}
+                {vertical}
+                markReadyAttempted={readyAttempted?.() ?? false}
+            />
         {/if}
     </div>
 </Tooltip.Provider>
