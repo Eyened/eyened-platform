@@ -1,7 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/svelte";
-import { createRawSnippet } from "svelte";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from "@testing-library/svelte";
+import { createRawSnippet, mount, unmount } from "svelte";
 import { describe, expect, it, vi } from "vitest";
 import Modal from "./modal.svelte";
+import ModalFocusHarness from "./ModalFocusHarness.test.svelte";
 
 const body = createRawSnippet(() => ({ render: () => "<p>Body</p>" }));
 
@@ -60,5 +67,35 @@ describe("Modal", () => {
         expect(onsubmit).toHaveBeenCalledOnce();
         expect(save).toHaveAttribute("aria-disabled", "true");
         expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    it("gives focus back to a trigger in another document, as in the form window", async () => {
+        const frame = document.body.appendChild(
+            document.createElement("iframe"),
+        );
+        const doc = frame.contentDocument!;
+        // Made with this document's realm, as formWindow does for the popup.
+        const portalTo = document.createElement("div");
+        doc.body.append(portalTo);
+        const app = mount(ModalFocusHarness, {
+            target: doc.body,
+            props: { portalTo },
+        });
+
+        const trigger = doc.querySelector("button")!;
+        trigger.focus();
+        await fireEvent.click(trigger);
+        const cancel = await within(portalTo).findByRole("button", {
+            name: "Cancel",
+        });
+        cancel.focus();
+        await fireEvent.click(cancel);
+        await waitFor(() =>
+            expect(portalTo.querySelector("[role=dialog]")).toBeNull(),
+        );
+
+        expect(doc.activeElement).toBe(trigger);
+        await unmount(app);
+        frame.remove();
     });
 });

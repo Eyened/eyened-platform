@@ -171,10 +171,13 @@ class FormWindow {
         doc.title = view.kind === "form" ? formLabel(view.form) : "Form window";
         // A fresh host, so a gone page's delegated listeners are not on the element this page mounts into.
         const host = doc.createElement("div");
-        doc.body.replaceChildren(host);
+        // Made with the opener's document: bits-ui checks portal targets with the opener's Element.
+        // ASSUMPTION: Chrome keeps a moved node's opener prototype, so this still passes that check in the popup.
+        const portalTo = document.createElement("div");
+        doc.body.replaceChildren(host, portalTo);
         this.app = mount(FormWindowContent, {
             target: host,
-            props: { view },
+            props: { view, portalTo },
             context: contexts,
         });
         doc.documentElement.dataset.mounted = "1";
