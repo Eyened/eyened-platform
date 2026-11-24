@@ -1,22 +1,28 @@
-<script lang="ts">
-    import * as Field from "$lib/components/ui/field/index.js";
-    import { Input } from "$lib/components/ui/input";
-    import type { ImagePoint, PointEnumExtra } from "$lib/forms/pointSchema";
-    import { Trash } from "$lib/viewer-window/icons/icons";
-    import WarningFilled from "carbon-icons-svelte/lib/WarningFilled.svelte";
+<script lang="ts" module>
+    import type { ImagePoint } from "$lib/forms/pointSchema";
 
     export type PointRow = { publicId: string; index: number; pt: ImagePoint };
+</script>
+
+<script lang="ts">
+    import { Button } from "$lib/components/ui/button/index.js";
+    import { Dropdown } from "$lib/components/ui/dropdown/index.js";
+    import { NumberInput } from "$lib/components/ui/number-input/index.js";
+    import { TextInput } from "$lib/components/ui/text-input/index.js";
+    import type { PointEnumExtra } from "$lib/forms/pointSchema";
+    import TrashCan from "carbon-icons-svelte/lib/TrashCan.svelte";
 
     interface Props {
         row: PointRow;
+        /** The marker number, as the image labels it. */
+        number: number;
         canEdit: boolean;
         hasExtras: boolean;
         enumExtras: readonly PointEnumExtra[];
         stringExtraKeys: string[];
         indexApplicable: (pt: ImagePoint) => boolean;
-        /** When false (volume schemas), the editor rejects a blank i with the B-scan error. */
+        /** When false (volume schemas), an empty B-scan is an error and nothing is saved. */
         allowNullIndex?: boolean;
-        coordLabel: string;
         /** Why the viewer didn't move to this point. */
         hint?: string | null;
         onUpdateCoord: (
@@ -37,13 +43,13 @@
 
     let {
         row,
+        number,
         canEdit,
         hasExtras,
         enumExtras,
         stringExtraKeys,
         indexApplicable,
         allowNullIndex = true,
-        coordLabel,
         hint = null,
         onUpdateCoord,
         onUpdateExtra,
@@ -51,265 +57,128 @@
         onCollapse,
     }: Props = $props();
 
-    const uid = $props.id();
     // A volume point needs its B-scan; nothing is saved while the box is empty.
     let bscanEmpty = $state(false);
+
+    function bscanText(): string {
+        if (bscanEmpty) return "";
+        return typeof row.pt.index === "number"
+            ? String(Math.round(row.pt.index))
+            : "";
+    }
 </script>
 
-<div class="editor">
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div
+    role="group"
+    aria-label="Point {number}"
+    class="flex flex-col gap-4 border-s-2 border-border-subtle-01 py-2 ps-4"
+    onkeydown={(e) => {
+        if (e.key === "Escape") {
+            e.stopPropagation();
+            onCollapse();
+        }
+    }}
+>
     {#if hint}
         <p class="text-helper-text-01 text-text-secondary">{hint}</p>
     {/if}
-    <div class="editor-header">
-        <span class="editor-label" title={coordLabel}>{coordLabel}</span>
-        <div class="editor-actions">
-            {#if canEdit}
-                <button
-                    type="button"
-                    class="icon-btn"
-                    title="Remove point"
-                    aria-label="Remove point"
-                    onclick={onRemove}
-                >
-                    <Trash size="1.1em" />
-                </button>
-            {/if}
-            <button type="button" class="collapse" onclick={onCollapse}>
-                Done
-            </button>
-        </div>
-    </div>
-
-    <div class="editor-coords">
-        <label>
-            x
-            <Input
-                type="number"
-                step="1"
-                disabled={!canEdit}
-                value={Math.round(row.pt.x)}
-                oninput={(e) =>
-                    onUpdateCoord(
-                        row.publicId,
-                        row.index,
-                        "x",
-                        (e.currentTarget as HTMLInputElement).value,
-                    )}
-            />
-        </label>
-        <label>
-            y
-            <Input
-                type="number"
-                step="1"
-                disabled={!canEdit}
-                value={Math.round(row.pt.y)}
-                oninput={(e) =>
-                    onUpdateCoord(
-                        row.publicId,
-                        row.index,
-                        "y",
-                        (e.currentTarget as HTMLInputElement).value,
-                    )}
-            />
-        </label>
+    <p class="text-heading-compact-01 text-text-primary">Point {number}</p>
+    <div class="flex flex-wrap gap-4">
+        <NumberInput
+            size="sm"
+            labelText="x"
+            readonly={!canEdit}
+            bind:value={
+                () => String(Math.round(row.pt.x)),
+                (raw) => onUpdateCoord(row.publicId, row.index, "x", raw)
+            }
+        />
+        <NumberInput
+            size="sm"
+            labelText="y"
+            readonly={!canEdit}
+            bind:value={
+                () => String(Math.round(row.pt.y)),
+                (raw) => onUpdateCoord(row.publicId, row.index, "y", raw)
+            }
+        />
         {#if indexApplicable(row.pt)}
-            <label
-                title={allowNullIndex
-                    ? "B-scan index; empty = enface (null)"
-                    : "B-scan index (required)"}
-            >
-                i
-                <span class="relative block">
-                    <Input
-                        type="number"
-                        step="1"
-                        class={bscanEmpty ? "pe-10" : undefined}
-                        disabled={!canEdit}
-                        value={typeof row.pt.index === "number"
-                            ? Math.round(row.pt.index)
-                            : ""}
-                        placeholder={allowNullIndex ? "null" : undefined}
-                        required={!allowNullIndex}
-                        oninput={(e) => {
-                            const raw = (e.currentTarget as HTMLInputElement)
-                                .value;
-                            bscanEmpty = !allowNullIndex && raw.trim() === "";
-                            if (!bscanEmpty)
-                                onUpdateCoord(
-                                    row.publicId,
-                                    row.index,
-                                    "index",
-                                    raw,
-                                );
-                        }}
-                        aria-invalid={bscanEmpty ? "true" : undefined}
-                        aria-describedby={bscanEmpty
-                            ? `${uid}-bscan`
-                            : undefined}
-                    />
-                    {#if bscanEmpty}
-                        <WarningFilled
-                            class="absolute end-4 top-1/2 -translate-y-1/2 text-support-error"
-                        />
-                    {/if}
-                </span>
-            </label>
-            {#if bscanEmpty}
-                <Field.Error id="{uid}-bscan" role="alert" class="basis-full"
-                    >Enter a B-scan number.</Field.Error
-                >
-            {/if}
+            <NumberInput
+                size="sm"
+                labelText="B-scan"
+                readonly={!canEdit}
+                required={!allowNullIndex}
+                helperText={allowNullIndex ? "Empty = en-face" : undefined}
+                invalidText={bscanEmpty ? "Enter a B-scan number." : undefined}
+                bind:value={
+                    bscanText,
+                    (raw) => {
+                        bscanEmpty = !allowNullIndex && raw.trim() === "";
+                        if (!bscanEmpty)
+                            onUpdateCoord(
+                                row.publicId,
+                                row.index,
+                                "index",
+                                raw,
+                            );
+                    }
+                }
+            />
         {/if}
     </div>
-
     {#if hasExtras}
-        <div class="editor-extras">
+        <div class="flex flex-wrap gap-4">
             {#each enumExtras as extra (extra.key)}
                 {@const raw = row.pt[extra.key]}
                 {@const grade =
                     typeof raw === "string" && extra.values.includes(raw)
                         ? raw
                         : ""}
-                <label>
-                    {extra.key}
-                    <select
-                        disabled={!canEdit}
-                        value={grade}
-                        onchange={(e) =>
+                {#if canEdit}
+                    <!-- A required grade has no None, so an unset point stays visibly unset. -->
+                    <Dropdown
+                        size="sm"
+                        labelText={extra.key}
+                        placeholder="Choose an option"
+                        items={[
+                            ...(extra.required
+                                ? []
+                                : [{ id: "", text: "None" }]),
+                            ...extra.values.map((v) => ({ id: v, text: v })),
+                        ]}
+                        selectedId={grade || (extra.required ? undefined : "")}
+                        onselect={(id) =>
                             onUpdateExtra(
                                 row.publicId,
                                 row.index,
                                 extra.key,
-                                (e.currentTarget as HTMLSelectElement).value,
+                                id,
                             )}
-                    >
-                        {#if !extra.required || grade === ""}
-                            <!-- Disabled when required so an unset point is
-                                 visible, but the browser cannot snap to the
-                                 first enum value or clear a saved grade. -->
-                            <option value="" disabled={!!extra.required}
-                                >—</option
-                            >
-                        {/if}
-                        {#each extra.values as opt (opt)}
-                            <option value={opt}>{opt}</option>
-                        {/each}
-                    </select>
-                </label>
+                    />
+                {:else}
+                    <TextInput labelText={extra.key} readonly value={grade} />
+                {/if}
             {/each}
             {#each stringExtraKeys as key (key)}
                 {@const extraVal = row.pt[key]}
-                <label>
-                    {key}
-                    <!-- Native controlled input: shadcn Input's $bindable+bind:value
-                         does not reliably show one-way value={...} updates. -->
-                    <input
-                        type="text"
-                        class="extra-input"
-                        disabled={!canEdit}
-                        value={typeof extraVal === "string" ? extraVal : ""}
-                        oninput={(e) =>
-                            onUpdateExtra(
-                                row.publicId,
-                                row.index,
-                                key,
-                                e.currentTarget.value,
-                            )}
-                    />
-                </label>
+                <TextInput
+                    labelText={key}
+                    readonly={!canEdit}
+                    bind:value={
+                        () => (typeof extraVal === "string" ? extraVal : ""),
+                        (v) => onUpdateExtra(row.publicId, row.index, key, v)
+                    }
+                />
             {/each}
         </div>
     {/if}
+    <div class="flex gap-2">
+        {#if canEdit}
+            <Button variant="danger-ghost" size="sm" onclick={onRemove}
+                >Delete point<TrashCan /></Button
+            >
+        {/if}
+        <Button variant="outline" size="sm" onclick={onCollapse}>Done</Button>
+    </div>
 </div>
-
-<style>
-    .editor {
-        display: flex;
-        flex-direction: column;
-        gap: 0.45em;
-        margin-left: 0.15em;
-        padding: 0.5em;
-        border: 1px solid rgba(0, 0, 0, 0.3);
-        border-radius: 0.35em;
-        background: rgba(255, 255, 255, 0.07);
-    }
-    .editor-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5em;
-    }
-    .editor-label {
-        font-family: monospace;
-        font-size: 0.9em;
-        opacity: 0.9;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        min-width: 0;
-    }
-    .editor-actions {
-        display: flex;
-        align-items: center;
-        gap: 0.35em;
-        flex-shrink: 0;
-    }
-    .editor-coords,
-    .editor-extras {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5em 0.75em;
-        align-items: center;
-    }
-    .editor label {
-        display: flex;
-        align-items: center;
-        gap: 0.35em;
-        font-size: 0.9em;
-    }
-    .extra-input {
-        min-width: 8em;
-        padding: 0.2em 0.4em;
-        font: inherit;
-        color: inherit;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.28);
-        border-radius: 3px;
-    }
-    .extra-input:disabled {
-        opacity: 0.55;
-    }
-    .icon-btn {
-        appearance: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: transparent;
-        border: 1px solid transparent;
-        border-radius: 3px;
-        color: inherit;
-        cursor: pointer;
-        opacity: 0.75;
-        padding: 0.15em;
-        margin: 0;
-    }
-    .icon-btn:hover {
-        opacity: 1;
-        background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(255, 255, 255, 0.25);
-    }
-    .collapse {
-        appearance: none;
-        background: transparent;
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        border-radius: 3px;
-        color: inherit;
-        cursor: pointer;
-        font-size: 0.8em;
-        padding: 0.15em 0.5em;
-    }
-    .collapse:hover {
-        background: rgba(255, 255, 255, 0.08);
-    }
-</style>

@@ -1,31 +1,38 @@
+<script lang="ts" module>
+    import type { ImagePoint } from "$lib/forms/pointSchema";
+
+    /** One place in an image's list; `pt` is null where a matched landmark was deleted. */
+    export type PointSlot = {
+        publicId: string;
+        index: number;
+        pt: ImagePoint | null;
+    };
+</script>
+
 <script lang="ts">
-    import type {
-        ImagePoint,
-        PointAddressing,
-        PointCardinality,
-        PointEnumExtra,
-    } from "$lib/forms/pointSchema";
+    import type { PointEnumExtra } from "$lib/forms/pointSchema";
     import PointRowEditor, {
         type PointRow,
     } from "$lib/forms/PointRowEditor.svelte";
+    import { cn } from "$lib/utils.js";
 
     interface Props {
-        group: { publicId: string; rows: PointRow[] };
-        addressing: PointAddressing;
-        cardinality?: PointCardinality;
+        group: { publicId: string; rows: PointSlot[] };
+        /** The image in viewer words: "OD · OCT · 2024-03-12". */
+        heading: string;
         expandedKey: string | null;
         canEdit: boolean;
         hasExtras: boolean;
         enumExtras: readonly PointEnumExtra[];
         stringExtraKeys: string[];
-        formatCoord: (pt: ImagePoint) => string;
+        rowKey: (row: PointSlot) => string;
+        /** "B-scan 37", "en-face", or null when the field has no B-scans. */
+        bscanText: (pt: ImagePoint) => string | null;
         extraPreview: (pt: ImagePoint) => string;
-        rowKey: (row: PointRow) => string;
         indexApplicable: (pt: ImagePoint) => boolean;
         allowNullIndex?: boolean;
-        onGoTo: (row: PointRow) => void;
-        chipName: (row: PointRow) => string;
         hint: string | null;
+        onGoTo: (row: PointRow) => void;
         onUpdateCoord: (
             pid: string,
             index: number,
@@ -44,135 +51,111 @@
 
     let {
         group,
-        addressing,
-        cardinality = "list",
+        heading,
         expandedKey,
         canEdit,
         hasExtras,
         enumExtras,
         stringExtraKeys,
-        formatCoord,
-        extraPreview,
         rowKey,
+        bscanText,
+        extraPreview,
         indexApplicable,
         allowNullIndex = true,
-        onGoTo,
-        chipName,
         hint,
+        onGoTo,
         onUpdateCoord,
         onUpdateExtra,
         onRemovePoint,
         onCollapse,
     }: Props = $props();
+
+    const count = $derived(group.rows.filter((r) => r.pt).length);
 </script>
 
-<div class="image-group">
-    <div class="group-line">
-        {#if addressing === "byImage"}
-            <span class="public-id" title={group.publicId}
-                >{group.publicId}</span
-            >
-            <span class="sep">:</span>
-        {/if}
-        {#if cardinality === "list"}
-            <span class="count">{group.rows.length} pts</span>
-            <span class="paren">(</span>
-        {/if}
-        {#each group.rows as row, i (rowKey(row))}
-            {#if i > 0}<span class="comma">, </span>{/if}
-            <button
-                type="button"
-                class="coord-chip"
-                class:expanded={expandedKey === rowKey(row)}
-                aria-label={chipName(row)}
-                aria-expanded={expandedKey === rowKey(row)}
-                onclick={() => onGoTo(row)}
-            >
-                {formatCoord(row.pt)}{#if extraPreview(row.pt)}<span
-                        class="extra-preview">{extraPreview(row.pt)}</span
-                    >{/if}
-            </button>
-        {/each}
-        {#if cardinality === "list"}
-            <span class="paren">)</span>
-        {/if}
+<div class="flex flex-col">
+    <div class="flex h-8 items-center justify-between gap-2">
+        <p
+            class="truncate text-heading-compact-01 text-text-primary"
+            title={group.publicId}
+        >
+            {heading}
+        </p>
+        <p class="shrink-0 text-label-01 text-text-secondary">
+            {count === 1 ? "1 point" : `${count} points`}
+        </p>
     </div>
-
-    {#each group.rows as row (rowKey(row))}
-        {#if expandedKey === rowKey(row)}
-            <PointRowEditor
-                {row}
-                {canEdit}
-                {hasExtras}
-                {enumExtras}
-                {stringExtraKeys}
-                {indexApplicable}
-                {allowNullIndex}
-                {hint}
-                coordLabel={formatCoord(row.pt) + extraPreview(row.pt)}
-                {onUpdateCoord}
-                {onUpdateExtra}
-                onRemove={() => onRemovePoint(row.publicId, row.index)}
-                {onCollapse}
-            />
-        {/if}
-    {/each}
+    <ul class="flex flex-col">
+        {#each group.rows as slot (rowKey(slot))}
+            <li>
+                {#if slot.pt}
+                    {@const row = {
+                        publicId: slot.publicId,
+                        index: slot.index,
+                        pt: slot.pt,
+                    }}
+                    {@const open = expandedKey === rowKey(slot)}
+                    <!-- The name is the visible text, so voice control can say what it sees. -->
+                    <button
+                        type="button"
+                        data-row-key={rowKey(slot)}
+                        aria-expanded={open}
+                        class={cn(
+                            "flex h-8 w-full items-center gap-2 px-2 text-start text-body-compact-01 text-text-primary hover:bg-layer-hover-01",
+                            open && "bg-layer-selected-01",
+                        )}
+                        onclick={() => onGoTo(row)}
+                    >
+                        <span class="w-16 shrink-0"
+                            ><span class="sr-only">Point </span>{slot.index +
+                                1}</span
+                        >
+                        <span class="w-16 shrink-0"
+                            ><span class="sr-only">x </span>{Math.round(
+                                slot.pt.x,
+                            )}</span
+                        >
+                        <span class="w-16 shrink-0"
+                            ><span class="sr-only">y </span>{Math.round(
+                                slot.pt.y,
+                            )}</span
+                        >
+                        {#if bscanText(slot.pt)}
+                            <span class="w-24 shrink-0"
+                                >{bscanText(slot.pt)}</span
+                            >
+                        {/if}
+                        <span
+                            class="min-w-0 flex-1 truncate text-text-secondary"
+                            >{extraPreview(slot.pt).trim()}</span
+                        >
+                    </button>
+                    {#if open}
+                        <PointRowEditor
+                            {row}
+                            number={slot.index + 1}
+                            {canEdit}
+                            {hasExtras}
+                            {enumExtras}
+                            {stringExtraKeys}
+                            {indexApplicable}
+                            {allowNullIndex}
+                            {hint}
+                            {onUpdateCoord}
+                            {onUpdateExtra}
+                            onRemove={() =>
+                                onRemovePoint(slot.publicId, slot.index)}
+                            {onCollapse}
+                        />
+                    {/if}
+                {:else}
+                    <p
+                        class="flex h-8 items-center px-2 text-body-compact-01 text-text-disabled"
+                    >
+                        {slot.index + 1} · deleted
+                    </p>
+                {/if}
+            </li>
+        {/each}
+    </ul>
 </div>
-
-<style>
-    .image-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35em;
-    }
-    .group-line {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: baseline;
-        gap: 0.15em 0.2em;
-        font-family: monospace;
-        font-size: 0.9em;
-        line-height: 1.5;
-    }
-    .public-id {
-        max-width: 12em;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        opacity: 0.85;
-    }
-    .sep,
-    .paren,
-    .comma,
-    .count {
-        opacity: 0.7;
-    }
-    .coord-chip {
-        appearance: none;
-        background: transparent;
-        border: 1px solid transparent;
-        border-radius: 0.35em;
-        color: inherit;
-        cursor: pointer;
-        font: inherit;
-        padding: 0.05em 0.3em;
-        margin: 0;
-        transition:
-            background-color 0.12s ease,
-            border-color 0.12s ease;
-    }
-    .coord-chip:hover {
-        background: color-mix(in srgb, currentColor 8%, transparent);
-        border-color: color-mix(in srgb, currentColor 35%, transparent);
-    }
-    /* Match PointRowEditor panel so the open chip reads as its tab. */
-    .coord-chip.expanded {
-        background: rgba(255, 255, 255, 0.07);
-        border-color: rgba(255, 255, 255, 0.3);
-        border-radius: 0.35em 0.35em 0.15em 0.15em;
-    }
-    .extra-preview {
-        opacity: 0.65;
-        font-size: 0.9em;
-    }
-</style>

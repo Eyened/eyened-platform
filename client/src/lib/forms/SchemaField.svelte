@@ -223,6 +223,10 @@ One question: its control by kind, " (required)", helper text, the error once it
                     {onchange}
                     canEdit={ctx.canEdit}
                     fieldPath={path || "point"}
+                    {title}
+                    {required}
+                    {helperText}
+                    {invalidText}
                 />
             {:else}
                 <p class="text-body-compact-01 text-text-secondary">
