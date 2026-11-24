@@ -285,7 +285,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     });
 
     let browserOpen = $state(false);
-    // Each opening starts from the task's setting, as the overlay did.
+    // Each opening starts from the task's setting.
     const saveLinksDefault = mergeClientConfig(
         CLIENT_DEFAULTS,
         taskContext?.task.task_definition.config,
