@@ -188,8 +188,9 @@
 
     function bscanText(pt: ImagePoint): string | null {
         if (!indexApplicable(pt)) return null;
+        // Shown from 1 like the viewer's slice counter; stored from 0.
         return typeof pt.index === "number"
-            ? `B-scan ${Math.round(pt.index)}`
+            ? `B-scan ${Math.round(pt.index) + 1}`
             : "en-face";
     }
 

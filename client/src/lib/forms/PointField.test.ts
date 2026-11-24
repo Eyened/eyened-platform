@@ -244,7 +244,7 @@ describe("PointField", () => {
             onchange,
         });
         await fireEvent.click(
-            screen.getByRole("button", { name: "1, 2 · B-scan 4" }),
+            screen.getByRole("button", { name: "1, 2 · B-scan 5" }),
         );
         const i = screen.getByLabelText("B-scan");
         await fireEvent.input(i, { target: { value: "" } });
@@ -252,6 +252,24 @@ describe("PointField", () => {
         expect(i).toHaveAttribute("aria-invalid", "true");
         expect(onchange).not.toHaveBeenCalled();
         expect(toast.warning).not.toHaveBeenCalled();
+    });
+
+    it("typing B-scan 7 stores index 6", async () => {
+        const onchange = vi.fn();
+        renderField({
+            schema: volumeSchema,
+            value: { x: 1, y: 2, index: 4 },
+            onchange,
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "1, 2 · B-scan 5" }),
+        );
+        await fireEvent.input(screen.getByLabelText("B-scan"), {
+            target: { value: "7" },
+        });
+        expect(onchange).toHaveBeenCalledWith(
+            expect.objectContaining({ index: 6 }),
+        );
     });
 
     it("a row click goes to its point in the viewport showing its image and opens the editor", async () => {
@@ -268,7 +286,7 @@ describe("PointField", () => {
             ]),
         );
         const chip = screen.getByRole("button", {
-            name: "30, 20 · B-scan 4",
+            name: "30, 20 · B-scan 5",
         });
         await fireEvent.click(chip);
         expect(viewer.setIndex).toHaveBeenCalledWith(4);
@@ -291,7 +309,7 @@ describe("PointField", () => {
             ]),
         );
         await fireEvent.click(
-            screen.getByRole("button", { name: "30, 20 · B-scan 4" }),
+            screen.getByRole("button", { name: "30, 20 · B-scan 5" }),
         );
         expect(viewer.focusPoint).not.toHaveBeenCalled();
         // Once in the editor, once in the live region.
@@ -351,7 +369,7 @@ describe("PointField", () => {
         });
 
         await fireEvent.click(
-            screen.getByRole("button", { name: "1, 2 · B-scan 4" }),
+            screen.getByRole("button", { name: "1, 2 · B-scan 5" }),
         );
         const i = screen.getByLabelText("B-scan") as HTMLInputElement;
         await fireEvent.input(i, { target: { value: "" } });

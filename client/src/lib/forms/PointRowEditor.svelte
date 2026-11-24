@@ -57,14 +57,32 @@
         onCollapse,
     }: Props = $props();
 
-    // A volume point needs its B-scan; nothing is saved while the box is empty.
-    let bscanEmpty = $state(false);
+    // The typed text while it is invalid; nothing is saved then.
+    let invalidText = $state<string | null>(null);
 
+    // Shown from 1 like the viewer's slice counter; stored from 0.
     function bscanText(): string {
-        if (bscanEmpty) return "";
+        if (invalidText !== null) return invalidText;
         return typeof row.pt.index === "number"
-            ? String(Math.round(row.pt.index))
+            ? String(Math.round(row.pt.index) + 1)
             : "";
+    }
+
+    function setBscan(raw: string) {
+        const n = Number(raw);
+        const empty = raw.trim() === "";
+        invalidText =
+            (empty && !allowNullIndex) ||
+            (!empty && Number.isFinite(n) && n < 1)
+                ? raw
+                : null;
+        if (invalidText !== null) return;
+        onUpdateCoord(
+            row.publicId,
+            row.index,
+            "index",
+            empty || !Number.isFinite(n) ? raw : String(n - 1),
+        );
     }
 </script>
 
@@ -110,20 +128,10 @@
                 readonly={!canEdit}
                 required={!allowNullIndex}
                 helperText={allowNullIndex ? "Empty = en-face" : undefined}
-                invalidText={bscanEmpty ? "Enter a B-scan number." : undefined}
-                bind:value={
-                    bscanText,
-                    (raw) => {
-                        bscanEmpty = !allowNullIndex && raw.trim() === "";
-                        if (!bscanEmpty)
-                            onUpdateCoord(
-                                row.publicId,
-                                row.index,
-                                "index",
-                                raw,
-                            );
-                    }
-                }
+                invalidText={invalidText !== null
+                    ? "Enter a B-scan number."
+                    : undefined}
+                bind:value={bscanText, setBscan}
             />
         {/if}
     </div>
