@@ -13,7 +13,7 @@ export type JSONSchema = {
     $comment?: string | undefined;
     type?: JSONSchemaType | readonly JSONSchemaType[];
     const?: unknown;
-    enum?: readonly JSONSchemaType[];
+    enum?: readonly unknown[];
     multipleOf?: number | undefined;
     maximum?: number | undefined;
     exclusiveMaximum?: number | undefined;
@@ -48,6 +48,7 @@ export type JSONSchema = {
     contentMediaType?: string | undefined;
     contentEncoding?: string | undefined;
     definitions?: Readonly<Record<string, JSONSchema>>;
+    $defs?: Readonly<Record<string, JSONSchema>>;
     title?: string | undefined;
     description?: string | undefined;
     default?: unknown;
@@ -104,4 +105,41 @@ export function getDefault(schema: JSONSchema) {
     } else {
         console.warn("Unknown schema type", schema);
     }
+}
+
+/** A plain object: not null and not an array. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The keys of a JSON Pointer such as "/naevi/0/size", unescaped. */
+export function parsePointer(path: string): string[] {
+    if (path === "") return [];
+    return path
+        .split("/")
+        .slice(1)
+        .map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~"));
+}
+
+/** The JSON Pointer to `key` under `parent`, written as ajv writes instancePath. */
+export function pointer(parent: string, key: string | number): string {
+    return `${parent}/${String(key).replace(/~/g, "~0").replace(/\//g, "~1")}`;
+}
+
+/** The schema `node` stands for: a local `$ref` followed (keys next to it win), or undefined when it is missing. */
+export function deref(node: unknown, root: JSONSchema): JSONSchema | undefined {
+    let current = node;
+    while (isRecord(current) && typeof current.$ref === "string") {
+        const ref = current.$ref;
+        if (!ref.startsWith("#")) return undefined;
+        let target: unknown = root;
+        for (const key of parsePointer(ref.slice(1))) {
+            target = isRecord(target) ? target[key] : undefined;
+        }
+        if (!isRecord(target)) return undefined;
+        const rest = { ...current };
+        delete rest.$ref;
+        current = { ...target, ...rest };
+    }
+    return isRecord(current) ? (current as JSONSchema) : undefined;
 }
