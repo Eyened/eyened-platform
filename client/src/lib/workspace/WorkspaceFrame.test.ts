@@ -348,6 +348,44 @@ describe("WorkspaceFrame", () => {
         await waitFor(() => expect(menu).toHaveFocus());
     });
 
+    it("F1 with a tool armed scrolls to its Help group after focusing the heading, so the focus doesn't scroll back up", async () => {
+        mockWidth({ md: true, xlg: true });
+        const ws = workspaceWith(2);
+        ws.arm("brush");
+        renderFrame(ws);
+        const focusedAtScroll: (Element | null)[] = [];
+        const original = Element.prototype.scrollIntoView;
+        Element.prototype.scrollIntoView = function () {
+            focusedAtScroll.push(document.activeElement);
+        };
+        try {
+            await fireEvent.keyDown(document.body, { key: "F1" });
+            const heading = await screen.findByRole("heading", {
+                name: "Help",
+            });
+            await waitFor(() => expect(focusedAtScroll).toHaveLength(1));
+            expect(focusedAtScroll[0]).toBe(heading);
+        } finally {
+            Element.prototype.scrollIntoView = original;
+        }
+    });
+
+    it("at md, F1 from an Images option then Esc returns focus to the Help icon, not the Images one", async () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(2));
+        await fireEvent.click(screen.getByRole("button", { name: "Images" }));
+        const option = (await screen.findAllByRole("option")).find(
+            (o) => o.tabIndex === 0,
+        )!;
+        option.focus();
+        await fireEvent.keyDown(option, { key: "F1" });
+        const heading = await screen.findByRole("heading", { name: "Help" });
+        await fireEvent.keyDown(heading, { key: "Escape" });
+        await waitFor(() =>
+            expect(screen.getByRole("button", { name: "Help" })).toHaveFocus(),
+        );
+    });
+
     it("at md, Esc inside a left panel closes it and returns focus to where it was; Esc in a viewport leaves the panel open", async () => {
         mockWidth({ md: true, xlg: true });
         // With the strip on, Images starts closed.

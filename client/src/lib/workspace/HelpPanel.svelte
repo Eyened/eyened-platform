@@ -57,11 +57,14 @@ Each time it opens, only the armed tool's group is open, scrolled to just under 
             armedSection(workspace.armedTool, pointArming.session !== null),
         );
         open = group ? [group] : [];
+        // A frame later, so the frame's focus on the panel heading (which scrolls it into view) has happened.
         if (group)
             void tick().then(() =>
-                document
-                    .getElementById(`${uid}-${slug(group)}`)
-                    ?.scrollIntoView({ block: "start" }),
+                requestAnimationFrame(() =>
+                    document
+                        .getElementById(`${uid}-${slug(group)}`)
+                        ?.scrollIntoView({ block: "start" }),
+                ),
             );
     });
 </script>
