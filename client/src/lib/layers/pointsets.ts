@@ -7,6 +7,7 @@ import {
 } from "$lib/viewer-window/panelRegistration/groupOpenImages";
 import {
     imageName,
+    octPart,
     type ImageMeta,
     type ImageName,
 } from "$lib/workspace/imageMeta";
@@ -135,6 +136,7 @@ export function loadedEyeImages(
                       ...imageName(
                           image.instance,
                           win.twins.get(imageId) ?? "",
+                          octPart(imageId, (id) => win.images.has(id)),
                       ),
                   },
               ]

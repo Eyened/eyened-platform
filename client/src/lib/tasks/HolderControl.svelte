@@ -26,11 +26,10 @@ Who holds the set, as a read-only Tag, and beside it Claim or Give back as a gho
     const LABELS = { claim: "Claim", giveBack: "Give back" } as const;
 </script>
 
-<!-- The header squeezes the tag first; it stops at 80 px and cuts the name, which its title shows. -->
-<!-- ASSUMPTION: min-w-20 (80 px) is the smallest the tag gets. -->
+<!-- The header squeezes the tag first; it cuts the name, which its title shows, down to the Tag's own minimum. -->
 <div class="flex min-w-0 items-center gap-1">
     <!-- A live region: quiet on load, it reads the new holder after Claim, Give back or a save that claims. -->
-    <span role="status" class="flex min-w-20">
+    <span role="status" class="flex min-w-0">
         <Tag icon={User} title={holder.text} class="max-w-[min(13rem,100%)]"
             >{holder.text}</Tag
         >

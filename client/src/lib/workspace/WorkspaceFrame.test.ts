@@ -20,6 +20,7 @@ import { DebouncedSaver } from "$lib/saving/debouncedSaver.svelte";
 import { saveTracker } from "$lib/saving/saveTracker.svelte";
 import {
     expectNoAxeViolations,
+    instance,
     mockWidth,
     workspaceContext,
     workspaceWith,
@@ -71,6 +72,7 @@ function renderFrame(
             viewer,
             tile,
             titleFor,
+            instanceFor: (id: string) => instance(id),
             onaddimages: vi.fn(),
             emptyMessage: null,
             task,
@@ -197,9 +199,6 @@ describe("WorkspaceFrame", () => {
         for (const el of underOverlay(container))
             expect(el).not.toHaveAttribute("inert");
         expect(localStorage.getItem("eyened:viewer:rightOpen")).toBeNull();
-        expect(
-            document.body.style.getPropertyValue("--viewer-toast-right"),
-        ).toBe("16px");
     });
 
     it("below md the menu holds Task overview, Layout…, the tools and Images; Esc closes it; nothing is stored", async () => {
@@ -277,7 +276,7 @@ describe("WorkspaceFrame", () => {
         choose.focus();
         await fireEvent.click(choose);
         const panel = await screen.findByRole("region", { name: "Images" });
-        await fireEvent.click(panel.querySelectorAll("li button")[2]);
+        await fireEvent.click(panel.querySelectorAll('[role="option"]')[2]);
         await waitFor(() =>
             expect(screen.getByRole("main")).not.toHaveAttribute("inert"),
         );
@@ -348,6 +347,83 @@ describe("WorkspaceFrame", () => {
         await fireEvent.keyDown(help, { key: "Escape" });
         await waitFor(() => expect(menu).toHaveFocus());
     });
+
+    it("F1 with a tool armed scrolls to its Help group after focusing the heading, so the focus doesn't scroll back up", async () => {
+        mockWidth({ md: true, xlg: true });
+        const ws = workspaceWith(2);
+        ws.arm("brush");
+        renderFrame(ws);
+        const focusedAtScroll: (Element | null)[] = [];
+        const original = Element.prototype.scrollIntoView;
+        Element.prototype.scrollIntoView = function () {
+            focusedAtScroll.push(document.activeElement);
+        };
+        try {
+            await fireEvent.keyDown(document.body, { key: "F1" });
+            const heading = await screen.findByRole("heading", {
+                name: "Help",
+            });
+            await waitFor(() => expect(focusedAtScroll).toHaveLength(1));
+            expect(focusedAtScroll[0]).toBe(heading);
+        } finally {
+            Element.prototype.scrollIntoView = original;
+        }
+    });
+
+    it("at md, F1 from an Images option then Esc returns focus to the Help icon, not the Images one", async () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(2));
+        await fireEvent.click(screen.getByRole("button", { name: "Images" }));
+        const option = (await screen.findAllByRole("option")).find(
+            (o) => o.tabIndex === 0,
+        )!;
+        option.focus();
+        await fireEvent.keyDown(option, { key: "F1" });
+        const heading = await screen.findByRole("heading", { name: "Help" });
+        await fireEvent.keyDown(heading, { key: "Escape" });
+        await waitFor(() =>
+            expect(screen.getByRole("button", { name: "Help" })).toHaveFocus(),
+        );
+    });
+
+    it("at md, Esc inside a left panel closes it and returns focus to where it was; Esc in a viewport leaves the panel open", async () => {
+        mockWidth({ md: true, xlg: true });
+        // With the strip on, Images starts closed.
+        const ws = workspaceWith(2);
+        ws.strip = false;
+        renderFrame(ws);
+        expect(
+            screen.getByRole("region", { name: "Images" }),
+        ).toBeInTheDocument();
+        const control = document.querySelector<HTMLElement>(
+            '[aria-current="true"] [tabindex="0"]',
+        )!;
+        control.focus();
+        await fireEvent.keyDown(control, { key: "Escape" });
+        expect(
+            screen.getByRole("region", { name: "Images" }),
+        ).toBeInTheDocument();
+
+        await fireEvent.keyDown(control, { key: "F1" });
+        const heading = await screen.findByRole("heading", { name: "Help" });
+        await waitFor(() => expect(heading).toHaveFocus());
+        // A right panel's icon pressed meanwhile is not where Esc returns.
+        await fireEvent.click(screen.getByRole("button", { name: "Layers" }));
+        const box = screen.getByRole("searchbox", { name: "Search keys" });
+        box.focus();
+        await fireEvent.input(box, { target: { value: "space" } });
+        await fireEvent.keyDown(box, { key: "Escape" });
+        expect(box).toHaveValue("");
+        expect(
+            screen.getByRole("region", { name: "Help" }),
+        ).toBeInTheDocument();
+        // A second F1 with focus inside Help keeps the original opener.
+        heading.focus();
+        await fireEvent.keyDown(heading, { key: "F1" });
+        await fireEvent.keyDown(box, { key: "Escape" });
+        await waitFor(() => expect(control).toHaveFocus());
+        expect(screen.queryByRole("region", { name: "Help" })).toBeNull();
+    });
 });
 
 describe("Right panels", () => {
@@ -395,12 +471,14 @@ describe("Layers", () => {
         mockWidth({ md: true, xlg: true });
         const ws = workspaceWith(2, { layout: "1x2" });
         renderFrame(ws);
+        // Info repeats the line in its hidden section.
+        const layers = within(screen.getByRole("region", { name: "Layers" }));
         expect(
-            screen.getByText("Viewport 1 · P-000417 OD · CF F1 · img01"),
+            layers.getByText("Viewport 1 · P-000417 OD · CF F1 · img01"),
         ).toBeInTheDocument();
         ws.select(1);
         expect(
-            await screen.findByText("Viewport 2 · P-000417 OD · CF F1 · img02"),
+            await layers.findByText("Viewport 2 · P-000417 OD · CF F1 · img02"),
         ).toBeInTheDocument();
     });
 });
@@ -489,5 +567,19 @@ describe("below md, the Grading footer", () => {
                 screen.getByRole("heading", { name: "Grading" }),
             ),
         );
+    });
+
+    it("the header counts every open patient, in view or not", () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(3, { layout: "1x1" }), null, {
+            instanceFor: (id: string) =>
+                instance(id, {
+                    patient:
+                        id === "img03"
+                            ? { id: 2, identifier: "P-000502" }
+                            : { id: 1, identifier: "P-000417" },
+                }),
+        });
+        expect(screen.getByText("2 patients open")).toBeInTheDocument();
     });
 });

@@ -12,6 +12,7 @@ import {
 import type { ImageRenderer } from "$lib/webgl/imageRenderer";
 import {
     imageName,
+    octPart,
     type ImageName,
     type TitleSuffix,
 } from "$lib/workspace/imageMeta";
@@ -206,6 +207,7 @@ export class ViewportBlend {
         return imageName(
             image.instance,
             this.win.twins.get(image.image_id) ?? "",
+            octPart(image.image_id, (id) => this.win.images.has(id)),
         );
     }
 
@@ -218,7 +220,11 @@ export class ViewportBlend {
     }
 
     private suffix(lead: string, image: AbstractImage): TitleSuffix {
-        const { name, device } = imageName(image.instance, "");
+        const { name, device } = imageName(
+            image.instance,
+            "",
+            octPart(image.image_id, (id) => this.win.images.has(id)),
+        );
         const shown =
             this.sameName(image) && device ? `${name} · ${device}` : name;
         return {

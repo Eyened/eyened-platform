@@ -60,7 +60,7 @@ It moves only when the grader drags its gripper or clicks it for the next corner
         const t = titleFor(source.viewerContext.image.image_id);
         return [
             source.position === null ? "" : `Viewport ${source.position + 1}`,
-            t ? titleText(t) : "",
+            t ? titleText({ ...t, demographics: "" }) : "",
         ]
             .filter(Boolean)
             .join(" · ");

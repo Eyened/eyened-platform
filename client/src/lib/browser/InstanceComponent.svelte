@@ -1,7 +1,5 @@
 <script lang="ts">
-    import * as Dialog from "$lib/components/ui/dialog/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
-    import { modalSizeClasses } from "$lib/components/ui/modal/sizes.js";
     import { getThumbUrl } from "$lib/data-loading/utils";
     import { cn } from "$lib/utils.js";
     import { copyToClipboard } from "$lib/utils/copyToClipboard";
@@ -13,7 +11,7 @@
     import type { ImageGET } from "../../types/openapi_types";
     import type { BrowserContext } from "./browserContext.svelte";
     import { instanceLabel } from "./images";
-    import InstanceInfoLazy from "./InstanceInfoLazy.svelte";
+    import InstanceInfoDialog from "./InstanceInfoDialog.svelte";
 
     // A selectable image item: the whole item toggles the selection, the checkbox sits over the
     // image's top-left corner, and the image-info button is its own click target.
@@ -128,26 +126,4 @@
     </div>
 </div>
 
-<!-- Carbon Modal lg, passive: no footer, ✕ only; an outside click closes it. -->
-<Dialog.Root bind:open={infoOpen}>
-    <Dialog.Content class={cn("gap-0 p-0", modalSizeClasses.lg)}>
-        <Dialog.Header class="mb-2 pt-4 pr-12 pl-4">
-            <p class="text-label-01 text-text-secondary">Image</p>
-            <div class="flex min-w-0 items-center gap-2">
-                <Dialog.Title class="truncate">{instance.id}</Dialog.Title>
-                <IconButton
-                    label={copied ? "Copied!" : "Copy public ID"}
-                    closeOnClick={false}
-                    onclick={copy}
-                >
-                    <Copy />
-                </IconButton>
-            </div>
-        </Dialog.Header>
-        <div
-            class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-2 pb-12 md:overflow-hidden"
-        >
-            <InstanceInfoLazy instanceId={instance.id} />
-        </div>
-    </Dialog.Content>
-</Dialog.Root>
+<InstanceInfoDialog instanceId={instance.id} bind:open={infoOpen} />

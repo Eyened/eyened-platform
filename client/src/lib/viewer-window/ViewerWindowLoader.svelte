@@ -63,7 +63,7 @@ Without WebGL 2, or once the browser drops the context, a notice takes the windo
         replaceUrl: (params) => {
             // Avoid `new URL(...)` (svelte/prefer-svelte-reactivity).
             // Use history.replaceState (not page.url) so we don't fight SvelteKit;
-            // readers must use window.location.search (see BrowserOverlay).
+            // readers must use window.location.search (see addImages.ts).
             const searchRaw = params.toString();
             const search = searchRaw
                 ? `?${searchRaw.replaceAll("%2C", ",")}`

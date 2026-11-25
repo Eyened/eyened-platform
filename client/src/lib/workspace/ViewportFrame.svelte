@@ -176,6 +176,9 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     {id}
     role="group"
     aria-label={name}
+    aria-describedby={shownTitle?.demographicsText
+        ? `${id}-demographics`
+        : undefined}
     aria-current={selected ? "true" : undefined}
     data-mode={mode}
     class="frame"
@@ -191,6 +194,9 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     {ondragleave}
     {ondrop}
 >
+    {#if shownTitle?.demographicsText}
+        <span id="{id}-demographics" hidden>{shownTitle.demographicsText}</span>
+    {/if}
     {#if highlighted}
         <!-- A Grading row is about this image: dashed, inside the selected frame. -->
         <div class="highlight" aria-hidden="true"></div>
@@ -248,9 +254,17 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
                     {#snippet child({ props })}
                         <span {...props} tabindex="-1" class="title-text">
                             {#if shownTitle}
-                                <span class="patient">{shownTitle.patient}</span
+                                <span class="patient"
+                                    >{shownTitle.patient}{#if shownTitle.demographics}&nbsp;·
+                                        {shownTitle.demographics}{/if}</span
                                 >
-                                <span class="rest">{shownTitle.rest}</span>
+                                <span class="title-body"
+                                    >{#if shownTitle.eye}<span class="eye"
+                                            >{shownTitle.eye}{#if shownTitle.rest}&nbsp;·&nbsp;{/if}</span
+                                        >{/if}<span class="rest"
+                                        >{shownTitle.rest}</span
+                                    ></span
+                                >
                                 {#if shownTitle.twin}
                                     <span class="twin">{shownTitle.twin}</span>
                                 {/if}
@@ -396,6 +410,16 @@ One viewport: title bar, selection, empty state and title-bar drag. The image vi
     .patient {
         flex: none;
         color: var(--color-text-primary);
+    }
+    /* The eye never shortens (BIR 4.16.4.2.2.6.7); the rest ends in an ellipsis from the device end. */
+    .title-body {
+        display: flex;
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+    .eye {
+        flex: none;
+        color: var(--color-text-secondary);
     }
     .rest {
         flex: 0 1 auto;

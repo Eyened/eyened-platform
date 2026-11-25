@@ -27,7 +27,10 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         type RevealTarget,
     } from "$lib/saving/saveTracker.svelte";
     import { titleText, type ViewportTitle } from "./imageMeta";
-    import ImagesListShell from "./ImagesListShell.svelte";
+    import type { ImageGET } from "../../types/openapi_types";
+    import HelpPanel from "./HelpPanel.svelte";
+    import InfoPanel from "./InfoPanel.svelte";
+    import ImagesPanel from "./ImagesPanel.svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
     import MagnifierPanel from "./MagnifierPanel.svelte";
     import Pager from "./Pager.svelte";
@@ -50,6 +53,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         viewer,
         tile,
         titleFor,
+        instanceFor,
         onaddimages,
         task = null,
         emptyMessage = null,
@@ -59,6 +63,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         viewer: Snippet<[string]>;
         tile: Snippet<[string]>;
         titleFor: (imageId: string) => ViewportTitle | null;
+        /** The image's metadata; for an OCT's `_proj`, its OCT's. */
+        instanceFor: (imageId: string) => ImageGET | null;
         onaddimages: () => void;
         task?: TaskHeader | null;
         emptyMessage?: string | null;
@@ -131,18 +137,28 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
             ) ?? document.getElementById(`${uid}-forms-title`)
         )?.focus();
     }
+    // Every patient in the catalogue, in view or not.
+    const patients = $derived(
+        new Set(
+            workspace.catalogue
+                .map((id) => instanceFor(id)?.patient.id)
+                .filter((id) => id !== undefined),
+        ).size,
+    );
     const layersSubtitle = $derived.by(() => {
         const position = workspace.selected;
         const imageId = workspace.slots[position]?.imageId ?? null;
         const title = imageId ? titleFor(imageId) : null;
         const what = title
-            ? titleText(title)
+            ? titleText({ ...title, demographics: "" })
             : imageId || !workspace.loaded
               ? "Loading…"
               : "Empty";
         return `Viewport ${position + 1} · ${what}`;
     });
     let opener: HTMLElement | null = null;
+    /** Where focus was before a docked left panel opened; right-panel icons don't change it. */
+    let leftOpener: HTMLElement | null = null;
     // The palette gets what the rail leaves after the bottom group and one gap.
     let railHeight = $state(0);
     let bottomHeight = $state(0);
@@ -235,6 +251,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
 
     function toggleLeft(panel: LeftPanel, e: MouseEvent) {
         opener = e.currentTarget as HTMLElement;
+        leftOpener = opener;
         left = left === panel ? null : panel;
         writeLeftPanel(left);
         if (left) void focusPanel(left);
@@ -277,9 +294,38 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     }
 
     function onkeydown(e: KeyboardEvent) {
-        if (e.key !== "Escape" || !overlayOpen) return;
+        if (e.key !== "Escape") return;
+        if (overlayOpen) {
+            e.preventDefault();
+            void dismiss();
+            return;
+        }
+        // Wide: Esc inside a docked left panel closes it. A field with text, or an open menu, takes Esc first.
+        if (left === null || e.defaultPrevented) return;
+        if (!document.getElementById(`${uid}-left`)?.contains(e.target as Node))
+            return;
+        // An open tooltip takes Esc first (bits-ui closes it on the document); only the next Esc closes the panel.
+        if (
+            document.querySelector(
+                '[data-slot="tooltip-content"]:not([data-state="closed"]):not([data-viewport-title])',
+            )
+        )
+            return;
         e.preventDefault();
-        void dismiss();
+        void closeLeft(left);
+    }
+
+    /** Back to where focus was before the panel opened; when that has gone or sat in the panel, to the panel's icon. */
+    async function closeLeft(closing: LeftPanel) {
+        const column = document.getElementById(`${uid}-left`);
+        const back =
+            leftOpener?.isConnected && !column?.contains(leftOpener)
+                ? leftOpener
+                : byControls(`${uid}-${closing}`);
+        left = null;
+        writeLeftPanel(left);
+        await tick();
+        back?.focus();
     }
 
     // F1 opens Help from anywhere but a text field, a dialog or an open ⋯ list.
@@ -307,6 +353,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
             document.getElementById(`${uid}-help-title`)?.focus();
             return;
         }
+        // A repeat F1 while Help is open keeps the real opener.
+        if (left !== "help") leftOpener = opener;
         left = "help";
         writeLeftPanel(left);
         void focusPanel("help");
@@ -323,13 +371,14 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
             overlay = "menu";
             menuTab = "images";
         } else {
+            leftOpener = opener;
             left = "images";
             writeLeftPanel(left);
         }
         await tick();
         document
             .getElementById(`${uid}-images`)
-            ?.querySelector<HTMLElement>("li button")
+            ?.querySelector<HTMLElement>('[role="option"][tabindex="0"]')
             ?.focus();
     }
 
@@ -377,24 +426,6 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 nowNarrow ? `${uid}-right-panels` : `${uid}-${panel}`,
             )?.focus();
     }
-
-    // ASSUMPTION: the root <Toaster> reads these (plan decision 16): bottom right of the canvas, above the pager
-    // and the bottom-right viewport's 32 px view bar, with an 8 px gap.
-    $effect(() => {
-        const style = document.body.style;
-        style.setProperty(
-            "--viewer-toast-right",
-            `${narrow ? 16 : (rightOpen ? RIGHT_OPEN_PX : RAIL_PX) + 16}px`,
-        );
-        style.setProperty(
-            "--viewer-toast-bottom",
-            `${workspace.showPager ? 72 : 40}px`,
-        );
-        return () => {
-            style.removeProperty("--viewer-toast-right");
-            style.removeProperty("--viewer-toast-bottom");
-        };
-    });
 </script>
 
 {#snippet tools(orientation: "vertical" | "horizontal")}
@@ -463,7 +494,13 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
           : `${RAIL_PX}px`};"
     {onkeydown}
 >
-    <WorkspaceHeader {task} {narrow} start={headerStart} end={headerEnd} />
+    <WorkspaceHeader
+        {task}
+        {narrow}
+        {patients}
+        start={headerStart}
+        end={headerEnd}
+    />
     {#if !narrow}
         <nav
             class="rail"
@@ -548,11 +585,20 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                     {panel.label}
                 </h2>
                 {#if panel.id === "images"}
-                    <ImagesListShell
+                    <ImagesPanel
                         {titleFor}
+                        {instanceFor}
                         {onaddimages}
                         onloaded={imageLoaded}
                     />
+                {:else if panel.id === "info"}
+                    <InfoPanel
+                        {instanceFor}
+                        subtitle={layersSubtitle}
+                        shown={leftShown === "info"}
+                    />
+                {:else if panel.id === "help"}
+                    <HelpPanel shown={leftShown === "help"} />
                 {/if}
             </section>
         {/each}

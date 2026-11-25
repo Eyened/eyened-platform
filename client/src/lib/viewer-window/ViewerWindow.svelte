@@ -1,7 +1,7 @@
 <!--
 @component
 Plugs today's viewer into the workspace frame: sets the viewer-window context,
-loads registrations, renders MainViewer per viewport and StripViewer per strip tile, and hosts the Add images overlay.
+loads registrations, renders MainViewer per viewport and StripViewer per strip tile, and hosts the Add images modal.
 -->
 <script lang="ts">
     import { resolve } from "$app/paths";
@@ -48,7 +48,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
         navigateSubtaskIndex,
         TaskNavigation,
     } from "$lib/tasks/taskUtils.svelte";
-    import { viewportTitle } from "$lib/workspace/imageMeta";
+    import { octPart, viewportTitle } from "$lib/workspace/imageMeta";
     import WorkspaceFrame from "$lib/workspace/WorkspaceFrame.svelte";
     import type { TaskHeader } from "$lib/workspace/WorkspaceHeader.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
@@ -61,7 +61,13 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     } from "svelte";
     import { adoptFormWindow } from "$lib/forms/adoptFormWindow";
     import { formWindow } from "$lib/forms/formWindow.svelte";
-    import BrowserOverlay from "./BrowserOverlay.svelte";
+    import BrowserPicker from "$lib/browser/BrowserPicker.svelte";
+    import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+    import {
+        CLIENT_DEFAULTS,
+        mergeClientConfig,
+    } from "$lib/config/clientDefaults";
+    import { addImages, patientConditions } from "./addImages";
     import MainViewer from "./MainViewer.svelte";
     import RegistrationItemLoader from "./RegistrationItemLoader.svelte";
     import StripViewer from "./StripViewer.svelte";
@@ -73,6 +79,7 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     }
 
     let { viewerWindowContext }: Props = $props();
+    const uid = $props.id();
     setContext("viewerWindowContext", viewerWindowContext);
     const registration = viewerWindowContext.registration;
 
@@ -278,15 +285,38 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
     });
 
     let browserOpen = $state(false);
+    // Each opening starts from the task's setting.
+    const saveLinksDefault = mergeClientConfig(
+        CLIENT_DEFAULTS,
+        taskContext?.task.task_definition.config,
+    ).update_subtask_image_links;
+    let saveLinks = $state(saveLinksDefault);
+
+    // The images open when the picker opened, kept fixed while it is open.
+    let opened = $state<string[]>([]);
+
+    function openAddImages() {
+        opened = viewerWindowContext.instanceIds.slice();
+        saveLinks = saveLinksDefault;
+        browserOpen = true;
+    }
 
     function titleFor(imageId: string) {
         const image = viewerWindowContext.images.get(imageId);
         return image
             ? {
-                  ...viewportTitle(image.instance),
+                  ...viewportTitle(image.instance, {
+                      oct: octPart(imageId, (id) =>
+                          viewerWindowContext.images.has(id),
+                      ),
+                  }),
                   twin: viewerWindowContext.twins.get(imageId) ?? "",
               }
             : null;
+    }
+
+    function instanceFor(imageId: string) {
+        return viewerWindowContext.images.get(imageId)?.instance ?? null;
     }
 </script>
 
@@ -321,9 +351,10 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 
 <WorkspaceFrame
     {titleFor}
+    {instanceFor}
     {task}
     startOnGrading={handoff?.reopenPanel === "forms"}
-    onaddimages={() => (browserOpen = true)}
+    onaddimages={openAddImages}
     emptyMessage={viewerWindowContext.instanceIds.length === 0
         ? "Enter instance IDs in url"
         : null}
@@ -363,22 +394,39 @@ loads registrations, renders MainViewer per viewport and StripViewer per strip t
 {/if}
 
 {#if browserOpen}
-    <!-- isolate keeps the overlay's z-index below menus portalled to <body>. -->
-    <div class="isolate">
-        <div
-            class="fixed inset-0 z-1000 flex flex-col overflow-hidden bg-background text-text-primary"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Add images"
-            tabindex="-1"
-            onkeydown={(e) => {
-                if (e.key === "Escape") browserOpen = false;
-            }}
-        >
-            <BrowserOverlay
-                {viewerWindowContext}
-                onClose={() => (browserOpen = false)}
-            />
-        </div>
-    </div>
+    <BrowserPicker
+        bind:open={browserOpen}
+        modalHeading="Add images"
+        modalLabel={taskContext ? `Set ${setNumber}` : undefined}
+        primaryButtonText="Add images"
+        primaryButtonLoadingDescription="Adding images…"
+        successDescription="Images added"
+        errorTitle={taskContext
+            ? `Images for set ${setNumber} could not be saved`
+            : "Images could not be added"}
+        initialConditions={patientConditions(opened)}
+        initialSelectedIds={opened}
+        onConfirm={(ids) =>
+            addImages(ids, {
+                subTaskId:
+                    taskContext && saveLinks ? taskContext.subTask.id : null,
+                opened,
+                setInstanceIDs: (next) =>
+                    viewerWindowContext.setInstanceIDs(next),
+                rewriteUrl: !taskContext,
+            })}
+    >
+        {#snippet top()}
+            {#if taskContext}
+                <div class="mb-4 flex items-center gap-2">
+                    <Checkbox id="{uid}-save-links" bind:checked={saveLinks} />
+                    <label
+                        for="{uid}-save-links"
+                        class="text-body-compact-01 text-text-primary"
+                        >Save to the set's images</label
+                    >
+                </div>
+            {/if}
+        {/snippet}
+    </BrowserPicker>
 {/if}
