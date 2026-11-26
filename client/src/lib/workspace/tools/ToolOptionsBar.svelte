@@ -77,12 +77,23 @@ The tool options bar: the armed tool's icon and name, its target or why it can't
                   (point !== null && point.id !== null && !point.reason),
     );
     const cursorOn = $derived(layers?.viewerContext.keyboardCursor.on ?? false);
+    // On a read-only pointset P only steps through the points, so Keys lists only [ / ].
+    const shownKeys = $derived(
+        point?.id != null && !point.canEdit
+            ? (shownTool?.keys ?? []).filter((row) => row.keys === "[ / ]")
+            : (shownTool?.keys ?? []),
+    );
     // The armed tool's keys, or the keyboard cursor's while it is on, then those that work without a tool.
     const keyLists = $derived([
         ...(cursorOn
             ? [{ title: "Keyboard cursor", rows: KEYBOARD_CURSOR_KEYS }]
-            : shownTool && shownTool.keys.length > 0
-              ? [{ title: shownTool.name, rows: shownTool.keys }]
+            : shownTool && shownKeys.length > 0
+              ? [
+                    {
+                        title: formSession ? "Form points" : shownTool.name,
+                        rows: shownKeys,
+                    },
+                ]
               : []),
         { title: "Without a tool", rows: NO_TOOL_KEYS },
     ]);
