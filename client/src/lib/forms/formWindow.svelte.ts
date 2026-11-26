@@ -57,7 +57,7 @@ export interface ShowOptions {
 export interface WindowMemory {
     schemaId: number | null;
     formId: number | null;
-    /** It showed a row Grade's failure. */
+    /** It showed a row Grade's failure, on this page's path (the same set or /view). */
     failed: boolean;
 }
 
@@ -136,7 +136,7 @@ class FormWindow {
         return {
             schemaId: id(root.dataset.schemaId),
             formId: id(root.dataset.formId),
-            failed: root.dataset.failed === "1",
+            failed: root.dataset.failed === location.pathname,
         };
     }
 
@@ -190,7 +190,9 @@ class FormWindow {
             context: contexts,
         });
         doc.documentElement.dataset.mounted = "1";
-        if (view.kind === "failed") doc.documentElement.dataset.failed = "1";
+        // Keyed by the path, not the query the layout rewrites, so another set's page load drops it.
+        if (view.kind === "failed")
+            doc.documentElement.dataset.failed = location.pathname;
         else delete doc.documentElement.dataset.failed;
         if (focused) doc.querySelector<HTMLElement>("h1")?.focus();
     }

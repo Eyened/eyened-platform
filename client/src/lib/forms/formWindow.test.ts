@@ -173,6 +173,27 @@ describe("formWindow", () => {
         },
     );
 
+    it("a failed Grade does not follow the window to another set", () => {
+        const before = window.location.pathname;
+        history.replaceState(null, "", "/tasks/1/set/3");
+        current = fakeWindow();
+        vi.spyOn(window, "open").mockReturnValue(current as never);
+        const win = formWindow.begin("panel")!;
+        formWindow.showView(win, { kind: "failed" }, new Map());
+        history.replaceState(null, "", "/tasks/1/set/4");
+        adoptFormWindow(win, {
+            workspace: {} as never,
+            images: [],
+            userId: 5,
+            subTaskId: 78,
+            canEdit: () => true,
+            contexts: new Map(),
+        });
+        history.replaceState(null, "", before);
+        const last = vi.mocked(mount).mock.calls.at(-1)![1];
+        expect(last.props).toMatchObject({ view: { kind: "closed" } });
+    });
+
     it("Grade, then Try again after it failed, puts focus on the form", async () => {
         formSchemas.set(10, {
             id: 10,
