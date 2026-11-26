@@ -501,13 +501,13 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
 
 {#snippet panelSwitch(side: "left" | "top")}
     {#each RIGHT_PANELS as item (item.id)}
-        <!-- Selected: layer-selected plus a 3 px border-interactive bar on the panel side, like the side nav's current item. -->
+        <!-- Pressed: the same look as an armed tool and an open left panel. -->
         <IconButton
             label={panelName(item.id)}
             {side}
             aria-pressed={rightShown && panel === item.id}
             aria-controls="{uid}-{item.id}"
-            class="relative aria-pressed:bg-layer-selected-01 aria-pressed:before:absolute aria-pressed:before:inset-y-0 aria-pressed:before:start-0 aria-pressed:before:w-0.75 aria-pressed:before:bg-border-interactive"
+            class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
             onclick={(e) => toggleRight(item.id, e)}
         >
             <item.Icon />
@@ -552,6 +552,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                         side="right"
                         aria-pressed={left === panel.id}
                         aria-controls="{uid}-{panel.id}"
+                        class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
                         onclick={(e) => toggleLeft(panel.id, e)}
                     >
                         <panel.Icon />
@@ -828,11 +829,13 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         background: var(--color-layer-01);
         border-inline-end: 1px solid var(--color-border-subtle-01);
     }
-    /* At short heights the bottom group joins the top one and they scroll together (S2 side navigation). */
+    /* At short heights the bottom group joins the top one and they scroll together (S2 side navigation).
+       The top border keeps panels and tools apart even then. */
     .rail-bottom {
         display: flex;
         flex-direction: column;
         margin-top: auto;
+        border-top: 1px solid var(--color-border-subtle-01);
     }
     .left {
         grid-area: left;
