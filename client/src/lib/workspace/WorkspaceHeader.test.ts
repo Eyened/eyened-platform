@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
-import { createRawSnippet } from "svelte";
+import { createRawSnippet, tick } from "svelte";
 import { describe, expect, it, vi } from "vitest";
 import type { ResolvedPathname } from "$app/types";
 import {
@@ -66,6 +66,39 @@ describe("WorkspaceHeader", () => {
             saveTracker.edited = false;
         }
     });
+
+    it.each([
+        {
+            mode: "in a task, before the set's move",
+            task: () =>
+                taskHeader({
+                    status: createRawSnippet(() => ({
+                        render: () =>
+                            `<button type="button">Mark ready and next</button>`,
+                    })),
+                }),
+            selector: '[data-header-slot="mark-ready"] [data-slot="separator"]',
+        },
+        {
+            mode: "on /view, before the strip and Layout",
+            task: () => null,
+            selector:
+                '[data-header-slot="save-state"] + [data-slot="separator"]',
+        },
+    ])(
+        "$mode: no divider beside the save state until it says something",
+        async ({ task, selector }) => {
+            try {
+                renderHeader(task());
+                expect(document.querySelector(selector)).toBeNull();
+                saveTracker.edited = true;
+                await tick();
+                expect(document.querySelector(selector)).not.toBeNull();
+            } finally {
+                saveTracker.edited = false;
+            }
+        },
+    );
 
     it("shows no set navigation outside a task", () => {
         renderHeader(null);

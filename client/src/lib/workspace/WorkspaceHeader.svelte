@@ -72,6 +72,9 @@
     // Below lg (66rem) there is no room for the status tag either; ▾ still names the status.
     const lg = new MediaQuery("min-width: 66rem");
     const workspace = getContext<Workspace>("workspace");
+    // No divider beside the save state while it is empty, before the first edit.
+    // ASSUMPTION: "N patients open" alone doesn't bring the divider back.
+    const saveShows = $derived(saveTracker.text !== "");
 
     function toggleStrip() {
         workspace.strip = !workspace.strip;
@@ -205,7 +208,7 @@
         <div class="contents" data-header-slot="mark-ready">
             <!-- Below md, the set's move and status wait for the narrow footer. -->
             {#if !narrow && task.status}
-                {@render divider()}
+                {#if saveShows}{@render divider()}{/if}
                 {@render task.status("header")}
             {/if}
         </div>
@@ -213,7 +216,8 @@
     {#if narrow}
         {@render end?.()}
     {:else}
-        {@render divider()}
+        <!-- Beside the set's move, or else beside the save state. -->
+        {#if task?.status || saveShows}{@render divider()}{/if}
         <!-- In a task, the task config sets the strip. -->
         {#if task === null}
             <IconButton
