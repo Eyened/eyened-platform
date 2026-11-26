@@ -3,7 +3,7 @@
 An APG window splitter between two viewport tracks: drag it, or click to pick it up and click again to place it (WCAG 2.5.7).
 -->
 <script lang="ts">
-    import { onDestroy } from "svelte";
+    import { onDestroy, type Snippet } from "svelte";
     import type { Axis } from "./workspaceRules";
 
     let {
@@ -22,6 +22,7 @@ An APG window splitter between two viewport tracks: drag it, or click to pick it
         onstep,
         onlimit,
         onreset,
+        children,
     }: {
         axis: Axis;
         label: string;
@@ -39,6 +40,8 @@ An APG window splitter between two viewport tracks: drag it, or click to pick it
         onstep: (direction: -1 | 1) => void;
         onlimit: (end: "min" | "max") => void;
         onreset: () => void;
+        /** Shown centred on the line, such as a resize icon. */
+        children?: Snippet;
     } = $props();
 
     const descriptionId = $props.id();
@@ -142,7 +145,9 @@ An APG window splitter between two viewport tracks: drag it, or click to pick it
     {onpointerup}
     {onkeydown}
     onblur={cancel}
-></div>
+>
+    {@render children?.()}
+</div>
 <span id={descriptionId} hidden>
     Drag, or click to pick up and click again to place. Arrow keys move it;
     Enter resets it.
@@ -168,6 +173,9 @@ An APG window splitter between two viewport tracks: drag it, or click to pick it
         outline: none;
         height: var(--thickness);
         cursor: row-resize;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     .splitter.col {
         height: auto;
