@@ -4,6 +4,8 @@ import { isRecord, parsePointer } from "./schemaType";
 export const MISSING = "Answer this question.";
 export const NOT_APPLICABLE =
     "This question doesn't apply any more. Clear the answer.";
+/** NOT_APPLICABLE on a read-only form, which has no Clear. */
+export const NOT_APPLICABLE_READ_ONLY = "This question doesn't apply any more.";
 export const DONT_FIT = "These answers don't fit together.";
 
 const COMBINATIONS = new Set(["oneOf", "anyOf", "not"]);
