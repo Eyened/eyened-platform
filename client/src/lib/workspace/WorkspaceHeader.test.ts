@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 import { describe, expect, it, vi } from "vitest";
 import type { ResolvedPathname } from "$app/types";
@@ -114,21 +114,6 @@ describe("WorkspaceHeader", () => {
         );
         expect(screen.getByText("Set 2 of 5")).toHaveClass("sr-only");
         await expectNoAxeViolations(container);
-    });
-
-    it("outside a task, Browse | All tools sets the palette's mode and remembers it; a task shows none", async () => {
-        mockWidth({ md: true, xlg: true });
-        const ws = workspaceWith(2);
-        render(WorkspaceHeader, {
-            props: { task: null, narrow: false },
-            context: workspaceContext(ws),
-        });
-        await fireEvent.click(screen.getByRole("tab", { name: "Browse" }));
-        expect(ws.toolMode).toBe("browse");
-        expect(localStorage.getItem("eyened:viewer:toolMode")).toBe("browse");
-        cleanup();
-        renderHeader(taskHeader());
-        expect(screen.queryByRole("tablist", { name: "Mode" })).toBeNull();
     });
 
     it("from md to lg: no product name, the short set label, Task overview and Layout as icons", () => {

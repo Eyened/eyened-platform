@@ -538,6 +538,35 @@ describe("Right panels", () => {
     });
 });
 
+describe("All tools button", () => {
+    it("on /view it ends the tools, switches Browse and All tools with aria-expanded, and remembers the choice", async () => {
+        mockWidth({ md: true, xlg: true });
+        const ws = workspaceWith(1);
+        ws.toolMode = "browse";
+        renderFrame(ws);
+        const tools = screen.getByRole("toolbar", { name: "Tools" });
+        const button = within(tools).getAllByRole("button").at(-1);
+        expect(button).toHaveAccessibleName("All tools");
+        expect(button).toHaveAttribute("aria-expanded", "false");
+
+        await fireEvent.click(button!);
+        expect(ws.toolMode).toBe("all");
+        expect(button).toHaveAttribute("aria-expanded", "true");
+        expect(button).toHaveAccessibleName("All tools");
+        expect(localStorage.getItem("eyened:viewer:toolMode")).toBe("all");
+
+        await fireEvent.click(button!);
+        expect(ws.toolMode).toBe("browse");
+        expect(localStorage.getItem("eyened:viewer:toolMode")).toBe("browse");
+    });
+
+    it("isn't there in a task", () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(1), taskHeader());
+        expect(screen.queryByRole("button", { name: "All tools" })).toBeNull();
+    });
+});
+
 describe("Layers", () => {
     it("names the selected viewport under the heading", async () => {
         mockWidth({ md: true, xlg: true });

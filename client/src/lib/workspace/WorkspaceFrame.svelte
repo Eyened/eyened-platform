@@ -464,7 +464,11 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
 </script>
 
 {#snippet tools(orientation: "vertical" | "horizontal")}
-    <ToolPalette available={paletteSpace} {orientation} />
+    <ToolPalette
+        available={paletteSpace}
+        {orientation}
+        modeToggle={task === null}
+    />
 {/snippet}
 
 {#snippet headerStart()}

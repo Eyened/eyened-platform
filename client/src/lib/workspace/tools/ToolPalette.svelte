@@ -1,16 +1,20 @@
 <!--
 @component
 The tool palette: one toolbar, flat while every slot fits, else one slot per job with a list of its tools. Outside All tools, ⋯ More tools holds the rest.
+On /view the All tools button ends the toolbar and switches Browse and All tools.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
+    import ChevronUp from "carbon-icons-svelte/lib/ChevronUp.svelte";
     import OverflowMenuHorizontal from "carbon-icons-svelte/lib/OverflowMenuHorizontal.svelte";
     import WatsonHealthMagnify from "carbon-icons-svelte/lib/WatsonHealthMagnify.svelte";
     import { getContext } from "svelte";
     import OverflowMenu from "../OverflowMenu.svelte";
     import { rovingIndex } from "../rovingIndex";
     import type { Workspace } from "../workspace.svelte";
+    import { writeToolMode } from "../workspacePrefs";
     import {
         GAP_PX,
         paletteLayout,
@@ -29,11 +33,14 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     let {
         available,
         orientation = "vertical",
+        modeToggle = false,
     }: {
         /** Rail height left for the palette, in px. */
         available: number;
         /** Horizontal in the narrow menu, which is always flat. */
         orientation?: "vertical" | "horizontal";
+        /** The All tools button; a task is always All tools and has none. */
+        modeToggle?: boolean;
     } = $props();
 
     const workspace = getContext<Workspace>("workspace");
@@ -44,10 +51,14 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     const sections = $derived(
         paletteSections(workspace.toolMode, workspace.hiddenTools),
     );
-    // The Magnifier toggle keeps its own slot, so the tools get the rest.
+    // The Magnifier toggle and the All tools button keep their own slots, so the tools get the rest.
+    const ownSlots = $derived(modeToggle ? 2 : 1);
     const flat = $derived(
         orientation === "horizontal" ||
-            paletteLayout(available - SLOT_PX - GAP_PX, sections) === "flat",
+            paletteLayout(
+                available - ownSlots * (SLOT_PX + GAP_PX),
+                sections,
+            ) === "flat",
     );
     // A tool the task hides is in neither the rail nor ⋯.
     const leftOut = $derived(
@@ -85,6 +96,7 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
             return [...slots, ...actions(s.tools).map((t) => t.id)];
         }),
         "magnifier",
+        ...(modeToggle ? ["mode"] : []),
     ]);
     let current = $state("");
     const active = $derived(stops.includes(current) ? current : stops[0]);
@@ -122,6 +134,11 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     }
 
     const tab = (key: string) => (key === active ? 0 : -1);
+
+    function toggleMode() {
+        workspace.toolMode = workspace.toolMode === "all" ? "browse" : "all";
+        writeToolMode(workspace.toolMode);
+    }
 </script>
 
 {#snippet toolButton(tool: ToolDef)}
@@ -257,6 +274,21 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     >
         <WatsonHealthMagnify />
     </IconButton>
+    {#if modeToggle}
+        <!-- ASSUMPTION: the last stop, after the Magnifier, as "last stop of the toolbar" says. -->
+        <!-- A disclosure button, not a toggle: no pressed look, so it never reads as an armed tool. -->
+        <IconButton
+            label="All tools"
+            side={tooltipSide}
+            aria-expanded={workspace.toolMode === "all"}
+            data-stop="mode"
+            tabindex={tab("mode")}
+            onclick={toggleMode}
+        >
+            {#if workspace.toolMode === "all"}<ChevronUp />{:else}<ChevronDown
+                />{/if}
+        </IconButton>
+    {/if}
 </div>
 
 <style>
