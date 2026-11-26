@@ -67,7 +67,7 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
     );
 </script>
 
-<!-- @carbon/styles 1.117.0 combo-button: the two parts 1 px apart. -->
+<!-- @carbon/styles 1.117.0 combo-button: the two parts 1 px apart. The main part keeps Button's 320 px max, not the combo's 239 px (deviation in DESIGN.md). -->
 <!-- The invalid border is an overlay: the buttons are positioned and would paint over the wrapper's own outline. -->
 <div
     class={cn(
@@ -81,9 +81,7 @@ Without a label only a ghost ▾ is left, showing the selected item. Other attri
         <Button
             {...mainProps}
             size="sm"
-            class={fullWidth
-                ? "max-w-none min-w-0 flex-1"
-                : "max-w-59.75 min-w-31.75"}
+            class={fullWidth ? "max-w-none min-w-0 flex-1" : "min-w-31.75"}
             aria-disabled={pending || undefined}
             onclick={() => onclick?.()}
         >

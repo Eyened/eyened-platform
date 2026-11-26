@@ -166,4 +166,21 @@ describe("WorkspaceHeader", () => {
             screen.getByRole("button", { name: "Layout" }),
         ).not.toHaveTextContent("Layout");
     });
+
+    it("in a task from xlg, patients open shows only the count, its button named in words", () => {
+        mockWidth({ md: true, xlg: true });
+        render(WorkspaceHeader, {
+            props: {
+                task: taskHeader(),
+                narrow: false,
+                patients: 2,
+                start,
+                end,
+            },
+            context: workspaceContext(workspaceWith(2)),
+        });
+        expect(
+            screen.getByRole("button", { name: "2 patients open" }),
+        ).toHaveTextContent(/^2$/);
+    });
 });

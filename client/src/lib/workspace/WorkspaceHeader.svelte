@@ -71,6 +71,8 @@
     const compact = $derived(task !== null && !xlg.current);
     // Below lg (66rem) there is no room for the status tag either; ▾ still names the status.
     const lg = new MediaQuery("min-width: 66rem");
+    // A task header has no room for "N patients open" below cds-max (99rem), so it shows "⚠ N".
+    const cdsMax = new MediaQuery("min-width: 99rem");
     const workspace = getContext<Workspace>("workspace");
     // No divider beside the save state while it is empty, before the first edit.
     // ASSUMPTION: "N patients open" alone doesn't bring the divider back.
@@ -193,7 +195,10 @@
     {/if}
     <div class="min-w-0 flex-1"></div>
     <div class="contents" data-header-slot="patients-open">
-        <PatientsOpen count={patients} />
+        <PatientsOpen
+            count={patients}
+            compact={task !== null && !cdsMax.current}
+        />
     </div>
     <!-- Save state: 4 and 5; "Mark ready and next": 5. -->
     <div class="contents" data-header-slot="save-state">
