@@ -66,7 +66,9 @@ The blue bar, tint and Document icon mark the form open in the window; the grey 
             ? "not graded"
             : completion === "complete"
               ? "complete"
-              : "not complete",
+              : completion === "unchecked"
+                ? "not checked"
+                : "not complete",
     );
     const date = $derived(form?.date_inserted.slice(0, 10) ?? "");
     // The states in words after the visible name (WCAG 2.5.3).
@@ -134,6 +136,9 @@ The blue bar, tint and Document icon mark the form open in the window; the grey 
                 aria-hidden="true"
                 class="shrink-0 text-status-green"
             />
+        {:else if completion === "unchecked"}
+            <!-- The schema won't compile, so the answers weren't checked. -->
+            <Tag>Not checked</Tag>
         {:else}
             <Incomplete aria-hidden="true" class="shrink-0 text-status-blue" />
         {/if}
