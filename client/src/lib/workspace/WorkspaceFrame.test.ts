@@ -491,6 +491,51 @@ describe("Right panels", () => {
         ).toBeInTheDocument();
         expect(screen.queryByRole("region", { name: "Layers" })).toBeNull();
     });
+
+    it("at md the panel's edge resizes it: ← / → by 16 px, Home / End to 288 / 480, Enter back to 288; the width is kept", async () => {
+        mockWidth({ md: true, xlg: true });
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(
+            1200,
+        );
+        renderFrame(workspaceWith(3));
+        const edge = screen.getByRole("separator", {
+            name: "Right panel width",
+        });
+        expect(edge).toHaveAttribute("aria-valuenow", "288");
+        expect(edge).toHaveAttribute("aria-valuemin", "288");
+        expect(edge).toHaveAttribute("aria-valuemax", "480");
+
+        await fireEvent.keyDown(edge, { key: "ArrowLeft" });
+        expect(edge).toHaveAttribute("aria-valuenow", "304");
+        expect(localStorage.getItem("eyened:viewer:rightWidth")).toBe("304");
+        await fireEvent.keyDown(edge, { key: "ArrowRight" });
+        await fireEvent.keyDown(edge, { key: "ArrowRight" });
+        expect(edge).toHaveAttribute("aria-valuenow", "288");
+        await fireEvent.keyDown(edge, { key: "End" });
+        expect(edge).toHaveAttribute("aria-valuenow", "480");
+        await fireEvent.keyDown(edge, { key: "Home" });
+        expect(edge).toHaveAttribute("aria-valuenow", "288");
+        await fireEvent.keyDown(edge, { key: "End" });
+        await fireEvent.keyDown(edge, { key: "Enter" });
+        expect(edge).toHaveAttribute("aria-valuenow", "288");
+        expect(localStorage.getItem("eyened:viewer:rightWidth")).toBe("288");
+    });
+
+    it("stops widening where the viewport grid keeps 320 px beside the rail and left panel", async () => {
+        mockWidth({ md: true, xlg: true });
+        // 1100 - 48 rail - 256 Images - 320 grid leaves the panel 476.
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(
+            1100,
+        );
+        const ws = workspaceWith(3);
+        ws.strip = false;
+        renderFrame(ws);
+        const edge = screen.getByRole("separator", {
+            name: "Right panel width",
+        });
+        await fireEvent.keyDown(edge, { key: "End" });
+        expect(edge).toHaveAttribute("aria-valuenow", "476");
+    });
 });
 
 describe("Layers", () => {

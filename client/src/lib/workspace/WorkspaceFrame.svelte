@@ -34,6 +34,13 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     import LayoutPopover from "./LayoutPopover.svelte";
     import MagnifierPanel from "./MagnifierPanel.svelte";
     import Pager from "./Pager.svelte";
+    import {
+        RIGHT_MIN_PX,
+        RIGHT_STEP_PX,
+        rightMax,
+        rightWidth,
+    } from "./rightWidth";
+    import Splitter from "./Splitter.svelte";
     import { GAP_PX } from "./tools/paletteLayout";
     import ToolOptionsBar from "./tools/ToolOptionsBar.svelte";
     import ToolPalette from "./tools/ToolPalette.svelte";
@@ -44,8 +51,10 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     import {
         readLeftPanel,
         readRightOpen,
+        readRightWidth,
         writeLeftPanel,
         writeRightOpen,
+        writeRightWidth,
         type LeftPanel,
     } from "./workspacePrefs";
 
@@ -79,8 +88,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     const md = new MediaQuery("min-width: 42rem");
     const xlg = new MediaQuery("min-width: 82rem");
     const narrow = $derived(!md.current);
-    const RIGHT_OPEN_PX = 288;
     const RAIL_PX = 48;
+    const LEFT_PX = 256;
 
     // Images starts closed while the strip is on: the strip already shows the catalogue.
     // ASSUMPTION: read once at mount (plan decision 22).
@@ -109,6 +118,18 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         narrow ? (overlay === "menu" ? menuTab : null) : left,
     );
     const rightShown = $derived(narrow ? overlay === "right" : rightOpen);
+    // The open right column's width at md and up: the user's, clamped to what the grid leaves.
+    let frameWidth = $state(0);
+    let savedRight = $state(readRightWidth());
+    let rightBefore = 0;
+    let rightStart = 0;
+    const room = $derived(frameWidth - RAIL_PX - (left ? LEFT_PX : 0));
+    const rightPx = $derived(rightWidth(savedRight, room));
+
+    function keepRight(px: number) {
+        savedRight = rightWidth(Math.round(px), room);
+        writeRightWidth(savedRight);
+    }
     const overlayOpen = $derived(narrow && overlay !== null);
     const formsName = $derived(task ? "Grading" : "Forms");
     const footer = $derived(
@@ -501,12 +522,13 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     class="frame"
     class:narrow
     style="--rail: {narrow ? '0px' : `${RAIL_PX}px`}; --left: {left && !narrow
-        ? '256px'
+        ? `${LEFT_PX}px`
         : '0px'}; --right: {narrow
         ? '0px'
         : rightOpen
-          ? `${RIGHT_OPEN_PX}px`
+          ? `${rightPx}px`
           : `${RAIL_PX}px`};"
+    bind:clientWidth={frameWidth}
     {onkeydown}
 >
     <WorkspaceHeader
@@ -747,6 +769,31 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
             </section>
         </div>
     </aside>
+    {#if !narrow && rightOpen}
+        <!-- Below md there is no splitter: the overlay stays 288 px. -->
+        <Splitter
+            axis="col"
+            label="Right panel width"
+            controls="{uid}-right-panels"
+            valueNow={rightPx}
+            valueMin={RIGHT_MIN_PX}
+            valueMax={rightMax(room)}
+            style="top: 48px; bottom: 0; right: {rightPx - 4}px;"
+            ondragstart={() => {
+                rightBefore = savedRight;
+                rightStart = rightPx;
+            }}
+            ondrag={(delta) =>
+                (savedRight = rightWidth(Math.round(rightStart - delta), room))}
+            ondragend={() => writeRightWidth(savedRight)}
+            oncancel={() => (savedRight = rightBefore)}
+            onstep={(direction) =>
+                keepRight(rightPx - direction * RIGHT_STEP_PX)}
+            onlimit={(end) =>
+                keepRight(end === "min" ? RIGHT_MIN_PX : rightMax(room))}
+            onreset={() => keepRight(RIGHT_MIN_PX)}
+        />
+    {/if}
     {#if overlayOpen}
         <div class="scrim" aria-hidden="true" onclick={dismiss}></div>
     {/if}
