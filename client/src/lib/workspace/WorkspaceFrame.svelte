@@ -830,6 +830,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         overflow-y: auto;
         /* The 48 px split slot is 1 px wider than the content box beside the border. */
         overflow-x: hidden;
+        /* A classic 16 px scrollbar would cover the job chevrons at the rail's edge; wheel, touch and focus still scroll. */
+        scrollbar-width: none;
         background: var(--color-layer-01);
         border-inline-end: 1px solid var(--color-border-subtle-01);
     }
