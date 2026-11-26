@@ -567,6 +567,53 @@ describe("All tools button", () => {
     });
 });
 
+describe("Header strip toggle and Layout", () => {
+    it("on /view the strip toggle shows and hides the strip, says so when pressed, and remembers it", async () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(3));
+        const toggle = screen.getByRole("button", { name: "Thumbnail strip" });
+        expect(toggle).toHaveAttribute("aria-pressed", "true");
+        expect(
+            screen.getByRole("list", { name: "Thumbnails" }),
+        ).toBeInTheDocument();
+
+        await fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute("aria-pressed", "false");
+        expect(screen.queryByRole("list", { name: "Thumbnails" })).toBeNull();
+        expect(localStorage.getItem("eyened:viewer:strip")).toBe("false");
+
+        await fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute("aria-pressed", "true");
+        expect(
+            screen.getByRole("list", { name: "Thumbnails" }),
+        ).toBeInTheDocument();
+    });
+
+    it("Layout opens the popover without the strip switch; Crosshair tracking stays", async () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(3));
+        await fireEvent.click(screen.getByRole("button", { name: "Layout" }));
+        await screen.findByRole("button", { name: "One viewport" });
+        expect(
+            screen.getByRole("button", { name: "By visit" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("switch", { name: "Thumbnail strip" }),
+        ).toBeNull();
+        expect(
+            screen.getByRole("switch", { name: "Crosshair tracking" }),
+        ).toBeInTheDocument();
+    });
+
+    it("isn't there in a task", () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(1), taskHeader());
+        expect(
+            screen.queryByRole("button", { name: "Thumbnail strip" }),
+        ).toBeNull();
+    });
+});
+
 describe("Layers", () => {
     it("names the selected viewport under the heading", async () => {
         mockWidth({ md: true, xlg: true });

@@ -42,8 +42,12 @@
     import SaveStateSlot from "$lib/saving/SaveStateSlot.svelte";
     import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import { MediaQuery } from "svelte/reactivity";
+    import { getContext } from "svelte";
+    import CarouselHorizontal from "carbon-icons-svelte/lib/CarouselHorizontal.svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
     import PatientsOpen from "./PatientsOpen.svelte";
+    import type { Workspace } from "./workspace.svelte";
+    import { writeStripOn } from "./workspacePrefs";
 
     // Below md the frame supplies the menu button (start) and the right-column button (end).
     let {
@@ -67,6 +71,12 @@
     const compact = $derived(task !== null && !xlg.current);
     // Below lg (66rem) there is no room for the status tag either; ▾ still names the status.
     const lg = new MediaQuery("min-width: 66rem");
+    const workspace = getContext<Workspace>("workspace");
+
+    function toggleStrip() {
+        workspace.strip = !workspace.strip;
+        writeStripOn(workspace.strip);
+    }
 </script>
 
 {#snippet divider()}
@@ -205,6 +215,16 @@
     {:else}
         {@render divider()}
         <!-- In a task, the task config sets the strip. -->
-        <LayoutPopover stripToggle={task === null} iconOnly={compact} />
+        {#if task === null}
+            <IconButton
+                label="Thumbnail strip"
+                aria-pressed={workspace.strip}
+                class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
+                onclick={toggleStrip}
+            >
+                <CarouselHorizontal />
+            </IconButton>
+        {/if}
+        <LayoutPopover />
     {/if}
 </header>
