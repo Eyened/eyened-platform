@@ -5,16 +5,23 @@ import { writeHandoff, type SetControl } from "./setHandoff";
 
 export const STATUS_ID = "set-status";
 
-/** Focus on the header's ◀, ▶, primary button or Set status ▾; without a primary button, an enabled ▶. */
+/** Focus on the header's ◀, ▶, primary button or Set status ▾; without a primary button, ▶; when ▶ is disabled (the last set), ◀. */
 export function focusSetControl(control: SetControl | "status"): void {
     const find = (c: SetControl | "status") =>
         c === "status"
             ? document.getElementById(STATUS_ID)
             : document.querySelector<HTMLElement>(`[data-set-control="${c}"]`);
-    // After a lost Claim, or arriving by the primary move on a set that has none.
-    const element =
-        find(control) ?? (control === "primary" ? find("next") : null);
-    if (element && !element.matches(":disabled")) element.focus();
+    // After a lost Claim, or arriving by the primary move or ▶ on a set where that control is missing or disabled.
+    const order: (SetControl | "status")[] =
+        control === "primary"
+            ? ["primary", "next", "prev"]
+            : control === "next"
+              ? ["next", "prev"]
+              : [control];
+    order
+        .map(find)
+        .find((element) => element && !element.matches(":disabled"))
+        ?.focus();
 }
 
 /** True when everything saved within `ms`; false on a failure or when a save is still running. */
@@ -130,8 +137,8 @@ export class SetNavigation {
                 }
                 // A failure shows on the combo button; the grader stays.
                 if (!(await this.saveStatus("Ready"))) return;
-                // Work that became unsaved during the status save keeps the grader here.
-                if (!last && tracker.firstUnsaved()) {
+                // Work drawn during the status save is saved before leaving; if it can't save, the grader stays.
+                if (!last && !(await flushWithin(tracker, 5000))) {
                     this.revealUnsaved(control);
                     return;
                 }
