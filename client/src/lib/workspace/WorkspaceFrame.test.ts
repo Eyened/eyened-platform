@@ -276,7 +276,7 @@ describe("WorkspaceFrame", () => {
         choose.focus();
         await fireEvent.click(choose);
         const panel = await screen.findByRole("region", { name: "Images" });
-        await fireEvent.click(panel.querySelectorAll('[role="option"]')[2]);
+        await fireEvent.dblClick(panel.querySelectorAll('[role="option"]')[2]);
         await waitFor(() =>
             expect(screen.getByRole("main")).not.toHaveAttribute("inert"),
         );

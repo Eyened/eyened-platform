@@ -1,7 +1,7 @@
 <!--
 @component
 The Images panel: the catalogue as a listbox, in catalogue order, with a patient heading and a visit heading each time they change.
-One tab stop: ↑ ↓ Home End move without loading; Enter or Space, or a click, loads into the selected viewport; a drag loads onto any viewport.
+One tab stop: ↑ ↓ Home End move without loading; a click only focuses an option; Enter or Space, or a double-click, loads into the selected viewport; a drag loads onto any viewport.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
@@ -173,7 +173,7 @@ One tab stop: ↑ ↓ Home End move without loading; Enter or Space, or a click,
                         draggable="true"
                         data-index={order.indexOf(imageId)}
                         class="flex min-h-16 cursor-pointer items-center gap-2 py-2 ps-4 pe-2 hover:bg-layer-hover-01 aria-selected:selected-look aria-selected:hover:bg-layer-selected-hover-01"
-                        onclick={() => load(imageId)}
+                        ondblclick={() => load(imageId)}
                         onkeydown={(e) => onkeydown(e, imageId)}
                         onfocus={() => (focusId = imageId)}
                         ondragstart={(e) => ondragstart(e, imageId)}

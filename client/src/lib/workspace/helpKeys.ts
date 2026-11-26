@@ -35,10 +35,7 @@ const PANEL_KEYS: readonly KeyRow[] = [
     { keys: "Shift+Page Up / Down", action: "Previous / next page" },
     { keys: "← / →", action: "Move between thumbnails in the strip" },
     { keys: "↑ / ↓", action: "Move in the Images list" },
-    {
-        keys: "Enter",
-        action: "Load the thumbnail or image into the selected viewport",
-    },
+    { keys: "Double-click or Enter", action: "Open in the selected viewport" },
     { keys: "F1", action: "Help" },
     { keys: "Esc", action: "Close Images, Info or Help" },
 ];

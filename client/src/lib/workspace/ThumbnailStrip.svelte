@@ -3,7 +3,7 @@
 The thumbnail strip: one live tile per catalogue image, in catalogue order, scrolling sideways.
 One tab stop for the tiles (plus that tile's Copy): ← → move between tiles, Home / End go to the ends, Enter or Space loads.
 Each tile's Copy public ID bar shows on hover or while focus is inside the tile; its button takes Tab only in the tile that holds the tab stop.
-Click or Enter loads into the selected viewport; drag loads onto any viewport. Tiles never write the shared pointer.
+A click only focuses a tile; a double-click or Enter loads into the selected viewport; drag loads onto any viewport. Tiles never write the shared pointer.
 -->
 <script lang="ts">
     import {
@@ -65,7 +65,7 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
     let copiedTimer: ReturnType<typeof setTimeout> | undefined;
     onDestroy(() => clearTimeout(copiedTimer));
 
-    // Carbon CopyButton feedback for 2 s. The click must not reach the tile, which loads.
+    // Carbon CopyButton feedback for 2 s. Its clicks must not reach the tile, which takes focus and loads on a double-click.
     async function copy(e: MouseEvent, imageId: string) {
         e.stopPropagation();
         if (!(await copyToClipboard(instanceIdFromImageId(imageId)))) return;
@@ -88,8 +88,13 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
         workspace.draggedImageId = imageId;
     }
 
-    // Enter and Space are the button's own click, which the tile handles.
+    // Enter and Space load here, since a click only focuses.
     async function onkeydown(e: KeyboardEvent, i: number) {
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            workspace.load(workspace.selected, workspace.catalogue[i]);
+            return;
+        }
         const next = rovingIndex(e.key, i, workspace.catalogue.length, {
             prev: ["ArrowLeft"],
             next: ["ArrowRight"],
@@ -113,12 +118,16 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
     {#each workspace.catalogue as imageId, i (imageId)}
         {@const title = titleFor(imageId)}
         {@const slots = slotNumbers[imageId]}
-        <!-- ASSUMPTION: a click on the tile's image is a shortcut for its button (plan decision 21). -->
+        <!-- A click anywhere on the tile focuses its button; a double-click loads, as its button's Enter does. -->
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
         <li
             class="tile"
             class:highlighted={workspace.highlightedImages.includes(imageId)}
-            onclick={() => workspace.load(workspace.selected, imageId)}
+            onclick={(e) =>
+                e.currentTarget
+                    .querySelector<HTMLElement>("[data-tile-index]")
+                    ?.focus()}
+            ondblclick={() => workspace.load(workspace.selected, imageId)}
         >
             <button
                 type="button"
@@ -166,6 +175,7 @@ Click or Enter loads into the selected viewport; drag loads onto any viewport. T
                         closeOnClick={false}
                         tabindex={imageId === tabStop ? 0 : -1}
                         onclick={(e) => copy(e, imageId)}
+                        ondblclick={(e) => e.stopPropagation()}
                         onpointerdown={(e) => e.stopPropagation()}
                     >
                         <Copy />
