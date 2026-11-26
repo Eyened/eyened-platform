@@ -5,6 +5,7 @@
     import { cn } from "$lib/utils.js";
     import { copyToClipboard } from "$lib/utils/copyToClipboard";
     import Copy from "carbon-icons-svelte/lib/Copy.svelte";
+    import { onDestroy } from "svelte";
     import InstanceInfoLazy from "./InstanceInfoLazy.svelte";
 
     // An image's information: Carbon Modal lg, passive (the close button only; an outside click closes it), titled by the public ID with its copy.
@@ -14,10 +15,20 @@
     }: { instanceId: string; open?: boolean } = $props();
 
     let copied = $state(false);
+    let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+    onDestroy(() => clearTimeout(copiedTimer));
+    // Closing ends the feedback, so it isn't there on reopening and an old timer can't cut a new copy short.
+    $effect(() => {
+        if (open) return;
+        clearTimeout(copiedTimer);
+        copied = false;
+    });
+
     // Carbon CopyButton feedback: "Copied!" for 2 s.
     async function copy() {
+        clearTimeout(copiedTimer);
         copied = await copyToClipboard(instanceId);
-        setTimeout(() => (copied = false), 2000);
+        copiedTimer = setTimeout(() => (copied = false), 2000);
     }
 </script>
 

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
 import { tick } from "svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudyGET } from "../../types/openapi_types";
@@ -103,6 +103,30 @@ describe("VisitsList", () => {
             await screen.findByRole("button", { name: /2022-02-02/ }),
         ).toHaveAttribute("aria-expanded", "true");
         expect(loadPatientStudies).toHaveBeenLastCalledWith("P2");
+    });
+
+    it("another visit of the same patient opens its item; the grader's closed item stays closed", async () => {
+        const { rerender } = render(VisitsList, {
+            props: { instance: p1, active: true },
+        });
+        const thisVisit = await screen.findByRole("button", {
+            name: /2024-06-01/,
+        });
+        await fireEvent.click(thisVisit);
+        expect(thisVisit).toHaveAttribute("aria-expanded", "false");
+        await rerender({
+            instance: instance("c", {
+                patient: { id: 1, identifier: "P1" },
+                study: { id: 11, date: "2020-01-01" },
+            }),
+            active: true,
+        });
+        expect(
+            screen.getByRole("button", { name: /2020-01-01/ }),
+        ).toHaveAttribute("aria-expanded", "true");
+        expect(
+            screen.getByRole("button", { name: /2024-06-01/ }),
+        ).toHaveAttribute("aria-expanded", "false");
     });
 
     it("a failed load says so without the patient ID", async () => {

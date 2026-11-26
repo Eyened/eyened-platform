@@ -3,8 +3,12 @@ import { ApiError } from "$lib/api/client";
 import { subtasks } from "$lib/data/stores.svelte";
 import type { SubTaskWithImagesGET } from "../../types/openapi_types";
 
-const { goto } = vi.hoisted(() => ({ goto: vi.fn() }));
+const { goto, toast } = vi.hoisted(() => ({
+    goto: vi.fn(),
+    toast: { error: vi.fn() },
+}));
 vi.mock("$app/navigation", () => ({ goto }));
+vi.mock("svelte-sonner", () => ({ toast }));
 vi.mock("$lib/data/helpers", () => ({
     addSubTaskImage: vi.fn(),
     removeSubTaskImage: vi.fn(),
@@ -41,6 +45,7 @@ beforeEach(() => {
     order.length = 0;
     mostInFlight = 0;
     goto.mockReset();
+    toast.error.mockReset();
     vi.mocked(removeSubTaskImage)
         .mockReset()
         .mockImplementation((_set, id) =>
@@ -53,7 +58,7 @@ beforeEach(() => {
         );
 });
 
-const inTask = (opened: string[], setInstanceIDs = vi.fn()) => ({
+const inTask = (opened: string[], setInstanceIDs = vi.fn(async () => [])) => ({
     subTaskId: SET,
     opened,
     setInstanceIDs,
@@ -120,8 +125,22 @@ describe("addImages", () => {
         expect(order).toEqual(["+x"]);
     });
 
+    it("images that fail to load after the links saved say so", async () => {
+        serverHas([]);
+        const setInstanceIDs = vi.fn(() =>
+            Promise.reject(new Error("GET /api/instances/x failed")),
+        );
+        await addImages(["x"], inTask([], setInstanceIDs));
+        await vi.waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                "Some images couldn't be opened",
+                { description: "Try again later." },
+            ),
+        );
+    });
+
     it("on /view saves nothing and writes instances= in the address", async () => {
-        const setInstanceIDs = vi.fn();
+        const setInstanceIDs = vi.fn(async () => []);
         await addImages(["a", "b"], {
             subTaskId: null,
             opened: [],

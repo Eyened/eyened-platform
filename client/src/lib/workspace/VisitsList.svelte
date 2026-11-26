@@ -1,7 +1,7 @@
 <!--
 @component
 The selected image's patient's visits, newest first, each a Carbon Accordion item holding its data sources; this visit starts open.
-It loads only while Info is shown; another patient's image reloads it with that image's visit open.
+It loads only while Info is shown; another patient's image reloads it with that image's visit open; another visit of the same patient opens that visit too.
 -->
 <script lang="ts">
     import AdditionalDataSources from "$lib/browser/AdditionalDataSources.svelte";
@@ -52,6 +52,16 @@ It loads only while Info is shown; another patient's image reloads it with that 
         return () => {
             cancelled = true;
         };
+    });
+
+    // Another visit of the same patient: open its item too; the grader's other items keep their state.
+    $effect(() => {
+        const id = String(currentStudyId);
+        untrack(() => {
+            if (loaded?.identifier !== identifier || open.includes(id)) return;
+            if (loaded.result.studies.some((s) => String(s.id) === id))
+                open = [...open, id];
+        });
     });
 </script>
 
