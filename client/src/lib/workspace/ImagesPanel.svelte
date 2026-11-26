@@ -174,6 +174,10 @@ One tab stop: ↑ ↓ Home End move without loading; a click only focuses an opt
                         data-index={order.indexOf(imageId)}
                         class="flex min-h-16 cursor-pointer items-center gap-2 py-2 ps-4 pe-2 hover:bg-layer-hover-01 aria-selected:selected-look aria-selected:hover:bg-layer-selected-hover-01"
                         ondblclick={() => load(imageId)}
+                        onclick={(e) => {
+                            // A click with no pointer (screen reader, voice control) loads, like Enter.
+                            if (e.detail === 0) load(imageId);
+                        }}
                         onkeydown={(e) => onkeydown(e, imageId)}
                         onfocus={() => (focusId = imageId)}
                         ondragstart={(e) => ondragstart(e, imageId)}

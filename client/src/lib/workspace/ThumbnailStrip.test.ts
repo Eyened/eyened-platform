@@ -35,7 +35,7 @@ describe("ThumbnailStrip", () => {
         expect(names[1]).toMatch(/In viewport\s*2/);
         expect(names[2]).not.toMatch(/In viewport/);
         ws.select(1);
-        await fireEvent.click(screen.getByTestId("tile-img03"));
+        await fireEvent.click(screen.getByTestId("tile-img03"), { detail: 1 });
         expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img02"]);
         await fireEvent.dblClick(screen.getByTestId("tile-img03"));
         expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img03"]);
@@ -53,6 +53,17 @@ describe("ThumbnailStrip", () => {
         expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img03"]);
         await fireEvent.keyDown(titles()[0], { key: " " });
         expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img01"]);
+    });
+
+    it("a click without a pointer (screen reader, voice control) loads the tile", async () => {
+        const ws = workspaceWith(3, { layout: "2x1" });
+        render(ThumbnailStrip, {
+            props: { tile, titleFor },
+            context: workspaceContext(ws),
+        });
+        ws.select(1);
+        await fireEvent.click(titles()[2], { detail: 0 });
+        expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img03"]);
     });
 
     it("is one tab stop that arrow keys and Home / End move", async () => {

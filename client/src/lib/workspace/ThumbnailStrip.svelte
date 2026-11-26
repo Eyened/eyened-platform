@@ -139,6 +139,11 @@ A click only focuses a tile; a double-click or Enter loads into the selected vie
                 data-tile-index={i}
                 tabindex={imageId === tabStop ? 0 : -1}
                 onfocus={() => (focusId = imageId)}
+                onclick={(e) => {
+                    // A click with no pointer (screen reader, voice control) loads, like Enter.
+                    if (e.detail === 0)
+                        workspace.load(workspace.selected, imageId);
+                }}
                 onkeydown={(e) => onkeydown(e, i)}
                 ondragstart={(e) => ondragstart(e, imageId)}
                 ondragend={() => (workspace.draggedImageId = null)}
