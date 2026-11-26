@@ -39,16 +39,15 @@
     import ChevronLeft from "carbon-icons-svelte/lib/ChevronLeft.svelte";
     import ChevronRight from "carbon-icons-svelte/lib/ChevronRight.svelte";
     import { InlineLoading } from "$lib/components/ui/inline-loading/index.js";
-    import { ContentSwitcher } from "$lib/components/ui/content-switcher/index.js";
-    import { getContext } from "svelte";
     import SaveStateSlot from "$lib/saving/SaveStateSlot.svelte";
     import { saveTracker } from "$lib/saving/saveTracker.svelte";
     import { MediaQuery } from "svelte/reactivity";
+    import { getContext } from "svelte";
+    import CarouselHorizontal from "carbon-icons-svelte/lib/CarouselHorizontal.svelte";
     import LayoutPopover from "./LayoutPopover.svelte";
-    import type { ToolMode } from "./tools/registry";
-    import type { Workspace } from "./workspace.svelte";
-    import { writeToolMode } from "./workspacePrefs";
     import PatientsOpen from "./PatientsOpen.svelte";
+    import type { Workspace } from "./workspace.svelte";
+    import { writeStripOn } from "./workspacePrefs";
 
     // Below md the frame supplies the menu button (start) and the right-column button (end).
     let {
@@ -66,21 +65,22 @@
         end?: Snippet;
     } = $props();
 
-    const workspace = getContext<Workspace>("workspace");
     // ASSUMPTION: words from xlg (82rem); below it the save state is an icon.
     const xlg = new MediaQuery("min-width: 82rem");
     // Below xlg a task header shrinks in place: no product name, short label, icon-only links.
     const compact = $derived(task !== null && !xlg.current);
     // Below lg (66rem) there is no room for the status tag either; ▾ still names the status.
     const lg = new MediaQuery("min-width: 66rem");
-    const MODES = [
-        { id: "browse", text: "Browse" },
-        { id: "all", text: "All tools" },
-    ];
+    // A task header has no room for "N patients open" below cds-max (99rem), so it shows "⚠ N".
+    const cdsMax = new MediaQuery("min-width: 99rem");
+    const workspace = getContext<Workspace>("workspace");
+    // No divider beside the save state while it is empty, before the first edit.
+    // ASSUMPTION: "N patients open" alone doesn't bring the divider back.
+    const saveShows = $derived(saveTracker.text !== "");
 
-    function setMode(id: string) {
-        workspace.toolMode = id as ToolMode;
-        writeToolMode(workspace.toolMode);
+    function toggleStrip() {
+        workspace.strip = !workspace.strip;
+        writeStripOn(workspace.strip);
     }
 </script>
 
@@ -104,20 +104,7 @@
             >EyeNED</span
         >
     {/if}
-    <!-- ASSUMPTION: reserved slots in the overview's order. Mode: 3. -->
-    <div class="contents" data-header-slot="mode">
-        {#if !task}
-            <!-- A task is always All tools and shows no switcher. -->
-            <ContentSwitcher
-                size="sm"
-                label="Mode"
-                class="ms-2 w-fit"
-                items={MODES}
-                selectedId={workspace.toolMode}
-                onchange={setMode}
-            />
-        {/if}
-    </div>
+    <!-- ASSUMPTION: reserved slots in the overview's order. -->
     {#if task}
         {#if !narrow && (task.show.title || task.show.nav || task.show.overview || task.tag || task.holder)}
             {@render divider()}
@@ -208,7 +195,10 @@
     {/if}
     <div class="min-w-0 flex-1"></div>
     <div class="contents" data-header-slot="patients-open">
-        <PatientsOpen count={patients} />
+        <PatientsOpen
+            count={patients}
+            compact={task !== null && !cdsMax.current}
+        />
     </div>
     <!-- Save state: 4 and 5; "Mark ready and next": 5. -->
     <div class="contents" data-header-slot="save-state">
@@ -223,7 +213,7 @@
         <div class="contents" data-header-slot="mark-ready">
             <!-- Below md, the set's move and status wait for the narrow footer. -->
             {#if !narrow && task.status}
-                {@render divider()}
+                {#if saveShows}{@render divider()}{/if}
                 {@render task.status("header")}
             {/if}
         </div>
@@ -231,8 +221,19 @@
     {#if narrow}
         {@render end?.()}
     {:else}
-        {@render divider()}
+        <!-- Beside the set's move, or else beside the save state. -->
+        {#if task?.status || saveShows}{@render divider()}{/if}
         <!-- In a task, the task config sets the strip. -->
-        <LayoutPopover stripToggle={task === null} iconOnly={compact} />
+        {#if task === null}
+            <IconButton
+                label="Thumbnail strip"
+                aria-pressed={workspace.strip}
+                class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
+                onclick={toggleStrip}
+            >
+                <CarouselHorizontal />
+            </IconButton>
+        {/if}
+        <LayoutPopover />
     {/if}
 </header>

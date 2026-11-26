@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/svelte";
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import SchemaForm from "./SchemaForm.svelte";
 import type { JSONSchema } from "./schemaType";
@@ -142,6 +148,33 @@ describe("SchemaForm", () => {
             screen.getByText(
                 "This question doesn't apply any more. Clear the answer.",
             ),
+        ).toBeInTheDocument();
+    });
+
+    it("on a read-only form, a ruled-out question that holds an answer doesn't ask to clear it", () => {
+        const conditional = {
+            type: "object",
+            properties: {
+                seen: { description: "Seen", type: "boolean" },
+                note: { description: "Note", type: "string" },
+            },
+            allOf: [
+                {
+                    if: {
+                        properties: { seen: { const: false } },
+                        required: ["seen"],
+                    },
+                    then: { properties: { note: false } },
+                },
+            ],
+        } as unknown as JSONSchema;
+        renderForm({
+            schema: conditional,
+            value: { seen: false, note: "x" },
+            canEdit: false,
+        });
+        expect(
+            screen.getByText("This question doesn't apply any more."),
         ).toBeInTheDocument();
     });
 
@@ -316,5 +349,25 @@ describe("SchemaForm", () => {
         expect(
             screen.getByRole("button", { name: "Note" }),
         ).toBeInTheDocument();
+    });
+
+    it("the form-level notice link moves focus to the form", async () => {
+        const either = {
+            type: "object",
+            properties: {
+                a: { description: "A", type: "string" },
+                b: { description: "B", type: "string" },
+            },
+            oneOf: [{ required: ["a"] }, { required: ["b"] }],
+        } as unknown as JSONSchema;
+        renderForm({
+            schema: either,
+            value: { a: "x", b: "y" },
+            markReadyAttempted: true,
+        });
+        await fireEvent.click(
+            screen.getByRole("button", { name: "This form" }),
+        );
+        await waitFor(() => expect(screen.getByLabelText("A")).toHaveFocus());
     });
 });

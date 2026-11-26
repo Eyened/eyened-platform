@@ -75,6 +75,7 @@ A ⋯ disclosure: the button shows or hides a list that can hold buttons, slider
         {label}
         {size}
         {tabindex}
+        side={side === "end" ? "right" : undefined}
         data-armed={active || undefined}
         class="data-armed:selected-look data-armed:hover:bg-layer-selected-hover-01"
         aria-expanded={open}

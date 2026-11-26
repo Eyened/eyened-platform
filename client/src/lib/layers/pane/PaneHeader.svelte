@@ -26,9 +26,9 @@ The Selected pane's fixed header, in the selected row's look: an optional colour
     } = $props();
 </script>
 
-<!-- The selected row's fill and 3 px bar; ps-3.25 keeps the text at 16 px. -->
+<!-- The selected row's look one layer up, on the pane's layer-02, with its 3 px bar; ps-3.25 keeps the text at 16 px. -->
 <div
-    class="flex-none border-s-3 border-b border-s-border-interactive border-b-border-subtle-01 bg-layer-selected-01 ps-3.25 pe-4 pt-2 pb-1"
+    class="flex-none border-s-3 border-b border-s-border-interactive border-b-border-subtle-01 bg-layer-selected-02 ps-3.25 pe-4 pt-2 pb-1"
 >
     <h3
         {id}

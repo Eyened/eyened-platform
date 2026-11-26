@@ -269,26 +269,31 @@ export function matchForms(input: {
     return { taskSchema, taskRows, other, multiPatient };
 }
 
-export type Completion = "complete" | "incomplete";
+export type Completion = "complete" | "incomplete" | "unchecked";
 
-/** Complete when the form window would show no errors: the same value and the same checker. */
+/** Complete when the form window would show no errors: the same value and the same checker. Unchecked when the schema won't compile. */
 export function completion(
     form: FormAnnotationGET,
     schema: FormSchemaGET,
 ): Completion {
     const root = schema.schema as JSONSchema;
     const value = form.form_data || getDefault(root);
-    return validateSchema(root, value).length === 0 ? "complete" : "incomplete";
+    const errors = validateSchema(root, value);
+    if (errors[0]?.type === "schema") return "unchecked";
+    return errors.length === 0 ? "complete" : "incomplete";
 }
 
-/** Rows with a complete form: the task section's "n of m complete". */
-export function completeCount(
+/** The task section's "n of m complete"; rows whose form wasn't checked count in neither. */
+export function completeText(
     rows: readonly TaskRow[],
     schema: FormSchemaGET,
-): number {
-    return rows.filter(
-        (row) => row.form && completion(row.form, schema) === "complete",
-    ).length;
+): string {
+    const states = rows.map((row) =>
+        row.form ? completion(row.form, schema) : null,
+    );
+    const done = states.filter((s) => s === "complete").length;
+    const of = states.filter((s) => s !== "unchecked").length;
+    return `${done} of ${of} complete`;
 }
 
 /** What "Mark ready" warns about: task rows not graded or not complete, then my other forms in this set that aren't complete. */

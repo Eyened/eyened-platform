@@ -20,7 +20,7 @@ const titles = () => [
 const copies = () => screen.getAllByRole("button", { name: "Copy public ID" });
 
 describe("ThumbnailStrip", () => {
-    it("tiles follow the catalogue, carry their slot number, and a click loads into the selected viewport", async () => {
+    it("tiles follow the catalogue, carry their slot number; a click loads nothing, a double-click loads into the selected viewport", async () => {
         const ws = workspaceWith(3, { layout: "2x1" });
         const { container } = render(ThumbnailStrip, {
             props: { tile, titleFor },
@@ -35,9 +35,35 @@ describe("ThumbnailStrip", () => {
         expect(names[1]).toMatch(/In viewport\s*2/);
         expect(names[2]).not.toMatch(/In viewport/);
         ws.select(1);
-        await fireEvent.click(screen.getByTestId("tile-img03"));
+        await fireEvent.click(screen.getByTestId("tile-img03"), { detail: 1 });
+        expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img02"]);
+        await fireEvent.dblClick(screen.getByTestId("tile-img03"));
         expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img03"]);
         await expectNoAxeViolations(container);
+    });
+
+    it("Enter and Space on a tile load it into the selected viewport", async () => {
+        const ws = workspaceWith(3, { layout: "2x1" });
+        render(ThumbnailStrip, {
+            props: { tile, titleFor },
+            context: workspaceContext(ws),
+        });
+        ws.select(1);
+        await fireEvent.keyDown(titles()[2], { key: "Enter" });
+        expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img03"]);
+        await fireEvent.keyDown(titles()[0], { key: " " });
+        expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img01"]);
+    });
+
+    it("a click without a pointer (screen reader, voice control) loads the tile", async () => {
+        const ws = workspaceWith(3, { layout: "2x1" });
+        render(ThumbnailStrip, {
+            props: { tile, titleFor },
+            context: workspaceContext(ws),
+        });
+        ws.select(1);
+        await fireEvent.click(titles()[2], { detail: 0 });
+        expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img03"]);
     });
 
     it("is one tab stop that arrow keys and Home / End move", async () => {
@@ -67,6 +93,7 @@ describe("ThumbnailStrip", () => {
         });
         ws.select(1);
         await fireEvent.click(copies()[2]);
+        await fireEvent.dblClick(copies()[2]);
         expect(writeText).toHaveBeenCalledWith("img03");
         expect(ws.slots.map((s) => s.imageId)).toEqual(["img01", "img02"]);
     });

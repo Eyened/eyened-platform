@@ -184,6 +184,34 @@ describe("ToolOptionsBar", () => {
         ).toBeInTheDocument();
     });
 
+    it("on a read-only pointset Keys lists only the previous / next point keys", async () => {
+        const ws = workspaceWith(1);
+        ws.attachViewport(0, {
+            zoomPercent: 100,
+            zoomBy: vi.fn(),
+            reset: vi.fn(),
+            layers: {
+                pointTarget: { id: 640, canEdit: false, reason: null },
+                viewerContext: { keyboardCursor: { on: false } },
+            } as never,
+        });
+        ws.arm("point");
+        render(ToolOptionsBar, { context: workspaceContext(ws) });
+        await fireEvent.click(screen.getByRole("button", { name: "Keys" }));
+        const dialog = await screen.findByRole("dialog", { name: "Keys" });
+        const pointTable = within(dialog).getByRole("table", { name: "Point" });
+        expect(
+            within(pointTable)
+                .getAllByRole("row")
+                .slice(1)
+                .map((r) =>
+                    within(r)
+                        .getAllByRole("cell")
+                        .map((c) => c.textContent?.trim()),
+                ),
+        ).toEqual([["[ / ]", "Previous / next point"]]);
+    });
+
     it("keeps Point's reason it can't act visible while the keyboard cursor is on", () => {
         const ws = workspaceWith(1);
         ws.attachViewport(0, {
@@ -523,6 +551,17 @@ describe("ToolOptionsBar with a form's point field armed", () => {
         expect(
             screen.queryByRole("group", { name: "Points" }),
         ).not.toBeInTheDocument();
+    });
+
+    it("titles the Keys list Form points", async () => {
+        renderFormPoints(true);
+        await fireEvent.click(screen.getByRole("button", { name: "Keys" }));
+        const dialog = await screen.findByRole("dialog", { name: "Keys" });
+        expect(
+            within(dialog)
+                .getAllByRole("heading")
+                .map((h) => h.textContent?.trim()),
+        ).toEqual(["Form points", "Without a tool"]);
     });
 
     it("on the right image names the field and its form and shows the stepper", () => {

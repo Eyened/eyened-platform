@@ -7,7 +7,12 @@ A form from its JSON Schema: the root's questions on Carbon controls; a question
     import { InlineNotification } from "$lib/components/ui/inline-notification/index.js";
     import { tick } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
-    import { fieldErrors, MISSING, NOT_APPLICABLE } from "./fieldErrors";
+    import {
+        fieldErrors,
+        MISSING,
+        NOT_APPLICABLE,
+        NOT_APPLICABLE_READ_ONLY,
+    } from "./fieldErrors";
     import FieldList from "./FieldList.svelte";
     import { fieldKind, titleAt } from "./fieldKind";
     import { FOCUSABLE, setFormContext } from "./formContext";
@@ -65,16 +70,21 @@ A form from its JSON Schema: the root's questions on Carbon controls; a question
             : `${n} answers need attention`;
     });
 
-    /** Unfolds the sections holding the question, then focuses it. */
+    /** Unfolds the sections holding the question, then focuses it; a form-level message focuses the first question. */
     async function go(path: string) {
         reveal = { path };
         await tick();
         requestAnimationFrame(() => {
-            const field = [
+            const fields = [
                 ...(element?.querySelectorAll<HTMLElement>(
                     "[data-field-path]",
                 ) ?? []),
-            ].find((f) => f.dataset.fieldPath === path);
+            ];
+            // ASSUMPTION: "focus the form" means its first question, as an error summary links a form-level error to the first field.
+            const field =
+                path === ""
+                    ? fields[0]
+                    : fields.find((f) => f.dataset.fieldPath === path);
             field?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
         });
     }
@@ -95,7 +105,9 @@ A form from its JSON Schema: the root's questions on Carbon controls; a question
         // Another answer made this one not apply, so it shows at once.
         message: (path) => {
             const text = messages.get(path);
-            return text === NOT_APPLICABLE || shown(path) ? text : undefined;
+            if (text === NOT_APPLICABLE)
+                return canEdit ? text : NOT_APPLICABLE_READ_ONLY;
+            return shown(path) ? text : undefined;
         },
         shown,
         ruledOut: (path) => check.ruledOut.has(path),

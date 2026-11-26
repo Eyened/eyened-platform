@@ -4,7 +4,6 @@ The Layout button and its popover: the preset grid and the Arrange orders, each 
 Arrow keys move focus only; Enter, Space or a click applies.
 -->
 <script lang="ts">
-    import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
     import Grid from "carbon-icons-svelte/lib/Grid.svelte";
     import * as Popover from "$lib/components/ui/popover/index.js";
@@ -20,13 +19,10 @@ Arrow keys move focus only; Enter, Space or a click applies.
 
     let {
         stripToggle = false,
-        iconOnly = false,
         anchor,
         open = $bindable(false),
     }: {
         stripToggle?: boolean;
-        /** Below xlg in a task: the Grid icon, with "Layout" as its name and tooltip. */
-        iconOnly?: boolean;
         /** CSS selector of an outside element to hang from; no trigger is rendered. */
         anchor?: string;
         open?: boolean;
@@ -137,15 +133,10 @@ Arrow keys move focus only; Enter, Space or a click applies.
         <span bind:this={triggerWrap} class="contents">
             <Popover.Trigger>
                 {#snippet child({ props })}
-                    {#if iconOnly}
-                        <IconButton {...props} label="Layout"
-                            ><Grid /></IconButton
-                        >
-                    {:else}
-                        <Button {...props} variant="ghost" size="sm"
-                            >Layout <ChevronDown /></Button
-                        >
-                    {/if}
+                    <!-- Grid and chevron fit the 40 px icon button side by side. -->
+                    <IconButton {...props} label="Layout" class="gap-0.5"
+                        ><Grid /><ChevronDown /></IconButton
+                    >
                 {/snippet}
             </Popover.Trigger>
         </span>

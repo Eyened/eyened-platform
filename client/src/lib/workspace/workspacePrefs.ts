@@ -10,12 +10,14 @@ import {
     type MagnifierSize,
 } from "./magnifier";
 import { PAINT_DEFAULTS, SIZE_MAX, SIZE_MIN, type PaintPrefs } from "./paint";
+import { RIGHT_MIN_PX } from "./rightWidth";
 import type { LocalizerMode } from "./workspaceRules";
 import type { ToolMode } from "./tools/registry";
 import type { LayerSectionId } from "$lib/layers/layerSections";
 
 const LEFT_KEY = "eyened:viewer:leftPanel";
 const RIGHT_KEY = "eyened:viewer:rightOpen";
+const RIGHT_WIDTH_KEY = "eyened:viewer:rightWidth";
 const STRIP_KEY = "eyened:viewer:strip";
 const TRACKING_KEY = "eyened:viewer:stripTracking";
 const LOCALIZER_KEY = "eyened:viewer:localizer";
@@ -68,6 +70,25 @@ export function writeRightOpen(open: boolean): void {
         localStorage.setItem(RIGHT_KEY, String(open));
     } catch {
         // Private mode or quota: the choice lasts this session only.
+    }
+}
+
+/** The open right column's width the user set, in px; 288 when none or bad. */
+export function readRightWidth(): number {
+    try {
+        const raw = localStorage.getItem(RIGHT_WIDTH_KEY);
+        const px = raw === null ? NaN : Number(raw);
+        return Number.isFinite(px) && px > 0 ? px : RIGHT_MIN_PX;
+    } catch {
+        return RIGHT_MIN_PX;
+    }
+}
+
+export function writeRightWidth(px: number): void {
+    try {
+        localStorage.setItem(RIGHT_WIDTH_KEY, String(Math.round(px)));
+    } catch {
+        // Private mode or quota: the width lasts this session only.
     }
 }
 

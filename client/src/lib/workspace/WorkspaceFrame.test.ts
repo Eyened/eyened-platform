@@ -276,7 +276,7 @@ describe("WorkspaceFrame", () => {
         choose.focus();
         await fireEvent.click(choose);
         const panel = await screen.findByRole("region", { name: "Images" });
-        await fireEvent.click(panel.querySelectorAll('[role="option"]')[2]);
+        await fireEvent.dblClick(panel.querySelectorAll('[role="option"]')[2]);
         await waitFor(() =>
             expect(screen.getByRole("main")).not.toHaveAttribute("inert"),
         );
@@ -285,6 +285,33 @@ describe("WorkspaceFrame", () => {
                 document.querySelector('[aria-current="true"]'),
             ).toContainElement(document.activeElement as HTMLElement),
         );
+    });
+
+    it("closing the set notice returns focus to where it was before", async () => {
+        mockWidth({ md: true, lg: true, xlg: true });
+        renderFrame(workspaceWith(3), {
+            ...taskHeader(),
+            holderNotice: {
+                title: "Anna de Vries holds this set",
+                subtitle:
+                    "What you save here is saved as yours, inside this set.",
+                alert: false,
+            },
+        });
+        const overview = screen.getByRole("link", {
+            name: "Task overview, opens in a new tab",
+        });
+        overview.focus();
+        // Tab moves on to the notice's close button.
+        const notice = screen
+            .getByText("Anna de Vries holds this set")
+            .closest<HTMLElement>('[data-slot="alert"]')!;
+        const close = within(notice).getByRole("button", { name: "Close" });
+        close.focus();
+
+        await fireEvent.click(close);
+
+        expect(overview).toHaveFocus();
     });
 
     it("crossing md closes an open overlay and moves focus to the button that now controls it", async () => {
@@ -463,6 +490,127 @@ describe("Right panels", () => {
             screen.getByRole("region", { name: "Grading" }),
         ).toBeInTheDocument();
         expect(screen.queryByRole("region", { name: "Layers" })).toBeNull();
+    });
+
+    it("at md the panel's edge resizes it: ← / → by 16 px, Home / End to 288 / 480, Enter back to 288; the width is kept", async () => {
+        mockWidth({ md: true, xlg: true });
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(
+            1200,
+        );
+        renderFrame(workspaceWith(3));
+        const edge = screen.getByRole("separator", {
+            name: "Right panel width",
+        });
+        expect(edge).toHaveAttribute("aria-valuenow", "288");
+        expect(edge).toHaveAttribute("aria-valuemin", "288");
+        expect(edge).toHaveAttribute("aria-valuemax", "480");
+
+        await fireEvent.keyDown(edge, { key: "ArrowLeft" });
+        expect(edge).toHaveAttribute("aria-valuenow", "304");
+        expect(localStorage.getItem("eyened:viewer:rightWidth")).toBe("304");
+        await fireEvent.keyDown(edge, { key: "ArrowRight" });
+        await fireEvent.keyDown(edge, { key: "ArrowRight" });
+        expect(edge).toHaveAttribute("aria-valuenow", "288");
+        await fireEvent.keyDown(edge, { key: "End" });
+        expect(edge).toHaveAttribute("aria-valuenow", "480");
+        await fireEvent.keyDown(edge, { key: "Home" });
+        expect(edge).toHaveAttribute("aria-valuenow", "288");
+        await fireEvent.keyDown(edge, { key: "End" });
+        await fireEvent.keyDown(edge, { key: "Enter" });
+        expect(edge).toHaveAttribute("aria-valuenow", "288");
+        expect(localStorage.getItem("eyened:viewer:rightWidth")).toBe("288");
+    });
+
+    it("stops widening where the viewport grid keeps 320 px beside the rail and left panel", async () => {
+        mockWidth({ md: true, xlg: true });
+        // 1100 - 48 rail - 256 Images - 320 grid leaves the panel 476.
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(
+            1100,
+        );
+        const ws = workspaceWith(3);
+        ws.strip = false;
+        renderFrame(ws);
+        const edge = screen.getByRole("separator", {
+            name: "Right panel width",
+        });
+        await fireEvent.keyDown(edge, { key: "End" });
+        expect(edge).toHaveAttribute("aria-valuenow", "476");
+    });
+});
+
+describe("All tools button", () => {
+    it("on /view it ends the tools, switches Browse and All tools with aria-expanded, and remembers the choice", async () => {
+        mockWidth({ md: true, xlg: true });
+        const ws = workspaceWith(1);
+        ws.toolMode = "browse";
+        renderFrame(ws);
+        const tools = screen.getByRole("toolbar", { name: "Tools" });
+        const button = within(tools).getAllByRole("button").at(-1);
+        expect(button).toHaveAccessibleName("All tools");
+        expect(button).toHaveAttribute("aria-expanded", "false");
+
+        await fireEvent.click(button!);
+        expect(ws.toolMode).toBe("all");
+        expect(button).toHaveAttribute("aria-expanded", "true");
+        expect(button).toHaveAccessibleName("All tools");
+        expect(localStorage.getItem("eyened:viewer:toolMode")).toBe("all");
+
+        await fireEvent.click(button!);
+        expect(ws.toolMode).toBe("browse");
+        expect(localStorage.getItem("eyened:viewer:toolMode")).toBe("browse");
+    });
+
+    it("isn't there in a task", () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(1), taskHeader());
+        expect(screen.queryByRole("button", { name: "All tools" })).toBeNull();
+    });
+});
+
+describe("Header strip toggle and Layout", () => {
+    it("on /view the strip toggle shows and hides the strip, says so when pressed, and remembers it", async () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(3));
+        const toggle = screen.getByRole("button", { name: "Thumbnail strip" });
+        expect(toggle).toHaveAttribute("aria-pressed", "true");
+        expect(
+            screen.getByRole("list", { name: "Thumbnails" }),
+        ).toBeInTheDocument();
+
+        await fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute("aria-pressed", "false");
+        expect(screen.queryByRole("list", { name: "Thumbnails" })).toBeNull();
+        expect(localStorage.getItem("eyened:viewer:strip")).toBe("false");
+
+        await fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute("aria-pressed", "true");
+        expect(
+            screen.getByRole("list", { name: "Thumbnails" }),
+        ).toBeInTheDocument();
+    });
+
+    it("Layout opens the popover without the strip switch; Crosshair tracking stays", async () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(3));
+        await fireEvent.click(screen.getByRole("button", { name: "Layout" }));
+        await screen.findByRole("button", { name: "One viewport" });
+        expect(
+            screen.getByRole("button", { name: "By visit" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("switch", { name: "Thumbnail strip" }),
+        ).toBeNull();
+        expect(
+            screen.getByRole("switch", { name: "Crosshair tracking" }),
+        ).toBeInTheDocument();
+    });
+
+    it("isn't there in a task", () => {
+        mockWidth({ md: true, xlg: true });
+        renderFrame(workspaceWith(1), taskHeader());
+        expect(
+            screen.queryByRole("button", { name: "Thumbnail strip" }),
+        ).toBeNull();
     });
 });
 

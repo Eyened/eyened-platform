@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
-import { createRawSnippet } from "svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
+import { createRawSnippet, tick } from "svelte";
 import { describe, expect, it, vi } from "vitest";
 import type { ResolvedPathname } from "$app/types";
 import {
@@ -67,6 +67,39 @@ describe("WorkspaceHeader", () => {
         }
     });
 
+    it.each([
+        {
+            mode: "in a task, before the set's move",
+            task: () =>
+                taskHeader({
+                    status: createRawSnippet(() => ({
+                        render: () =>
+                            `<button type="button">Mark ready and next</button>`,
+                    })),
+                }),
+            selector: '[data-header-slot="mark-ready"] [data-slot="separator"]',
+        },
+        {
+            mode: "on /view, before the strip and Layout",
+            task: () => null,
+            selector:
+                '[data-header-slot="save-state"] + [data-slot="separator"]',
+        },
+    ])(
+        "$mode: no divider beside the save state until it says something",
+        async ({ task, selector }) => {
+            try {
+                renderHeader(task());
+                expect(document.querySelector(selector)).toBeNull();
+                saveTracker.edited = true;
+                await tick();
+                expect(document.querySelector(selector)).not.toBeNull();
+            } finally {
+                saveTracker.edited = false;
+            }
+        },
+    );
+
     it("shows no set navigation outside a task", () => {
         renderHeader(null);
         expect(screen.queryByRole("button", { name: "Next set" })).toBeNull();
@@ -116,21 +149,6 @@ describe("WorkspaceHeader", () => {
         await expectNoAxeViolations(container);
     });
 
-    it("outside a task, Browse | All tools sets the palette's mode and remembers it; a task shows none", async () => {
-        mockWidth({ md: true, xlg: true });
-        const ws = workspaceWith(2);
-        render(WorkspaceHeader, {
-            props: { task: null, narrow: false },
-            context: workspaceContext(ws),
-        });
-        await fireEvent.click(screen.getByRole("tab", { name: "Browse" }));
-        expect(ws.toolMode).toBe("browse");
-        expect(localStorage.getItem("eyened:viewer:toolMode")).toBe("browse");
-        cleanup();
-        renderHeader(taskHeader());
-        expect(screen.queryByRole("tablist", { name: "Mode" })).toBeNull();
-    });
-
     it("from md to lg: no product name, the short set label, Task overview and Layout as icons", () => {
         mockWidth({ md: true, lg: false, xlg: false });
         render(WorkspaceHeader, {
@@ -147,5 +165,22 @@ describe("WorkspaceHeader", () => {
         expect(
             screen.getByRole("button", { name: "Layout" }),
         ).not.toHaveTextContent("Layout");
+    });
+
+    it("in a task from xlg, patients open shows only the count, its button named in words", () => {
+        mockWidth({ md: true, xlg: true });
+        render(WorkspaceHeader, {
+            props: {
+                task: taskHeader(),
+                narrow: false,
+                patients: 2,
+                start,
+                end,
+            },
+            context: workspaceContext(workspaceWith(2)),
+        });
+        expect(
+            screen.getByRole("button", { name: "2 patients open" }),
+        ).toHaveTextContent(/^2$/);
     });
 });

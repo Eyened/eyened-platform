@@ -8,11 +8,13 @@ import {
     readLayerArea,
     readLayerSections,
     readPaint,
+    readRightWidth,
     readToolMode,
     readStripTracking,
     startStripOn,
     writeLayerArea,
     writeLayerSections,
+    writeRightWidth,
     writeStripOn,
 } from "./workspacePrefs";
 
@@ -44,6 +46,16 @@ describe("tool mode", () => {
         expect(readToolMode()).toBe("browse");
         localStorage.setItem("eyened:viewer:toolMode", "all");
         expect(readToolMode()).toBe("all");
+    });
+});
+
+describe("right column width", () => {
+    it("starts at 288, remembers a set width and ignores a bad value", () => {
+        expect(readRightWidth()).toBe(288);
+        writeRightWidth(400);
+        expect(readRightWidth()).toBe(400);
+        localStorage.setItem("eyened:viewer:rightWidth", "wide");
+        expect(readRightWidth()).toBe(288);
     });
 });
 

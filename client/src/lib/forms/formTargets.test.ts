@@ -5,6 +5,7 @@ import type {
     FormSchemaGET,
 } from "../../types/openapi_types";
 import {
+    completeText,
     completion,
     foldKeys,
     incompleteForms,
@@ -82,6 +83,11 @@ const QUALITY = schema(1, "Image quality grading");
 const VISIT = schema(2, "Visit notes", "Study");
 const REGISTRATION = schema(3, "Pointset registration");
 const schemas = new Map([QUALITY, VISIT, REGISTRATION].map((s) => [s.id, s]));
+// "int" isn't a JSON Schema type, so ajv won't compile it.
+const BROKEN = schema(1, "Image quality grading", "ImageInstance", {
+    type: "object",
+    properties: { quality: { type: "int" } },
+});
 
 describe("targetsFor", () => {
     it.each([
@@ -216,6 +222,24 @@ describe("completion", () => {
     it("every answer valid is complete", () => {
         expect(completion(form({}), QUALITY)).toBe("complete");
     });
+
+    it("a schema that won't compile is not checked", () => {
+        expect(completion(form({}), BROKEN)).toBe("unchecked");
+    });
+});
+
+describe("completeText", () => {
+    it("leaves out a form whose schema won't compile, but counts a Grade row", () => {
+        const matched = matchForms({
+            forms: [form({})],
+            images: [image("img-a"), image("img-b", { laterality: "L" })],
+            schemas: new Map([[1, BROKEN]]),
+            taskSchemaId: 1,
+            userId: ME,
+            subTaskId: SET,
+        });
+        expect(completeText(matched.taskRows!, BROKEN)).toBe("0 of 1 complete");
+    });
 });
 
 describe("incompleteForms", () => {
@@ -253,6 +277,19 @@ describe("incompleteForms", () => {
             subTaskId: SET,
         });
         expect(incompleteForms(matched, schemas, ME, SET)).toEqual([]);
+    });
+
+    it("leaves out a form whose schema won't compile", () => {
+        const broken = new Map([[1, BROKEN]]);
+        const matched = matchForms({
+            forms: [form({})],
+            images: [image("img-a")],
+            schemas: broken,
+            taskSchemaId: 1,
+            userId: ME,
+            subTaskId: SET,
+        });
+        expect(incompleteForms(matched, broken, ME, SET)).toEqual([]);
     });
 
     it("with two patients open, names the patient before the target", () => {

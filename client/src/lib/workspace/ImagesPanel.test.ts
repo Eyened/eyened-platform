@@ -86,11 +86,21 @@ describe("ImagesPanel", () => {
         expect(props.onloaded).toHaveBeenCalled();
     });
 
-    it("clicking an image loads it into the selected viewport", async () => {
+    it("a click loads nothing; a double-click loads into the selected viewport", async () => {
         const { ws, props } = renderPanel();
-        await fireEvent.click(
-            screen.getByRole("option", { name: /not in view$/i }),
-        );
+        const option = screen.getByRole("option", { name: /not in view$/i });
+        await fireEvent.click(option, { detail: 1 });
+        expect(ws.slots[0].imageId).toBe("img01");
+        expect(props.onloaded).not.toHaveBeenCalled();
+        await fireEvent.dblClick(option);
+        expect(ws.slots[0].imageId).toBe("img03");
+        expect(props.onloaded).toHaveBeenCalled();
+    });
+
+    it("a click without a pointer (screen reader, voice control) loads the image", async () => {
+        const { ws, props } = renderPanel();
+        const option = screen.getByRole("option", { name: /not in view$/i });
+        await fireEvent.click(option, { detail: 0 });
         expect(ws.slots[0].imageId).toBe("img03");
         expect(props.onloaded).toHaveBeenCalled();
     });

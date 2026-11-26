@@ -13,7 +13,7 @@
 <tr
     class={cn(
         !head &&
-            "border-t border-border-subtle-00 last:border-b in-dialog:border-border-subtle-01",
+            "border-t border-border-subtle-00 last:border-b in-dialog:border-border-subtle-01 in-layer-02:border-border-subtle-01",
         className,
     )}
     {...restProps}

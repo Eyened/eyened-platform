@@ -14,7 +14,7 @@
     bind:this={ref}
     data-slot="native-select-option"
     class={cn(
-        "bg-layer-hover-01 text-text-primary disabled:text-text-disabled in-dialog:bg-layer-hover-02",
+        "bg-layer-hover-01 text-text-primary disabled:text-text-disabled in-dialog:bg-layer-hover-02 in-layer-02:bg-layer-hover-02",
         className,
     )}
     {...restProps}

@@ -3,6 +3,7 @@ import { ApiError, isOutOfDeclaration } from "$lib/api/client";
 import type { Condition } from "$lib/browser/browserContext.svelte";
 import { addSubTaskImage, removeSubTaskImage } from "$lib/data/helpers";
 import { instances, subtasks } from "$lib/data/stores.svelte";
+import { toast } from "svelte-sonner";
 
 const NOT_APPLIED = "Earlier changes were saved; the rest were not applied.";
 
@@ -11,7 +12,7 @@ export interface AddImagesTarget {
     subTaskId: number | null;
     /** The images that were open when the picker opened; only these can be unlinked. */
     opened: readonly string[];
-    setInstanceIDs: (ids: string[]) => unknown;
+    setInstanceIDs: (ids: string[]) => Promise<unknown>;
     /** /view: the address keeps the open images in instances=. */
     rewriteUrl: boolean;
 }
@@ -23,7 +24,13 @@ export async function addImages(
 ): Promise<void> {
     if (target.subTaskId !== null)
         await saveLinks(target.subTaskId, ids, target.opened);
-    void target.setInstanceIDs(ids);
+    // ASSUMPTION: a toast, since the modal has closed and the failed images have no viewport for an inline notice.
+    // Never the server's message: it may name images.
+    void target.setInstanceIDs(ids).catch(() =>
+        toast.error("Some images couldn't be opened", {
+            description: "Try again later.",
+        }),
+    );
     if (target.rewriteUrl) {
         // history.replaceState (view-state) is not mirrored into page.url.
         const params = new URLSearchParams(window.location.search);

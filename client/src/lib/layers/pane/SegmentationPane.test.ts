@@ -3,7 +3,7 @@ import {
     fireEvent,
     render,
     screen,
-    waitFor,
+    within,
 } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
@@ -123,29 +123,42 @@ describe("SegmentationPane", () => {
         expect(mainViewerContext.applyConnectedComponents.has(item)).toBe(true);
     });
 
-    it("Duplicate… opens the Copy and Type options; Create copy closes them and duplicates", async () => {
+    it("Duplicate on a 3-D Binary row opens a menu; Volume › As Probability copies the volume as Probability", async () => {
         renderPane(
             graderSegmentation(1, ME, "Drusen v2", {
                 data_representation: "Binary",
             }),
             { is3D: true },
         );
+        const trigger = screen.getByRole("button", { name: "Duplicate" });
+        expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+        await fireEvent.keyDown(trigger, { key: "Enter" });
+        const volume = await screen.findByRole("group", { name: "Volume" });
         await fireEvent.click(
-            screen.getByRole("button", { name: "Duplicate…" }),
-        );
-        const dialog = await screen.findByRole("dialog", { name: "Duplicate" });
-        expect(dialog).toContainElement(
-            screen.getByRole("group", { name: "Copy" }),
-        );
-        await fireEvent.click(
-            screen.getByRole("button", { name: "Create copy" }),
+            within(volume).getByRole("menuitem", { name: "As Probability" }),
         );
         expect(duplicate).toHaveBeenCalledOnce();
-        await waitFor(() =>
-            expect(
-                screen.queryByRole("dialog", { name: "Duplicate" }),
-            ).toBeNull(),
+        const args = vi.mocked(duplicate).mock.calls[0];
+        expect(args[5]).toBe(true);
+        expect(args[6]).toBe("P");
+    });
+
+    it("a 2-D MultiClass row has no Duplicate menu; Duplicate copies straight away", async () => {
+        renderPane(
+            graderSegmentation(1, ME, "Layers", {
+                data_representation: "MultiClass",
+            }),
         );
+        const button = screen.getByRole("button", { name: "Duplicate" });
+        expect(button).not.toHaveAttribute("aria-haspopup");
+        await fireEvent.click(button);
+        expect(duplicate).toHaveBeenCalledOnce();
+        expect(vi.mocked(duplicate).mock.calls[0][5]).toBe(false);
+    });
+
+    it("an AI row whose B-scan state has not loaded has no Duplicate", () => {
+        renderPane(modelSegmentation(11, "Drusen AI"), { slice: null });
+        expect(screen.queryByRole("button", { name: "Duplicate" })).toBeNull();
     });
 
     it("a tag added in the store shows in the pane", async () => {

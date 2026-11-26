@@ -22,7 +22,7 @@
         bind:this={ref}
         data-slot="native-select"
         class={cn(
-            "peer block h-10 w-full cursor-pointer appearance-none border-0 border-b border-border-strong-01 bg-field-01 py-0 pr-12 pl-4 text-body-compact-01 text-ellipsis text-text-primary hover:bg-field-hover-01 focus:outline-2 focus:-outline-offset-2 focus:outline-focus disabled:cursor-not-allowed disabled:border-transparent disabled:text-text-disabled in-dialog:border-border-strong-02 in-dialog:bg-field-02 in-dialog:hover:bg-field-hover-02",
+            "peer block h-10 w-full cursor-pointer appearance-none border-0 border-b border-border-strong-01 bg-field-01 py-0 pr-12 pl-4 text-body-compact-01 text-ellipsis text-text-primary hover:bg-field-hover-01 focus:outline-2 focus:-outline-offset-2 focus:outline-focus disabled:cursor-not-allowed disabled:border-transparent disabled:text-text-disabled in-dialog:border-border-strong-02 in-dialog:bg-field-02 in-dialog:hover:bg-field-hover-02 in-layer-02:border-border-strong-03 in-layer-02:bg-field-03 in-layer-02:hover:bg-field-hover-03",
             className,
         )}
         {...restProps}

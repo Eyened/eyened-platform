@@ -153,9 +153,27 @@ describe("SetNavigation", () => {
         expect(s.navigate).not.toHaveBeenCalled();
     });
 
-    it("Mark ready and next stays and shows work that became unsaved during the status save", async () => {
+    it("Mark ready and next saves a stroke drawn during the status save, then leaves", async () => {
         vi.useFakeTimers();
-        const s = setup(async () => {});
+        const send = vi.fn(async (_value: number) => {});
+        const s = setup(send);
+        let release!: () => void;
+        s.statusSend.mockImplementationOnce(
+            () => new Promise<void>((resolve) => (release = resolve)),
+        );
+        void s.navigation.move("primary", { markReady: true });
+        await settle();
+        s.work.edit(1);
+        release();
+        await settle();
+        expect(send).toHaveBeenCalledWith(1);
+        expect(s.navigate).toHaveBeenCalledWith(5);
+    });
+
+    it("Mark ready and next stays and shows a stroke from the status save that couldn't save", async () => {
+        vi.useFakeTimers();
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        const s = setup(offline);
         let release!: () => void;
         s.statusSend.mockImplementationOnce(
             () => new Promise<void>((resolve) => (release = resolve)),
@@ -270,6 +288,26 @@ describe("Next open set", () => {
     it("focus meant for the main button goes to ▶ when there is none", () => {
         document.body.innerHTML = `<button data-set-control="next">Next set</button>`;
         focusSetControl("primary");
+        expect(document.activeElement).toBe(
+            document.querySelector('[data-set-control="next"]'),
+        );
+        document.body.innerHTML = "";
+    });
+
+    it("on the last set, focus meant for ▶ or the missing main button goes to ◀", () => {
+        document.body.innerHTML = `<button data-set-control="prev">Previous set</button><button data-set-control="next" disabled>Next set</button>`;
+        const prev = document.querySelector('[data-set-control="prev"]');
+        focusSetControl("next");
+        expect(document.activeElement).toBe(prev);
+        (document.activeElement as HTMLElement).blur();
+        focusSetControl("primary");
+        expect(document.activeElement).toBe(prev);
+        document.body.innerHTML = "";
+    });
+
+    it("on the first set, focus meant for ◀ goes to ▶", () => {
+        document.body.innerHTML = `<button data-set-control="prev" disabled>Previous set</button><button data-set-control="next">Next set</button>`;
+        focusSetControl("prev");
         expect(document.activeElement).toBe(
             document.querySelector('[data-set-control="next"]'),
         );

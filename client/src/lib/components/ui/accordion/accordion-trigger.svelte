@@ -18,7 +18,7 @@
 
 <AccordionPrimitive.Header {level}>
     <AccordionPrimitive.Trigger
-        class="group flex min-h-10 w-full cursor-pointer items-center pe-4 text-start text-text-primary hover:bg-layer-hover-01 in-dialog:hover:bg-layer-hover-02 in-study:hover:bg-layer-hover-02 in-dialog:in-study:hover:bg-layer-hover-03"
+        class="group flex min-h-10 w-full cursor-pointer items-center pe-4 text-start text-text-primary hover:bg-layer-hover-01 in-dialog:hover:bg-layer-hover-02 in-layer-02:hover:bg-layer-hover-02 in-study:hover:bg-layer-hover-02 in-dialog:in-study:hover:bg-layer-hover-03"
     >
         <!-- The space keeps the summary a separate word in the accessible name; flex does not draw it. The title keeps its width and a long summary ends in an ellipsis. -->
         <span class="flex w-full gap-2 ps-4 text-body-01"

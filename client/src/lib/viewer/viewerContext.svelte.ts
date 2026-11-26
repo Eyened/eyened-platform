@@ -506,6 +506,8 @@ export class ViewerContext {
 
         const renderTarget = { ...renderBounds, framebuffer: null, scissor };
 
+        // The image pass leaves pixels outside the image untouched, so a viewer drawn over another (the Magnifier) would show it there.
+        this.image.webgl.clear(scissor ?? renderBounds);
         this.imageRenderer.renderImage(this, renderTarget);
 
         this.context2D.clearRect(

@@ -1,20 +1,25 @@
 <!--
 @component
 The tool palette: one toolbar, flat while every slot fits, else one slot per job with a list of its tools. Outside All tools, ⋯ More tools holds the rest.
+On /view the All tools button ends the toolbar and switches Browse and All tools.
 -->
 <script lang="ts">
     import { Button } from "$lib/components/ui/button/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
+    import ChevronDown from "carbon-icons-svelte/lib/ChevronDown.svelte";
+    import ChevronUp from "carbon-icons-svelte/lib/ChevronUp.svelte";
     import OverflowMenuHorizontal from "carbon-icons-svelte/lib/OverflowMenuHorizontal.svelte";
     import WatsonHealthMagnify from "carbon-icons-svelte/lib/WatsonHealthMagnify.svelte";
     import { getContext } from "svelte";
     import OverflowMenu from "../OverflowMenu.svelte";
     import { rovingIndex } from "../rovingIndex";
     import type { Workspace } from "../workspace.svelte";
+    import { writeToolMode } from "../workspacePrefs";
     import {
         GAP_PX,
         paletteLayout,
         paletteSections,
+        type Section,
         SLOT_PX,
     } from "./paletteLayout";
     import {
@@ -29,21 +34,37 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     let {
         available,
         orientation = "vertical",
+        modeToggle = false,
     }: {
         /** Rail height left for the palette, in px. */
         available: number;
         /** Horizontal in the narrow menu, which is always flat. */
         orientation?: "vertical" | "horizontal";
+        /** The All tools button; a task is always All tools and has none. */
+        modeToggle?: boolean;
     } = $props();
 
     const workspace = getContext<Workspace>("workspace");
+    // In the rail, tooltips open beside the column so they never cover the next button.
+    const tooltipSide = $derived(
+        orientation === "vertical" ? "right" : undefined,
+    );
     const sections = $derived(
         paletteSections(workspace.toolMode, workspace.hiddenTools),
     );
-    // The Magnifier toggle keeps its own slot, so the tools get the rest.
+    const toolSections = $derived(
+        sections.filter(
+            (s): s is Section & { group: ToolGroup } => s.group !== "More",
+        ),
+    );
+    const hasMore = $derived(toolSections.length < sections.length);
+    // The Magnifier and the All tools button keep their own slots, so the tools get the rest. The button joins ⋯'s group, so it needs no gap there.
+    const ownPx = $derived(
+        SLOT_PX + GAP_PX + (modeToggle ? SLOT_PX + (hasMore ? 0 : GAP_PX) : 0),
+    );
     const flat = $derived(
         orientation === "horizontal" ||
-            paletteLayout(available - SLOT_PX - GAP_PX, sections) === "flat",
+            paletteLayout(available - ownPx, sections) === "flat",
     );
     // A tool the task hides is in neither the rail nor ⋯.
     const leftOut = $derived(
@@ -71,8 +92,7 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
 
     /** One Tab stop; arrow keys move between slots in markup order. */
     const stops = $derived([
-        ...sections.flatMap((s) => {
-            if (s.group === "More") return ["more"];
+        ...toolSections.flatMap((s) => {
             const m = modal(s.tools);
             const slots =
                 !flat && m.length > 1
@@ -81,6 +101,8 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
             return [...slots, ...actions(s.tools).map((t) => t.id)];
         }),
         "magnifier",
+        ...(hasMore ? ["more"] : []),
+        ...(modeToggle ? ["mode"] : []),
     ]);
     let current = $state("");
     const active = $derived(stops.includes(current) ? current : stops[0]);
@@ -118,6 +140,11 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     }
 
     const tab = (key: string) => (key === active ? 0 : -1);
+
+    function toggleMode() {
+        workspace.toolMode = workspace.toolMode === "all" ? "browse" : "all";
+        writeToolMode(workspace.toolMode);
+    }
 </script>
 
 {#snippet toolButton(tool: ToolDef)}
@@ -125,6 +152,7 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
         label={tool.name}
         shortcut={tool.key ?? undefined}
         description={tool.does}
+        side={tooltipSide}
         aria-keyshortcuts={tool.key === "Esc"
             ? "Escape"
             : (tool.key ?? undefined)}
@@ -174,9 +202,52 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     {onkeydown}
     {onfocusin}
 >
-    {#each sections as section (section.group)}
+    {#each toolSections as section (section.group)}
         <div class={orientation === "vertical" ? "flex flex-col" : "flex"}>
-            {#if section.group === "More"}
+            {#if !flat && modal(section.tools).length > 1}
+                {@const tools = modal(section.tools)}
+                {@const group = section.group}
+                <ToolSlot
+                    {group}
+                    tool={shown(group, tools)}
+                    tabindex={tab(group)}
+                    listTabindex={tab(`${group}-list`)}
+                >
+                    {#snippet children(close)}
+                        {#each tools as t (t.id)}
+                            {@render menuRow(t, close)}
+                        {/each}
+                    {/snippet}
+                </ToolSlot>
+                {#each actions(section.tools) as action (action.id)}
+                    {@render toolButton(action)}
+                {/each}
+            {:else}
+                {#each section.tools as tool (tool.id)}
+                    {@render toolButton(tool)}
+                {/each}
+            {/if}
+        </div>
+    {/each}
+    <!-- Not a tool: it shows a panel and leaves the armed tool alone. -->
+    <IconButton
+        label="Magnifier"
+        shortcut="M"
+        description="Shows the area under the pointer magnified in a floating panel"
+        side={tooltipSide}
+        aria-keyshortcuts="M"
+        aria-pressed={workspace.magnifier.on}
+        class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
+        data-stop="magnifier"
+        tabindex={tab("magnifier")}
+        onclick={() => workspace.setMagnifier({ on: !workspace.magnifier.on })}
+    >
+        <WatsonHealthMagnify />
+    </IconButton>
+    <!-- ⋯ and the All tools button are one group at the end, the button last. -->
+    {#if hasMore || modeToggle}
+        <div class={orientation === "vertical" ? "flex flex-col" : "flex"}>
+            {#if hasMore}
                 <OverflowMenu
                     label={armedOut
                         ? `${armedOut.name} (More tools)`
@@ -212,45 +283,24 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
                         {/each}
                     {/snippet}
                 </OverflowMenu>
-            {:else if !flat && modal(section.tools).length > 1}
-                {@const tools = modal(section.tools)}
-                {@const group = section.group}
-                <ToolSlot
-                    {group}
-                    tool={shown(group, tools)}
-                    tabindex={tab(group)}
-                    listTabindex={tab(`${group}-list`)}
+            {/if}
+            {#if modeToggle}
+                <!-- ASSUMPTION: the last stop, after the Magnifier, as "last stop of the toolbar" says. -->
+                <!-- A disclosure button, not a toggle: no pressed look, so it never reads as an armed tool. -->
+                <IconButton
+                    label="All tools"
+                    side={tooltipSide}
+                    aria-expanded={workspace.toolMode === "all"}
+                    data-stop="mode"
+                    tabindex={tab("mode")}
+                    onclick={toggleMode}
                 >
-                    {#snippet children(close)}
-                        {#each tools as t (t.id)}
-                            {@render menuRow(t, close)}
-                        {/each}
-                    {/snippet}
-                </ToolSlot>
-                {#each actions(section.tools) as action (action.id)}
-                    {@render toolButton(action)}
-                {/each}
-            {:else}
-                {#each section.tools as tool (tool.id)}
-                    {@render toolButton(tool)}
-                {/each}
+                    {#if workspace.toolMode === "all"}<ChevronUp
+                        />{:else}<ChevronDown />{/if}
+                </IconButton>
             {/if}
         </div>
-    {/each}
-    <!-- Not a tool: it shows a panel and leaves the armed tool alone. -->
-    <IconButton
-        label="Magnifier"
-        shortcut="M"
-        description="Shows the area under the pointer magnified in a floating panel"
-        aria-keyshortcuts="M"
-        aria-pressed={workspace.magnifier.on}
-        class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
-        data-stop="magnifier"
-        tabindex={tab("magnifier")}
-        onclick={() => workspace.setMagnifier({ on: !workspace.magnifier.on })}
-    >
-        <WatsonHealthMagnify />
-    </IconButton>
+    {/if}
 </div>
 
 <style>

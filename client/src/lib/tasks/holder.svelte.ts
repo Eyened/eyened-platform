@@ -22,8 +22,6 @@ export interface SetHolderDeps {
 export class SetHolder {
     busy = $state(false);
     failed: HolderAction | null = $state(null);
-    /** The last Claim lost to someone else's; the notice says so and is announced. */
-    raceLost = $state(false);
 
     constructor(private readonly deps: SetHolderDeps) {}
 
@@ -61,17 +59,15 @@ export class SetHolder {
         return "";
     }
 
-    /** The canvas notice while someone else holds the set. */
+    /** The canvas notice while someone else holds the set; never an alert, as the tag announces a lost Claim. */
     get notice(): { title: string; subtitle: string; alert: boolean } | null {
         if (this.holderId === null || this.holderId === this.deps.userId)
             return null;
         const name = this.set?.creator?.name ?? "";
         return {
-            title: this.raceLost
-                ? `${name} claimed this set first`
-                : `${name} holds this set`,
+            title: `${name} holds this set`,
             subtitle: "What you save here is saved as yours, inside this set.",
-            alert: this.raceLost,
+            alert: false,
         };
     }
 
@@ -81,12 +77,14 @@ export class SetHolder {
         this.busy = true;
         this.failed = null;
         try {
-            // A save still running would claim the set again behind the tag; its failure shows as usual.
+            // A save still running would claim the set again behind the tag, so the set stays held.
             if (
                 action === "giveBack" &&
                 !(await flushWithin(this.deps.tracker, 5000))
-            )
+            ) {
+                this.failed = action;
                 return;
+            }
             await updateSubTask(this.deps.subTaskId, {
                 claim: action === "claim",
             });
@@ -111,7 +109,6 @@ export class SetHolder {
             this.failed = "claim";
             return;
         }
-        this.raceLost = true;
         await tick();
         this.deps.focusAfterRace();
     }

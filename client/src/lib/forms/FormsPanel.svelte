@@ -33,7 +33,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
     import FormGroups from "./FormGroups.svelte";
     import FormRow from "./FormRow.svelte";
     import {
-        completeCount,
+        completeText,
         completion,
         foldKeys,
         matchForms,
@@ -294,10 +294,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
             <div data-layer-section="task-form">
                 <LayerSection
                     title={schemaName(schema)}
-                    count="{completeCount(
-                        rows,
-                        schema,
-                    )} of {rows.length} complete"
+                    count={completeText(rows, schema)}
                     open={!folded.has("task")}
                     ontoggle={() => toggle("task")}
                 >
@@ -306,10 +303,7 @@ Rows open their form in the window; "Grade" and Copy make one and open it.
                             {#if patient.rows.length > 0}
                                 <LayerSection
                                     title={patient.name}
-                                    count="{completeCount(
-                                        patient.rows,
-                                        schema,
-                                    )} of {patient.rows.length} complete"
+                                    count={completeText(patient.rows, schema)}
                                     level={4}
                                     open={!folded.has(
                                         `task:patient:${patientId}`,

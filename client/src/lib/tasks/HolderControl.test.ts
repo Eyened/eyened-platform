@@ -31,23 +31,25 @@ function storeSet(over: Record<string, unknown> = {}) {
 function setup(over: Record<string, unknown> = {}) {
     storeSet(over);
     const focusAfterRace = vi.fn();
+    const tracker = new SaveTracker();
     const holder = new SetHolder({
         subTaskId: SUBTASK_ID,
         taskId: 3,
         index: 4,
         userId: ME,
-        tracker: new SaveTracker(),
+        tracker,
         focusAfterRace,
     });
     // From lg the action is a ghost button beside the tag.
     mockWidth({ md: true, lg: true, xlg: true });
     render(HolderControl, { props: { holder, showStatus: true } });
-    return { holder, focusAfterRace };
+    return { holder, focusAfterRace, tracker };
 }
 
 const tag = () => document.querySelector('[data-slot="tag"]');
 
 afterEach(() => {
+    vi.useRealTimers();
     subtasks.clear();
     vi.restoreAllMocks();
     vi.mocked(updateSubTask).mockReset();
@@ -77,7 +79,7 @@ describe("HolderControl", () => {
         expect(screen.queryByRole("button")).toBeNull();
     });
 
-    it("a Claim someone else won shows their name, says so first, and moves focus on", async () => {
+    it("a Claim someone else won names them as the holder, not as an alert, and moves focus on", async () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
         vi.mocked(updateSubTask).mockRejectedValue(
             new ApiError(409, "Conflict", {
@@ -102,9 +104,9 @@ describe("HolderControl", () => {
         expect(tag()).toHaveTextContent("Held by Anna de Vries");
         expect(screen.queryByRole("button")).toBeNull();
         expect(holder.notice).toEqual({
-            title: "Anna de Vries claimed this set first",
+            title: "Anna de Vries holds this set",
             subtitle: "What you save here is saved as yours, inside this set.",
-            alert: true,
+            alert: false,
         });
     });
 
@@ -139,5 +141,29 @@ describe("HolderControl", () => {
 
         await waitFor(() => expect(tag()).toHaveTextContent("Yours"));
         expect(screen.queryByText("Couldn't claim. Try again.")).toBeNull();
+    });
+
+    it("a Give back whose save is still running at 5 s says it wasn't given back", async () => {
+        vi.useFakeTimers();
+        const { tracker } = setup({
+            creator_id: ME,
+            creator: { id: ME, name: "Kim" },
+        });
+        tracker.join({
+            kind: "form",
+            group: "form_1",
+            target: { to: "focus", focus: () => {} },
+            state: "saving",
+            flush: () => new Promise<void>(() => {}),
+        });
+
+        await fireEvent.click(
+            screen.getByRole("button", { name: "Give back" }),
+        );
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(screen.getByRole("alert")).toHaveTextContent(
+            "Couldn't give back. Try again.",
+        );
     });
 });

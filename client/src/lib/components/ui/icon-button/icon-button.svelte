@@ -21,6 +21,7 @@
         shortcut,
         tooltip,
         description,
+        side,
         ...restProps
     }: Omit<HTMLButtonAttributes, "aria-label" | "children"> & {
         label: string;
@@ -33,6 +34,8 @@
         tooltip?: string;
         /** A second tooltip line, e.g. what a tool does; also the button's accessible description. */
         description?: string;
+        /** Where the tooltip opens; columns pass the side away from the column. Defaults to top. */
+        side?: "top" | "right" | "bottom" | "left";
         /** A link instead of a button, e.g. Task overview opening another tab. */
         href?: ResolvedPathname;
         target?: string;
@@ -61,7 +64,7 @@
                 </Button>
             {/snippet}
         </Tooltip.Trigger>
-        <Tooltip.Content size="icon"
+        <Tooltip.Content size="icon" {side}
             >{tooltip ?? label}{#if shortcut}<kbd class="ms-4 font-sans"
                     >{shortcut}</kbd
                 >{/if}{#if description}<span

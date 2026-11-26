@@ -4,6 +4,7 @@ The Layers tab's list above the Selected pane, with a splitter between them. The
 -->
 <script lang="ts">
     import Splitter from "$lib/workspace/Splitter.svelte";
+    import DragVertical from "carbon-icons-svelte/lib/DragVertical.svelte";
     import {
         readPaneHeight,
         writePaneHeight,
@@ -68,11 +69,17 @@ The Layers tab's list above the Selected pane, with a splitter between them. The
             saved = null;
             writePaneHeight(null);
         }}
-    />
+    >
+        <!-- Always shown so the line reads as draggable; its middle gap leaves the 2 px line visible. -->
+        <DragVertical
+            size={16}
+            class="pointer-events-none text-icon-secondary"
+        />
+    </Splitter>
     <div
         id="{uid}-pane"
         data-slot="selected-pane"
-        class="flex flex-none flex-col overflow-hidden border-t border-border-subtle-01"
+        class="flex flex-none flex-col overflow-hidden border-t border-border-subtle-01 bg-layer-02"
         style={set === null ? "max-height: 50%;" : `height: ${set}px;`}
         bind:offsetHeight={shown}
     >

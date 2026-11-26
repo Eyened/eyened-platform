@@ -25,6 +25,8 @@ export function formWindowHandback(win: Window): void {
         const opener = win.opener as Opener | null;
         if (!opener || opener.closed) return;
         opener.addEventListener("pagehide", () => {
+            // The viewer let go of the window (an in-app link): this copy stops.
+            if (root.dataset.released) return showClosed();
             const gone = opener.document;
             delete root.dataset.mounted;
             show(root.dataset.loading || "Loading…");

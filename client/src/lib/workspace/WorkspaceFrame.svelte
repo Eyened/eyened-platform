@@ -34,6 +34,13 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     import LayoutPopover from "./LayoutPopover.svelte";
     import MagnifierPanel from "./MagnifierPanel.svelte";
     import Pager from "./Pager.svelte";
+    import {
+        RIGHT_MIN_PX,
+        RIGHT_STEP_PX,
+        rightMax,
+        rightWidth,
+    } from "./rightWidth";
+    import Splitter from "./Splitter.svelte";
     import { GAP_PX } from "./tools/paletteLayout";
     import ToolOptionsBar from "./tools/ToolOptionsBar.svelte";
     import ToolPalette from "./tools/ToolPalette.svelte";
@@ -44,8 +51,10 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     import {
         readLeftPanel,
         readRightOpen,
+        readRightWidth,
         writeLeftPanel,
         writeRightOpen,
+        writeRightWidth,
         type LeftPanel,
     } from "./workspacePrefs";
 
@@ -79,8 +88,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     const md = new MediaQuery("min-width: 42rem");
     const xlg = new MediaQuery("min-width: 82rem");
     const narrow = $derived(!md.current);
-    const RIGHT_OPEN_PX = 288;
     const RAIL_PX = 48;
+    const LEFT_PX = 256;
 
     // Images starts closed while the strip is on: the strip already shows the catalogue.
     // ASSUMPTION: read once at mount (plan decision 22).
@@ -109,6 +118,18 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         narrow ? (overlay === "menu" ? menuTab : null) : left,
     );
     const rightShown = $derived(narrow ? overlay === "right" : rightOpen);
+    // The open right column's width at md and up: the user's, clamped to what the grid leaves.
+    let frameWidth = $state(0);
+    let savedRight = $state(readRightWidth());
+    let rightBefore = 0;
+    let rightStart = 0;
+    const room = $derived(frameWidth - RAIL_PX - (left ? LEFT_PX : 0));
+    const rightPx = $derived(rightWidth(savedRight, room));
+
+    function keepRight(px: number) {
+        savedRight = rightWidth(Math.round(px), room);
+        writeRightWidth(savedRight);
+    }
     const overlayOpen = $derived(narrow && overlay !== null);
     const formsName = $derived(task ? "Grading" : "Forms");
     const footer = $derived(
@@ -116,6 +137,20 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     );
     // Closing the holder notice lasts for this set; the next set is a page load.
     let holderNoticeClosed = $state(false);
+    // Where focus was before it entered the holder notice; closing returns it there.
+    let holderNoticeReturn: HTMLElement | null = null;
+
+    function holderNoticeFocusIn(
+        e: FocusEvent & { currentTarget: HTMLElement },
+    ) {
+        const from = e.relatedTarget as HTMLElement | null;
+        if (!e.currentTarget.contains(from)) holderNoticeReturn = from;
+    }
+
+    function closeHolderNotice() {
+        if (holderNoticeReturn?.isConnected) holderNoticeReturn.focus();
+        holderNoticeClosed = true;
+    }
     let footerHeight = $state(0);
     // The header's words on the narrow panels button while something couldn't save.
     const saveFailure = $derived(
@@ -429,7 +464,11 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
 </script>
 
 {#snippet tools(orientation: "vertical" | "horizontal")}
-    <ToolPalette available={paletteSpace} {orientation} />
+    <ToolPalette
+        available={paletteSpace}
+        {orientation}
+        modeToggle={task === null}
+    />
 {/snippet}
 
 {#snippet headerStart()}
@@ -464,14 +503,15 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     </IconButton>
 {/snippet}
 
-{#snippet panelSwitch()}
+{#snippet panelSwitch(side: "left" | "top")}
     {#each RIGHT_PANELS as item (item.id)}
-        <!-- Selected: layer-selected plus a 3 px border-interactive bar on the panel side, like the side nav's current item. -->
+        <!-- Pressed: the same look as an armed tool and an open left panel. -->
         <IconButton
             label={panelName(item.id)}
+            {side}
             aria-pressed={rightShown && panel === item.id}
             aria-controls="{uid}-{item.id}"
-            class="relative aria-pressed:bg-layer-selected-01 aria-pressed:before:absolute aria-pressed:before:inset-y-0 aria-pressed:before:start-0 aria-pressed:before:w-0.75 aria-pressed:before:bg-border-interactive"
+            class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
             onclick={(e) => toggleRight(item.id, e)}
         >
             <item.Icon />
@@ -486,12 +526,13 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     class="frame"
     class:narrow
     style="--rail: {narrow ? '0px' : `${RAIL_PX}px`}; --left: {left && !narrow
-        ? '256px'
+        ? `${LEFT_PX}px`
         : '0px'}; --right: {narrow
         ? '0px'
         : rightOpen
-          ? `${RIGHT_OPEN_PX}px`
+          ? `${rightPx}px`
           : `${RAIL_PX}px`};"
+    bind:clientWidth={frameWidth}
     {onkeydown}
 >
     <WorkspaceHeader
@@ -512,8 +553,10 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 {#each LEFT_PANELS as panel (panel.id)}
                     <IconButton
                         label={panel.label}
+                        side="right"
                         aria-pressed={left === panel.id}
                         aria-controls="{uid}-{panel.id}"
+                        class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
                         onclick={(e) => toggleLeft(panel.id, e)}
                     >
                         <panel.Icon />
@@ -630,7 +673,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                         />
                     {/if}
                 </div>
-                <!-- Outside the live region: on arrival it is just there; after a lost Claim it is an alert. -->
+                <!-- Outside the live region: it is just there; after a lost Claim the holder tag announces the change. -->
                 {#if task?.holderNotice && !holderNoticeClosed}
                     <InlineNotification
                         kind="warning"
@@ -639,7 +682,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                         title={task.holderNotice.title}
                         subtitle={task.holderNotice.subtitle}
                         role={task.holderNotice.alert ? "alert" : "none"}
-                        onclose={() => (holderNoticeClosed = true)}
+                        onfocusin={holderNoticeFocusIn}
+                        onclose={closeHolderNotice}
                     />
                 {/if}
             </div>
@@ -657,7 +701,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     <div class="pager" inert={overlayOpen}><Pager /></div>
     <aside class="right" aria-label="Layers and {formsName.toLowerCase()}">
         {#if !narrow}
-            <div class="right-rail">{@render panelSwitch()}</div>
+            <div class="right-rail">{@render panelSwitch("left")}</div>
         {/if}
         <div
             id="{uid}-right-panels"
@@ -673,7 +717,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                     aria-label="Panels"
                     class="flex border-b border-border-subtle-01 px-2"
                 >
-                    {@render panelSwitch()}
+                    {@render panelSwitch("top")}
                 </div>
             {/if}
             <section
@@ -730,6 +774,31 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
             </section>
         </div>
     </aside>
+    {#if !narrow && rightOpen}
+        <!-- Below md there is no splitter: the overlay stays 288 px. -->
+        <Splitter
+            axis="col"
+            label="Right panel width"
+            controls="{uid}-right-panels"
+            valueNow={rightPx}
+            valueMin={RIGHT_MIN_PX}
+            valueMax={rightMax(room)}
+            style="top: 48px; bottom: 0; right: {rightPx - 4}px;"
+            ondragstart={() => {
+                rightBefore = savedRight;
+                rightStart = rightPx;
+            }}
+            ondrag={(delta) =>
+                (savedRight = rightWidth(Math.round(rightStart - delta), room))}
+            ondragend={() => writeRightWidth(savedRight)}
+            oncancel={() => (savedRight = rightBefore)}
+            onstep={(direction) =>
+                keepRight(rightPx - direction * RIGHT_STEP_PX)}
+            onlimit={(end) =>
+                keepRight(end === "min" ? RIGHT_MIN_PX : rightMax(room))}
+            onreset={() => keepRight(RIGHT_MIN_PX)}
+        />
+    {/if}
     {#if overlayOpen}
         <div class="scrim" aria-hidden="true" onclick={dismiss}></div>
     {/if}
@@ -761,14 +830,18 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         overflow-y: auto;
         /* The 48 px split slot is 1 px wider than the content box beside the border. */
         overflow-x: hidden;
+        /* A classic 16 px scrollbar would cover the job chevrons at the rail's edge; wheel, touch and focus still scroll. */
+        scrollbar-width: none;
         background: var(--color-layer-01);
         border-inline-end: 1px solid var(--color-border-subtle-01);
     }
-    /* At short heights the bottom group joins the top one and they scroll together (S2 side navigation). */
+    /* At short heights the bottom group joins the top one and they scroll together (S2 side navigation).
+       The top border keeps panels and tools apart even then. */
     .rail-bottom {
         display: flex;
         flex-direction: column;
         margin-top: auto;
+        border-top: 1px solid var(--color-border-subtle-01);
     }
     .left {
         grid-area: left;

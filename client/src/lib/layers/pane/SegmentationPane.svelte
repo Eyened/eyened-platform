@@ -1,12 +1,11 @@
 <!--
 @component
-The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the header; color, Threshold, Mask with reference, classes and Area open; Tags, Reference image and Connected components folded.
+The Selected pane for a segmentation: Duplicate and Import in the header; color, Threshold, Mask with reference, classes and Area open; Tags, Reference image and Connected components folded.
 -->
 <script lang="ts">
     import * as Accordion from "$lib/components/ui/accordion/index.js";
     import * as Field from "$lib/components/ui/field/index.js";
     import { IconButton } from "$lib/components/ui/icon-button/index.js";
-    import * as Popover from "$lib/components/ui/popover/index.js";
     import { Toggle } from "$lib/components/ui/toggle/index.js";
     import { modelSegmentations, segmentations } from "$lib/data/stores.svelte";
     import { tagSegmentation, untagSegmentation } from "$lib/data/helpers";
@@ -22,7 +21,6 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     import type { ViewerContext } from "$lib/viewer/viewerContext.svelte";
     import CCPanel from "$lib/viewer-window/panelSegmentation/CCPanel.svelte";
     import { duplicate } from "$lib/viewer-window/panelSegmentation/duplicate_utils";
-    import DuplicateAnnotationPanel from "$lib/viewer-window/panelSegmentation/DuplicateAnnotationPanel.svelte";
     import FeatureColorPicker from "$lib/viewer-window/panelSegmentation/FeatureColorPicker.svelte";
     import ImportPanel from "$lib/viewer-window/panelSegmentation/ImportPanel.svelte";
     import MultiFeatureSelector from "$lib/viewer-window/panelSegmentation/MultiFeatureSelector.svelte";
@@ -35,8 +33,8 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     import ThresholdSlider from "$lib/viewer-window/panelSegmentation/ThresholdSlider.svelte";
     import type { Workspace } from "$lib/workspace/workspace.svelte";
     import type { SegmentationItem } from "$lib/webgl/segmentationItem.svelte";
+    import { DropdownMenu } from "bits-ui";
     import Copy from "carbon-icons-svelte/lib/Copy.svelte";
-    import CopyFile from "carbon-icons-svelte/lib/CopyFile.svelte";
     import { getContext, type Snippet } from "svelte";
     import type { SegmentationGET } from "../../../types/openapi_types";
     import PaneHeader from "./PaneHeader.svelte";
@@ -74,7 +72,6 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
     function retry() {
         for (const saver of savers) void saver.flush();
     }
-    let duplicateOpen = $state(false);
     let rare: string[] = $state([]);
     const me = globalContext.user.id;
     // Read once at mount, as the row's picker does, so the derived read below never assigns a colour.
@@ -101,20 +98,31 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
             : `[${referenceId}]`;
     });
 
-    function quickDuplicate() {
+    // MultiClass and MultiLabel copies keep their type, so the letter is unused there.
+    function copy(volume: boolean, type: "Q" | "B" | "P") {
         duplicate(
             segmentationContext,
             segmentation,
             item,
             image,
             viewerContext,
-            false,
-            "Q",
-            item.threshold,
-            0.5,
+            volume,
+            type,
+            item.threshold ?? segmentation.threshold ?? 0.5, // original threshold
+            0.5, // new threshold
             taskContext,
         );
     }
+    const asTypes = [
+        { type: "Q", label: "As Questionable" },
+        { type: "B", label: "As Binary" },
+        { type: "P", label: "As Probability" },
+    ] as const;
+    // Carbon Menu items, styled as the combo button's.
+    const menuItem =
+        "flex h-8 cursor-pointer items-center px-4 text-body-compact-01 text-text-secondary outline-none select-none hover:bg-layer-hover-01 hover:text-text-primary data-highlighted:bg-layer-hover-01 data-highlighted:text-text-primary data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-focus";
+    const groupHeading =
+        "flex h-8 items-center px-4 text-label-01 text-text-secondary";
 </script>
 
 <PaneHeader
@@ -130,35 +138,77 @@ The Selected pane for a segmentation: Duplicate, Duplicate… and Import in the 
         {/if}
     {/snippet}
     {#snippet actions()}
-        {#if isModel}
-            <IconButton
-                size="icon-xs"
-                label="Duplicate"
-                onclick={quickDuplicate}><Copy /></IconButton
-            >
-        {/if}
+        <!-- Only once the B-scan state exists: before it, a copy would upload empty planes. -->
         {#if sliceState}
-            <Popover.Root bind:open={duplicateOpen}>
-                <Popover.Trigger>
-                    {#snippet child({ props })}
-                        <IconButton {...props} size="icon-xs" label="Duplicate…"
-                            ><CopyFile /></IconButton
-                        >
-                    {/snippet}
-                </Popover.Trigger>
-                <Popover.Content
-                    role="dialog"
-                    aria-label="Duplicate"
-                    align="start"
+            {#if isMulti && !image.is3D}
+                <IconButton
+                    size="icon-xs"
+                    label="Duplicate"
+                    onclick={() => copy(false, "Q")}><Copy /></IconButton
                 >
-                    <DuplicateAnnotationPanel
-                        {segmentation}
-                        {image}
-                        segmentationItem={item}
-                        oncreate={() => (duplicateOpen = false)}
-                    />
-                </Popover.Content>
-            </Popover.Root>
+            {:else}
+                <DropdownMenu.Root>
+                    <DropdownMenu.Trigger>
+                        {#snippet child({ props })}
+                            <IconButton
+                                {...props}
+                                size="icon-xs"
+                                label="Duplicate"><Copy /></IconButton
+                            >
+                        {/snippet}
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                        <DropdownMenu.Content
+                            align="start"
+                            sideOffset={0}
+                            class="z-50 w-60 bg-layer-01 py-1 shadow-popover outline-none"
+                        >
+                            {#if isMulti}
+                                <DropdownMenu.Item
+                                    class={menuItem}
+                                    onSelect={() => copy(false, "Q")}
+                                    >This B-scan</DropdownMenu.Item
+                                >
+                                <DropdownMenu.Item
+                                    class={menuItem}
+                                    onSelect={() => copy(true, "Q")}
+                                    >Volume</DropdownMenu.Item
+                                >
+                            {:else if image.is3D}
+                                {#each [{ volume: false, heading: "This B-scan" }, { volume: true, heading: "Volume" }] as group, i (group.heading)}
+                                    {#if i > 0}
+                                        <DropdownMenu.Separator
+                                            class="my-1 h-px bg-border-subtle-01"
+                                        />
+                                    {/if}
+                                    <DropdownMenu.Group>
+                                        <DropdownMenu.GroupHeading
+                                            class={groupHeading}
+                                            >{group.heading}</DropdownMenu.GroupHeading
+                                        >
+                                        {#each asTypes as t (t.type)}
+                                            <DropdownMenu.Item
+                                                class={menuItem}
+                                                onSelect={() =>
+                                                    copy(group.volume, t.type)}
+                                                >{t.label}</DropdownMenu.Item
+                                            >
+                                        {/each}
+                                    </DropdownMenu.Group>
+                                {/each}
+                            {:else}
+                                {#each asTypes as t (t.type)}
+                                    <DropdownMenu.Item
+                                        class={menuItem}
+                                        onSelect={() => copy(false, t.type)}
+                                        >{t.label}</DropdownMenu.Item
+                                    >
+                                {/each}
+                            {/if}
+                        </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                </DropdownMenu.Root>
+            {/if}
         {/if}
         {#if isEditable}
             <ImportPanel {segmentation} {image} segmentationItem={item} />

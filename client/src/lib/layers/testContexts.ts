@@ -131,8 +131,8 @@ export function layersContexts(
         resolution?: { x: number; y: number; z: number };
         is3D?: boolean;
         getMask?: (index: number) => unknown;
-        /** Every slice state's initial load, and whether its slice has nothing. */
-        slice?: { loaded?: Promise<void>; isEmptyForSlice?: boolean };
+        /** Every slice state's initial load, and whether its slice has nothing; null before any slice state exists. */
+        slice?: { loaded?: Promise<void>; isEmptyForSlice?: boolean } | null;
         /** The image's model keypoints, for the AI grid. */
         cfKeypoints?: { fovea_xy: number[]; disc_edge_xy: number[] };
         /** Image ids registered to this one. */
@@ -187,6 +187,7 @@ export function layersContexts(
                     importOther: vi.fn(async () => {}),
                     savedScanIndices: [],
                     getSegmentationState: (index: number) => {
+                        if (over.slice === null) return undefined;
                         return {
                             loaded: over.slice?.loaded ?? Promise.resolve(),
                             isEmptyForSlice:

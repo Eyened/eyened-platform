@@ -32,11 +32,14 @@
     --color-field-hover-01: #333333;
     --color-field-02: #393939;
     --color-field-hover-02: #474747;
+    --color-field-03: #525252;
+    --color-field-hover-03: #636363;
     --color-border-subtle-00: #393939;
     --color-border-subtle-01: #525252;
     --color-border-subtle-02: #6f6f6f;
     --color-border-strong-01: #6f6f6f;
     --color-border-strong-02: #8d8d8d;
+    --color-border-strong-03: #a8a8a8;
     --color-border-interactive: #4589ff;
     --color-border-inverse: #f4f4f4;
     --color-border-disabled: rgba(141, 141, 141, 0.5);
@@ -231,8 +234,10 @@
     }
 }
 
-/* Carbon Layer: inside a dialog, a ConditionBuilder popover, a tag popover, a filter popover, the viewer options bar or the Layers Selected pane, surfaces and fields use the 02 set. */
-@custom-variant in-dialog (&:where([data-slot="dialog-content"] *, [data-slot="condition-popover"] *, [data-slot="tag-popover"] *, [data-slot="filter-popover"] *, [data-slot="tool-options"] *, [data-slot="selected-pane"] *));
+/* Carbon Layer: inside a dialog, a ConditionBuilder popover, a tag popover, a filter popover or the viewer options bar, surfaces and fields use the 02 set. */
+@custom-variant in-dialog (&:where([data-slot="dialog-content"] *, [data-slot="condition-popover"] *, [data-slot="tag-popover"] *, [data-slot="filter-popover"] *, [data-slot="tool-options"] *));
+/* Carbon Layer: on a layer-02 surface (the Layers Selected pane), fields use the 03 set. */
+@custom-variant in-layer-02 (&:where([data-slot="selected-pane"] *));
 /* Data table size: rows and cells follow the table's data-size. */
 @custom-variant table-xl (&:where([data-size="xl"] *));
 @custom-variant table-lg (&:where([data-size="lg"] *));
