@@ -138,8 +138,8 @@ The Selected pane for a segmentation: Duplicate and Import in the header; color,
         {/if}
     {/snippet}
     {#snippet actions()}
-        <!-- ASSUMPTION: shown where either of the old Duplicate buttons showed (AI rows, or a loaded B-scan). -->
-        {#if isModel || sliceState}
+        <!-- Only once the B-scan state exists: before it, a copy would upload empty planes. -->
+        {#if sliceState}
             {#if isMulti && !image.is3D}
                 <IconButton
                     size="icon-xs"

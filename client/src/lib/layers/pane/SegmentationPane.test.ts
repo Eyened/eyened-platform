@@ -156,6 +156,11 @@ describe("SegmentationPane", () => {
         expect(vi.mocked(duplicate).mock.calls[0][5]).toBe(false);
     });
 
+    it("an AI row whose B-scan state has not loaded has no Duplicate", () => {
+        renderPane(modelSegmentation(11, "Drusen AI"), { slice: null });
+        expect(screen.queryByRole("button", { name: "Duplicate" })).toBeNull();
+    });
+
     it("a tag added in the store shows in the pane", async () => {
         const s = graderSegmentation(1, ME, "Drusen v2");
         renderPane(s);
