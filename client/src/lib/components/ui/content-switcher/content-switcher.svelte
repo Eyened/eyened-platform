@@ -46,7 +46,7 @@
     role="tablist"
     aria-label={label}
     class={cn(
-        "grid w-full auto-cols-fr grid-flow-col overflow-hidden rounded-content-switcher border border-border-strong-01 in-dialog:border-border-strong-02",
+        "grid w-full auto-cols-fr grid-flow-col overflow-hidden rounded-content-switcher border border-border-strong-01 in-dialog:border-border-strong-02 in-layer-02:border-border-strong-03",
         size === "lg" ? "h-12" : size === "sm" ? "h-8" : "h-10",
         className,
     )}

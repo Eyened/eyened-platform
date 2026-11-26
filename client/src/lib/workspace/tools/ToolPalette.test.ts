@@ -164,6 +164,30 @@ describe("ToolPalette", () => {
         await expectNoAxeViolations(container);
     });
 
+    it("in Browse on /view, ⋯ and All tools end the rail after the Magnifier, in markup and arrow-key order", async () => {
+        const ws = workspaceWith(1);
+        ws.toolMode = "browse";
+        render(ToolPalette, {
+            props: { available: 1000, modeToggle: true },
+            context: workspaceContext(ws),
+        });
+        const names = screen
+            .getAllByRole("button")
+            .map((b) => b.getAttribute("aria-label") ?? b.textContent);
+        expect(names.slice(-3)).toEqual([
+            "Magnifier",
+            "More tools",
+            "All tools",
+        ]);
+        const magnifier = screen.getByRole("button", { name: "Magnifier" });
+        magnifier.focus();
+        await fireEvent.keyDown(magnifier, { key: "ArrowDown" });
+        const more = screen.getByRole("button", { name: "More tools" });
+        expect(more).toHaveFocus();
+        await fireEvent.keyDown(more, { key: "ArrowDown" });
+        expect(screen.getByRole("button", { name: "All tools" })).toHaveFocus();
+    });
+
     it("a task that hides Measure has no Distance on the rail and no ETDRS circle under ⋯", async () => {
         const ws = new Workspace({ hiddenTools: hiddenTools(["Measure"]) });
         ws.hydrate(entries(1), NO_URL);

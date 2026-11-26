@@ -85,7 +85,7 @@
                     flushSync(); // render the filtered list before bits-ui highlights its first option
                 }}
                 class={cn(
-                    "h-10 w-full border-0 border-b border-border-strong-01 bg-field-01 ps-4 text-body-compact-01 text-text-primary placeholder:text-text-placeholder hover:bg-field-hover-01 in-dialog:border-border-strong-02 in-dialog:bg-field-02 in-dialog:hover:bg-field-hover-02",
+                    "h-10 w-full border-0 border-b border-border-strong-01 bg-field-01 ps-4 text-body-compact-01 text-text-primary placeholder:text-text-placeholder hover:bg-field-hover-01 in-dialog:border-border-strong-02 in-dialog:bg-field-02 in-dialog:hover:bg-field-hover-02 in-layer-02:border-border-strong-03 in-layer-02:bg-field-03 in-layer-02:hover:bg-field-hover-03",
                     value ? "pe-17.5" : "pe-12",
                 )}
             />

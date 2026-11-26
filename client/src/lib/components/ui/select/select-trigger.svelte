@@ -23,7 +23,7 @@
         "group/trigger relative flex h-12 cursor-pointer items-center text-left text-body-compact-01 text-text-primary disabled:cursor-not-allowed disabled:text-text-disabled",
         variant === "inline"
             ? "w-auto ps-2 pe-8 hover:bg-layer-hover-01 aria-expanded:hover:bg-transparent"
-            : "w-full border-b border-border-strong-01 bg-field-01 ps-4 pe-12 hover:bg-field-hover-01 disabled:border-transparent aria-expanded:border-border-subtle-01 aria-expanded:hover:bg-field-01 in-dialog:border-border-strong-02 in-dialog:bg-field-02 in-dialog:hover:bg-field-hover-02 in-dialog:aria-expanded:border-border-subtle-02",
+            : "w-full border-b border-border-strong-01 bg-field-01 ps-4 pe-12 hover:bg-field-hover-01 disabled:border-transparent aria-expanded:border-border-subtle-01 aria-expanded:hover:bg-field-01 in-dialog:border-border-strong-02 in-dialog:bg-field-02 in-dialog:hover:bg-field-hover-02 in-dialog:aria-expanded:border-border-subtle-02 in-layer-02:border-border-strong-03 in-layer-02:bg-field-03 in-layer-02:hover:bg-field-hover-03 in-layer-02:aria-expanded:border-border-subtle-02",
         className,
     )}
     {...restProps}

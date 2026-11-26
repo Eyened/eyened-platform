@@ -19,7 +19,7 @@
     bind:this={ref}
     data-slot="textarea"
     class={cn(
-        "block min-h-10 w-full min-w-40 resize-y border-0 border-b border-border-strong-01 bg-field-01 px-4 pt-2.75 pb-2 text-body-01 text-text-primary placeholder:text-text-placeholder read-only:border-border-subtle-01 read-only:bg-transparent disabled:cursor-not-allowed disabled:resize-none disabled:border-transparent disabled:text-text-disabled in-dialog:border-border-strong-02 in-dialog:bg-field-02",
+        "block min-h-10 w-full min-w-40 resize-y border-0 border-b border-border-strong-01 bg-field-01 px-4 pt-2.75 pb-2 text-body-01 text-text-primary placeholder:text-text-placeholder read-only:border-border-subtle-01 read-only:bg-transparent disabled:cursor-not-allowed disabled:resize-none disabled:border-transparent disabled:text-text-disabled in-dialog:border-border-strong-02 in-dialog:bg-field-02 in-layer-02:border-border-strong-03 in-layer-02:bg-field-03",
         className,
     )}
     bind:value

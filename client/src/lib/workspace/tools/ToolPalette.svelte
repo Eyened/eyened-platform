@@ -19,6 +19,7 @@ On /view the All tools button ends the toolbar and switches Browse and All tools
         GAP_PX,
         paletteLayout,
         paletteSections,
+        type Section,
         SLOT_PX,
     } from "./paletteLayout";
     import {
@@ -51,14 +52,19 @@ On /view the All tools button ends the toolbar and switches Browse and All tools
     const sections = $derived(
         paletteSections(workspace.toolMode, workspace.hiddenTools),
     );
-    // The Magnifier toggle and the All tools button keep their own slots, so the tools get the rest.
-    const ownSlots = $derived(modeToggle ? 2 : 1);
+    const toolSections = $derived(
+        sections.filter(
+            (s): s is Section & { group: ToolGroup } => s.group !== "More",
+        ),
+    );
+    const hasMore = $derived(toolSections.length < sections.length);
+    // The Magnifier and the All tools button keep their own slots, so the tools get the rest. The button joins ⋯'s group, so it needs no gap there.
+    const ownPx = $derived(
+        SLOT_PX + GAP_PX + (modeToggle ? SLOT_PX + (hasMore ? 0 : GAP_PX) : 0),
+    );
     const flat = $derived(
         orientation === "horizontal" ||
-            paletteLayout(
-                available - ownSlots * (SLOT_PX + GAP_PX),
-                sections,
-            ) === "flat",
+            paletteLayout(available - ownPx, sections) === "flat",
     );
     // A tool the task hides is in neither the rail nor ⋯.
     const leftOut = $derived(
@@ -86,8 +92,7 @@ On /view the All tools button ends the toolbar and switches Browse and All tools
 
     /** One Tab stop; arrow keys move between slots in markup order. */
     const stops = $derived([
-        ...sections.flatMap((s) => {
-            if (s.group === "More") return ["more"];
+        ...toolSections.flatMap((s) => {
             const m = modal(s.tools);
             const slots =
                 !flat && m.length > 1
@@ -96,6 +101,7 @@ On /view the All tools button ends the toolbar and switches Browse and All tools
             return [...slots, ...actions(s.tools).map((t) => t.id)];
         }),
         "magnifier",
+        ...(hasMore ? ["more"] : []),
         ...(modeToggle ? ["mode"] : []),
     ]);
     let current = $state("");
@@ -196,45 +202,9 @@ On /view the All tools button ends the toolbar and switches Browse and All tools
     {onkeydown}
     {onfocusin}
 >
-    {#each sections as section (section.group)}
+    {#each toolSections as section (section.group)}
         <div class={orientation === "vertical" ? "flex flex-col" : "flex"}>
-            {#if section.group === "More"}
-                <OverflowMenu
-                    label={armedOut
-                        ? `${armedOut.name} (More tools)`
-                        : "More tools"}
-                    side={orientation === "vertical" ? "end" : "bottom"}
-                    active={armedOut !== null}
-                    stop="more"
-                    tabindex={tab("more")}
-                >
-                    {#snippet icon()}
-                        {#if armedOut}
-                            <armedOut.icon />
-                            <span class="flyout-mark" aria-hidden="true"></span>
-                        {:else}
-                            <OverflowMenuHorizontal />
-                        {/if}
-                    {/snippet}
-                    {#snippet children(close)}
-                        {#each GROUPS as group (group)}
-                            {@const tools = leftOut.filter(
-                                (t) => t.group === group,
-                            )}
-                            {#if tools.length}
-                                <p
-                                    class="px-4 pt-2 text-label-01 text-text-secondary"
-                                >
-                                    {group}
-                                </p>
-                                {#each tools as tool (tool.id)}
-                                    {@render menuRow(tool, close)}
-                                {/each}
-                            {/if}
-                        {/each}
-                    {/snippet}
-                </OverflowMenu>
-            {:else if !flat && modal(section.tools).length > 1}
+            {#if !flat && modal(section.tools).length > 1}
                 {@const tools = modal(section.tools)}
                 {@const group = section.group}
                 <ToolSlot
@@ -274,20 +244,62 @@ On /view the All tools button ends the toolbar and switches Browse and All tools
     >
         <WatsonHealthMagnify />
     </IconButton>
-    {#if modeToggle}
-        <!-- ASSUMPTION: the last stop, after the Magnifier, as "last stop of the toolbar" says. -->
-        <!-- A disclosure button, not a toggle: no pressed look, so it never reads as an armed tool. -->
-        <IconButton
-            label="All tools"
-            side={tooltipSide}
-            aria-expanded={workspace.toolMode === "all"}
-            data-stop="mode"
-            tabindex={tab("mode")}
-            onclick={toggleMode}
-        >
-            {#if workspace.toolMode === "all"}<ChevronUp />{:else}<ChevronDown
-                />{/if}
-        </IconButton>
+    <!-- ⋯ and the All tools button are one group at the end, the button last. -->
+    {#if hasMore || modeToggle}
+        <div class={orientation === "vertical" ? "flex flex-col" : "flex"}>
+            {#if hasMore}
+                <OverflowMenu
+                    label={armedOut
+                        ? `${armedOut.name} (More tools)`
+                        : "More tools"}
+                    side={orientation === "vertical" ? "end" : "bottom"}
+                    active={armedOut !== null}
+                    stop="more"
+                    tabindex={tab("more")}
+                >
+                    {#snippet icon()}
+                        {#if armedOut}
+                            <armedOut.icon />
+                            <span class="flyout-mark" aria-hidden="true"></span>
+                        {:else}
+                            <OverflowMenuHorizontal />
+                        {/if}
+                    {/snippet}
+                    {#snippet children(close)}
+                        {#each GROUPS as group (group)}
+                            {@const tools = leftOut.filter(
+                                (t) => t.group === group,
+                            )}
+                            {#if tools.length}
+                                <p
+                                    class="px-4 pt-2 text-label-01 text-text-secondary"
+                                >
+                                    {group}
+                                </p>
+                                {#each tools as tool (tool.id)}
+                                    {@render menuRow(tool, close)}
+                                {/each}
+                            {/if}
+                        {/each}
+                    {/snippet}
+                </OverflowMenu>
+            {/if}
+            {#if modeToggle}
+                <!-- ASSUMPTION: the last stop, after the Magnifier, as "last stop of the toolbar" says. -->
+                <!-- A disclosure button, not a toggle: no pressed look, so it never reads as an armed tool. -->
+                <IconButton
+                    label="All tools"
+                    side={tooltipSide}
+                    aria-expanded={workspace.toolMode === "all"}
+                    data-stop="mode"
+                    tabindex={tab("mode")}
+                    onclick={toggleMode}
+                >
+                    {#if workspace.toolMode === "all"}<ChevronUp
+                        />{:else}<ChevronDown />{/if}
+                </IconButton>
+            {/if}
+        </div>
     {/if}
 </div>
 

@@ -54,7 +54,7 @@
             focused = null;
     }}
     class={cn(
-        "flex border border-border-strong-01 in-dialog:border-border-strong-02",
+        "flex border border-border-strong-01 in-dialog:border-border-strong-02 in-layer-02:border-border-strong-03",
         className,
     )}
 >
