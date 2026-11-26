@@ -287,6 +287,33 @@ describe("WorkspaceFrame", () => {
         );
     });
 
+    it("closing the set notice returns focus to where it was before", async () => {
+        mockWidth({ md: true, lg: true, xlg: true });
+        renderFrame(workspaceWith(3), {
+            ...taskHeader(),
+            holderNotice: {
+                title: "Anna de Vries holds this set",
+                subtitle:
+                    "What you save here is saved as yours, inside this set.",
+                alert: false,
+            },
+        });
+        const overview = screen.getByRole("link", {
+            name: "Task overview, opens in a new tab",
+        });
+        overview.focus();
+        // Tab moves on to the notice's close button.
+        const notice = screen
+            .getByText("Anna de Vries holds this set")
+            .closest<HTMLElement>('[data-slot="alert"]')!;
+        const close = within(notice).getByRole("button", { name: "Close" });
+        close.focus();
+
+        await fireEvent.click(close);
+
+        expect(overview).toHaveFocus();
+    });
+
     it("crossing md closes an open overlay and moves focus to the button that now controls it", async () => {
         const width = mockWidth({ md: false, xlg: false });
         renderFrame(workspaceWith(3));

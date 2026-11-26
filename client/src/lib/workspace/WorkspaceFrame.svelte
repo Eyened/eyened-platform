@@ -116,6 +116,20 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     );
     // Closing the holder notice lasts for this set; the next set is a page load.
     let holderNoticeClosed = $state(false);
+    // Where focus was before it entered the holder notice; closing returns it there.
+    let holderNoticeReturn: HTMLElement | null = null;
+
+    function holderNoticeFocusIn(
+        e: FocusEvent & { currentTarget: HTMLElement },
+    ) {
+        const from = e.relatedTarget as HTMLElement | null;
+        if (!e.currentTarget.contains(from)) holderNoticeReturn = from;
+    }
+
+    function closeHolderNotice() {
+        if (holderNoticeReturn?.isConnected) holderNoticeReturn.focus();
+        holderNoticeClosed = true;
+    }
     let footerHeight = $state(0);
     // The header's words on the narrow panels button while something couldn't save.
     const saveFailure = $derived(
@@ -641,7 +655,8 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                         title={task.holderNotice.title}
                         subtitle={task.holderNotice.subtitle}
                         role={task.holderNotice.alert ? "alert" : "none"}
-                        onclose={() => (holderNoticeClosed = true)}
+                        onfocusin={holderNoticeFocusIn}
+                        onclose={closeHolderNotice}
                     />
                 {/if}
             </div>
