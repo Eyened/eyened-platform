@@ -28,7 +28,11 @@ export function adoptFormWindow(
 ): void {
     const { workspace, images, contexts, subTaskId } = deps;
     const memory = formWindow.adopt(win);
-    const show = (form: FormAnnotationGET, target: FormTarget | null) =>
+    const show = (
+        form: FormAnnotationGET,
+        target: FormTarget | null,
+        focus = false,
+    ) =>
         formWindow.showForm(win, form, {
             canEdit: deps.canEdit(form),
             viewerContext: target ? viewerFor(workspace, target) : undefined,
@@ -36,9 +40,15 @@ export function adoptFormWindow(
             from: "viewer",
             contexts,
             // Arriving after a page load must not take the keyboard from the viewer.
-            focus: false,
+            focus,
         });
-    const closed = () => formWindow.showView(win, { kind: "closed" }, contexts);
+    // Nothing to follow: a fresh window whose row Grade failed stays on the failure.
+    const closed = () =>
+        formWindow.showView(
+            win,
+            { kind: memory.failed ? "failed" : "closed" },
+            contexts,
+        );
 
     if (subTaskId === undefined) {
         const form =
@@ -91,7 +101,8 @@ export function adoptFormWindow(
                     subTaskId,
                 }),
             );
-            show(form, target);
+            // Grade was pressed in the window, so the form takes the keyboard.
+            show(form, target, true);
         } catch {
             ask(true);
         }

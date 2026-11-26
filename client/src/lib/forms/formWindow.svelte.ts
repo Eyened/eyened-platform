@@ -57,6 +57,8 @@ export interface ShowOptions {
 export interface WindowMemory {
     schemaId: number | null;
     formId: number | null;
+    /** It showed a row Grade's failure. */
+    failed: boolean;
 }
 
 /** The one form window, named so every click and page load finds the same one. */
@@ -106,6 +108,8 @@ class FormWindow {
             script.textContent = `(${formWindowHandback.toString()})(window);`;
             win.document.head.append(script);
         }
+        // Taken again after release(): the hand-back follows page loads again.
+        delete root.dataset.released;
         if (this.win !== win) {
             this.win = win;
             root.lang = document.documentElement.lang;
@@ -132,6 +136,7 @@ class FormWindow {
         return {
             schemaId: id(root.dataset.schemaId),
             formId: id(root.dataset.formId),
+            failed: root.dataset.failed === "1",
         };
     }
 
@@ -155,7 +160,11 @@ class FormWindow {
         this.formId = form.id;
         this.imageIds = opts.imageIds;
         this.label = formLabel(form);
-        if (opts.focus !== false) win.focus();
+        if (opts.focus !== false) {
+            win.focus();
+            // Also when the window didn't report focus as the view changed.
+            win.document.querySelector<HTMLElement>("h1")?.focus();
+        }
     }
 
     /** Replaces what the window shows; focus, if it was in the window, goes to the new view's heading. */
@@ -181,6 +190,8 @@ class FormWindow {
             context: contexts,
         });
         doc.documentElement.dataset.mounted = "1";
+        if (view.kind === "failed") doc.documentElement.dataset.failed = "1";
+        else delete doc.documentElement.dataset.failed;
         if (focused) doc.querySelector<HTMLElement>("h1")?.focus();
     }
 
@@ -219,8 +230,11 @@ class FormWindow {
 
     /** The viewer left without a page load: the window says so, and nothing stays open. */
     release(): void {
-        if (this.win && !this.win.closed)
+        if (this.win && !this.win.closed) {
             this.showView(this.win, { kind: "closed" }, new Map());
+            // So a later page load in this tab doesn't take the window back.
+            this.win.document.documentElement.dataset.released = "1";
+        }
         this.clear();
         pointArming.disarm();
     }
