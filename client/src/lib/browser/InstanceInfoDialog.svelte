@@ -27,7 +27,10 @@
     // Carbon CopyButton feedback: "Copied!" for 2 s.
     async function copy() {
         clearTimeout(copiedTimer);
-        copied = await copyToClipboard(instanceId);
+        const ok = await copyToClipboard(instanceId);
+        // A copy that finishes after the close shows nothing.
+        if (!open) return;
+        copied = ok;
         copiedTimer = setTimeout(() => (copied = false), 2000);
     }
 </script>

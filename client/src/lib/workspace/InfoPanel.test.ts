@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
+import { tick } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { copyToClipboard } from "$lib/utils/copyToClipboard";
 import InfoPanel from "./InfoPanel.svelte";
 import { instance, workspaceContext, workspaceWith } from "./testUtils";
 
@@ -94,6 +96,25 @@ describe("InfoPanel", () => {
             await vi.advanceTimersByTimeAsync(1600);
             expect(
                 screen.getByRole("button", { name: "Copied!" }),
+            ).toBeInTheDocument();
+        });
+
+        it("a copy that finishes after the close shows no Copied! on reopening", async () => {
+            let finish!: (ok: boolean) => void;
+            vi.mocked(copyToClipboard).mockImplementationOnce(
+                () => new Promise((resolve) => (finish = resolve)),
+            );
+            renderPanel();
+            await viewAll();
+            await fireEvent.click(
+                screen.getByRole("button", { name: "Copy public ID" }),
+            );
+            await close();
+            finish(true);
+            await tick();
+            await viewAll();
+            expect(
+                await screen.findByRole("button", { name: "Copy public ID" }),
             ).toBeInTheDocument();
         });
     });

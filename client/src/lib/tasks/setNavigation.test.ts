@@ -304,4 +304,13 @@ describe("Next open set", () => {
         expect(document.activeElement).toBe(prev);
         document.body.innerHTML = "";
     });
+
+    it("on the first set, focus meant for ◀ goes to ▶", () => {
+        document.body.innerHTML = `<button data-set-control="prev" disabled>Previous set</button><button data-set-control="next">Next set</button>`;
+        focusSetControl("prev");
+        expect(document.activeElement).toBe(
+            document.querySelector('[data-set-control="next"]'),
+        );
+        document.body.innerHTML = "";
+    });
 });

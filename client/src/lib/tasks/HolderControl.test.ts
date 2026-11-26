@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
-import { tick } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "$lib/api/client";
 import { fetchSubTaskByIndex, updateSubTask } from "$lib/data/api";
@@ -57,24 +56,6 @@ afterEach(() => {
     vi.mocked(fetchSubTaskByIndex).mockReset();
 });
 
-/** Claim answers 409 and the refetch shows `winner` holding the set. */
-function loseClaimTo(winner: { id: number; name: string }) {
-    vi.mocked(updateSubTask).mockRejectedValue(
-        new ApiError(409, "Conflict", {
-            code: "subtask_already_claimed",
-            message: "taken",
-        }),
-    );
-    vi.mocked(fetchSubTaskByIndex).mockImplementation(async () => {
-        storeSet({
-            creator_id: winner.id,
-            creator: winner,
-            can_edit_status_and_comments: false,
-        });
-        return {} as never;
-    });
-}
-
 describe("HolderControl", () => {
     it.each([
         [
@@ -98,7 +79,7 @@ describe("HolderControl", () => {
         expect(screen.queryByRole("button")).toBeNull();
     });
 
-    it("a Claim someone else won shows their name, says so first, and moves focus on", async () => {
+    it("a Claim someone else won names them as the holder, not as an alert, and moves focus on", async () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
         vi.mocked(updateSubTask).mockRejectedValue(
             new ApiError(409, "Conflict", {
@@ -123,47 +104,7 @@ describe("HolderControl", () => {
         expect(tag()).toHaveTextContent("Held by Anna de Vries");
         expect(screen.queryByRole("button")).toBeNull();
         expect(holder.notice).toEqual({
-            title: "Anna de Vries claimed this set first",
-            subtitle: "What you save here is saved as yours, inside this set.",
-            alert: true,
-        });
-    });
-
-    it("a lost Claim is announced once: by the notice, not by the tag", async () => {
-        vi.spyOn(console, "error").mockImplementation(() => {});
-        loseClaimTo(ANNA);
-        // The tag's live region as the winner's name lands in it.
-        let live: string | null | undefined;
-        const refetch = vi.mocked(fetchSubTaskByIndex).getMockImplementation()!;
-        vi.mocked(fetchSubTaskByIndex).mockImplementation(async (...args) => {
-            const set = await refetch(...args);
-            await tick();
-            live = tag()!.closest('[role="status"]')?.getAttribute("aria-live");
-            return set;
-        });
-        const { focusAfterRace } = setup();
-
-        await fireEvent.click(screen.getByRole("button", { name: "Claim" }));
-        await waitFor(() => expect(focusAfterRace).toHaveBeenCalled());
-
-        expect(live).toBe("off");
-    });
-
-    it('drops "claimed this set first" once the holder changes again', async () => {
-        vi.spyOn(console, "error").mockImplementation(() => {});
-        loseClaimTo(ANNA);
-        const { holder, focusAfterRace } = setup();
-        await fireEvent.click(screen.getByRole("button", { name: "Claim" }));
-        await waitFor(() => expect(focusAfterRace).toHaveBeenCalled());
-
-        storeSet({
-            creator_id: 9,
-            creator: { id: 9, name: "Ben Smit" },
-            can_edit_status_and_comments: false,
-        });
-
-        expect(holder.notice).toEqual({
-            title: "Ben Smit holds this set",
+            title: "Anna de Vries holds this set",
             subtitle: "What you save here is saved as yours, inside this set.",
             alert: false,
         });

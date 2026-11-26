@@ -22,15 +22,8 @@ export interface SetHolderDeps {
 export class SetHolder {
     busy = $state(false);
     failed: HolderAction | null = $state(null);
-    /** Who won my last lost Claim; the notice says so and is announced while they hold the set. */
-    private winner: number | null = $state(null);
-    private refetching = $state(false);
 
     constructor(private readonly deps: SetHolderDeps) {}
-
-    private get raceLost(): boolean {
-        return this.winner !== null && this.winner === this.holderId;
-    }
 
     private get set() {
         return subtasks.get(this.deps.subTaskId);
@@ -66,22 +59,15 @@ export class SetHolder {
         return "";
     }
 
-    /** The notice announces a lost Claim, so the tag's live region stays quiet from its refetch on. */
-    get quiet(): boolean {
-        return this.refetching || this.raceLost;
-    }
-
-    /** The canvas notice while someone else holds the set. */
+    /** The canvas notice while someone else holds the set; never an alert, as the tag announces a lost Claim. */
     get notice(): { title: string; subtitle: string; alert: boolean } | null {
         if (this.holderId === null || this.holderId === this.deps.userId)
             return null;
         const name = this.set?.creator?.name ?? "";
         return {
-            title: this.raceLost
-                ? `${name} claimed this set first`
-                : `${name} holds this set`,
+            title: `${name} holds this set`,
             subtitle: "What you save here is saved as yours, inside this set.",
-            alert: this.raceLost,
+            alert: false,
         };
     }
 
@@ -117,15 +103,11 @@ export class SetHolder {
 
     /** Refetch, so the tag, the lock and the next open set follow whoever won. */
     private async showWinner(): Promise<void> {
-        this.refetching = true;
         try {
             await fetchSubTaskByIndex(this.deps.taskId, this.deps.index);
-            this.winner = this.holderId;
         } catch {
             this.failed = "claim";
             return;
-        } finally {
-            this.refetching = false;
         }
         await tick();
         this.deps.focusAfterRace();

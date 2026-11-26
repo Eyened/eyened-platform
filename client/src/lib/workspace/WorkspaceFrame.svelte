@@ -673,7 +673,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                         />
                     {/if}
                 </div>
-                <!-- Outside the live region: on arrival it is just there; after a lost Claim it is an alert. -->
+                <!-- Outside the live region: it is just there; after a lost Claim the holder tag announces the change. -->
                 {#if task?.holderNotice && !holderNoticeClosed}
                     <InlineNotification
                         kind="warning"

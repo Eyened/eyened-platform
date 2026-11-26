@@ -5,19 +5,21 @@ import { writeHandoff, type SetControl } from "./setHandoff";
 
 export const STATUS_ID = "set-status";
 
-/** Focus on the header's ◀, ▶, primary button or Set status ▾; without a primary button, ▶; when ▶ is disabled (the last set), ◀. */
+/** Focus on the header's ◀, ▶, primary button or Set status ▾; without a primary button, ▶; when ▶ is disabled (the last set), ◀, and the other way round on the first set. */
 export function focusSetControl(control: SetControl | "status"): void {
     const find = (c: SetControl | "status") =>
         c === "status"
             ? document.getElementById(STATUS_ID)
             : document.querySelector<HTMLElement>(`[data-set-control="${c}"]`);
-    // After a lost Claim, or arriving by the primary move or ▶ on a set where that control is missing or disabled.
+    // After a lost Claim, or arriving by the primary move, ▶ or ◀ on a set where that control is missing or disabled.
     const order: (SetControl | "status")[] =
         control === "primary"
             ? ["primary", "next", "prev"]
             : control === "next"
               ? ["next", "prev"]
-              : [control];
+              : control === "prev"
+                ? ["prev", "next"]
+                : [control];
     order
         .map(find)
         .find((element) => element && !element.matches(":disabled"))
