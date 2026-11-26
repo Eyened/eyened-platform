@@ -55,11 +55,13 @@ It loads only while Info is shown; another patient's image reloads it with that 
     });
 
     // Another visit of the same patient: open its item too; the grader's other items keep their state.
+    // Also re-runs when a load lands, for a visit chosen while it loaded.
     $effect(() => {
         const id = String(currentStudyId);
+        const list = loaded;
         untrack(() => {
-            if (loaded?.identifier !== identifier || open.includes(id)) return;
-            if (loaded.result.studies.some((s) => String(s.id) === id))
+            if (list?.identifier !== identifier || open.includes(id)) return;
+            if (list.result.studies.some((s) => String(s.id) === id))
                 open = [...open, id];
         });
     });
