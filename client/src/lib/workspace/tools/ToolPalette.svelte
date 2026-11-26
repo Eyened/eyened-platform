@@ -37,6 +37,10 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
     } = $props();
 
     const workspace = getContext<Workspace>("workspace");
+    // In the rail, tooltips open beside the column so they never cover the next button.
+    const tooltipSide = $derived(
+        orientation === "vertical" ? "right" : undefined,
+    );
     const sections = $derived(
         paletteSections(workspace.toolMode, workspace.hiddenTools),
     );
@@ -125,6 +129,7 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
         label={tool.name}
         shortcut={tool.key ?? undefined}
         description={tool.does}
+        side={tooltipSide}
         aria-keyshortcuts={tool.key === "Esc"
             ? "Escape"
             : (tool.key ?? undefined)}
@@ -242,6 +247,7 @@ The tool palette: one toolbar, flat while every slot fits, else one slot per job
         label="Magnifier"
         shortcut="M"
         description="Shows the area under the pointer magnified in a floating panel"
+        side={tooltipSide}
         aria-keyshortcuts="M"
         aria-pressed={workspace.magnifier.on}
         class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"

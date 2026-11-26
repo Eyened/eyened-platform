@@ -464,11 +464,12 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     </IconButton>
 {/snippet}
 
-{#snippet panelSwitch()}
+{#snippet panelSwitch(side: "left" | "top")}
     {#each RIGHT_PANELS as item (item.id)}
         <!-- Selected: layer-selected plus a 3 px border-interactive bar on the panel side, like the side nav's current item. -->
         <IconButton
             label={panelName(item.id)}
+            {side}
             aria-pressed={rightShown && panel === item.id}
             aria-controls="{uid}-{item.id}"
             class="relative aria-pressed:bg-layer-selected-01 aria-pressed:before:absolute aria-pressed:before:inset-y-0 aria-pressed:before:start-0 aria-pressed:before:w-0.75 aria-pressed:before:bg-border-interactive"
@@ -512,6 +513,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 {#each LEFT_PANELS as panel (panel.id)}
                     <IconButton
                         label={panel.label}
+                        side="right"
                         aria-pressed={left === panel.id}
                         aria-controls="{uid}-{panel.id}"
                         onclick={(e) => toggleLeft(panel.id, e)}
@@ -657,7 +659,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     <div class="pager" inert={overlayOpen}><Pager /></div>
     <aside class="right" aria-label="Layers and {formsName.toLowerCase()}">
         {#if !narrow}
-            <div class="right-rail">{@render panelSwitch()}</div>
+            <div class="right-rail">{@render panelSwitch("left")}</div>
         {/if}
         <div
             id="{uid}-right-panels"
@@ -673,7 +675,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                     aria-label="Panels"
                     class="flex border-b border-border-subtle-01 px-2"
                 >
-                    {@render panelSwitch()}
+                    {@render panelSwitch("top")}
                 </div>
             {/if}
             <section
