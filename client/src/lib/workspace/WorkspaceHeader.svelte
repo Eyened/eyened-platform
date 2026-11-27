@@ -223,17 +223,14 @@
     {:else}
         <!-- Beside the set's move, or else beside the save state. -->
         {#if task?.status || saveShows}{@render divider()}{/if}
-        <!-- In a task, the task config sets the strip. -->
-        {#if task === null}
-            <IconButton
-                label="Thumbnail strip"
-                aria-pressed={workspace.strip}
-                class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
-                onclick={toggleStrip}
-            >
-                <CarouselHorizontal />
-            </IconButton>
-        {/if}
+        <IconButton
+            label="Thumbnail strip"
+            aria-pressed={workspace.strip}
+            class="aria-pressed:selected-look aria-pressed:hover:bg-layer-selected-hover-01"
+            onclick={toggleStrip}
+        >
+            <CarouselHorizontal />
+        </IconButton>
         <LayoutPopover />
     {/if}
 </header>

@@ -239,7 +239,7 @@ Arrow keys move focus only; Enter, Space or a click applies.
                 </button>
             {/each}
         </div>
-        <!-- ASSUMPTION: Carbon small toggles; a task sets the strip in its config, so there the strip is a plain label. -->
+        <!-- ASSUMPTION: Carbon small toggles; from md up the header has the strip toggle, so here the strip is a plain label. -->
         {#if stripToggle}
             <Field.Field orientation="horizontal" class="mt-3 min-h-6 px-2">
                 <Toggle

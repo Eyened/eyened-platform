@@ -92,7 +92,7 @@ export function writeRightWidth(px: number): void {
     }
 }
 
-/** Whether the thumbnail strip is on in /view; undefined when the user never chose. */
+/** The user's strip choice, shared by /view and tasks; undefined when the user never chose. */
 export function readStripOn(): boolean | undefined {
     try {
         const raw = localStorage.getItem(STRIP_KEY);
@@ -104,10 +104,10 @@ export function readStripOn(): boolean | undefined {
     }
 }
 
-/** The strip's start value: off on a narrow window, else the task's config or the /view choice. */
+/** The strip's start value: off on a narrow window, else the user's choice, else the task's config. */
 export function startStripOn(taskStrip?: boolean): boolean {
     if (!new MediaQuery("min-width: 42rem").current) return false;
-    return taskStrip ?? readStripOn() ?? true;
+    return readStripOn() ?? taskStrip ?? true;
 }
 
 export function writeStripOn(on: boolean): void {

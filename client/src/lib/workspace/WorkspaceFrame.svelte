@@ -486,7 +486,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     <LayoutPopover
         anchor={`[aria-controls="${uid}-left"]`}
         bind:open={layoutOpen}
-        stripToggle={task === null}
+        stripToggle
     />
 {/snippet}
 

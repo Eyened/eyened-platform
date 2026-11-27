@@ -604,14 +604,6 @@ describe("Header strip toggle and Layout", () => {
             screen.getByRole("switch", { name: "Crosshair tracking" }),
         ).toBeInTheDocument();
     });
-
-    it("isn't there in a task", () => {
-        mockWidth({ md: true, xlg: true });
-        renderFrame(workspaceWith(1), taskHeader());
-        expect(
-            screen.queryByRole("button", { name: "Thumbnail strip" }),
-        ).toBeNull();
-    });
 });
 
 describe("Layers", () => {

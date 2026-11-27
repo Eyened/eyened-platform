@@ -104,7 +104,7 @@ describe("LayoutPopover strip settings", () => {
         ).toBeNull();
     });
 
-    it("in a task, shows the settings under a plain Thumbnail strip label and remembers them", async () => {
+    it("without the strip switch, shows the settings under a plain Thumbnail strip label and remembers them", async () => {
         localStorage.clear();
         const ws = workspaceWith(3);
         const { container } = render(LayoutPopover, {

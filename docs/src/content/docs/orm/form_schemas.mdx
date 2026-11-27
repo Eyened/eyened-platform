@@ -188,7 +188,7 @@ TaskConfig is merged over client defaults (`client/src/lib/config/clientDefaults
 | `task_panel.enabled` | When `false`, hide all of the task items in the viewer header and in Grading (the sections below). Default `true`. Without them graders have no in-app prev/next or status controls and must navigate another way |
 | `task_panel.sections.*` | Independently show `title`, `nav`, `status`, `comments`, `overview`. Each defaults to `true`. Missing `task_panel` means all sections are shown. Hiding `nav` removes prev/next from the viewer |
 | `layout.hide` | Layers section names to hide: `"Segmentation"`, `"ETDRS"`, `"Registration"`, `"Measure"` (and `"Rendering"`, which removes the view bar and render-mode keys). A hidden section takes its tools with it: off the tool rail and ⋯ menu, and their keys do nothing. `"Segmentation"` also hides the en-face projection; `"Registration"` also hides Pointsets and Blend. Other names, such as the old `"Form"`, have no effect |
-| `layout.strip` | `false` hides the thumbnail strip above the viewports. Default `true` |
+| `layout.strip` | `false` starts the task with the thumbnail strip above the viewports hidden. Default `true`. Once a grader shows or hides the strip with its header button, that choice wins in every task and in /view (kept per browser) |
 
 Example task import row (see **[Importer — tasks](/eyened-platform/orm/importer)**):
 
