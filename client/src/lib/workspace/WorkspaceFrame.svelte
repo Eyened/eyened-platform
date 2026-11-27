@@ -213,6 +213,11 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
     ] as const;
     const panelName = (id: RightPanel) =>
         id === "layers" ? "Layers" : formsName;
+    /** A right panel's focus target: Layers with two tabs hides its heading, so its selected tab. */
+    const rightTitle = (id: RightPanel) =>
+        document.querySelector<HTMLElement>(
+            `#${uid}-${id} [role="tab"][aria-selected="true"]`,
+        ) ?? document.getElementById(`${uid}-${id}-title`);
     /** IconButton's tooltip trigger replaces any id, so buttons are found by what they control. */
     const byControls = (id: string) =>
         document.querySelector<HTMLElement>(`[aria-controls="${id}"]`);
@@ -251,13 +256,13 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         else setRight(true);
         await tick();
         // The pane's Retry; while the save still runs there is none, so the selected row's name.
-        // With no viewport on the image nothing is selected, so the Layers panel's heading.
+        // With no viewport on the image nothing is selected, so the Layers panel's selected tab or heading.
         (
             document.querySelector<HTMLElement>("[data-save-retry]") ??
             document.querySelector<HTMLElement>(
                 "[data-layers-list] [data-layer-row].selected button",
             ) ??
-            document.getElementById(`${uid}-layers-title`)
+            rightTitle("layers")
         )?.focus();
     }
     /** Comments, and the status in the narrow footer, live in Grading: show it first. */
@@ -311,8 +316,7 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
         overlay = overlay === next ? null : next;
         if (overlay === null) return;
         await tick();
-        if (next === "right")
-            document.getElementById(`${uid}-${panel}-title`)?.focus();
+        if (next === "right") rightTitle(panel)?.focus();
         else
             document
                 .getElementById(`${uid}-left`)
@@ -725,16 +729,10 @@ The right column shows one panel at a time, Layers or Grading (Forms without a t
                 aria-labelledby="{uid}-layers-title"
                 hidden={panel !== "layers"}
             >
-                <h2
-                    id="{uid}-layers-title"
-                    tabindex="-1"
-                    class="px-4 pt-3 pb-2 text-heading-compact-01 text-text-primary"
-                >
-                    Layers
-                </h2>
                 <LayersPanel
                     subtitle={layersSubtitle}
                     shown={rightShown && panel === "layers"}
+                    titleId="{uid}-layers-title"
                 />
             </section>
             <section

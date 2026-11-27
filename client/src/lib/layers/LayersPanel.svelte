@@ -1,6 +1,6 @@
 <!--
 @component
-The Layers panel body: Layers and Display tabs, the selected viewport's name, then the sections of the shown tab that apply to its image.
+The Layers panel: its heading, Layers and Display tabs, the selected viewport's name, then the sections of the shown tab that apply to its image.
 -->
 <script lang="ts">
     import { BUILTIN_VIEWER_FORM_SCHEMA_NAMES } from "$lib/config/builtinFormSchemas";
@@ -19,11 +19,14 @@ The Layers panel body: Layers and Display tabs, the selected viewport's name, th
     let {
         subtitle,
         shown,
+        titleId,
     }: {
         /** "Viewport n · title". */
         subtitle: string;
         /** True while the panel is on screen. */
         shown: boolean;
+        /** The heading's id, which names the panel's region. */
+        titleId: string;
     } = $props();
 
     const workspace = getContext<Workspace>("workspace");
@@ -64,9 +67,8 @@ The Layers panel body: Layers and Display tabs, the selected viewport's name, th
         display: sections.filter((id) => tabOf(id) === "display"),
     });
     // A task or an image with no view settings leaves only the Layers tab.
-    const current = $derived<Tab>(
-        bySection.display.length > 0 ? workspace.layersTab : "layers",
-    );
+    const hasDisplay = $derived(bySection.display.length > 0);
+    const current = $derived<Tab>(hasDisplay ? workspace.layersTab : "layers");
 
     // Kept on the workspace, not per viewport, so a section stays open when the selection moves.
     function toggle(id: LayerSectionId) {
@@ -89,16 +91,26 @@ The Layers panel body: Layers and Display tabs, the selected viewport's name, th
     {/if}
 {/snippet}
 
+<!-- With two tabs the tab list is the title, so the heading is for screen readers only. -->
+<h2
+    id={titleId}
+    tabindex="-1"
+    class={hasDisplay
+        ? "sr-only"
+        : "px-4 pt-3 pb-2 text-heading-compact-01 text-text-primary"}
+>
+    Layers
+</h2>
 <Tabs.Root
     bind:value={() => current, (v) => (workspace.layersTab = v as Tab)}
     class="flex min-h-0 flex-1 flex-col"
 >
-    <Tabs.List aria-label="Layers panel" class="px-4">
-        <Tabs.Trigger value="layers">Layers</Tabs.Trigger>
-        {#if bySection.display.length > 0}
+    {#if hasDisplay}
+        <Tabs.List aria-label="Layers panel" class="px-4">
+            <Tabs.Trigger value="layers">Layers</Tabs.Trigger>
             <Tabs.Trigger value="display">Display</Tabs.Trigger>
-        {/if}
-    </Tabs.List>
+        </Tabs.List>
+    {/if}
     <p class="px-4 pt-2 pb-2 text-helper-text-01 text-text-secondary">
         {subtitle}
     </p>

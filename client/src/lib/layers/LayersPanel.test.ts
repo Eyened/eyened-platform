@@ -82,7 +82,11 @@ function renderPanel(ws: Workspace, hide: string[] = []) {
         task: { task_definition: { config: { layout: { hide } } } },
     });
     return render(LayersPanel, {
-        props: { subtitle: "Viewport 1 · test", shown: true },
+        props: {
+            subtitle: "Viewport 1 · test",
+            shown: true,
+            titleId: "layers-title",
+        },
         context,
     });
 }
@@ -184,11 +188,6 @@ describe("LayersPanel", () => {
             ]),
         });
         renderPanel(ws);
-        expect(screen.getByRole("tab", { name: "Layers" })).toHaveAttribute(
-            "aria-selected",
-            "true",
-        );
-        expect(screen.queryByRole("tab", { name: "Display" })).toBeNull();
 
         ws.select(1);
         const display = await screen.findByRole("tab", { name: "Display" });
